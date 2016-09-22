@@ -4,8 +4,8 @@
 
 $mdtname = $ARGV[0];
 
-$mdtdir = "/usr/lpp/htx/mdt";
-$ecgdir = "/usr/lpp/htx/ecg";
+$mdtdir = $ENV{"HTXMDT"};
+$ecgdir = $ENV{"HTXECG"};
 
 if($mdtname eq "") {
 	chdir("$mdtdir");
@@ -36,27 +36,27 @@ if($mdtname eq "") {
 			next;
 		}
 		if($mdtname =~ /ecg/) {
-			$mdtfile = "/usr/lpp/htx/ecg/$mdtname";
+			$mdtfile = $ecgdir . "/$mdtname";
 		} else {
-			$mdtfile = "/usr/lpp/htx/mdt/$mdtname";
+			$mdtfile = $mdtdir . "/$mdtname";
 		}
 		last;
 	}
 } else {  
 	if($mdtname =~ /ecg/) {
-		$mdtfile = "/usr/lpp/htx/ecg/$mdtname";
+		$mdtfile = $ecgdir . "/$mdtname";
 	} else {
-		$mdtfile = "/usr/lpp/htx/mdt/$mdtname";
+		$mdtfile = $mdtdir . "/$mdtname";
 	}
 }
 
 #read in the net.mdt file
 if($mdtname =~ /ecg/) {
-	$netfile = "/usr/lpp/htx/ecg/net.ecg";
-	$tmpfile = "/usr/lpp/htx/ecg/net.tmp";
+	$netfile = $ecgdir . "/net.ecg";
+	$tmpfile = $ecgdir . "/net.tmp";
 } else {
-	$netfile = "/usr/lpp/htx/mdt/net.mdt";
-	$tmpfile = "/usr/lpp/htx/mdt/net.tmp";
+	$netfile = $mdtdir . "/net.mdt";
+	$tmpfile = $mdtdir . "/net.tmp";
 }
 
 unless (open (MDT_NET,"$netfile")) {
