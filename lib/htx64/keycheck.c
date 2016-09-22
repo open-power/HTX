@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,14 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+/* @(#)12	1.7  src/htx/usr/lpp/htx/lib/htx64/keycheck.c, htx_license, htxubuntu 7/15/16 07:06:20 */
+
 #include <expirekey.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -171,8 +174,8 @@ int stx_license()
   char *filename; /* ="/usr/lpp/htx/etc/scripts/htxkey";*/
   char buffer[35];
   char temp[15],temp1[35];
-  char version[5];
-  char host_name[2];
+  char version[6];
+  char host_name[3];
   int i,j;
   char release[7];
   char *test,*p;
@@ -357,7 +360,7 @@ int stx_license()
 	read_rc = read(fd,buf,KEYLEN);
 	if(read_rc != KEYLEN)
 	{
-		printf("read_rc = %d\n",read_rc);
+		printf("read_rc = %zd\n",read_rc);
 		printf("\n Did not read the key file properly\n");
 		exit(-3);
 	}
@@ -727,7 +730,7 @@ int  DecodeKeyData(unsigned char *key_data, char *version,
   int rc = GOOD;
   int i, j, k;
   char *a_char;
-  char a_num[3];
+  char a_num[4];
   int digit;
   char digit_char[3];
   char exp_date_key[7];
@@ -736,7 +739,7 @@ int  DecodeKeyData(unsigned char *key_data, char *version,
   char email_key[12];
   char vers_key[5];
   char numr_key[2];
-  char release_key[36];
+  char release_key[37];
   char temp[12];
   char emlen_key[2];
 
@@ -1925,6 +1928,7 @@ int DecodeKey(unsigned char* key)
 		count += 3;
 
       }
+	return 0;
 	/*printf("In DecodeKey, Releases = %s\n",Releases);*/
 }
 

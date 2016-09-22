@@ -17,6 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+static char sccsid[] = "@(#)85        1.15.1.19  src/htx/usr/lpp/htx/lib/htxsyscfg64/htxsyscfg.c, htx_libhtxsyscfg64, htxfedora 5/19/15 01:28:11";
 
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -39,17 +40,31 @@ int array_index;
 int 				syscfg_base_pg_idx;
 unsigned int 		syscfg_base_page_size;
 
+/* readind env variables to avoid hardcodings of paths */
+
 /* to read the entries for core exclusion from /tmp/syscfg_excluded_cores.txt file */
 int read_core_exclusion_array(void)
 {
-    int i,j,k,l,flag;
+	int i,j,k,l,flag,str_len;
 	i = j = k = l = flag = 0;
 	char buffer[20];
 	char * pch;
 	FILE *myFile;
+	char fname[100];
+	char tmp_path[64];
+	char *tmp_path_temp;
 
-    myFile = fopen("/tmp/syscfg_excluded_cores.txt", "r");
-    //read file into array
+	tmp_path_temp = getenv("HTX_LOG_DIR");
+	if (tmp_path_temp == NULL){
+		strcpy(tmp_path, "/tmp/");
+    }
+	else{
+		strcpy(tmp_path,getenv("HTX_LOG_DIR"));
+	}
+
+	sprintf(fname,"%ssyscfg_excluded_cores.txt",tmp_path);
+	myFile = fopen(fname, "r");
+	//read file into array
 	for(k=0; k<MAX_CORES_PER_CHIP; k++){
 		for(l=0;l<3;l++){
 			numberArray_copy[k][l] = -2;
@@ -240,7 +255,7 @@ int init_rwlocks(void){
                 sprintf(msg,"global_ptr->syscfg.rw_lock_init() failed with rc=%d\n", lockinit4);
                 hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
         }
-        else if((lockinit1 == EAGAIN) || (lockinit1 == ENOMEM)){
+        else if ((lockinit1 == EAGAIN) || (lockinit1 == ENOMEM)){
             usleep(10);
 			lockinit1_1=pthread_rwlock_init(&(global_ptr->syscfg.rw),&rwlattr);
             if(lockinit1_1 !=0){
@@ -961,6 +976,27 @@ int get_memory_pools(void) {
 	FILE *fp=0;
 	char command[200],fname[100];
 	int i,j,rc,cpu,lcpu,huge_page_size,tot_pools=0;
+
+	char tmp_path[64],scripts_path[64];
+	char *tmp_path_temp;
+
+	tmp_path_temp = getenv("HTX_LOG_DIR");
+	if (tmp_path_temp == NULL){
+		strcpy(tmp_path, "/tmp/");
+    }
+	else{
+		strcpy(tmp_path,getenv("HTX_LOG_DIR"));
+	}
+
+	tmp_path_temp = getenv("HTXSCRIPTS");
+	if (tmp_path_temp == NULL){
+		strcpy(scripts_path, "/usr/lpp/htx/etc/scripts/");
+    }
+	else{
+		strcpy(scripts_path,getenv("HTXSCRIPTS"));
+	}
+
+
 	 t =&(global_ptr->global_memory.mem_pools)[0];
 
 
@@ -971,10 +1007,10 @@ int get_memory_pools(void) {
         	t[i].page_info_per_mempool[j].supported = FALSE;
     	}
 	}
-	sprintf(fname,"/tmp/mem_pool_details");
-	sprintf(command,"/usr/lpp/htx/etc/scripts/get_mem_pool_details.sh > %s",fname);
+	sprintf(fname,"%smem_pool_details",tmp_path);
+	sprintf(command,"%s/get_mem_pool_details.sh > %s",scripts_path,fname);
 	if ( (rc = system(command)) == -1 ) {
-		printf("/usr/lpp/htx/etc/scripts/get_mem_pool_details.sh failed\n");
+		printf("%sget_mem_pool_details.sh failed\n",scripts_path);
 		return -4;
 	}
 	if ((fp=fopen(fname,"r"))==NULL){
@@ -1058,7 +1094,7 @@ int  get_page_details(void){
         t[i].supported = FALSE;
     }
     fp=popen("getconf PAGESIZE", "r");
-    if (fp == NULL || fp == -1 ) {
+    if (fp == NULL || fp == (void *)-1 ) {
         pclose(fp);
         return -3;
     }
@@ -1079,7 +1115,7 @@ int  get_page_details(void){
 	t[syscfg_base_pg_idx].supported = TRUE;
 
 	fp=popen("cat /proc/meminfo | grep MemTotal | awk '{print $2}' ","r");
-	if (fp == NULL || fp == -1 ) {	
+	if (fp == NULL || fp ==  (void *)-1 ) {	
 		pclose(fp);
 		return -3;
 	} 
@@ -1094,7 +1130,7 @@ int  get_page_details(void){
 	pclose(fp);
 		
 	fp=popen("cat /proc/meminfo | grep MemAvailable | awk '{print $2}' ","r");
-	if (fp == NULL || fp == -1 ) {	
+	if (fp == NULL || fp ==  (void *)-1 ) {	
 		pclose(fp);
 		return -3;
 	} 
@@ -1103,7 +1139,7 @@ int  get_page_details(void){
 	{	
 		pclose(fp);
 		fp=popen("cat /proc/meminfo | grep MemFree  | awk '{print $2}' ","r");
-		    if (fp == NULL || fp == -1 ) {
+		    if (fp == NULL || fp == (void *)-1 ) {
 		        pclose(fp);
 		        return -3;
 		    }
@@ -1117,7 +1153,7 @@ int  get_page_details(void){
 	t[syscfg_base_pg_idx].free_pages = ((t[syscfg_base_pg_idx].free_pages * 1024) / t[syscfg_base_pg_idx].page_size);
 	pclose(fp);
 	fp=popen("cat /proc/meminfo | grep Hugepagesize | awk '{print $2}' ","r");
-	if (fp == NULL || fp == -1 ) {
+	if (fp == NULL || fp == (void *)-1 ) {
 		pclose(fp);
 		return -3;
 	}
@@ -1132,7 +1168,7 @@ int  get_page_details(void){
 		t[PAGE_INDEX_16M].page_size = 16777216;
 		t[PAGE_INDEX_16M].supported = TRUE;
 		fp=popen("cat /proc/meminfo | grep HugePages_Total | awk '{print $2}' ","r");
-		if (fp == NULL || fp == -1 ) {
+		if (fp == NULL || fp == (void *)-1 ) {
 			pclose(fp);
 			return -3;
 		}
@@ -1142,7 +1178,7 @@ int  get_page_details(void){
 		}	
 		pclose(fp);
 		fp=popen("cat /proc/meminfo | grep HugePages_Free | awk '{print $2}' ","r");
-		if (fp == NULL || fp == -1 ) {
+		if (fp == NULL || fp == (void *)-1 ) {
 			pclose(fp);
 			return -3;
 		}
@@ -1374,7 +1410,7 @@ int L1cache_update(void)
         r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER6@0/d-cache-size |  cut -c 15-19 ");
     else if (Pvr == 0x3f )
         r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER7@0/d-cache-size |  cut -c 15-19 ");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/d-cache-size |  cut -c 15-19 ");
 
     t->L1_dsize = atoi(dest);
@@ -1384,7 +1420,7 @@ int L1cache_update(void)
         r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER6@0/i-cache-size |  cut -c 15-19");
     else if (Pvr == 0x3f )
         r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER7@0/i-cache-size |  cut -c 15-19");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/i-cache-size |  cut -c 15-19");
 
     t->L1_isize = atoi(dest);
@@ -1394,7 +1430,7 @@ int L1cache_update(void)
         r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER6@0/d-cache-line-size |  cut -c 17-19 ");
     else if (Pvr == 0x3f )
         r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER7@0/d-cache-line-size |  cut -c 17-19 ");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/d-cache-line-size |  cut -c 17-19 ");
 
     t->L1_dline = atoi(dest);
@@ -1404,7 +1440,7 @@ int L1cache_update(void)
         r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER6@0/i-cache-line-size |  cut -c 17-19");
     else if(Pvr == 0x3f )
         r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/POWER7@0/i-cache-line-size |  cut -c 17-19");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/i-cache-line-size |  cut -c 17-19");
 
     t->L1_iline = atoi(dest);
@@ -1414,7 +1450,7 @@ int L1cache_update(void)
         r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER6@0/d-cache-size |  cut -c 15-19 ");
     else if (Pvr == 0x3f )
         r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-size |  cut -c 15-19 ");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-size |  cut -c 15-19 ");
 
     t->L1_dsize = atoi(dest);
@@ -1424,7 +1460,7 @@ int L1cache_update(void)
         r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER6@0/i-cache-size |  cut -c 15-19");
     else if (Pvr == 0x3f )
         r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-size |  cut -c 15-19");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-size |  cut -c 15-19");
 
     t->L1_isize = atoi(dest);
@@ -1434,7 +1470,7 @@ int L1cache_update(void)
         r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER6@0/d-cache-line-size |  cut -c 17-19 ");
     else if (Pvr == 0x3f )
         r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-line-size |  cut -c 17-19 ");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-line-size |  cut -c 17-19 ");
 
     t->L1_dline = atoi(dest);
@@ -1444,7 +1480,7 @@ int L1cache_update(void)
         r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER6@0/i-cache-line-size |  cut -c 17-19");
     else if(Pvr == 0x3f )
         r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-line-size |  cut -c 17-19");
-    else if (Pvr == 0x4a )
+    else if (Pvr == 0x4a || Pvr == 0x4b )
         r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-line-size |  cut -c 17-19");
 
     t->L1_iline = atoi(dest);
@@ -1776,9 +1812,21 @@ int get_env_details_update(void)
 {
     unsigned int i = 1;
     int temp,r1;
-    char dest[100];
+    char dest[100],fname[100];
 	FILE* fp1;
 	htxsyscfg_env_details_t* e;
+
+	char htx_home_path[64];
+	char *tmp_path_temp;
+
+	tmp_path_temp = getenv("HTX_HOME_DIR");
+	if (tmp_path_temp == NULL){
+		strcpy(htx_home_path, "/usr/lpp/htx/");
+    }
+	else{
+		strcpy(htx_home_path,getenv("HTX_HOME_DIR"));
+	}
+
     e =&(global_ptr->global_lpar.env_details);
 	/* initialize as PVM guest*/
 	e->virt_flag = PVM_GUEST; 
@@ -1806,7 +1854,8 @@ int get_env_details_update(void)
     temp = atoi(dest);
     if (temp > 0)
     {
-        if((fp1=fopen("/usr/lpp/htx/affinity_yes","r")) == NULL)
+        sprintf(fname, "%saffinity_yes", htx_home_path);
+        if((fp1=fopen(fname,"r")) == NULL)
         {
             e->virt_flag =  KVM_GUEST;
             strcpy(e->virt_typ,"KVM_GUEST");

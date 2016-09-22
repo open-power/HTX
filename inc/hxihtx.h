@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
+
 /* @(#)46  1.15.4.8  src/htx/usr/lpp/htx/inc/hxihtx.h, htx_libhtx, htxubuntu 6/1/15 07:43:26 */
 /* Component = htx_libhtx_lx */
 
@@ -84,6 +85,7 @@ enum sev_code {
 
 #define SYS_FORMAT_ROOM 240       /* room in msg_text for system info     */
 #define MAX_TEXT_MSG (MSG_TEXT_SIZE - SYS_FORMAT_ROOM)  /* for HE use     */
+#define ENV_VAR_SIZE 256 /* HTX_LOG_DIR env var size */
 
 struct htx_msg_data{
 	char			msg_text[MSG_TEXT_SIZE];
@@ -149,6 +151,8 @@ struct htx_data {
 	    unsigned int passno;
 	    int      status;
 	    unsigned int stanza;
+	char htx_exer_log_dir[ENV_VAR_SIZE];
+	char htx_log_dir[ENV_VAR_SIZE];
         int    rsvd3;
         int    rsvd4;
         int    rsvd5;

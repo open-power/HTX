@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
+
+/* @(#)68     1.17.3.25  src/htx/usr/lpp/htx/lib/misc64/misc.c, libmisc, htxfedora 7/30/15 06:09:11 */
 
 #include <pthread.h>
 #include <sched.h>
@@ -569,11 +571,11 @@ int print_sysfs_cpu(int pcpu,size_t size,cpu_set_t* mask){
 		
 		ptr = (long long*)mask;
 		for(i=0;i<iter;i++){
-			char loc_msg[8];
-		/*	sprintf(loc_msg,"%llx\t",*ptr);*/
-			strcpy(loc_msg,ptr);
-			strcat(msg,loc_msg);
-			ptr++;
+                        char loc_msg[9];
+                        snprintf(loc_msg,9,"%zx\t",*ptr);
+                        strncat(msg,loc_msg,9);
+                        ptr++;
+
 		}
 			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
 	} else {
@@ -583,13 +585,7 @@ int print_sysfs_cpu(int pcpu,size_t size,cpu_set_t* mask){
 		{
 			fscanf(fp1, "%s", g_online);
 			fclose(fp1);
-            if((misc_htx_data != NULL)  && ((strcmp (misc_htx_data->run_type, "OTH") == 0))) {
 				sprintf(msg,"sysfs contents: /sys/devices/system/cpu/online value is %s \n And content of cpu_set_t mask is:", g_online); 
-			}
-			else if(misc_htx_data != NULL){
-				sprintf(msg,"sysfs contents: /sys/devices/system/cpu/online value is %s \n And content of cpu_set_t mask is:", g_online);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-			}
 		} else {
 				sprintf(msg,"[%d][%s]Failed to open sysfs fp1=%p with errno=%d\n",__LINE__,__FUNCTION__,fp1,errno);
 				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
@@ -598,15 +594,13 @@ int print_sysfs_cpu(int pcpu,size_t size,cpu_set_t* mask){
 		
 		ptr = (long long*)mask;
 		for(i=0;i<iter;i++){
-			char loc_msg[8];
-/*			sprintf(loc_msg,"%llx\t",*ptr);*/
-			strcpy(loc_msg,ptr);
-			strcat(msg,loc_msg);
+			char loc_msg[9];
+			snprintf(loc_msg,9,"%zx\t",*ptr);
+			strncat(msg,loc_msg,9);
 			ptr++;
 		}
-		if(misc_htx_data != NULL){
 			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
+
 	}
     return rc;
 }
