@@ -25,6 +25,9 @@
 #include "miscomp_debug.h"
 #include <ucontext.h>
 #include <semaphore.h>
+
+/* htx64 library */
+extern struct tm * htx_localtime_r (const time_t *timep, struct tm *result);
 /* syscfg prototype */
 extern void get_env_details(htxsyscfg_env_details_t* e);
 /* misc library call */
@@ -92,6 +95,7 @@ struct dev_info {
     char rule_file_name[200];
 } dinfo;
 FILE *hlog = NULL;
+char dumpfile[128];
 
 /*
  * core_num is a number encoded in device name. For e.g. if device name is /dev/fpu5, core_num = 5.
@@ -196,6 +200,9 @@ extern struct instruction_masks vmx_p9_instructions_array[];
 extern struct instruction_masks vsx_p9_instructions_array[];
 extern struct instruction_masks bfp_p9_instructions_array[];
 extern struct instruction_masks dfp_p9_instructions_array[];
+extern struct instruction_masks cpu_p9_dd2_instructions_array[];
+extern struct instruction_masks vmx_p9_dd2_instructions_array[];
+extern struct instruction_masks bfp_p9_dd2_instructions_array[];
 
 db_fptr fp_value_gen_fptr_array[VSR_OP_TYPES][BFP_DATA_BIAS_TYPES] = {
 	{&sp_z,       &sp_z,          &sp_z,          &sp_z,       &sp_z,         &sp_z,          &sp_z,       &sp_z,          &sp_z,       &sp_z},
@@ -232,7 +239,7 @@ uint32 sizes_for_types[VSR_OP_TYPES] = {0, 8, 8, 16, 16, 16, 8, 8, 16, 16, 16, 1
 		/* only gpr3 and the xer are altered by this function */
 	#endif
 #else
-	#define read_tb(var) asm("mfspr %0, 268":"=r"(var));
+	#define read_tb(var) asm volatile ("mfspr %0, 268":"=r"(var));
 	uint64 exclude_cat_mask = 0;
 #endif
 
@@ -242,7 +249,6 @@ main(int argc, char *argv[])
 {
 	int rc, rc1, i, j;
 	uint32 prev_sao_val = 0;
-	char tb_fname[128];
 
 #ifdef __HTX_LINUX__
 	/* Register common signal handler for hardware generated signals */
@@ -250,6 +256,7 @@ main(int argc, char *argv[])
 #ifdef AWAN
 	sigvector.sa_flags = SA_SIGINFO;
 #endif
+
 	sigvector.sa_sigaction = SIGHW_handler;
 	sigaction(SIGSEGV, &sigvector, (struct sigaction *) NULL);
 	sigaction(SIGILL, &sigvector, (struct sigaction *) NULL);
@@ -332,6 +339,23 @@ main(int argc, char *argv[])
 
 	core_num = dev_num;		/* For fpu/cpu exerciser dev_num will indicate core number. */
 	hxfupdate(START, &hd);
+
+	rc = strlen(hd.htx_log_dir);
+	if ( rc == 0 ) {
+		strcpy(hd.htx_log_dir, "/tmp");
+		sprintf(msg, "htx_log_dir not initialized. Setting it to /tmp");
+		hxfmsg(&hd, 0, HTX_HE_INFO, msg);
+	}
+
+	rc = strlen(hd.htx_exer_log_dir);
+	if ( rc == 0 ) {
+		sprintf(msg, "mkdir -p /tmp/htx/%s/%s", hd.HE_name, &(hd.sdev_id[5]));
+		system(msg);
+		sprintf(hd.htx_exer_log_dir, "/tmp/htx/hxefpu64/%s", &(hd.sdev_id[5]));
+		sprintf(msg, "htx_exer_log_dir not initialized. Setting it to %s", hd.htx_exer_log_dir);
+		hxfmsg(&hd, 0, HTX_HE_INFO, msg);
+	}
+
    	sprintf(msg, "Exerciser started.\n%s %s %s %s\n", argv[0], argv[1], argv[2], argv[3]);
 #ifndef AWAN
 	hxfmsg(&hd, 0, HTX_HE_INFO, msg);
@@ -360,6 +384,9 @@ main(int argc, char *argv[])
 
 #ifdef __HTX_LINUX__
 	num_cpus = get_nprocs();	/* Record number of cpus online at start. */
+    #if !defined (__BML__)
+	/* userspace should not do SCOMs, and in future, that interface will not be supported in secure boot scenario. */
+    /* https://github.com/open-power/HTX/issues/54 */
 	/* check Crypto disabled */
 	/* Bit 32 = 1 = tp_nx_allow_crypto_dc_int (NX Crypto Allowed) 
 	 * Bit 33 = 0 = tp_ex_fuse_vmx_crypto_dis_dc_int (VMX Crypto NOT Disabled) or ie VMX Crypto Enabled
@@ -368,43 +395,36 @@ main(int argc, char *argv[])
 	#define NX_CRYPTO_SCOM_BIT          0x0000000100000000ULL /* NX Crypto Enabled */
 	#define VMX_CRYPTO_SCOM_BIT         0x0000000200000000ULL /* VMX Crypto Disabled */
 
-	uint64 scom_val = 0, scom_addr = SCOM_REG_ADDR;
-	uint32 chip_id = 0xffffffff;
+	uint64 hwcap_val = getauxval(AT_HWCAP2);
 
-	chip_id = xscom_init();
-	if (chip_id == 0xffffffff) {
-		fprintf(stderr, "No valid XSCOM chip found\n");
-		sprintf(msg, "xscom_init failed, No valid XSCOM chip found\n");
-		hxfmsg(&hd, 0, HTX_HE_INFO, msg);
-	}
+	if (hwcap_val == 0) {
+		sprintf(msg, "Unable to determine VMX Crypto support,  getauxval returned 0 for AT_HWCAP2, error msg: %s\n", strerror(errno));
+	} 
 	else {
-		rc = xscom_read(chip_id, scom_addr, (uint64_t *)&scom_val);
-		if (rc) {
-			sprintf(msg, "xscom_read failed, Error reading XSCOM, RC: %d\n", rc);
-			hxfmsg(&hd, 0, HTX_HE_INFO, msg);
-		}
-		if (!(scom_val & VMX_CRYPTO_SCOM_BIT)) {
+		if (!(hwcap_val & VMX_CRYPTO_SCOM_BIT)) {
 			exclude_cat_mask = 0;
-			sprintf(msg, "Crypto enabled: chip id: %X, SCOM Addr: 0x%016llx, Value: %llx\n", chip_id, scom_addr, scom_val);
+			sprintf(msg, "Crypto enabled: AT_HWCAP2 Value: 0x%016llx\n", hwcap_val);
 		}
 		else {
-			/* exclude nstruction category for crypto */
+			/* exclude VMX Crypto from instructions verification tests */
 			exclude_cat_mask = VMX_MISC_ONLY;
-			sprintf(msg, "Crypto disabled: chip id: %X, SCOM Addr: 0x%016llx, Value: %llx, exclude category: 0x%016llX\n", chip_id, scom_addr, scom_val, exclude_cat_mask);
+			sprintf(msg, "Crypto disabled in chip: AT_HWCAP2 Value: 0x%016llx, exclude category: 0x%016llX\n", hwcap_val, exclude_cat_mask);
 		}
-		hxfmsg(&hd, 0, HTX_HE_INFO, msg);
 	}
-
+	hxfmsg(&hd, 0, HTX_HE_INFO, msg);
+	#endif
 #else
+	/* AIX */
 	num_cpus = _system_configuration.ncpus;
 #endif
-    rc = repopulate_syscfg(&hd);
-    if ( rc ) {
-        sprintf(msg,"repopulate_syscfg failed with error code= %d \n",rc);
-        hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
-        exit_flag = 1;
-        return -1;
-    }
+
+	rc = repopulate_syscfg(&hd);
+	if ( rc ) {
+		sprintf(msg,"repopulate_syscfg failed with error code= %d \n",rc);
+		hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+		exit_flag = 1;
+		return -1;
+	}
 
 
 	get_env_details(&proc_env); 	/* Tracking shared processor mode */
@@ -418,9 +438,10 @@ main(int argc, char *argv[])
 
 #ifndef SCTU
 	#if defined(DEBUG) && !defined(AWAN)
-    hlog = fopen(LOGFILE, "w");
-    if (hlog == NULL) {
-		sprintf(msg, "Error opening fpu_log file: %s, errno: 0x%X, %s\n", LOGFILE, errno, strerror(errno));
+	sprintf(dumpfile, "%s/fpu_log", hd.htx_exer_log_dir);
+	hlog = fopen(dumpfile, "w");
+	if (hlog == NULL) {
+		sprintf(msg, "Error opening fpu_log file: %s, errno: 0x%X, %s\n", dumpfile, errno, strerror(errno));
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
 	}
@@ -428,18 +449,18 @@ main(int argc, char *argv[])
 	#endif
 
 	/* open seed file in append mode */
-	sprintf(tb_fname, "/tmp/%s_seedlist.txt", argv[1] + 5);
-	fp_tblog = fopen(tb_fname, "a");
-    if (fp_tblog == NULL) {
-		sprintf(msg, "Error opening file: %s!!!, 0x%X, %s\n", tb_fname, errno, strerror(errno));
+	sprintf(dumpfile, "%s/seedlist.txt", hd.htx_exer_log_dir);
+	fp_tblog = fopen(dumpfile, "w");
+	if (fp_tblog == NULL) {
+		sprintf(msg, "Error opening file: %s!!!, 0x%X, %s\n", dumpfile, errno, strerror(errno));
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
 	}
 #else
-	sprintf(msg, "%s_%d", LOGFILE, core_num);
-    hlog = fopen(msg, "w");
-    if (hlog == NULL) {
-		sprintf(msg, "Error opening fpu_log file \n");
+	sprintf(dumpfile, "%s/sctu_log_%d", hd.htx_exer_log_dir, core_num);
+	hlog = fopen(dumpfile, "w");
+	if (hlog == NULL) {
+		sprintf(msg, "Error opening sctu_log file: %s, errno: 0x%X, %s\n", dumpfile, errno, strerror(errno));
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
 	}
@@ -631,7 +652,7 @@ main(int argc, char *argv[])
 		/*
 		 * open debug file pointers for client specific debug file.
 		 */
-		sprintf(global_sdata[INITIAL_BUF].cdata_ptr[i]->logfile, "/tmp/fpu_debug.%d.%d", core_num, i);
+		sprintf(global_sdata[INITIAL_BUF].cdata_ptr[i]->logfile, "%s/%s_debug.%d", hd.htx_exer_log_dir, &(hd.sdev_id[5]), i);
 		global_sdata[INITIAL_BUF].cdata_ptr[i]->clog = fopen((const char *)global_sdata[INITIAL_BUF].cdata_ptr[i]->logfile, "w");
 		if(global_sdata[INITIAL_BUF].cdata_ptr[i]->clog == NULL) {
 			sprintf(msg, "Error opening log file for client #%d. Exiting... \n", i);
@@ -666,8 +687,8 @@ main(int argc, char *argv[])
 
 #ifdef __HTX_LINUX__
 	/* Initialize physical bcpu fields for clients. */
-    for (i=0; i < MAX_NUM_CPUS; i++) {
-       	global_sdata[INITIAL_BUF].cdata_ptr[i]->phy_bcpu = -1;
+	for (i=0; i < MAX_NUM_CPUS; i++) {
+		global_sdata[INITIAL_BUF].cdata_ptr[i]->phy_bcpu = -1;
 	}
 #endif
 
@@ -1038,15 +1059,15 @@ main(int argc, char *argv[])
 		cycle_count++;
 	
 		/* dump instruction execution stats for the test cycle */
-		char instr_fname[128];
-		sprintf(instr_fname, "/tmp/%s_instr_stats", (char *)(dinfo.device_name+5));
-		FILE * fptr = fopen((const char *)instr_fname,"w");
+		sprintf(dumpfile, "%s/instr_stats", hd.htx_exer_log_dir);
+		FILE * fptr = fopen(dumpfile,"w");
 		if (fptr != NULL) {
 			fprintf(fptr, "Cycle # %lld\n", cycle_count);
 			for (i = 0; i < num_active_rules; i++) {
 				sprintf(msg, "Test id: %d ", stanza_stats[i].test_id);
 				for (j = 0; j < rule.num_threads; j++) {
-					sprintf(msg, "%s client[%d]: %d ", msg, j, stanza_stats[i].client_stats[j].tested_percent); 
+					sprintf(msg, "%s client[%d]: (tested(%d) / enabled (%d)) = %d ", msg, j, stanza_stats[i].client_stats[j].num_tested_instr, stanza_stats[i].client_stats[j].num_enabled_instr,
+																					 stanza_stats[i].client_stats[j].tested_percent); 
 				}
 				fprintf(fptr, "\n%s\n", msg);
 				fflush(fptr);
@@ -1443,8 +1464,8 @@ client_func(void *cinfo)
 	struct client_data *cptr = ((struct client_data *)cinfo);
 
 	volatile uint32 client_no = cptr->client_no, bcpu_no = cptr->bcpu, num_oper = 0, i;
-	int rc, miscomparing_num; /*a=0;*/
-	uint64 tick_start, tick_end;
+	int rc, miscomparing_num;
+	volatile uint64 tick_start, tick_end;
 	int32 seed_again, num_pass2 = 0;
 	uint16 virt_cpu = 0;
 	struct flock lockp;
@@ -1485,7 +1506,7 @@ client_func(void *cinfo)
 	 */
     rc = filter_masked_instruction_categories(client_no, 0, master_instructions_array);
 	if (rc == 0) {/* num enabled instructions */
-		sprintf(msg, "Client: %d: filter_masked_instruction_categories: failed to select any instruction for the mask in rule file !!!\n", client_no);
+		sprintf(msg, "Client: %d: filter_masked_instruction_categories: failed to select any instruction for the mask in rule stanza: %s !!!\n", client_no, rule.rule_id);
         hxfmsg(&hd, rc, HTX_HE_SOFT_ERROR, msg);
         pthread_mutex_lock(&exit_flag_lock);
         exit_flag = 1;
@@ -1861,6 +1882,7 @@ client_func(void *cinfo)
 #else  /* SCTU part ends */
 		/* Multiple pass2 for FPU and CPU only */
 		if (rule.log_seed == 1) {
+			/* CHAR time based testcase execution */
 			if ((rule_run_time != 0)) {
 				while (1) {
 					/* PASS2 unlimited, contolled by timer only */
@@ -1904,17 +1926,9 @@ client_func(void *cinfo)
 					}
 				}
 			}
-			else {
-				/* this part have beeen taken care in rule file validation */
-				exit_flag = 1;
-				sprintf(msg, "Inalid rule file configuration found, log_seed: %d, testcase time: %d\n", rule.log_seed, rule_run_time);
-				hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
-				if (!rule.testcase_sync) {
-					pthread_exit((void *)&exit_flag);
-				}
-			}
 		}
 		else {
+			/* MFG time based testcase execution */
 			if ((rule_run_time != 0)) {
 				sdata = &global_sdata[PASS2_BUF];
 				populate_buf(PASS2_BUF, client_no);
@@ -1950,7 +1964,8 @@ client_func(void *cinfo)
 					}
 				}
 			}
-			else {
+		}
+		if (rule_run_time == 0)	{
 				/* default for rule.num_pass2 is 1 */
 				for (num_pass2 = 0; num_pass2 < rule.num_pass2; num_pass2++) {
 					sdata = &global_sdata[PASS2_BUF];
@@ -1973,7 +1988,6 @@ client_func(void *cinfo)
 						}
 					}
 				}
-			}
 		}
 
 #endif
@@ -2017,24 +2031,24 @@ client_func(void *cinfo)
 				/* Location code currently supported in AIX only */
 				FILE *tmp_fp;
 				char tmp_str[200], loc_code1[50], loc_code2[100];
-				sprintf(msg, "cat /tmp/sctProcMap | awk 'NR==%d'", ((cptr->bcpu)+1));
+				sprintf(msg, "cat %s/sctProcMap | awk 'NR==%d'", hd.htx_log_dir, ((cptr->bcpu)+1));
 				tmp_fp = popen(msg, "r");
 				fgets(tmp_str, 100, tmp_fp);
 				sscanf(tmp_str, "%*s %s %s", loc_code1, loc_code2);
 				pclose(tmp_fp);
-				sprintf(msg, "%s miscompare detected. Testcase data dumped in: /tmp/%s_miscompare.%d.%x \
+				sprintf(msg, "%s miscompare detected. Testcase data dumped in: %s/miscompare.%x \
 					    \nNum_oper = %d, Seed = 0x%x, Parent Seed = 0x%x \
 						\nFailing Processor details - Logical CPU: %d, Physical CPU: %d, Location Code: %s %s\n",
-						miscomp_name, (char *)(dinfo.device_name+5), core_num, cptr->original_seed, \
+						miscomp_name, hd.htx_exer_log_dir, cptr->original_seed, \
 					    num_oper, cptr->original_seed, original_seed, \
 					 	cptr->bcpu, core_num, loc_code1, loc_code2);
 				hxfmsg(&hd, 0, HTX_HE_MISCOMPARE, msg);
 			}
 #else
-			sprintf(msg, "%s miscompare detected. Testcase data dumped in: /tmp/%s_miscompare.%d.%x \
+			sprintf(msg, "%s miscompare detected. Testcase data dumped in: %s/miscompare.%x \
 					\nNum_oper = %d, Seed = 0x%x, Parent Seed = 0x%x \
 					\nFailing Processor details - Logical CPU: %d, Physical CPU: %d\n",
-					miscomp_name, (char *)(dinfo.device_name+5), core_num, cptr->original_seed, \
+					miscomp_name, hd.htx_exer_log_dir, cptr->original_seed, \
 					num_oper, cptr->original_seed, original_seed, \
 					cptr->bcpu, core_num);
 			hxfmsg(&hd, 0, HTX_HE_MISCOMPARE, msg);
@@ -2089,17 +2103,17 @@ client_func(void *cinfo)
 					/* Location code currently supported in AIX only */
 					FILE *tmp_fp;
 					char tmp_str[200], loc_code1[50], loc_code2[100];
-					sprintf(msg, "cat /tmp/sctProcMap | awk 'NR==%d'", ((cptr->bcpu)+1));
+					sprintf(msg, "cat %s/sctProcMap | awk 'NR==%d'", hd.htx_log_dir, ((cptr->bcpu)+1));
 					tmp_fp = popen(msg, "r");
 					fgets(tmp_str, 100, tmp_fp);
 					sscanf(tmp_str, "%*s %s %s", loc_code1, loc_code2);
 					pclose(tmp_fp);
 					sprintf(msg, "Log dumped.\nProcessor detail - Logical Processor : %d, Physical Core : %d, Location Code : %s %s \
-								 \nLog file created : /tmp/%s_miscompare.%d.%x\n", cptr->bcpu,core_num,loc_code1,loc_code2,(char *)(dinfo.device_name+5), core_num,cptr->original_seed);
+								 \nLog file created : %s/miscompare.%x\n", cptr->bcpu,core_num,loc_code1,loc_code2, hd.htx_exer_log_dir,cptr->original_seed);
 				}
 #else /* __HTX_LINUX__ */
 				sprintf(msg, "Log dumped.\n Processor details - Logical Processor : %d, Physical Core : %d\
-							  \nLog file created : /tmp/%s_miscompare.%d.%x\n", cptr->bcpu, core_num, (char *)(dinfo.device_name+5), core_num, cptr->original_seed);
+							  \nLog file created : %s/miscompare.%x\n", cptr->bcpu, core_num, hd.htx_exer_log_dir, cptr->original_seed);
 #endif /* __HTX_LINUX__ */
 				hxfmsg(&hd, 0, HTX_HE_INFO, msg);
 			}
@@ -2281,7 +2295,7 @@ void dump_testcase_p7(int cno, int num_oper, int type, int num)
 	struct vsr_node *list_h, *list_t, *tmp_vsrs_list;
 	int i, j/*, total_ins*/;
 	int thread_start_index, thread_end_index;
-	char dump_file[50], temp_val1[35], temp_val2[35], host_name[50];
+	char dump_file[128], temp_val1[35], temp_val2[35], host_name[50];
 	FILE *dump;
 	time_t timer;
 	struct tm current_time;
@@ -2304,7 +2318,7 @@ void dump_testcase_p7(int cno, int num_oper, int type, int num)
 #ifdef AWAN
 	dump = stdout;
 #else
-	sprintf(dump_file, "/tmp/%s_miscompare.%d.%x", (char *)(dinfo.device_name+5), core_num, seed);
+	sprintf(dump_file, "%s/miscompare.%x", hd.htx_exer_log_dir, seed);
 	dump = fopen((const char *)dump_file,"w");
 	if(dump == NULL) {
 		sprintf(msg, "Error opening dump file %s, errno: 0x%X, %s\n", dump_file, errno, strerror(errno));
@@ -3083,9 +3097,9 @@ void dump_testcase_p6(int cno, int num_oper, int type, int num)
 	base1 = global_sdata[PASS1_BUF].cdata_ptr[cno]->ls_base[PASS1_BUF];
 	base2 = global_sdata[PASS2_BUF].cdata_ptr[cno]->ls_base[PASS2_BUF];
 
-	sprintf(dump_file, "/tmp/%s_miscompare.%d.%x", (char *)(dinfo.device_name+5), core_num, seed);
+	sprintf(dump_file, "%s/miscompare.%x", hd.htx_exer_log_dir, seed);
 	dump = fopen((const char *)dump_file,"w");
-    if(dump == NULL) {
+	if(dump == NULL) {
 		sprintf(msg, "Error opening dump file.\n");
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
@@ -3572,29 +3586,25 @@ read_rf()
 			break;
 		}
 		else if (rc > 0) { /* End of stanza so move stanza ptr to next */
-			/* validate testcase for log_seed and tc_time */
-			if (r->log_seed) {
-				/* num_pass2 is not used in case of log_seed, pass2 runs infinitely, and num_oper corresponds number of seeds */
+			/* validate testcase for tc_time */
+  			if (r->tc_time != 0) {
 				if (r->num_oper == 0) {
-					sprintf(msg, "Invalid testcase config: log_seed: %d, num_oper: %d\n", r->log_seed, r->num_oper);
+					sprintf(msg, "Invalid testcase config: num_oper: %d, tc_time: %d\n", r->num_oper, r->tc_time);
 					hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
 					return(-1);
 				}
-  				else if ((r->tc_time / r->num_oper) == 0) {
-					sprintf(msg, "Invalid testcase config: log_seed: %d, tc_time: %d, num_oper: %d",  r->log_seed, r->tc_time, r->num_oper);
-					hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
-					return(-1);
-  				}
-			}
-			else {
-  				if (r->tc_time != 0) {
-              		/* num_pass2 is not used in this case, it is executed only once, num_oper (0) runs infinitely */
-					if ((r->num_oper != 0) || (r->num_pass2 > 1)) {
-						sprintf(msg, "Invalid testcase config: tc_time: %d, num_pass2: %d, num_oper: %d",  r->tc_time, r->num_pass2, r->num_oper);
+				else {
+  					if ((r->tc_time / r->num_oper) == 0) {
+						sprintf(msg, "Invalid testcase config: log_seed: %d, tc_time: %d, num_oper: %d",  r->log_seed, r->tc_time, r->num_oper);
 						hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
-						return (-1);
-  					}
-				}
+						return(-1);
+					}
+              		/* num_pass2 is not used in this case, it is executed either once only or executed infinit number of times */
+					if (r->num_pass2 > 1) {
+						sprintf(msg, "Value of num_pass2 will be ignored: tc_time: %d, num_pass2: %d\n",  r->tc_time, r->num_pass2);
+						hxfmsg(&hd, 0, HTX_HE_INFO, msg);
+					}
+  				}
 			}
 
 			num_active_rules++;
@@ -5502,14 +5512,17 @@ get_random_gpr(int cno, int type, int tgt)
 	uint32 num_ins_built, prolog_size, *tc_memory, store_off, mcode;
 	struct vsr_list *vsrs;
 
-	vsrs = &cptr->vsrs[GR];
 	prolog_size = cptr->prolog_size;
 	num_ins_built = cptr->num_ins_built;
 	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
 
+	if (type == DUMMY) {
+		return gpr_no;
+	}
 	if (type == GRU) {
 		type = GR; /* GRU is same as GR */
 	}
+
     vsrs = &cptr->vsrs[GR];
 	gpr_no = vsrs->head[BFP]->vsr_no;
 	/* Move register to end of list */
@@ -6412,6 +6425,11 @@ int execute_testcase(int cno, int pass)
 #endif
 	DPRINT(cptr->clog, "\n r3 = 0x%llx r5 = 0x%llx\n", (uint64)cptr->tc_ptr[pass], (uint64)cptr->ls_base[pass]);
 	FFLUSH(cptr->clog);
+	#ifdef DBG_INSTR
+	if (pass == 1) {
+		decode_tc_instructions(cno);
+	}
+	#endif
 	(*fptr)(cptr->tc_ptr[pass], 0, cptr->ls_base[pass], 0, cptr->ls_base[pass], sdata->common_data_ptr->sync_words, cptr->time_stamps, cptr->cpu_id_mask);
 	DPRINT(cptr->clog, "\nfpu%d: Returned back from testcase...hurray !!\n", core_num);
 	FFLUSH(cptr->clog);
@@ -7619,6 +7637,7 @@ merge_instruction_tables()
 {
 	int i = 0, j = 0;
 	char str[1024];
+	char local_str[1024];
 	uint16 proc_rev_num = (pvr & 0xFFFF);
 
 	i = 0;
@@ -7633,13 +7652,15 @@ merge_instruction_tables()
 			memcpy(&master_instructions_array[j], &dfp_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d DFP instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d DFP P6 instructions\n", local_str, i);
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && vmx_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
 		 	memcpy(&master_instructions_array[j], &vmx_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d VMX instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d VMX P6 instructions\n", local_str, i);
 	}
 	if (shifted_pvr_os >= 0x3f) { /* If P7 or above */
 		i = 0;
@@ -7647,13 +7668,15 @@ merge_instruction_tables()
 			memcpy(&master_instructions_array[j], &bfp_p7_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d BFP P7 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d BFP P7 instructions\n", local_str, i);
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && vsx_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
 				memcpy(&master_instructions_array[j], &vsx_instructions_array[i], sizeof(struct instruction_masks));
 				i++; j++;
 		}
-		sprintf(str, "%sAdded %d VSX instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d VSX P7 instructions\n", local_str, i);
 	}
 	if (shifted_pvr_os >= 0x3e) { /* If P6 or above */
 		i = 0;
@@ -7661,7 +7684,8 @@ merge_instruction_tables()
 			memcpy(&master_instructions_array[j], &cpu_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d P6 CPU instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d CPU P6 instructions\n", local_str, i);
 	}
 	if (shifted_pvr_os >= 0x3f) { /* If P7 or above */
 		i = 0;
@@ -7669,14 +7693,16 @@ merge_instruction_tables()
 			memcpy(&master_instructions_array[j], &cpu_p7_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d P7 CPU instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d CPU P7 instructions\n", local_str, i);
 
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && cpu_macro_array[i].op_eop_mask != 0xDEADBEEF) {
 			memcpy(&master_instructions_array[j], &cpu_macro_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d Macro P8 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d Macro P7 instructions\n", local_str, i);
 	}
 	if (shifted_pvr_os >= SHIFTED_PVR_OS_P8) { 					/* If salerno or above processor versions */
 		i = 0;
@@ -7684,35 +7710,42 @@ merge_instruction_tables()
 			memcpy(&master_instructions_array[j], &cpu_p8_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d P8 CPU instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d CPU P8 instructions\n", local_str, i);
 
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && bfp_p8_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
 			memcpy(&master_instructions_array[j], &bfp_p8_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d BFP P8 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d BFP P8 instructions\n", local_str, i);
 
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && vmx_p8_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
 			memcpy(&master_instructions_array[j], &vmx_p8_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d VMX P8 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d VMX P8 instructions\n", local_str, i);
 
-		i = 0;
-		while(j < MAX_INSTRUCTIONS && vsx_p8_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
-			memcpy(&master_instructions_array[j], &vsx_p8_instructions_array[i], sizeof(struct instruction_masks));
-			i++; j++;
-		}
 		if (proc_rev_num >= PROC_DD2) {
 			i = 0;
 			while(j < MAX_INSTRUCTIONS && vmx_p8_dd2_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
 				memcpy(&master_instructions_array[j], &vmx_p8_dd2_instructions_array[i], sizeof(struct instruction_masks));
 				i++; j++;
 			}
+			strcpy(local_str, str);
+			sprintf(str, "%sAdded %d VMX P8 DD2 instructions\n", local_str, i);
 		}
-		sprintf(str, "%sAdded %d VSX P8 instructions\n", str, i);
+
+		i = 0;
+		while(j < MAX_INSTRUCTIONS && vsx_p8_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
+			memcpy(&master_instructions_array[j], &vsx_p8_instructions_array[i], sizeof(struct instruction_masks));
+			i++; j++;
+		}
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d VSX P8 instructions\n", local_str, i);
 	}
 	if (shifted_pvr_os >= SHIFTED_PVR_OS_P9) {	/* IBM P9 instructions */
 		i = 0;
@@ -7720,39 +7753,72 @@ merge_instruction_tables()
 			memcpy(&master_instructions_array[j], &cpu_p9_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d CPU P9 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d CPU P9 instructions\n", local_str, i);
+
 
 		i=0;
 		while(j < MAX_INSTRUCTIONS && vmx_p9_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
 			memcpy(&master_instructions_array[j], &vmx_p9_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d VMX P9 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d VMX P9 instructions\n", local_str, i);
 
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && vsx_p9_instructions_array[i].op_eop_mask != 0xDEADBEEF ) {
 			memcpy(&master_instructions_array[j], &vsx_p9_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d VSX P9 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d VSX P9 instructions\n", local_str, i);
 
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && bfp_p9_instructions_array[i].op_eop_mask != 0xDEADBEEF ) {
 			memcpy(&master_instructions_array[j], &bfp_p9_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d BFP P9 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d BFP P9 instructions\n", local_str, i);
 
 		i = 0;
 		while(j < MAX_INSTRUCTIONS && dfp_p9_instructions_array[i].op_eop_mask != 0xDEADBEEF ) {
 			memcpy(&master_instructions_array[j], &dfp_p9_instructions_array[i], sizeof(struct instruction_masks));
 			i++; j++;
 		}
-		sprintf(str, "%sAdded %d DFP P9 instructions\n", str, i);
+		strcpy(local_str, str);
+		sprintf(str, "%sAdded %d DFP P9 instructions\n", local_str, i);
+
+		if (proc_rev_num >= PROC_DD2) {
+			i = 0;
+			while(j < MAX_INSTRUCTIONS && cpu_p9_dd2_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
+				memcpy(&master_instructions_array[j], &cpu_p9_dd2_instructions_array[i], sizeof(struct instruction_masks));
+				i++; j++;
+			}
+			strcpy(local_str, str);
+			sprintf(str, "%sAdded %d CPU P9 DD2 instructions\n", local_str, i);
+
+			i = 0;
+			while(j < MAX_INSTRUCTIONS && vmx_p9_dd2_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
+				memcpy(&master_instructions_array[j], &vmx_p9_dd2_instructions_array[i], sizeof(struct instruction_masks));
+				i++; j++;
+			}
+			strcpy(local_str, str);
+			sprintf(str, "%sAdded %d VMX P9 DD2 instructions\n", local_str, i);
+
+			i = 0;
+			while(j < MAX_INSTRUCTIONS && bfp_p9_dd2_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
+				memcpy(&master_instructions_array[j], &bfp_p9_dd2_instructions_array[i], sizeof(struct instruction_masks));
+				i++; j++;
+			}
+			strcpy(local_str, str);
+			sprintf(str, "%sAdded %d BFP P9 DD2 instructions\n", local_str, i);
+		}
 	}
 
 	total_num_instructions = j;
-	sprintf(str, "%sTOTAL NUM INSTRUCTIONS = %d\n", str, total_num_instructions);
+	strcpy(local_str, str);
+	sprintf(str, "%sTOTAL NUM INSTRUCTIONS = %d\n", local_str, total_num_instructions);
 
 #ifdef AWAN
 	printf("%s", str);
@@ -8697,18 +8763,18 @@ void dump_testcase_sctu(int client_num, int num_oper, int rc, int miscomparing_n
 				/* Location code currently supported in AIX only */
 				FILE *tmp_fp;
 				char tmp_str[200], loc_code1[50], loc_code2[100];
-				sprintf(msg, "cat /tmp/sctProcMap | awk 'NR==%d'", ((cptr->bcpu)+1));
+				sprintf(msg, "cat %s/sctProcMap | awk 'NR==%d'", hd.htx_log_dir, ((cptr->bcpu)+1));
 				tmp_fp = popen(msg, "r");
 				fgets(tmp_str, 100, tmp_fp);
 				sscanf(tmp_str, "%*s %s %s", loc_code1, loc_code2);
 				pclose(tmp_fp);
 				sprintf(msg, "Log dumped.\nProcessor detail - Logical Processor : %d, Physical Core : %d, Location Code : %s %s \
-						\nLog file created : /tmp/%s_miscompare.%d.%x\n", cptr->bcpu,core_num,loc_code1,loc_code2,(char *)(dinfo.device_name+5), core_num,cptr->original_seed);
+						\nLog file created : %s/miscompare.%x\n", cptr->bcpu,core_num,loc_code1,loc_code2, hd.htx_exer_log_dir, cptr->original_seed);
 				hxfmsg(&hd, 0, HTX_HE_MISCOMPARE, msg);
 			}
 #else /* __HTX_LINUX__ */
 			sprintf(msg, "Log dumped.\n Processor details - Logical Processor : %d, Physical Core : %d\
-					\nLog file created : /tmp/%s_miscompare.%d.%x\n", cptr->bcpu, core_num, (char *)(dinfo.device_name+5), core_num, cptr->original_seed);
+					\nLog file created : %s/miscompare.%x\n", cptr->bcpu, core_num, hd.htx_exer_log_dir, cptr->original_seed);
 			hxfmsg(&hd, 0, HTX_HE_MISCOMPARE, msg);
 #endif /* __HTX_LINUX__ */
 		}
@@ -8720,21 +8786,31 @@ void dump_testcase_sctu(int client_num, int num_oper, int rc, int miscomparing_n
 int chip_testcase(void)
 {
 	FILE *fptr;
-	char temp_msg[20];
+	char temp_msg[128];
+	char dump_dir[128], *dir_ptr;
 	int i, j, k, rc, tmp, residue, server_num;
 	int num_chips, sctu_gang_num, core_sequential_num, server_sequential_num;
 	int cores_in_chip[MAX_CHIPS][MAX_CORES_PER_CHIP], sctu_gangs[MAX_CHIPS*2][8];
 	int cpus_in_sctu_server[MAX_CHIPS*2*MAX_CPUS_PER_CORE][SCTU_GANG_SIZE], sctu_server_size[MAX_CHIPS*2*MAX_CPUS_PER_CORE];
 
+	dir_ptr = getenv("HTX_LOG_DIR");
+	if ( strlen(dir_ptr) == 0 ) {
+		strcpy(dump_dir, "/tmp");
+	}
+	else {
+		strcpy(dump_dir, dir_ptr);
+	}
+
 	if ( strcasecmp(dinfo.device_name, "SCTU_DEV") == 0 ) {
-		fptr = fopen("/tmp/htx_sctu_chip_dev","w");
+		sprintf(temp_msg, "%s/htx_sctu_chip_dev", dump_dir);
+		fptr = fopen(temp_msg,"w");
 
 		if ( fptr == NULL ) {
 			/* Below printf is correct. It should not be replaces with sprintf/hxfmsg. 
 			 * That is because this code will run only with script. not during exerciser's
 			 * regular run. And with script(devconfig) stdout is open. 
 			 */
-			printf("Unable to open /tmp/htx_sctu_chip_dev. errno=%d(%s)", errno, strerror(errno));
+			printf("Unable to open %s. errno=%d(%s)", temp_msg, errno, strerror(errno));
 			return(errno);
 		}
 	}
@@ -8911,7 +8987,8 @@ int node_testcase(void)
 	int node, chip, core, thread, cpu_index, server_cpu_index;
 	int num_nodes, sctu_server_num, core_sequential_num, server_sequential_num;
 	int sctu_server[MAX_CORES][8], sctu_server_size[MAX_CORES];
-	char temp_msg[20];
+	char temp_msg[128];
+	char dump_dir[128], *dir_ptr;
 	FILE *fptr;
 
 	sctu_server_num = 0;
@@ -8920,15 +8997,24 @@ int node_testcase(void)
 	cpu_index = server_cpu_index = stop_cond = 0;
 	num_nodes = Sys_stat.nodes;
 
+	dir_ptr = getenv("HTX_LOG_DIR");
+	if ( strlen(dir_ptr) == 0 ) {
+		strcpy(dump_dir, "/tmp");
+	}
+	else {
+		strcpy(dump_dir, dir_ptr);
+	}
+
 	if ( strcasecmp(dinfo.device_name, "SCTU_DEV") == 0 ) {
-		fptr = fopen("/tmp/htx_sctu_node_dev","w");
+		sprintf(temp_msg, "%s/htx_sctu_node_dev", dump_dir);
+		fptr = fopen(temp_msg,"w");
 
 		if ( fptr == NULL ) {
 			/* Below printf is correct. It should not be replaces with sprintf/hxfmsg. 
 			 * That is because this code will run only with script. not during exerciser's
 			 * regular run. And with script(devconfig) stdout is open. 
 			 */
-			printf("Unable to open /tmp/htx_sctu_node_dev. errno=%d(%s)", errno, strerror(errno));
+			printf("Unable to open %s. errno=%d(%s)", temp_msg, errno, strerror(errno));
 			return(errno);
 		}
 	}
