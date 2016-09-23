@@ -98,9 +98,14 @@
 
 #define PVR_POWERP8P_GARRISION 0x4c 
 
+#define PVR_POWER9_NIMBUS        0x4e  /* P9 */
+#define PVR_POWER9_CUMULUS       0x4f  /* P9 */
+#define P9_NIMBUS_MAX_CORES_PER_CHIP     12 
+#define P9_CUMULUS_MAX_CORES_PER_CHIP    24
+#define P9_L3CACHE_SIZE          10*M
 #define L3CACHE_LINESIZE       128
 #define MAX_NODES   8
-#define MAX_CHIPS_PER_NODE 4
+#define MAX_CHIPS_PER_NODE 8
 #define MAX_CPUS_PER_CHIP 96 
 #define MAX_SMT_THREAD_PER_CHIP MAX_CPUS_PER_CHIP 
 

@@ -18,6 +18,11 @@
 /* IBM_PROLOG_END_TAG */
 
 #include "hxecache.h"
+#define PAGEMAP_ENTRY 8
+#define GET_BIT(X,Y) (X & ((uint64_t)1<<Y)) >> Y
+#define GET_PFN(X) X & 0x7FFFFFFFFFFFFF
+
+#define is_bigendian() ( (*(char*)&__endian_bit) == 0 )
 
 /* Global data structures and variables go here */
 
@@ -29,6 +34,8 @@ struct ruleinfo 	*next_rule;
 int					num_testcases;
 int					log_level = MINIMUM;
 
+int                         huge_page_size;
+int                         half_huge_page_size;
 int  						crash_on_misc_global;
 char 						*htxkdblevel;
 int							shm_id,cache_page_req=0,prefetch_page_req=0;
@@ -77,7 +84,7 @@ pthread_cond_t 				sync_cond  ;															/* Variable to synchronize threads
 int 						rollover_testcase_flag = 0;			 									/* Flag determines if rollover test case is to run 				*/
 int 						thread_sync_in_use = TRUE;												/* Flag to determine if thread sync mechanism is used or not	*/
 FILE						*log_fp;
-char 						log_file_name[100];
+char 						log_file_name[256];
 int							use_contiguous_pages = TRUE;
 int							run_indefinite = FALSE;													/* Flag to indicate if run has to continue indefinitely.		*/
 struct drand48_data 		sbuf;
@@ -85,6 +92,7 @@ struct drand48_data 		sbuf;
 void get_enabled_prefetch_algos ( unsigned int prefetch_conf , char enabled_algos[] ) ;
 void populate_cores_to_disable(struct ruleinfo *ruleptr, int disable_cores[], int num_cores_disabled);
 void SIGUSR2_hdl(int, int, struct sigcontext *);
+int find_EA_to_RA(unsigned long ea,unsigned long long* ra);
 /* Now the main function */
 
 int main(int argc, char **argv) {
@@ -116,7 +124,7 @@ int main(int argc, char **argv) {
 	}
 
 
-	strcpy(log_file_name,getenv("HTX_LOG_DIR"));
+	strcpy(log_file_name,h_d.htx_exer_log_dir);
 	sprintf(log_file_name,"%s/hxecache%d.runlog",log_file_name,get_device_instance(argv[1]));
 	run_log_fp = fopen(log_file_name,"w");
 
@@ -184,7 +192,7 @@ int main(int argc, char **argv) {
 			}
 		
 			for(i=0 ; i<num_testcases ;i++) {
-				for ( j=0 ; j<MAX_16M_PAGES ; j++ ) {
+				for ( j=0 ; j<MAX_HUGE_PAGES ; j++ ) {
 					h_r[i].mem_page_status[j] = PAGE_FREE;
 				}
 			}
@@ -297,10 +305,10 @@ int main(int argc, char **argv) {
 				update_sys_detail_flag = 1;
 			
 			}	
-			for ( i=0;i<MAX_THREADS_PER_CHIP;i++) {
+			/*for ( i=0;i<MAX_THREADS_PER_CHIP;i++) {
 				if(pcpus_thread_wise[i] != -1)
 					printf("pcpus_thread_wise[%d]===%d\n",i,pcpus_thread_wise[i]);
-			}
+			}*/
 #endif
 
 			/* Check if exit_flag is set */
@@ -550,21 +558,6 @@ int create_and_dispatch_threads(int current_test_case) {
 	int	current_tc_type	= current_rule->testcase_type;  
 	int num_prefetch_threads = current_rule->num_prefetch_threads_to_create;
 
-	/* Setup thread context for prefetch threads if required */
-	if ( num_prefetch_threads > 0 ) {
-		if ( (rc = setup_thread_context_array(PREFETCH)) != SUCCESS ) {
-			sprintf(msg,"[%d] Error in setting up Prefetch threads . Exitting !!",__LINE__);
-			hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
-			return (rc);
-		}
-
-		/* If create threads fails, exerciser cannot continue, therefore exit */
-		if( (rc = create_threads(PREFETCH)) != SUCCESS) {
-			sprintf(msg,"[%d] Error in creating Prefetch threads. Exitting !!",__LINE__);
-			hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
-			return (rc);
-		}
-	}
 
 	/* Create Cache threads here, if required
 	 * Only if cache testcase is disabled (PREFETCH_ONLY) then we skip creation
@@ -581,6 +574,21 @@ int create_and_dispatch_threads(int current_test_case) {
 		/* If create threads fails, exerciser cannot continue, therefore exit */
 		if( (rc = create_threads(CACHE)) != SUCCESS) {
 			sprintf(msg,"[%d] Error in creating Cache threads. Exitting !!",__LINE__);
+			hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
+			return (rc);
+		}
+	}
+	/* Setup thread context for prefetch threads if required */
+	if ( num_prefetch_threads > 0 ) {
+		if ( (rc = setup_thread_context_array(PREFETCH)) != SUCCESS ) {
+			sprintf(msg,"[%d] Error in setting up Prefetch threads . Exitting !!",__LINE__);
+			hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
+			return (rc);
+		}
+
+		/* If create threads fails, exerciser cannot continue, therefore exit */
+		if( (rc = create_threads(PREFETCH)) != SUCCESS) {
+			sprintf(msg,"[%d] Error in creating Prefetch threads. Exitting !!",__LINE__);
 			hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
 			return (rc);
 		}
@@ -695,12 +703,12 @@ int get_shared_memory(int shm_size, uint32_t memflg, int page_size) {
 	struct shmid_ds		shm_buf;
 #ifdef SET_PAGESIZE
 	struct vminfo_psize	vminfo_64k	= { 0 };
-	psize_t			 	psize	  	= page_size/*PG_SIZE*/;
+	psize_t			 	psize	  	= page_size/*huge_page_size*/;
 #else
-	unsigned long long 	psize 		= page_size/*PG_SIZE*/;
+	unsigned long long 	psize 		= page_size/*huge_page_size*/;
 #endif
 
-	seg = (page_size == PG_SIZE) ? 0 : 1;
+	seg = (page_size == huge_page_size) ? 0 : 1;
 	memset(&shm_buf,0,sizeof(struct shmid_ds));
 
 	mem.shm_id[seg] = shmget(IPC_PRIVATE,shm_size, memflg);     /* hotplug changes:multiple instances were resulting to same key after going DT*/
@@ -753,11 +761,12 @@ int get_shared_memory(int shm_size, uint32_t memflg, int page_size) {
 		/* Size of the total memory set, i.e size of memory requested from shmget() */
 	mem.memory_set_size[seg] = shm_size;
 
-	if ( page_size == PG_SIZE ) {
-		for(p=addr; p < addr+shm_size; p+=PG_SIZE) {
+	if ( page_size == huge_page_size ) {
+		for(p=addr; p < addr+shm_size; p+=huge_page_size) {
 			mem.ea[i] = p;
+            *p=0xBBBBBBBB;
 #ifdef __HTX_LINUX__
-			get_real_address(p, &mem.real_addr[i]);
+            find_EA_to_RA(mem.ea[i],&mem.real_addr[i]);
 #else
 			getRealAddress(p, 0, &mem.real_addr[i]);
 #endif
@@ -791,9 +800,9 @@ int get_cont_phy_mem(unsigned long long size_requested) {
 
 	/* Only ONE 16M page required in case we're running on P7 */
 	/* Set shm_size based on whether P6 or P7 or P7+ */
-	if(size_requested < PG_SIZE) {
+	if(size_requested < huge_page_size) {
 		/* If required size is < one 16M page ,then get one 16M page*/
-		shm_size = PG_SIZE;
+		shm_size = huge_page_size;
 	}
 	else {
 		/* Calculate required number of 16M pages to span this memory requirement
@@ -801,8 +810,8 @@ int get_cont_phy_mem(unsigned long long size_requested) {
 		 */
 		shm_size =  size_requested;
 
-		if (size_requested%(PG_SIZE) != 0) {
-			shm_size += ( (PG_SIZE) - (size_requested%(PG_SIZE)) ) ;  /* round off to the next highest 16M page */
+		if (size_requested%(huge_page_size) != 0) {
+			shm_size += ( (huge_page_size) - (size_requested%(huge_page_size)) ) ;  /* round off to the next highest 16M page */
 		}
 	}
 
@@ -888,7 +897,7 @@ int setup_memory_to_use(void) {
 		DEBUG_LOG("[%d] Contiguous memory sets = %d\n",__LINE__,rule->cont_memory_pool.num_sets);
 		/* Setup contiguous page for cache threads	*/
 		if ( rule->use_contiguous_pages == FALSE ) {
-			sprintf(msg,"[%d] Warning: Could not find sufficient contiguous 16M pages. Will be using non contiguous pages for rule: %s ( rule no %d ) \n",__LINE__, &(rule->rule_id[0]), test_case+1);
+			sprintf(msg,"[%d] Warning: Could not find sufficient contiguous HUGE pages. Will be using non contiguous pages for rule: %s ( rule no %d ) \n",__LINE__, &(rule->rule_id[0]), test_case+1);
 			hxfmsg(&h_d,0,HTX_HE_INFO,msg);
 		}
 
@@ -938,13 +947,13 @@ unsigned int get_max_cache_mem_req() {
 
 	for ( test_case = 0 ; test_case < num_testcases ; test_case++ ) {
 
-		if ( stanza_page_requirement < rule->cache_16M_pages_required ) {
-			stanza_page_requirement = rule->cache_16M_pages_required;
+		if ( stanza_page_requirement < rule->cache_HUGE_pages_required ) {
+			stanza_page_requirement = rule->cache_HUGE_pages_required;
 		}
 		rule++;
 	}
 
-	return (stanza_page_requirement * PG_SIZE) ;
+	return (stanza_page_requirement * huge_page_size) ;
 }
 
 unsigned int get_max_prefetch_mem_req() {
@@ -954,12 +963,12 @@ unsigned int get_max_prefetch_mem_req() {
 
 	for ( test_case = 0 ; test_case < num_testcases ; test_case++ ) {
 
-			if ( stanza_page_requirement < rule->prefetch_16M_pages_required ) {
-				stanza_page_requirement = rule->prefetch_16M_pages_required;
+			if ( stanza_page_requirement < rule->prefetch_HUGE_pages_required ) {
+				stanza_page_requirement = rule->prefetch_HUGE_pages_required;
 		}
 		rule++;
 	}
-	return (stanza_page_requirement * PG_SIZE) ;
+	return (stanza_page_requirement * huge_page_size) ;
 }
 unsigned int get_max_total_mem_req() {
 
@@ -969,14 +978,14 @@ unsigned int get_max_total_mem_req() {
 
 	for ( test_case = 0 ; test_case < num_testcases ; test_case++ ) {
 
-		if ( stanza_page_requirement < rule->total_16M_pages_required ) {
-			stanza_page_requirement = rule->total_16M_pages_required;
+		if ( stanza_page_requirement < rule->total_HUGE_pages_required ) {
+			stanza_page_requirement = rule->total_HUGE_pages_required;
 		}
 
 		rule++;
 	}
 
-	return (stanza_page_requirement * PG_SIZE) ;
+	return (stanza_page_requirement * huge_page_size) ;
 }
 /* This function calculates the highest requirement among all the stanzas in the rulefile.		*/
 /* If highest requirement comes out to be 0, then something is wrong and it flags FAILURE.		*/
@@ -1006,12 +1015,12 @@ int allocate_worst_case_memory(void) {
 #endif
 
 	if ( system_information.pvr >= POWER8_MURANO ) {
-		printf("[%d] Prefetch thread memory will be in 4KB pages and cache thread memory will be in 16MB pages \n",__LINE__);
+		printf("[%d] Prefetch thread memory will be in 4KB pages and cache thread memory will be in HUGE pages \n",__LINE__);
 		worst_case_memory = get_max_cache_mem_req();
 		worst_case_prefetch_memory = get_max_prefetch_mem_req();
 		prefetch_memflg = (IPC_CREAT | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 	} else {
-		PRINT_LOG("[%d] Prefetch and cache thread mem will be in 16MB pages.\n",__LINE__);
+		PRINT_LOG("[%d] Prefetch and cache thread mem will be in HUGE pages.\n",__LINE__);
 		worst_case_memory = get_max_total_mem_req();
 		PRINT_LOG("[%d] Total memory required = %d MB , cache memory = %d MB and prefetch memory = %d MB\n",
 				__LINE__,(worst_case_memory / (M)), (get_max_cache_mem_req()/(M)), (get_max_prefetch_mem_req()/(M)) );
@@ -1025,14 +1034,14 @@ int allocate_worst_case_memory(void) {
 		rc = FAILURE;
 	}
 
-	if(worst_case_memory < PG_SIZE) {
-		shm_size = PG_SIZE;
+	if(worst_case_memory < huge_page_size) {
+		shm_size = huge_page_size;
 	}
 	else {
 		shm_size = worst_case_memory;
 
-		if (worst_case_memory%(PG_SIZE) != 0) {
-			shm_size += ( (PG_SIZE) - (worst_case_memory%(PG_SIZE)) ) ;  /* round off to the next highest 16M page */
+		if (worst_case_memory%(huge_page_size) != 0) {
+			shm_size += ( (huge_page_size) - (worst_case_memory%(huge_page_size)) ) ;  /* round off to the next highest HUGE page */
 		}
 	}
 
@@ -1073,7 +1082,7 @@ int allocate_worst_case_memory(void) {
         hxfmsg(&h_d,0, HTX_HE_INFO, msg);
 	}
 	/* Now allocate the shared memory of required size */
-	if ( (rc = get_shared_memory(shm_size,memflg,PG_SIZE)) != SUCCESS ) {
+	if ( (rc = get_shared_memory(shm_size,memflg,huge_page_size)) != SUCCESS ) {
 		sprintf(msg,"[%d] Error: Unable to allocate memory (ret val = %d)\n",__LINE__,rc);
 		hxfmsg(&h_d, rc, HTX_HE_SOFT_ERROR, msg);
 		return (rc);
@@ -1150,7 +1159,9 @@ int register_signal_handlers(void) {
 }
 
 int do_initial_setup(char **arg_list) {
-	int rc = SUCCESS;
+    int rc = SUCCESS;
+    FILE* fp;
+    char fname[64];
 
 	/*  Parse command line arguments */
 #if defined(__HTX_LINUX__) && defined(AWAN)
@@ -1185,6 +1196,53 @@ int do_initial_setup(char **arg_list) {
 
 	/* Indicate that the exerciser has started */
 	hxfupdate(START, &h_d);
+
+    huge_page_size = 16 * M; /* default to 16MB(in AIX)*/
+#ifdef __HTX_LINUX__
+    char temp[500];
+    char *ret_ptr;
+    huge_page_size = -1;
+    sprintf(fname,"/proc/meminfo");
+    if ((fp=fopen(fname,"r"))==NULL){
+        sprintf(msg,"fopen of file %s failed with errno=%d",fname,errno);
+        hxfmsg(&h_d,0, HTX_HE_INFO, msg);       
+    }
+    else {
+        do
+        {
+            ret_ptr = fgets(temp, sizeof(temp), fp);
+            sscanf(temp, "Hugepagesize: %d kB", &huge_page_size);
+        } while ((ret_ptr != NULL) && (huge_page_size == -1));
+        if ( (ret_ptr == NULL) || huge_page_size == -1 ) {
+            sprintf(msg,"could not find Hugepagesize in file %s,errno =%d",fname,errno);
+            hxfmsg(&h_d,0, HTX_HE_INFO, msg);
+        }
+        fclose(fp);
+    }
+
+    if(huge_page_size == 2048){
+        sprintf(msg," hug pages of size 2MB will be used for cache opearions\n"); 
+        hxfmsg(&h_d,0, HTX_HE_INFO, msg);
+    }
+    else if(huge_page_size == 16384){   
+        sprintf(msg,"hug pages of size 16MB will be used for cache opearions\n");
+        hxfmsg(&h_d,0, HTX_HE_INFO, msg);
+    }
+    else {
+        sprintf(msg," huge_page_size = %d, unsupported huge page size is detected, exiting! \n", (huge_page_size * K));
+        hxfmsg(&h_d,0, HTX_HE_HARD_ERROR, msg);
+        exit(1);
+    }
+    huge_page_size = (huge_page_size * 1024);
+#endif
+    half_huge_page_size = (huge_page_size/2);
+    if((!(strlen(h_d.htx_log_dir))) || (!(strlen(h_d.htx_exer_log_dir)))){
+        sprintf(msg,"htx lib log direcories found to be htx_log_dir= %s and htx_exer_log_dir= %s, thus updating them to '/tmp/'\n",h_d.htx_log_dir,h_d.htx_exer_log_dir);
+    	hxfmsg(&h_d,0, HTX_HE_INFO, msg);
+        strcpy(h_d.htx_log_dir,"/tmp/");
+        strcpy(h_d.htx_exer_log_dir,"/tmp/");
+
+    }
 
 	return (rc);
 }
@@ -1348,7 +1406,7 @@ int find_reqd_cache_mem(unsigned int mem_req, struct ruleinfo *rule, int memory_
 
 	DEBUG_LOG("\n[%d] Contiguous memory required = %d",__LINE__,mem_req);
 
-	 if ( mem_req <= ((PG_SIZE)/2) ) {
+	 if ( mem_req <= ((huge_page_size)/2) ) {
 
 		for( i=0 ; i<mem.num_pages ; i++) {
 			current_page_status = rule->mem_page_status[i];
@@ -1361,12 +1419,12 @@ int find_reqd_cache_mem(unsigned int mem_req, struct ruleinfo *rule, int memory_
 			} else if ( current_page_status == PAGE_HALF_FREE ) {
 				rule->mem_page_status[i] = CACHE_PAGE;
 				DEBUG_LOG("\n[%d] returning page_number/total pages = %d/%d, status = %d address = %p\n",__LINE__,i+1,mem.num_pages, rule->mem_page_status[i], mem.ea[i]);
-				rule->cont_memory_pool.cont_mem_set[memory_set][0] = (mem.ea[i] + HALF_PAGE_SIZE);
+				rule->cont_memory_pool.cont_mem_set[memory_set][0] = (mem.ea[i] + half_huge_page_size);
 				return(0);
 			}
 		}
 
-	} else if ( mem_req > ((PG_SIZE)/2) && mem_req <= (PG_SIZE)) {
+	} else if ( mem_req > ((huge_page_size)/2) && mem_req <= (huge_page_size)) {
 		for (i=0 ; i<mem.num_pages ; i++) {
 			current_page_status = rule->mem_page_status[i];
 			if( current_page_status == PAGE_FREE ) {
@@ -1377,11 +1435,16 @@ int find_reqd_cache_mem(unsigned int mem_req, struct ruleinfo *rule, int memory_
 			}
 		}
 
-	} else if (mem_req > (PG_SIZE)) {
+	} else if (mem_req > (huge_page_size)) {
 		if ( rule->use_contiguous_pages == TRUE ) {
 			rc = find_reqd_contig_pages( mem_req, rule, memory_set );
 		} else if ( rule->use_contiguous_pages == FALSE ) {
 			rc = find_reqd_pages( mem_req, rule, memory_set );
+            if(rc == -1){
+                sprintf(msg,"[%d] find_reqd_pages() failed with -1\n");
+                hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
+                exit(1);
+		    }
 		}
 	}
 	
@@ -1392,15 +1455,15 @@ int find_reqd_contig_pages( unsigned int mem_req, struct ruleinfo *rule, int mem
 		
 	int				next_page_distance;
 	int				current_page_status , next_page_status;
-	int 			i, save_index = -1, contig_mem_size = PG_SIZE, j, k;
+	int 			i, save_index = -1, contig_mem_size = huge_page_size, j, k;
 
 	for(i = 0; i <= mem.num_pages; i++) {
-		next_page_distance 	= mem.real_addr[i + 1] - mem.real_addr[i] ;
+		next_page_distance 	= (mem.real_addr[i + 1] - mem.real_addr[i]) * getpagesize() ;
 		current_page_status	= rule->mem_page_status[i];
 		next_page_status	= rule->mem_page_status[i+1];
 
-		if (next_page_distance == PG_SIZE && current_page_status == PAGE_FREE && next_page_status == PAGE_FREE)  {
-			contig_mem_size += PG_SIZE;
+		if (next_page_distance == huge_page_size && current_page_status == PAGE_FREE && next_page_status == PAGE_FREE)  {
+			contig_mem_size += huge_page_size;
 			if(contig_mem_size >= mem_req) {
 				save_index = i;
 				for(j = 0, k = save_index; k <= (i+1) ; j++, k++) {
@@ -1408,7 +1471,7 @@ int find_reqd_contig_pages( unsigned int mem_req, struct ruleinfo *rule, int mem
 					rule->cont_memory_pool.cont_mem_set[memory_set][j] = mem.ea[k];
 				}
 
-				for ( j = 0; j<rule->cache_16M_pages_required ;j++) {
+				for ( j = 0; j<rule->cache_HUGE_pages_required ;j++) {
 					DEBUG_LOG("\n[%d] j = %d ea: %p page_status :%d",__LINE__,j,mem.ea[j],rule->mem_page_status[j]);
 				}
 
@@ -1416,7 +1479,7 @@ int find_reqd_contig_pages( unsigned int mem_req, struct ruleinfo *rule, int mem
 				return 0;
 			}
 		} else {
-			contig_mem_size = PG_SIZE;
+			contig_mem_size = huge_page_size;
 			save_index	  = -1;
 		}
 	}
@@ -1433,7 +1496,7 @@ int find_reqd_pages( unsigned int mem_req, struct ruleinfo *rule, int memory_set
 
 			rule->mem_page_status[i] = CACHE_PAGE;
 			rule->cont_memory_pool.cont_mem_set[memory_set][pages_found] = mem.ea[i];
-			allocated_mem += PG_SIZE ;
+			allocated_mem += huge_page_size ;
 			pages_found++;
 
 			if ( allocated_mem >= mem_req ) {
@@ -1731,7 +1794,7 @@ int write_mem(int index , int tid) {
 				addr = th_array[index].start_of_contiguous_memory + offset_sum;
 			}
 #endif
-			addr = th_array[index].contig_mem[offset_sum/(PG_SIZE)] + (offset_sum%(PG_SIZE));
+			addr = th_array[index].contig_mem[offset_sum/(huge_page_size)] + (offset_sum%(huge_page_size));
 
 			switch(data_width) {
 				case BYTE_WIDTH:
@@ -1960,7 +2023,7 @@ int read_and_compare_mem(int index , int tid) {
 			/* Calculate address to read/compare from */
 			offset_sum	= offset1+offset2;
 
-				addr = th_array[index].contig_mem[offset_sum/(PG_SIZE)] + (offset_sum%(PG_SIZE));
+				addr = th_array[index].contig_mem[offset_sum/(huge_page_size)] + (offset_sum%(huge_page_size));
 #if 0
 			if (system_information.pvr == POWER7P ) {
 			} else {
@@ -2053,7 +2116,7 @@ void set_defaults()
 		h_r[i].tgt_cache = L3;
 		h_r[i].num_oper = 15;
 #endif
-		for ( j=0 ; j<MAX_16M_PAGES ; j++ ) {
+		for ( j=0 ; j<MAX_HUGE_PAGES ; j++ ) {
 			h_r[i].mem_page_status[j] = PAGE_FREE;
 			h_r[i+1].mem_page_status[j] = PAGE_FREE;
 			h_r[i+2].mem_page_status[j] = PAGE_FREE;
@@ -3022,6 +3085,7 @@ int setup_prefetch_thread_context(void) {
 
 				for(j = 1; j<smt ; j++) {
 					index					   					= i + j;
+                    if(th_array[index].thread_type == CACHE)continue;
 					bound_cpu				   					= get_next_cpu( PREFETCH, testcase, index, core);
 #ifdef __HTX_MAMBO__
 					DEBUG_LOG("[%d] Prefetch thread number %d will be bound to CPU no %d\n",__LINE__,index,bound_cpu);
@@ -3071,7 +3135,7 @@ int setup_prefetch_thread_context(void) {
 
 
 int setup_cache_thread_context(void) {
-	int 		i=0, j=0, index=0, mem_per_thread, bound_cpu,core,smt,core_num,k,l;
+	int 		thd,i=0, j=0, index=0, mem_per_thread, bound_cpu,core,smt,core_num,k,l;
 	int			num_cores		= system_information.num_cores;
 	int 		rc 				= SUCCESS;
 	int 		tgt_cache_type 	= current_rule->tgt_cache;
@@ -3081,7 +3145,7 @@ int setup_cache_thread_context(void) {
 	int			pnum 				= 0;
 	char 		*ptr ;			
 	int			set_count			= 0;
-	int			pg_size			= PG_SIZE;
+	int			pg_size			= huge_page_size;
 	int			contiguous_pages 	= ceil( (double)current_rule->cont_memory_pool.contiguous_mem_required / (double) pg_size);
 	int			enabled_cores		= system_information.num_cores - current_rule->num_excluded_cores;
 
@@ -3097,7 +3161,13 @@ int setup_cache_thread_context(void) {
 		current_rule->num_cache_threads_to_create	= total_cache_threads;
 		mem_per_thread 								= line_size/current_rule->num_cache_threads_to_create;
 
-		for( core=0 ;  core < num_cores ; core++ ) {
+        for(core=0,thd=0;thd<total_cache_threads;thd++,core++){
+            if(system_information.pvr == POWER9_CUMULUS){
+                if(core == num_cores){
+                    core = 0;
+                    index = (system_information.core_smt_array[core]/2);
+                }        
+            }
 			core_num  										= system_information.cores_in_instance[core];
 			if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
 				continue;
@@ -3120,12 +3190,12 @@ int setup_cache_thread_context(void) {
 			th_array[index].cache_instance_under_test 		= j;
 			th_array[index].memory_starting_address_offset 	= 0;
 			/*th_array[index].start_of_contiguous_memory 		= (char *)current_rule->cont_memory_pool.cont_mem_set[0][0];*/
-			th_array[index].num_mem_sets					= 1;/*(current_rule->cache_16M_pages_required / enabled_cores) / contiguous_pages;*/
+			th_array[index].num_mem_sets					= 1;/*(current_rule->cache_HUGE_pages_required / enabled_cores) / contiguous_pages;*/
 			th_array[index].contig_mem[pnum++] 				= (char *)current_rule->cont_memory_pool.cont_mem_set[0][0];
 			th_array[index].pages_to_write 					= 1;
 #if 0
 			if ( core == (num_cores-1) ) {
-				th_array[index].num_mem_sets				+= (current_rule->cache_16M_pages_required % enabled_cores) / contiguous_pages;
+				th_array[index].num_mem_sets				+= (current_rule->cache_HUGE_pages_required % enabled_cores) / contiguous_pages;
 			}
 
 			for (l=j*th_array[index].num_mem_sets , set_count=0 ; set_count < th_array[index].num_mem_sets ; l++, set_count++ ) {
@@ -3153,7 +3223,13 @@ int setup_cache_thread_context(void) {
 		total_cache_threads							= get_num_threads(system_information.instance_number, testcase, CACHE, current_rule);
 		current_rule->num_cache_threads_to_create	= total_cache_threads;
 
-		for( core=0 ; core < num_cores ; core++ ) {
+        for(core=0,thd=0;thd<total_cache_threads;thd++,core++){
+            if(system_information.pvr == POWER9_CUMULUS){
+                if(core == num_cores){
+                    core = 0;
+                    index = (system_information.core_smt_array[core]/2);
+                }
+            }
 			core_num  										= system_information.cores_in_instance[core];
 			if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
 				DEBUG_LOG("[%d] excluding core index = %d , core number = %d \n",__LINE__,core,core_num);
@@ -3175,11 +3251,11 @@ int setup_cache_thread_context(void) {
 			th_array[index].walk_class_jump 				= 1;
 			th_array[index].cache_instance_under_test 		= j;
 			th_array[index].memory_starting_address_offset 	= /*th_array[index].cache_instance_under_test * 2*cache_size*/ 0 ;
-			th_array[index].num_mem_sets					= (current_rule->cache_16M_pages_required / enabled_cores) / contiguous_pages;
+			th_array[index].num_mem_sets					= (current_rule->cache_HUGE_pages_required / enabled_cores) / contiguous_pages;
 
 			/* In case this is the last core, assign all remaining pages to this core.	*/
 			if ( core == (num_cores-1) ) {
-				th_array[index].num_mem_sets				+= (current_rule->cache_16M_pages_required % enabled_cores) / contiguous_pages;
+				th_array[index].num_mem_sets				+= (current_rule->cache_HUGE_pages_required % enabled_cores) / contiguous_pages;
 			}
 
 			/* This is the offset within each cache line where this thread will write/read */
@@ -3189,7 +3265,7 @@ int setup_cache_thread_context(void) {
 			/* Instead now contig_mem array is used.								*/
 			/*th_array[index].start_of_contiguous_memory 		= (char *)current_rule->cont_memory_pool.cont_mem_set[j][0];*/
 
-			/*for (k=0 ; k<MAX_16M_PAGES_PER_CORE ; k++) {
+			/*for (k=0 ; k<MAX_HUGE_PAGES_PER_CORE ; k++) {
 				th_array[index].contig_mem[k] = (char *)current_rule->cont_memory_pool.cont_mem_set[j][k];
 			}*/
 
@@ -3272,7 +3348,7 @@ int setup_thread_context_array(int thread_type) {
 }
 
 int cleanup_thread_context_array(int thread_type) {
-	int j, index=0, core, smt,rc = SUCCESS;
+	int j,thd,index=0, core, smt,rc = SUCCESS;
 	int num_cores				= system_information.num_cores;
 	int testcase				= current_rule->testcase_type;
 	int num_cache_threads		= current_rule->num_cache_threads_created;
@@ -3312,6 +3388,7 @@ int cleanup_thread_context_array(int thread_type) {
 					smt = system_information.core_smt_array[core];
 					for(j = 1; j<smt ; j++) {
 						index = ( i * smt ) + j;
+                        if(th_array[index].thread_type == CACHE)continue;
 						pthread_attr_destroy(&th_array[index].thread_attrs_detached);
 						memset(&th_array[index], 0, sizeof(th_array[index]));
 					}
@@ -3326,7 +3403,13 @@ int cleanup_thread_context_array(int thread_type) {
 			/* one instance of cache thread runs per core											  */ 
 	
 				index = 0;
-				for( core=0 ; core < num_cores ; core++ ) {
+                for(core=0,thd=0;thd<num_cache_threads;thd++,core++){
+                    if(system_information.pvr == POWER9_CUMULUS){
+                        if(core == system_information.num_cores){
+                            index = (system_information.core_smt_array[core]/2);;
+                            core = 0;
+                        }
+                    }
 					int core_num = system_information.cores_in_instance[core];
 					if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
 						continue;
@@ -3379,7 +3462,7 @@ int cleanup_thread_context_array(int thread_type) {
 }
 
 int create_prefetch_threads(void){
-	int i, j, index, core, smt,rc = SUCCESS;
+	int i, j,index, core, smt,rc = SUCCESS;
 	int testcase_type = current_rule->testcase_type;
 	int num_prefetch_threads	= current_rule->num_prefetch_threads_to_create;
 
@@ -3443,6 +3526,7 @@ int create_prefetch_threads(void){
 					smt = system_information.core_smt_array[core];
 					for(j = 1; j<smt ; j++) {
 						index = i + j;
+                        if(th_array[index].thread_type == CACHE)continue;
 						if(pthread_create(&th_array[index].tid, &th_array[index].thread_attrs_detached,(void *(*)(void *))prefetch_irritator, (void *)&th_array[index]) ) {
 							/* If create threads fails, perform cleanup and return fail(-1) to calling function */
 							sprintf(msg, "Prefetch pthread_create call failed with %d \n", errno);
@@ -3491,7 +3575,8 @@ int create_cache_threads(void) {
 	int	index			= 0;
 	int	core 			= 0;
 	int num_cores		= system_information.num_cores;
-
+    int num_cache_threads = current_rule->num_cache_threads_created;
+    int thd;
 	switch(testcase_type) {
 		case CACHE_BOUNCE_ONLY :
 		case CACHE_BOUNCE_WITH_PREF:
@@ -3501,7 +3586,13 @@ int create_cache_threads(void) {
 			/* then one instance of cache thread runs per core.					*/
 		  
 			if(!exit_flag ) {
-				for( core=0 ; core < num_cores ; core++ ) {
+                for(core=0,thd=0;thd<num_cache_threads;thd++,core++){
+                    if(system_information.pvr == POWER9_CUMULUS){
+                       if(core == num_cores){
+                            core = 0;
+                            index = (system_information.core_smt_array[core]/2);
+                        }
+                    }
 					if ( core_to_exclude(&(current_rule->exclude_cores[0]), system_information.cores_in_instance[core]) == TRUE ) {
 						continue;
 					}
@@ -3765,9 +3856,13 @@ int derive_prefetch_algorithm_to_use(int index) {
 
 int get_next_cpu(int thread_type, int test_case, int thread_no, int core_no) {
 	int cpu = FAILURE;
-	int smt,i, index_in_core,core_num;
+	int smt,i, index_in_core,core_num,p9_cumulus_flag=0;
 	static int core_indexi_count[MAX_CORES_PER_CHIP] = {[0 ... (MAX_CORES_PER_CHIP -1)] = 1};
+    static int cache_thread_count = 0;
 
+    if(system_information.pvr == POWER9_CUMULUS){
+        p9_cumulus_flag = 1;
+    }
 	core_num									= system_information.cores_in_instance[core_no];
 	if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
 		DEBUG_LOG("[%d] Core %d is in exclude list, hence exitting \n",__LINE__, core_no);
@@ -3776,11 +3871,24 @@ int get_next_cpu(int thread_type, int test_case, int thread_no, int core_no) {
 		/*smt = get_smt_status(core_no);*/
 		smt = system_information.core_smt_array[core_no];
 		if(thread_type == CACHE) {
-			index_in_core = 0;
+            if(cache_thread_count >= system_information.num_cores){
+                index_in_core = (smt/2);
+            }else{
+			    index_in_core = 0;
+            }
+            if(p9_cumulus_flag){
+                cache_thread_count++;
+                if(cache_thread_count == (2*system_information.num_cores)){
+                    cache_thread_count = 0;
+                }
+            }
 		}
 		else {
-			index_in_core = core_indexi_count[core_no]++;/* Hotplug changes */
-			if(core_indexi_count[core_no] == smt) {
+			index_in_core = (core_indexi_count[core_no]++);/* Hotplug changes */
+            if((p9_cumulus_flag) && (index_in_core == (smt/2))){
+                index_in_core = (core_indexi_count[core_no]++);
+            }
+			if(core_indexi_count[core_no]  == smt) {
 				core_indexi_count[core_no] = 1;
 			}
 		}
@@ -3789,7 +3897,7 @@ int get_next_cpu(int thread_type, int test_case, int thread_no, int core_no) {
 		if( gang_size == 1){
 			cpu = system_information.instance_number;
 		}
-		/*printf("thread_no=%d, core_no = %d, cpu = %d\n,index_in_core=%d\n",thread_no,core_no,cpu,index_in_core);*/
+		DEBUG_LOG("thread_no=%d(th type = %d), core_no = %d, cpu = %d\n,index_in_core=%d\n",thread_no,thread_type,core_no,cpu,index_in_core);
 	}
 
 	return cpu;
@@ -3811,25 +3919,19 @@ int is_empty_list(int list[], int list_size) {
 }
 
 int get_num_threads(int instance_number, int test_case, int type, struct ruleinfo *rule) {
-	int core;
+	int core,p9_cumulus_flag=0;
 	int num_threads = FAILURE;
 	int smt 		= 0;
 
+    if(system_information.pvr == POWER9_CUMULUS){
+        p9_cumulus_flag = 1;
+    }
 	if ( (rule != NULL) || (is_empty_list(&(rule->exclude_cores[0]), MAX_CORES_PER_CHIP) != TRUE) ) {
 		num_threads = get_num_threads_for_rule(instance_number, test_case, type, rule);
 	} else {
 		if( type == PREFETCH ) {
 			switch ( test_case ) {
 				case PREFETCH_ONLY :														  /* If cache test is off, then all the threads run as Prefetch threads.	*/
-#if 0
-			   		num_threads = get_cpus_in_chip(instance_number,cpus_in_instance);
-
-					if (num_threads == -1) {
-						sprintf(msg,"[%d] syscfg library returned -1. Exitting !!",__LINE__);
-						hxfmsg(&h_d, -1, HTX_HE_HARD_ERROR, msg);
-						return (FAILURE);
-					}
-#endif
 					num_threads = system_information.number_of_logical_cpus;
 					break;
 
@@ -3848,7 +3950,7 @@ int get_num_threads(int instance_number, int test_case, int type, struct ruleinf
 							hxfmsg(&h_d, -1, HTX_HE_HARD_ERROR, msg);
 							return (FAILURE);
 						}
-						num_threads += ( smt - 1 );														/* we reserve one thread from each core for cache and other */
+						num_threads += ( smt - 1 - p9_cumulus_flag);														/* we reserve one thread from each core for cache and other */
 					}																					/* remaining threads are reserved for running prefetch.	 */
 					break;
 
@@ -3870,26 +3972,17 @@ int get_num_threads(int instance_number, int test_case, int type, struct ruleinf
 							hxfmsg(&h_d, -1, HTX_HE_HARD_ERROR, msg);
 							return (FAILURE);
 						}
-						if( smt >= 1)																			/* thread for every core in the chip, which has atleast one  */
-							num_threads++;																	   /* logical thread active in that core.					   */ 
+						if( smt >= 1){																			/* thread for every core in the chip, which has atleast one  */
+						    num_threads += (p9_cumulus_flag + 1);				
+                        }
 					}
 					break;
 				
-#if 0
-				case CACHE_ROLL_ONLY:																					/* If running ROLLOVER with no prefetch, then all threads run as CACHE threads */
-					/*num_threads = get_cpus_in_chip(instance_number,cpus_in_instance);*/
-					num_threads = system_information.number_of_logical_cpus;
-					if (num_threads == -1) {
-						sprintf(msg,"[%d] syscfg library returned -1. Exitting !!",__LINE__);
-						hxfmsg(&h_d, -1, HTX_HE_HARD_ERROR, msg);
-						return (FAILURE);
-					}
-					break;
-#endif
 				case CACHE_ROLL_WITH_PREF:
 					for( core=0 ; core<system_information.num_cores ; core++ ) {						/* If running ROLLOVER with prefetch, then we	*/
-						if( system_information.core_smt_array[core] >= 1)								/* count one thread for every core in chip	   */
-							num_threads++;																	 
+						if( system_information.core_smt_array[core] >= 1){								/* count one thread for every core in chip	   */
+						    num_threads += (p9_cumulus_flag + 1);				
+                        }
 					}
 					break;
 
@@ -3924,10 +4017,13 @@ int core_to_exclude(int core_list[], int core_num) {
 }
 
 int get_num_threads_for_rule(int instance_number, int test_case, int type, struct ruleinfo * rule) {
-	int core;
+	int core,p9_cumulus_flag=0;
 	int num_threads = 0;
 	int smt 		= 0;
   
+    if(system_information.pvr == POWER9_CUMULUS){
+        p9_cumulus_flag=1;
+    }
 	if( type == PREFETCH ) {
 		switch ( test_case ) {
 			case PREFETCH_ONLY :
@@ -3961,7 +4057,7 @@ int get_num_threads_for_rule(int instance_number, int test_case, int type, struc
 					}
 					if ( core_to_exclude(&(rule->exclude_cores[0]), system_information.cores_in_instance[core]) == FALSE ) {
 						DEBUG_LOG("\n[%d]Number of cores = %d",__LINE__,system_information.num_cores);
-						num_threads += smt - 1; 
+						num_threads += (smt - 1 - p9_cumulus_flag); 
 					}
 				}
 				break;
@@ -3990,7 +4086,7 @@ int get_num_threads_for_rule(int instance_number, int test_case, int type, struc
 						return (FAILURE);
 					}
 					if ( core_to_exclude(&(rule->exclude_cores[0]), system_information.cores_in_instance[core]) == FALSE )
-						num_threads += 1; 
+						num_threads +=(p9_cumulus_flag + 1); 
 				}
 				break;
 #if 0
@@ -4113,12 +4209,12 @@ int synchronize_threads(int index) {
 int dump_miscompare_data(int thread_index, void *addr) {
 
 	int rc = 0;
-	char dump_file_name[50];
+	char dump_file_name[256];
 	FILE *dump_fp;
 	int page_found = FALSE;
 	int i;
 	
-	strcpy(dump_file_name,getenv("HTX_LOG_DIR"));
+	strcpy(dump_file_name,h_d.htx_exer_log_dir);
 	sprintf(dump_file_name,"%s/hxecache_miscompare.%d.%d.%lx",dump_file_name,instance_number,thread_index,th_array[thread_index].seedval);
 	dump_fp = fopen(dump_file_name,"w");
 	
@@ -4146,7 +4242,7 @@ int dump_miscompare_data(int thread_index, void *addr) {
 	}
 	fprintf(dump_fp,"Memory starting address offset = %d\n",th_array[thread_index].memory_starting_address_offset);
 	fprintf(dump_fp,"Memory starting address        = %p\n\n\n",th_array[thread_index].start_of_contiguous_memory);
-	fprintf(dump_fp,"Dumping the 16M page where miscompare occurred\n\n");
+	fprintf(dump_fp,"Dumping the HUGE page where miscompare occurred\n\n");
 	fflush(dump_fp);
 
 	for(i=0; i<mem.num_pages; i++) {
@@ -4154,14 +4250,14 @@ int dump_miscompare_data(int thread_index, void *addr) {
 		unsigned char *next_page_addr		= mem.ea[i+1]; 
 
 		if ((unsigned char *)addr >= current_page_addr && (unsigned char *)addr <= next_page_addr) {
-			hexdump(dump_fp,(unsigned char *)current_page_addr,PG_SIZE);
+			hexdump(dump_fp,(unsigned char *)current_page_addr,huge_page_size);
 			page_found = TRUE;
 		}
 	}
 
 	if ( system_information.pvr >= POWER8_MURANO ) {
 		printf("[%d] Looking in Prefetch area for miscompares \n",__LINE__);
-		if ( (unsigned char *) addr >= mem.prefetch_4k_memory && (unsigned char *) addr <= (mem.prefetch_4k_memory + 7*PREFETCH_MEM_SZ) ) {
+		if ( (unsigned char *) addr >= mem.prefetch_4k_memory && (unsigned char *) addr <= (mem.prefetch_4k_memory + current_rule->num_prefetch_threads_to_create*PREFETCH_MEM_SZ) ) {
 			hexdump(dump_fp,(unsigned char *)addr, 512) ;
 			page_found = TRUE;
 		}
@@ -4192,7 +4288,7 @@ void hexdump(FILE *f,const unsigned char *s,int l)
 
 	for( ; n < l ; ++n) {
 		if((n%16) == 0)
-			fprintf(f,"\n%p",(s+n));
+			fprintf(f,"\n%p",(s+(n%16)));
 		fprintf(f," %02x",*s++);
 	}
 	fprintf(f,"\n");
@@ -4234,6 +4330,16 @@ int find_memory_requirement(void) {
 					return (mem_needed);
 				}
 				break;
+            case POWER9_NIMBUS:
+            case POWER9_CUMULUS:
+                mem_needed = calculate_mem_requirement_for_p9(rule);
+                if ( mem_needed < 0 ) {
+                    sprintf(msg,"[%d] Error: Unable to calculate memory requirement \n",__LINE__);
+                    hxfmsg(&h_d, mem_needed, HTX_HE_HARD_ERROR, msg);
+                    return (mem_needed);
+                }
+                break;
+                
 			default:
 				sprintf(msg,"[%d] Error: Unknown PVR (0x %x). Exitting \n",__LINE__,pvr);
 				hxfmsg(&h_d, E_UNKNOWN_PVR, HTX_HE_HARD_ERROR, msg);
@@ -4246,7 +4352,112 @@ int find_memory_requirement(void) {
 
 	return (rc);
 }
+int calculate_mem_requirement_for_p9(struct ruleinfo *rule_ptr) {
 
+    int tc_type                             = rule_ptr->testcase_type;
+    int target_cache                        = rule_ptr->tgt_cache;
+    int cache_size;
+    int worst_case_cache_memory_required    = -1;
+    int worst_case_contiguous_memory_pages_required = -1;
+    int worst_case_prefetch_memory_required = -1;
+    int testcase                            = rule_ptr->testcase_type;
+    int num_prefetch_threads;
+    int num_cache_threads;
+
+    rule_ptr->num_prefetch_threads_to_create    = get_num_threads(system_information.instance_number, testcase, PREFETCH, rule_ptr);
+    rule_ptr->num_cache_threads_to_create       = get_num_threads(system_information.instance_number, testcase, CACHE, rule_ptr);
+
+    if(gang_size == 1){
+        num_cache_threads = 1;
+    }
+    else{
+        num_cache_threads                       = rule_ptr->num_cache_threads_to_create;
+    }
+    num_prefetch_threads                        = rule_ptr->num_prefetch_threads_to_create;
+
+
+
+    switch(tc_type) {
+        case CACHE_BOUNCE_ONLY :
+            if ( num_cache_threads != 0 ) {
+                worst_case_cache_memory_required                    = huge_page_size;
+                cache_page_req                                      = (worst_case_cache_memory_required/(huge_page_size));
+                rule_ptr->cache_HUGE_pages_required                  = cache_page_req;
+                rule_ptr->cont_memory_pool.contiguous_mem_required  = huge_page_size;
+                rule_ptr->cont_memory_pool.num_sets                 = 1;
+            } else {
+                rule_ptr->cache_HUGE_pages_required                  = 0;
+                rule_ptr->cont_memory_pool.contiguous_mem_required  = 0;
+                rule_ptr->cont_memory_pool.num_sets                 = 0;
+            }
+            rule_ptr->prefetch_HUGE_pages_required               = 0;
+            prefetch_page_req                                   = 0;
+            rule_ptr->cont_memory_pool.prefetch_sets            = 0;
+            break;
+
+        case CACHE_BOUNCE_WITH_PREF :
+            if ( num_cache_threads != 0 ) {
+            worst_case_cache_memory_required                    = huge_page_size;
+            cache_page_req                                      = (worst_case_cache_memory_required/(huge_page_size));
+            rule_ptr->cache_HUGE_pages_required                  = cache_page_req;
+            rule_ptr->cont_memory_pool.contiguous_mem_required  = huge_page_size;
+            rule_ptr->cont_memory_pool.num_sets                 = 1;
+            } else {
+                rule_ptr->cache_HUGE_pages_required                  = 0;
+                rule_ptr->cont_memory_pool.contiguous_mem_required  = 0;
+                rule_ptr->cont_memory_pool.num_sets                 = 0;
+            }
+            prefetch_page_req                                   = (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+            rule_ptr->prefetch_HUGE_pages_required               = prefetch_page_req;
+            worst_case_prefetch_memory_required                 = (prefetch_page_req) * (huge_page_size);
+            rule_ptr->cont_memory_pool.prefetch_sets            = num_prefetch_threads;
+            break;
+
+        case CACHE_ROLL_WITH_PREF:
+        case CACHE_ROLL_ONLY :
+            if ( num_cache_threads != 0 ) {
+                cache_size                                          = system_information.cinfo[target_cache].cache_size;
+                rule_ptr->cont_memory_pool.contiguous_mem_required  = cache_size;
+                worst_case_contiguous_memory_pages_required         = (rule_ptr->cont_memory_pool.contiguous_mem_required / (huge_page_size)) + ((rule_ptr->cont_memory_pool.contiguous_mem_required % (huge_page_size)) == 0 ? 0:1);
+                cache_page_req                                      = worst_case_contiguous_memory_pages_required * num_cache_threads;
+                rule_ptr->cache_HUGE_pages_required                  = cache_page_req;
+                rule_ptr->cont_memory_pool.num_sets                 = num_cache_threads;
+            }else{
+                rule_ptr->cont_memory_pool.contiguous_mem_required  = 0;
+                rule_ptr->cache_HUGE_pages_required                  = 0;
+                rule_ptr->cont_memory_pool.num_sets                 = 0;
+            }
+            prefetch_page_req                                   = (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+            rule_ptr->prefetch_HUGE_pages_required               = prefetch_page_req;
+            worst_case_prefetch_memory_required                 = (prefetch_page_req) * (huge_page_size);
+            worst_case_cache_memory_required                    = cache_page_req * (huge_page_size);
+            rule_ptr->cont_memory_pool.prefetch_sets            = num_prefetch_threads;
+            DEBUG_LOG("*******[%d] prefetch pages reqd = %d, cache pages reqd = %d, cache threads = %d, prefetch threads = %d\n",
+                    __LINE__,rule_ptr->prefetch_HUGE_pages_required,rule_ptr->cache_HUGE_pages_required,num_cache_threads, num_prefetch_threads);
+            break;
+
+        case PREFETCH_ONLY :
+            worst_case_cache_memory_required                    = 0;
+            cache_page_req                                      = 0;
+            prefetch_page_req                                   = (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+            rule_ptr->prefetch_HUGE_pages_required               = prefetch_page_req;
+            worst_case_prefetch_memory_required                 = prefetch_page_req * (huge_page_size);
+            rule_ptr->cont_memory_pool.contiguous_mem_required  = 0;
+            rule_ptr->cont_memory_pool.num_sets                 = 0;
+            rule_ptr->cont_memory_pool.prefetch_sets            = num_prefetch_threads;
+            break;
+
+        default:
+            sprintf(msg,"[%d] Error: Invalid testcase type combination (%d) \n",__LINE__, testcase);
+            hxfmsg(&h_d, -1, HTX_HE_HARD_ERROR, msg);
+            rule_ptr->num_prefetch_threads_to_create            = 0;
+            rule_ptr->num_cache_threads_to_create               = 0;
+            break;
+    }
+    DEBUG_LOG("[%d] cache pages required = %d, contiguous mem sets required = %d\n",__LINE__,rule_ptr->cache_HUGE_pages_required,rule_ptr->cont_memory_pool.num_sets);
+    rule_ptr->total_HUGE_pages_required = rule_ptr->cache_HUGE_pages_required + rule_ptr->prefetch_HUGE_pages_required;
+    return ( worst_case_cache_memory_required + worst_case_prefetch_memory_required );
+}
 int calculate_mem_requirement_for_p7(struct ruleinfo *rule_ptr) {
 	
 	int	tc_type 							= rule_ptr->testcase_type;
@@ -4272,36 +4483,36 @@ int calculate_mem_requirement_for_p7(struct ruleinfo *rule_ptr) {
 	switch(tc_type) {
 		case CACHE_BOUNCE_ONLY :
 			if ( num_cache_threads != 0 ) {
-				worst_case_cache_memory_required					= PG_SIZE;
-				cache_page_req 										= (worst_case_cache_memory_required/(PG_SIZE));
-				rule_ptr->cache_16M_pages_required					= cache_page_req;
-				rule_ptr->cont_memory_pool.contiguous_mem_required	= PG_SIZE;
+				worst_case_cache_memory_required					= huge_page_size;
+				cache_page_req 										= (worst_case_cache_memory_required/(huge_page_size));
+				rule_ptr->cache_HUGE_pages_required					= cache_page_req;
+				rule_ptr->cont_memory_pool.contiguous_mem_required	= huge_page_size;
 				rule_ptr->cont_memory_pool.num_sets					= 1;
 			} else {
-				rule_ptr->cache_16M_pages_required					= 0;
+				rule_ptr->cache_HUGE_pages_required					= 0;
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
 				rule_ptr->cont_memory_pool.num_sets					= 0;
 			}
-			rule_ptr->prefetch_16M_pages_required				= 0;
+			rule_ptr->prefetch_HUGE_pages_required				= 0;
 			prefetch_page_req 									= 0;
 			rule_ptr->cont_memory_pool.prefetch_sets			= 0;
 			break;
 
 		case CACHE_BOUNCE_WITH_PREF :
 			if ( num_cache_threads != 0 ) {
-			worst_case_cache_memory_required					= PG_SIZE;
-			cache_page_req 										= (worst_case_cache_memory_required/(PG_SIZE));
-			rule_ptr->cache_16M_pages_required					= cache_page_req;
-			rule_ptr->cont_memory_pool.contiguous_mem_required	= PG_SIZE;
+			worst_case_cache_memory_required					= huge_page_size;
+			cache_page_req 										= (worst_case_cache_memory_required/(huge_page_size));
+			rule_ptr->cache_HUGE_pages_required					= cache_page_req;
+			rule_ptr->cont_memory_pool.contiguous_mem_required	= huge_page_size;
 			rule_ptr->cont_memory_pool.num_sets					= 1;
 			} else {
-				rule_ptr->cache_16M_pages_required					= 0;
+				rule_ptr->cache_HUGE_pages_required					= 0;
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
 				rule_ptr->cont_memory_pool.num_sets					= 0;
 			}
-			prefetch_page_req									= (num_prefetch_threads * (8*M))/(PG_SIZE) + ((num_prefetch_threads * (8*M))%(PG_SIZE) == 0 ? 0:1 ) ;
-			rule_ptr->prefetch_16M_pages_required				= prefetch_page_req;
-			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (PG_SIZE);
+			prefetch_page_req									= (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+			rule_ptr->prefetch_HUGE_pages_required				= prefetch_page_req;
+			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (huge_page_size);
 			rule_ptr->cont_memory_pool.prefetch_sets			= num_prefetch_threads;
 			break;
 
@@ -4310,31 +4521,31 @@ int calculate_mem_requirement_for_p7(struct ruleinfo *rule_ptr) {
 			if ( num_cache_threads != 0 ) {
 				cache_size 											= system_information.cinfo[target_cache].cache_size;
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 2*(cache_size);;
-				worst_case_contiguous_memory_pages_required 		= (rule_ptr->cont_memory_pool.contiguous_mem_required / (PG_SIZE)) + ((rule_ptr->cont_memory_pool.contiguous_mem_required % (PG_SIZE)) == 0 ? 0:1);
+				worst_case_contiguous_memory_pages_required 		= (rule_ptr->cont_memory_pool.contiguous_mem_required / (huge_page_size)) + ((rule_ptr->cont_memory_pool.contiguous_mem_required % (huge_page_size)) == 0 ? 0:1);
 				cache_page_req										= worst_case_contiguous_memory_pages_required * num_cache_threads;
-				rule_ptr->cache_16M_pages_required					= cache_page_req;
+				rule_ptr->cache_HUGE_pages_required					= cache_page_req;
 				rule_ptr->cont_memory_pool.num_sets					= system_information.num_cores/* - rule_ptr->num_excluded_cores*/;
 			} else {
-				rule_ptr->cache_16M_pages_required					= 0;
+				rule_ptr->cache_HUGE_pages_required					= 0;
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
 				rule_ptr->cont_memory_pool.num_sets					= 0;
 			}
-			prefetch_page_req									= (num_prefetch_threads * (8*M))/(PG_SIZE) + ((num_prefetch_threads * (8*M))%(PG_SIZE) == 0 ? 0:1 ) ;
-			rule_ptr->prefetch_16M_pages_required				= prefetch_page_req;
-			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (PG_SIZE);
-			worst_case_cache_memory_required					= cache_page_req * (PG_SIZE);
+			prefetch_page_req									= (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+			rule_ptr->prefetch_HUGE_pages_required				= prefetch_page_req;
+			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (huge_page_size);
+			worst_case_cache_memory_required					= cache_page_req * (huge_page_size);
 			rule_ptr->cont_memory_pool.prefetch_sets			= num_prefetch_threads;
-			DEBUG_LOG("*******[%d] prefetch pages reqd = %d, cache pages reqd = %d, cache threads = %d, prefetch threads = %d\n",
-					__LINE__,rule_ptr->prefetch_16M_pages_required,rule_ptr->cache_16M_pages_required,num_cache_threads, num_prefetch_threads);
+			printf("*******[%d] prefetch pages reqd = %d, cache pages reqd = %d, cache threads = %d, prefetch threads = %d\n",
+					__LINE__,rule_ptr->prefetch_HUGE_pages_required,rule_ptr->cache_HUGE_pages_required,num_cache_threads, num_prefetch_threads);
 			break;
 
 		case PREFETCH_ONLY :
 			worst_case_cache_memory_required					= 0;
-			cache_page_req 										= (worst_case_cache_memory_required/(PG_SIZE));
-			rule_ptr->cache_16M_pages_required					= cache_page_req;
-			prefetch_page_req									= (num_prefetch_threads * (8*M))/(PG_SIZE) + ((num_prefetch_threads * (8*M))%(PG_SIZE) == 0 ? 0:1 ) ;
-			rule_ptr->prefetch_16M_pages_required				= prefetch_page_req;
-			worst_case_prefetch_memory_required					= prefetch_page_req * (PG_SIZE);
+			cache_page_req 										= (worst_case_cache_memory_required/(huge_page_size));
+			rule_ptr->cache_HUGE_pages_required					= cache_page_req;
+			prefetch_page_req									= (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+			rule_ptr->prefetch_HUGE_pages_required				= prefetch_page_req;
+			worst_case_prefetch_memory_required					= prefetch_page_req * (huge_page_size);
 			rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
 			rule_ptr->cont_memory_pool.num_sets					= 0;
 			rule_ptr->cont_memory_pool.prefetch_sets			= num_prefetch_threads;
@@ -4352,9 +4563,10 @@ int calculate_mem_requirement_for_p7(struct ruleinfo *rule_ptr) {
 			break;
 	}
 
-	rule_ptr->total_16M_pages_required = rule_ptr->cache_16M_pages_required + rule_ptr->prefetch_16M_pages_required;
-	DEBUG_LOG("[%d] cache 16M pages needed = %d\n",__LINE__,rule_ptr->cache_16M_pages_required);
-	DEBUG_LOG("[%d] prefetch 16M pages needed = %d\n",__LINE__,rule_ptr->prefetch_16M_pages_required);
+	rule_ptr->total_HUGE_pages_required = rule_ptr->cache_HUGE_pages_required + rule_ptr->prefetch_HUGE_pages_required;
+	DEBUG_LOG("[%d] cache HUGE pages needed = %d\n",__LINE__,rule_ptr->cache_HUGE_pages_required);
+	DEBUG_LOG("[%d] prefetch HUGE pages needed = %d\n",__LINE__,rule_ptr->prefetch_HUGE_pages_required);
+	DEBUG_LOG("[%d]worst_case_cache_memory_required=%d,worst_case_prefetch_memory_required=%d\n",__LINE__,worst_case_cache_memory_required,worst_case_prefetch_memory_required);
 	return ( worst_case_cache_memory_required + worst_case_prefetch_memory_required );
 }
 
@@ -4381,36 +4593,36 @@ int calculate_mem_requirement_for_p7p(struct ruleinfo *rule_ptr) {
 	switch(testcase) {
 		case CACHE_BOUNCE_ONLY :
 			if ( num_cache_threads != 0 ) {
-				worst_case_cache_memory_required					= PG_SIZE;
-				cache_page_req 										= (worst_case_cache_memory_required/(PG_SIZE));
-				rule_ptr->cache_16M_pages_required					= cache_page_req;
-				rule_ptr->cont_memory_pool.contiguous_mem_required	= PG_SIZE;
+				worst_case_cache_memory_required					= huge_page_size;
+				cache_page_req 										= (worst_case_cache_memory_required/(huge_page_size));
+				rule_ptr->cache_HUGE_pages_required					= cache_page_req;
+				rule_ptr->cont_memory_pool.contiguous_mem_required	= huge_page_size;
 				rule_ptr->cont_memory_pool.num_sets					= 1;
 			} else {
-				rule_ptr->cache_16M_pages_required					= 0;
+				rule_ptr->cache_HUGE_pages_required					= 0;
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
 				rule_ptr->cont_memory_pool.num_sets					= 0;
 			}
-			rule_ptr->prefetch_16M_pages_required				= 0;
+			rule_ptr->prefetch_HUGE_pages_required				= 0;
 			prefetch_page_req 									= 0;
 			rule_ptr->cont_memory_pool.prefetch_sets			= 0;
 			break;
 
 		case CACHE_BOUNCE_WITH_PREF :
 			if ( num_cache_threads != 0 ) {
-				worst_case_cache_memory_required					= PG_SIZE;
-				cache_page_req 										= (worst_case_cache_memory_required/(PG_SIZE));
-				rule_ptr->cache_16M_pages_required					= cache_page_req;
-				rule_ptr->cont_memory_pool.contiguous_mem_required	= PG_SIZE;
+				worst_case_cache_memory_required					= huge_page_size;
+				cache_page_req 										= (worst_case_cache_memory_required/(huge_page_size));
+				rule_ptr->cache_HUGE_pages_required					= cache_page_req;
+				rule_ptr->cont_memory_pool.contiguous_mem_required	= huge_page_size;
 				rule_ptr->cont_memory_pool.num_sets					= 1;
 			} else {
-				rule_ptr->cache_16M_pages_required					= 0;
+				rule_ptr->cache_HUGE_pages_required					= 0;
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
 				rule_ptr->cont_memory_pool.num_sets					= 0;
 			}
-			prefetch_page_req									= (num_prefetch_threads * (8*M))/(PG_SIZE) + ((num_prefetch_threads * (8*M))%(PG_SIZE) == 0 ? 0:1 ) ;
-			rule_ptr->prefetch_16M_pages_required				= prefetch_page_req;
-			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (PG_SIZE);
+			prefetch_page_req									= (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+			rule_ptr->prefetch_HUGE_pages_required				= prefetch_page_req;
+			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (huge_page_size);
 			rule_ptr->cont_memory_pool.prefetch_sets			= num_prefetch_threads;
 			break;
 
@@ -4419,28 +4631,28 @@ int calculate_mem_requirement_for_p7p(struct ruleinfo *rule_ptr) {
 			if ( num_cache_threads != 0 ) {
 				cache_size 											= system_information.cinfo[target_cache].cache_size;
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 2*(cache_size);;
-				worst_case_contiguous_memory_pages_required 		= (rule_ptr->cont_memory_pool.contiguous_mem_required / (PG_SIZE)) + ((rule_ptr->cont_memory_pool.contiguous_mem_required % (PG_SIZE)) == 0 ? 0:1);
+				worst_case_contiguous_memory_pages_required 		= (rule_ptr->cont_memory_pool.contiguous_mem_required / (huge_page_size)) + ((rule_ptr->cont_memory_pool.contiguous_mem_required % (huge_page_size)) == 0 ? 0:1);
 				cache_page_req										= worst_case_contiguous_memory_pages_required * num_cache_threads;
-				rule_ptr->cache_16M_pages_required					= cache_page_req;
+				rule_ptr->cache_HUGE_pages_required					= cache_page_req;
 				rule_ptr->cont_memory_pool.num_sets					= system_information.num_cores /*- rule_ptr->num_excluded_cores*/;
 			} else {
 				rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
-				rule_ptr->cache_16M_pages_required					= 0;
+				rule_ptr->cache_HUGE_pages_required					= 0;
 				rule_ptr->cont_memory_pool.num_sets					= 0;
 			}
-			prefetch_page_req									= (num_prefetch_threads * (8*M))/(PG_SIZE) + ((num_prefetch_threads * (8*M))%(PG_SIZE) == 0 ? 0:1 ) ;
-			rule_ptr->prefetch_16M_pages_required				= prefetch_page_req;
-			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (PG_SIZE);
-			worst_case_cache_memory_required					= cache_page_req * (PG_SIZE);
+			prefetch_page_req									= (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+			rule_ptr->prefetch_HUGE_pages_required				= prefetch_page_req;
+			worst_case_prefetch_memory_required 				= (prefetch_page_req) * (huge_page_size);
+			worst_case_cache_memory_required					= cache_page_req * (huge_page_size);
 			rule_ptr->cont_memory_pool.prefetch_sets			= num_prefetch_threads;
 			break;
 
 		case PREFETCH_ONLY :
 			worst_case_cache_memory_required					= 0;
 			cache_page_req 										= 0;
-			prefetch_page_req									= (num_prefetch_threads * (8*M))/(PG_SIZE) + ((num_prefetch_threads * (8*M))%(PG_SIZE) == 0 ? 0:1 ) ;
-			rule_ptr->prefetch_16M_pages_required				= prefetch_page_req;
-			worst_case_prefetch_memory_required					= prefetch_page_req * (PG_SIZE);
+			prefetch_page_req									= (num_prefetch_threads * (8*M))/(huge_page_size) + ((num_prefetch_threads * (8*M))%(huge_page_size) == 0 ? 0:1 ) ;
+			rule_ptr->prefetch_HUGE_pages_required				= prefetch_page_req;
+			worst_case_prefetch_memory_required					= prefetch_page_req * (huge_page_size);
 			rule_ptr->cont_memory_pool.contiguous_mem_required	= 0;
 			rule_ptr->cont_memory_pool.num_sets					= 0;
 			rule_ptr->cont_memory_pool.prefetch_sets			= num_prefetch_threads;
@@ -4454,8 +4666,8 @@ int calculate_mem_requirement_for_p7p(struct ruleinfo *rule_ptr) {
 			break;
 	}
 
-	DEBUG_LOG("[%d] cache pages required = %d, contiguous mem sets required = %d\n",__LINE__,rule_ptr->cache_16M_pages_required,rule_ptr->cont_memory_pool.num_sets);
-	rule_ptr->total_16M_pages_required = rule_ptr->cache_16M_pages_required + rule_ptr->prefetch_16M_pages_required;
+	DEBUG_LOG("[%d] cache pages required = %d, contiguous mem sets required = %d\n",__LINE__,rule_ptr->cache_HUGE_pages_required,rule_ptr->cont_memory_pool.num_sets);
+	rule_ptr->total_HUGE_pages_required = rule_ptr->cache_HUGE_pages_required + rule_ptr->prefetch_HUGE_pages_required;
 	return ( worst_case_cache_memory_required + worst_case_prefetch_memory_required );
 }
 
@@ -4640,13 +4852,13 @@ void dump_rule_structure(struct ruleinfo *rule_ptr) {
 		}
 		print_log("\n[%d] Prefetch threads to be created         = %d",__LINE__,rule->num_prefetch_threads_to_create);
 		print_log("\n[%d] Cache threads to be created            = %d",__LINE__,rule->num_cache_threads_to_create);
-		print_log("\n[%d] 16M pages required for Cache           = %d",__LINE__,rule->cache_16M_pages_required);
-		print_log("\n[%d] 16M pages required for Prefetch        = %d",__LINE__,rule->prefetch_16M_pages_required);
+		print_log("\n[%d] HUGE pages required for Cache           = %d",__LINE__,rule->cache_HUGE_pages_required);
+		print_log("\n[%d] HUGE pages required for Prefetch        = %d",__LINE__,rule->prefetch_HUGE_pages_required);
 		if ( rule->use_contiguous_pages == TRUE ) {
-		print_log("\n[%d] Using 16MB contiguous pages for cache  = Yes",__LINE__);
+		print_log("\n[%d] Using HUGE contiguous pages for cache  = Yes",__LINE__);
 		print_log("\n[%d] Contiguous memory required             = %d bytes ( %d MB )",__LINE__,rule->cont_memory_pool.contiguous_mem_required, (rule->cont_memory_pool.contiguous_mem_required/1048576) );
 		} else {
-		print_log("\n[%d] Using 16MB contiguous pages            = No",__LINE__);
+		print_log("\n[%d] Using HUGE contiguous pages            = No",__LINE__);
 		}
 		print_log("\n[%d] Number of sets of contiguous pages     = %d",__LINE__,rule->cont_memory_pool.num_sets);
 		
@@ -4781,7 +4993,7 @@ int get_update_syschanges_hotplug()
 	hxfmsg(&h_d,retcode,HTX_HE_INFO, msg);
 
 	for(i=0 ; i<num_testcases ;i++) {
-		for ( j=0 ; j<MAX_16M_PAGES ; j++ ) {
+		for ( j=0 ; j<MAX_HUGE_PAGES ; j++ ) {
 			h_r[i].mem_page_status[j] = PAGE_FREE;
 		}
 	}
@@ -4810,7 +5022,7 @@ int get_update_syschanges_hotplug()
 			}
 		
 			for(i=0 ; i<num_testcases ;i++) {
-				for ( j=0 ; j<MAX_16M_PAGES ; j++ ) {
+				for ( j=0 ; j<MAX_HUGE_PAGES ; j++ ) {
 					h_r[i].mem_page_status[j] = PAGE_FREE;
 				}
 			}
@@ -4835,4 +5047,62 @@ int get_update_syschanges_hotplug()
 	update_sys_detail_flag = 0;
 	return (retcode);
 }
+
+int find_EA_to_RA(unsigned long ea,unsigned long long* ra){
+    const int __endian_bit = 1;
+    int i, c, pid, status;
+    uint64_t read_val, file_offset;
+    char path_buf [0x100] = {};
+    FILE * f;
+    char *end;
+    sprintf(path_buf, "/proc/self/pagemap");
+
+    /*printf("Big endian? %d\n", is_bigendian());*/
+    f = fopen(path_buf, "rb");
+    if(!f){
+        printf("Error! Cannot open %s\n", path_buf);
+        return -1;
+    }
+
+    /*Shifting by virt-addr-offset number of bytes*/
+    /*and multiplying by the size of an address (the size of an entry in pagemap file)*/
+    file_offset = ea / getpagesize() * PAGEMAP_ENTRY;
+    /*printf("Vaddr: 0x%lx, Page_size: %d, Entry_size: %d\n", ea , getpagesize(), PAGEMAP_ENTRY);
+    printf("Reading %s at 0x%llx\n", path_buf, (unsigned long long) file_offset);*/
+    status = fseek(f, file_offset, SEEK_SET);
+    if(status){
+        perror("Failed to do fseek!");
+        return -1;
+    }
+    errno = 0;
+    read_val = 0;
+    unsigned char c_buf[PAGEMAP_ENTRY];
+    for(i=0; i < PAGEMAP_ENTRY; i++){
+        c = getc(f);
+        if(c==EOF){
+            printf("\nReached end of the file\n");
+            return 0;
+        }
+        if(is_bigendian())
+           c_buf[i] = c;
+        else
+            c_buf[PAGEMAP_ENTRY - i - 1] = c;
+        /*printf("[%d]0x%x ", i, c);*/
+    }
+    for(i=0; i < PAGEMAP_ENTRY; i++){
+        read_val = (read_val << 8) + c_buf[i];
+    }
+    /*printf("\n");
+    printf("Result: 0x%llx\n", (unsigned long long) read_val);*/
+    if(GET_BIT(read_val, 63)){
+        /*printf("PFN: 0x%llx\n",(unsigned long long) GET_PFN(read_val));*/
+        *ra = (unsigned long long)GET_PFN(read_val);
+    }else
+        /*printf("Page not present\n");*/
+    if(GET_BIT(read_val, 62))
+        /*printf("Page swapped\n");*/
+    fclose(f);
+    return 0;
+}
+
 #endif

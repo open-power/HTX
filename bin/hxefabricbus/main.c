@@ -172,13 +172,20 @@ main(int argc, char *argv[]) {
     	return (-1);
     }
 	/* Configure which page size we are going to use */ 
-	if(pvr == PVR_POWER8_MURANO || pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) { /* Use 4 K */  
+	if(pvr >= PVR_POWER8_MURANO){/* Use 4 K */
 		SET_PAGESIZE= 0;	 /* We dont need to configure 16M pages, as its default */  
 	} else { /* Use 16M pages */ 
 		SET_PAGESIZE = 1; 
 	}
 
     hxfupdate(START, &htx_d);
+    if((!(strlen(htx_d.htx_log_dir))) || (!(strlen(htx_d.htx_exer_log_dir)))){
+        sprintf(msg_buf,"htx lib log direcories found to be htx_log_dir= %s and htx_exer_log_dir= %s, thus updating them to '/tmp/'\n",htx_d.htx_log_dir,htx_d.htx_exer_log_dir);
+        hxfmsg(&htx_d,0, HTX_HE_INFO, msg_buf);
+        strcpy(htx_d.htx_log_dir,"/tmp/");
+        strcpy(htx_d.htx_exer_log_dir,"/tmp/");
+
+    }
 #ifndef __HTX_LINUX__
     /* Machine should be dedicated LPAR  */
     if(_system_configuration.splpar_status & 0x2) {
@@ -383,7 +390,7 @@ main(int argc, char *argv[]) {
                 FILE * fp ;
 				unsigned long long psize; 
 				long long int pages_available = 0; 
-                char fname[32];
+                char fname[256];
 
                 if(query_memconf == 0 && query_pages == 0 ) {
                     if(SET_PAGESIZE) { /* P7P and below uses 16M pages */
@@ -422,7 +429,7 @@ main(int argc, char *argv[]) {
 					num_pages_available = (unsigned long long)(pages_available * 0.90); 	
 				#endif 
                     /* Next lets find out what was our requirement */
-					strcpy(fname,getenv("HTX_LOG_DIR"));
+					strcpy(fname,htx_d.htx_log_dir);
                     sprintf(fname, "%s/fabricbus_mem_req_%d",fname, mem_alloc);
                     if((fp=fopen(fname,"r")) == NULL){
                         sprintf(msg_buf, "fopen of file %s failed with errno=%d",fname,errno);
@@ -439,7 +446,7 @@ main(int argc, char *argv[]) {
                         return(-1);
                     }
 					/* For P8 we write 0 to "/tmp/fabricbus_mem_req_<mem_alloc>" */
-               		if(pvr == PVR_POWER8_MURANO || pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) {
+               		if(pvr >= PVR_POWER8_MURANO){ 
 						/* This logic won't work for mem_alloc = 0, 1,2, we only use them for debugging 
 						 * As long as mem_alloc = 3,4 we try to map all CPUs,  we are good with below equation 
 						 */  
@@ -473,8 +480,8 @@ main(int argc, char *argv[]) {
                      * mapping to /tmp/fabricbus_mem_config_*(* = mem_alloc).
                      */
                    	FILE * memfptr ;
-                    char file_mem[50];
-					strcpy(file_mem,getenv("HTX_LOG_DIR"));
+                    char file_mem[256];
+					strcpy(file_mem,htx_d.htx_log_dir);
                     sprintf(file_mem, "%s/fabricbus_mem_config_%d",file_mem, mem_alloc);
                     memfptr = fopen(file_mem,"w");
                     if(memfptr == NULL)  {
@@ -511,10 +518,10 @@ main(int argc, char *argv[]) {
 			 	 
 			if(query_maskconf) { 
 				/* This command will generate a sample mask file for user */ 
-				char file_masks[50];
+				char file_masks[256];
 				int j = 0, host_rad, dest_rad[MAX_NODES],  cnt = 0, found = 0 ;  
 				FILE * mfptr ;  
-				strcpy(file_masks,getenv("HTX_LOG_DIR"));
+				strcpy(file_masks,htx_d.htx_log_dir);
 				sprintf(file_masks, "%s/fabricbus_masks_%d",file_masks, mem_alloc); 
 	
 				mfptr = fopen(file_masks, "w"); 
@@ -613,7 +620,7 @@ main(int argc, char *argv[]) {
                    	max_page_req = page_req ;
 
             	FILE * qfptr;
-            	char file_pages[50];
+            	char file_pages[256];
 				unsigned int pages_configured = 0;
 				/* 
 				 * First magic number in calculation below is calculated as : 
@@ -627,7 +634,7 @@ main(int argc, char *argv[]) {
             		mem_page_req =(int)( 4 * max_page_req + 0.10 * 4 * max_page_req + 1); /* 10% extra for each thread */
 				} else if(pvr == PVR_POWER7PLUS) { 
 					mem_page_req = (int)( 10 * max_page_req + 0.10 * 10 * max_page_req + 1); /* 10% extra for each thread */
-				} else if(pvr == PVR_POWER8_MURANO || pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) { 
+				} else if(pvr >= PVR_POWER8_MURANO){
 					mem_page_req = 0;	/* Don't need 16M pages */ 
 				} else { 
 					mem_page_req = 4 * max_page_req; 
@@ -640,7 +647,7 @@ main(int argc, char *argv[]) {
 						mem_page_req += 0; 
 					}
 				} 
-				strcpy(file_pages,getenv("HTX_LOG_DIR"));
+				strcpy(file_pages,htx_d.htx_log_dir);
             	sprintf(file_pages, "%s/fabricbus_mem_req_%d",file_pages, mem_alloc);
             	qfptr = fopen(file_pages, "w");
             	if(qfptr == NULL ) {

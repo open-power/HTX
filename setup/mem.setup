@@ -2,15 +2,22 @@
 ###### Collect the large and huge page memory required memory statistics 
 ###### into the file ${HTX_LOG_DIR}/freepages
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
-if [[ $Hugepagesize -ne 16384 ]]
+if [[ $Hugepagesize -lt 2048 ]]
 then
-    echo "Hugepagesize is not equal to 16M"
+    echo "Hugepagesize is not equal to 2M or 16M (Hugepagesize=${Hugepagesize})"
     echo "cache instances will not be created."
     echo "avail_16M=0,avail_16G=0,free_16M=0,free_16G=0" >  ${HTX_LOG_DIR}/freepages
     echo "mem_16M=0" >>  ${HTX_LOG_DIR}/freepages
     echo "cache_16M=0" >>  ${HTX_LOG_DIR}/freepages
     echo "tlbie_16M=0" >> ${HTX_LOG_DIR}/freepages
     exit
+fi
+
+if [[ $Hugepagesize -eq 2048 ]]
+then
+    mult_factor=5
+else
+    mult_factor=1
 fi
 
 # Number of available processors on the system
@@ -102,7 +109,13 @@ then
 	    then
 		#P8
 		pages_reserved_cache_per_instance=$((max_cpus_in_instance/maxSMT))
-	    fi
+		
+		elif [[ "$proc_ver" = "0x4e" || "$proc_ver" = "0x4f" ]]
+		then
+		#P9
+			pages_reserved_cache_per_instance=$((max_cpus_in_instance/maxSMT)*2*mult_factor) #P9 cache size =10MB,1 cache thread for every (smt/2) threads. 
+		
+		fi
 
 	     Cpuset=$((Cpuset*smt_thr_per_cpu_cache))
 
@@ -118,7 +131,19 @@ fi
 mem_16M=$num_proc
 if [ "$shared_processor_mode" = "no" ]
 then
-	mem_16M_l4=`expr 8 \* $num_instances`
+	if [[ "$proc_ver" = "0x4e" || "$proc_ver" = "0x4f" ]]
+	then
+	#p9
+		if [[ $Hugepagesize -eq 16384 ]]
+		then
+			mem_16M_l4=`expr 16 \* $num_instances`
+		elif [[ $Hugepagesize -eq 2048 ]]
+		then
+			mem_16M_l4=`expr 10 \* 8 \* $num_instances`  # 10*2MB(to roll L3), num MCS = 8(assuming * mCS grouping)
+		fi
+	else
+		mem_16M_l4=`expr 8 \* $num_instances`
+	fi
 	if [ $mem_16M_l4 -gt $mem_16M ]
 	then
 		mem_16M=$mem_16M_l4
@@ -134,6 +159,11 @@ leave_16G=0
 
 # Add extra 16M as buffer so that if any other process takes additional 16M pages. We don't fall short of it and hit any error.
 extra_16M_buffer=5
+cache_buffer_pages=`expr $num_instances \* $mult_factor`
+if [[ $extra_16M_buffer -lt $cache_buffer_pages ]]
+then
+    extra_16M_buffer=$cache_buffer_pages
+fi
 leave_16M=`expr $leave_16M + $extra_16M_buffer`
 
 free_16M=0

@@ -652,11 +652,11 @@ user_def_memory_mapping(int mem_alloc, unsigned int * num_cpus_mapped, unsigned 
 
     FILE *fptr;
     int rc,eof_flag = 0 ;
-    char line[200], file_mem[100];
+    char line[200], file_mem[256];
     int node, host_cpu= -1, dest_cpu = -1, cpus_mapped = 0;
     int cpu_index[MAX_CHIPS] ={0};
 
-	strcpy(file_mem,getenv("HTX_LOG_DIR"));
+	strcpy(file_mem,htx_d.htx_log_dir);
     sprintf(file_mem,"%s/fabricbus_mem_config_%d",file_mem,mem_alloc);
     if ((fptr = fopen(file_mem,"r" )) == NULL) {
         sprintf(msg,"error open %s ",file_mem );
@@ -759,13 +759,13 @@ user_def_mask_mapping(unsigned int mem_alloc, unsigned int num_cpus_mapped, unsi
 
 	FILE *fptr; 
 	int rc, eof_flag = 0, i ;
-	char line[200], file_mask[100];
+	char line[200], file_mask[256];
 	char * host_ptr, * dest_ptr, * and_mask_ptr, *or_mask_ptr; 
 	unsigned int host, dest; 
 	unsigned long long and_mask[4], or_mask[4];
 	char * temp = NULL; 
 
-	strcpy(file_mask,getenv("HTX_LOG_DIR"));
+	strcpy(file_mask,htx_d.htx_log_dir);
 	sprintf(file_mask,"%s/fabricbus_masks_%d",file_mask,mem_alloc);
 	
 	if ((fptr = fopen(file_mask, "r" )) == NULL) {

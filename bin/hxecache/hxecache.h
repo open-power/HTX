@@ -146,8 +146,6 @@
 #define  M	 				1024*K
 
 /* Memory page size */
-#define PG_SIZE				16*M
-#define HALF_PAGE_SIZE		(PG_SIZE/2)
 #define PREF_PG_SIZE		4*K
 
 /* Target cache types	*/
@@ -186,7 +184,7 @@
 #define RR_ALL_ENABLED_PREFETCH_ALGORITHMS 	32
 
 #define GANG_SIZE 			8
-#define MAX_CONTIG_PAGES 	4
+#define MAX_CONTIG_PAGES 	5
 #define MAX_RULEID_LEN		40		/* Maximum characters in Rule id string */
 #define MAX_PREFETCH_ALGOS	5
 #define MAX_PREFETCH_STREAMS		16
@@ -210,7 +208,7 @@
 #define CACHE_PAGE			1
 #define PAGE_HALF_FREE 		2
 #define PREFETCH_PAGE  		3
-#define PREFETCH_MEM_SZ 	HALF_PAGE_SIZE
+#define PREFETCH_MEM_SZ 	8*M
 
 /* Exit flag codes */
 #define ERR_EXIT 			1
@@ -234,6 +232,8 @@
 #define POWER8_MURANO		0x4b
 #define POWER8_VENICE		0x4d
 #define POWER8_PRIME		0x4c
+#define POWER9_NIMBUS       0x4e
+#define POWER9_CUMULUS      0x4f
 
 /* Operation return values */
 #define SUCCESS					0
@@ -263,15 +263,16 @@
 /* Maximum SMT value */
 #define MAX_SMT				8
 
-/* Maximum 16M pages to be allocated */
-#define MAX_16M_PAGES		(SEG_SIZE*4)/(16*M)
-#define MAX_16M_PAGES_PER_CORE	2
 
 /* Maximum number of Prefetch threads */
-#define	MAX_CORES_IN_CHIP		12
+#define	MAX_CORES_IN_CHIP		24
 #define MAX_PREFETCH_THREADS	( (MAX_SMT - 1)*MAX_CORES_IN_CHIP
 /* Maximum 4K pages to be allocated for prefetch threads */
 #define MAX_4K_PAGES		( (PREFETCH_MEM_SZ / PREF_PG_SIZE) * MAX_PREFETCH_THREADS )
+
+/* Maximum HUGE pages to be allocated */
+#define MAX_HUGE_PAGES_PER_CORE	10
+#define MAX_HUGE_PAGES      (MAX_HUGE_PAGES_PER_CORE * MAX_CORES_IN_CHIP) 
 struct cache_info {
 	int line_size;	/* Cache line size */
 	int asc;		/* cache associativity */
@@ -309,11 +310,11 @@ struct thread_context {
 												 				/* the cache. This will be used as a starting point upon which offsets will	*/
 												 				/* be added and memory address to read/write will be calculated.			*/
 	unsigned long long int 	sync_mask;
-	char					*contig_mem[MAX_16M_PAGES_PER_CORE*MAX_CORES_PER_CHIP];
+	char					*contig_mem[MAX_HUGE_PAGES_PER_CORE*MAX_CORES_PER_CHIP];
 	int						prefetch_streams;					/* The maximum number of prefetch streams for the thread. Valid only for prefetch threads. 	*/
 	unsigned long long		read_dscr_val;						/* The DSCR value that is read from SPR 3.													*/
 	unsigned long long		written_dscr_val;					/* The DSCR value that is written to SPR 3.													*/
-	int						pages_to_write;						/* Number of 16MB pages written by ( cache ) thread.										*/	
+	int						pages_to_write;						/* Number of HUGEB pages written by ( cache ) thread.										*/	
 	int						num_mem_sets;						/* Number of sets of contiguous memory to be written by ( cache ) thread.					*/
 };
 
@@ -321,17 +322,17 @@ struct memory_set {
 	unsigned char 		*seg_addr[NUM_SEGS];			   					/* shared memory EA. 										*/
 	int 				shm_id[NUM_SEGS];				   					/* shared memory ids arrary. 								*/
 	int 				key[NUM_SEGS];										/* shared memory keys array. 								*/
-	unsigned long long 	real_addr[MAX_16M_PAGES];							/* shared memory RA arrary 									*/
-	unsigned char 		*ea[MAX_16M_PAGES];									/* shared memory EA array  Maximum mem required in case		*/
+	unsigned long long 	real_addr[MAX_HUGE_PAGES];							/* shared memory RA arrary 									*/
+	unsigned char 		*ea[MAX_HUGE_PAGES];									/* shared memory EA array  Maximum mem required in case		*/
 																			/* of p7+ rollover, 128MB/core in worst case.				*/
-	int 				num_pages;											/* Num of 16M pages allocated 								*/
+	int 				num_pages;											/* Num of HUGE pages allocated 								*/
 	unsigned long long 	page_size;
 	unsigned int 		cache_threads;										/* Number of cache threads created. 						*/
 	unsigned int 		prefetch_threads;									/* Prefetch threads created.								*/
 	unsigned int 		total_threads;										/* Total threads created.									*/
 	unsigned int 		contiguous_memory_size;	 							/* Size of conitguous memory. 								*/
 	unsigned int 		memory_set_size[NUM_SEGS];							/* Size of entire memory set. 								*/
-	unsigned int 		page_status[MAX_16M_PAGES];							/* Status of the page (FREE / CACHE / PREFETCH).			*/
+	unsigned int 		page_status[MAX_HUGE_PAGES];							/* Status of the page (FREE / CACHE / PREFETCH).			*/
 	unsigned char		*prefetch_4k_memory;								/* Memory allocated (of 4K page size) for prefetch threads	*/
 };
 
@@ -356,7 +357,7 @@ struct mempool_t {
 	unsigned int	contiguous_mem_required;					/* Contiguous memory required.												*/
 	unsigned int	num_sets;									/* Number of sets of contiguous memory areas needed.						*/
 	unsigned int	prefetch_sets;								/* Number of sets of prefetch memory.										*/
-	unsigned char	*cont_mem_set[MAX_CPUS_PER_CHIP][MAX_16M_PAGES_PER_CORE];	/* Array of pointers to store contiguous memory locations.					*/
+	unsigned char	*cont_mem_set[MAX_CPUS_PER_CHIP][MAX_HUGE_PAGES_PER_CORE];	/* Array of pointers to store contiguous memory locations.					*/
 	unsigned char	*prefetch_mem_set[MAX_CPUS_PER_CHIP];		/* Array of pointers to store memory address allocated to Prefetch threads.	*/
 };
 
@@ -384,10 +385,10 @@ struct ruleinfo {
 	unsigned int			prefetch_memory_size;				/* The amount of memory which will be prefetched.				*/
 	unsigned int			cache_memory_size;					/* The amount of memory that will be written by cache threads	*/
 	unsigned int			testcase_conf;						/* 32-bit variable to store testcase configuration.				*/
-	unsigned int			cache_16M_pages_required;			/* Cache memory required for this rule stanza					*/
-	unsigned int			prefetch_16M_pages_required;		/* Prefetch memory required for this rule stanza				*/
-	unsigned int 			total_16M_pages_required;			/* Actual amount of 16M pages needed for this rule.				*/
-	int						mem_page_status[MAX_16M_PAGES];		/* Indicates the allocated page belongs to CACHE/PREFETCH.		*/
+	unsigned int			cache_HUGE_pages_required;			/* Cache memory required for this rule stanza					*/
+	unsigned int			prefetch_HUGE_pages_required;		/* Prefetch memory required for this rule stanza				*/
+	unsigned int 			total_HUGE_pages_required;			/* Actual amount of HUGE pages needed for this rule.				*/
+	int						mem_page_status[MAX_HUGE_PAGES];		/* Indicates the allocated page belongs to CACHE/PREFETCH.		*/
 	struct mempool_t		cont_memory_pool;					/* Structure to store contiguous memory requirements.			*/
 	int						exclude_cores[MAX_CORES_PER_CHIP];	/* List of cores that should be excluded from execution.		*/
 	int						num_excluded_cores;
