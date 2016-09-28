@@ -41,7 +41,11 @@
 #endif
 
 #ifdef __CAPI_FLASH__
-	#include <sys/capiblock.h>
+    #ifdef __HTX_LINUX__
+        #include <capiblock.h>
+    #else
+        #include <sys/capiblock.h>
+    #endif
 #endif
 
 #define MAX_THREADS             4096
@@ -69,7 +73,6 @@
 #define RANDOM      1
 #define RROBIN      2
 #ifdef __CAPI_FLASH__
-    #define CBLK_SHR_LUN                0x10
     #define CBLK_OPN_PHY_LUN            0x00
     #define CBLK_CLOSE_LUN              0x4
 #endif

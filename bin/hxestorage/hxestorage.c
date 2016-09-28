@@ -51,7 +51,8 @@ oper_fptr oper_list[TESTCASE_TYPES][MAX_OPER_COUNT] = {{cflsh_read_operation, cf
                                                       };
 int 	lun_type = UNDEFINED;
 char	capi_device[MAX_STR_SZ];
-size_t 	chunk_size = 256 * KB;
+size_t 	chunk_size = DEFAULT_CHUNK_SIZE;
+volatile chunk_id_t shared_lun_id = NULL_CHUNK_ID;
 #else
 oper_fptr oper_list[TESTCASE_TYPES][MAX_OPER_COUNT] = {{&read_disk, &write_disk, &compare_buffers, &discard, NULL, NULL},
                                                       {&read_async_disk, &write_async_disk, &cmp_async_disk, NULL, NULL, NULL},
@@ -151,7 +152,9 @@ int main(int argc, char *argv[])
     if (ptr != NULL) {
 		strcpy(script_path, ptr);
     } else {
-        strcpy(script_path, "/usr/lpp/htx/etc/scripts/");
+        sprintf(msg, "HTX env. is not set. Hence exiting.\nPlease setup the env. and re-run the test");
+        user_msg(&data, 0, 0, INFO, msg);
+        exit(1);
     }
     sprintf(cmd_str, "%scheck_disk %s", script_path, data.sdev_id);
     rc = system(cmd_str);
@@ -190,22 +193,26 @@ int main(int argc, char *argv[])
     eeh_env = getenv("HTXEEH");
     if (eeh_env != NULL) {
         if (atoi(eeh_env)) {
-            eeh_retries = atoi(getenv("HTXEEHRETRIES"));
+            ptr = getenv("HTXEEHRETRIES");
+            if (ptr != NULL) {
+                eeh_retries = atoi(getenv("HTXEEHRETRIES"));
+			}
         } else if((strcmp(data.run_type, "REG") == 0) && data.p_shm_HE->cont_on_err) {
             /* If User specifies COE in mdt file, then need to make sure all
-             * read/write calls are successful. If we see occasional error, retry.
+             * read/write call are successfull. If we see ocassional error, retry.
              */
             eeh_retries = DEFAULT_EEH_RETRIES;
         }
     }
 
     /****************************************************************************/
-	/*    For CAPI flash, Device given as input is of format /dev/rhdisk[0-1]*.N*/
-    /*    Actual devicewould be /dev/rhdisk[0-1] and our invocation count would */
-    /*    be N. Extract device name from argv[1]                                */
+	/*   For CAPI flash, Device given as input is of format /dev/rhdisk[0-1]*.N */
+    /*   on AIX and sd[a-z][a-z]*.N on Linux. Actual device would be            */
+    /*   /dev/rhdisk[0-1] OR /dev/sd[a-z][a-z, 0-1]* and our invocation count   */
+    /*   would be N. Extract device name from argv[1]                           */
 	/****************************************************************************/
 
-	#ifdef __CAPI_FLASH__
+#ifdef __CAPI_FLASH__
 	char file[128] = "/tmp/test_lun_mode";
     FILE * fp ;
 	uint32_t num_instance = 0;
@@ -217,7 +224,11 @@ int main(int argc, char *argv[])
     str_len = strlen(input_dev);
 
 	rc = cblk_init(NULL, 0);
-
+	if (rc != 0) {
+       sprintf(msg, "cblk_init returned error. rc: %d.", rc);
+       user_msg(&data, 0, 0, HARD, msg);
+       exit(1);
+    }
 
     for(i = 0; i <= str_len; i++ ) {
         temp[indx]=input_dev[i];
@@ -244,61 +255,112 @@ int main(int argc, char *argv[])
 
 	rc = access(file, F_OK);
     if(rc == -1 ) {
+    #ifdef __HTX_LINUX__
+        /* In case of Linux, if file does not exist, we run in VLUN mode.
+         * Hence, setting the params for VLUN mode.
+         */
+        lun_type = CBLK_OPN_VIRT_LUN;
+        dev_info.maxblk = (unsigned long long)VLUN_TOTALBLOCKS;
+        dev_info.blksize = (unsigned int)VLUN_BLKSIZE;
+    #else
+        /* In case of AIX, if file does not exist, means we are testing in Legacy mode.
+         * hxestorage should run on this device instead of hxesurelock. Hence, exiting.
+         */
 		sprintf(msg, "File: %s, doesnot exists!! this exerciser should not have been envoked. \n", file);
 		user_msg(&data, 0, 0, HARD, msg);
 		return(rc);
-	}
-
-	/************************************************/
-	/* Get content of file : "/tmp/test_lun_mode"   */
-	/************************************************/
-	sprintf(cmd_str, "cat %s", file);
-    fp = popen(cmd_str, "r");
-    if (fp == NULL) {
-        sprintf(msg, "popen failed while reading file=%s with errno=%d. Setting Virtual LUN mode. \n", file, errno);
-        user_msg(&data, 0, 0, INFO, msg);
-		num_instance = 2;
-    } else {
-        if (fgets(buf, 128, fp) == NULL) {
-            sprintf(msg, "fgets failed while reading from file = %s, errno=%d. Setting Virtual LUN mode. \n \n", file, errno);
+    #endif
+	} else {
+        /************************************************/
+	    /* Get content of file : "/tmp/test_lun_mode"   */
+	    /************************************************/
+	    sprintf(cmd_str, "cat %s", file);
+        fp = popen(cmd_str, "r");
+        if (fp == NULL) {
+            sprintf(msg, "popen failed while reading file=%s with errno=%d. Setting Virtual LUN mode. \n", file, errno);
             user_msg(&data, 0, 0, INFO, msg);
-            pclose(fp);
-			num_instance = 2;
+	    	num_instance = 2;
         } else {
-            pclose(fp);
-            num_instance = atoi(buf);
+            if (fgets(buf, 128, fp) == NULL) {
+                sprintf(msg, "fgets failed while reading from file = %s, errno=%d. Setting Virtual LUN mode. \n \n", file, errno);
+                user_msg(&data, 0, 0, INFO, msg);
+                pclose(fp);
+	    		num_instance = 2;
+            } else {
+                pclose(fp);
+                num_instance = atoi(buf);
+            }
+        }
+
+	    if(num_instance == 1) {
+	    	/***********************************************************/
+            /* File exists with value=1, we are testing PLUNs. We can  */
+            /* query IOCINFO on PLUNs for total blocks and block size. */
+            /***********************************************************/
+            lun_type            = CBLK_OPN_PHY_LUN;
+        #ifndef __HTX_LINUX__
+            rc = get_disk_info(&data, capi_device);
+            if ( rc != 0) {
+                exit(1);
+            }
+            /****************************************************/
+            /* For PLUN chunk_size is same as num blocks on disk*/
+            /****************************************************/
+            chunk_size = dev_info.maxblk + 1;
+        #else
+            chunk_id_t chunk_id = NULL_CHUNK_ID;
+
+            chunk_id = cblk_open(capi_device, MAX_THREADS, O_RDWR, NULL, 0);
+            if(chunk_id == NULL_CHUNK_ID) {
+                sprintf(msg, "main : Cannot get a valid chunk_id, capi_device = %s, errno = %d \n", capi_device, errno);
+                user_msg(&data, errno, 0, HARD, msg);
+                exit(1);
+	        }
+            rc = cblk_get_lun_size(chunk_id, &dev_info.maxblk, 0);
+            if(rc ) {
+                sprintf(msg, "cblk_get_size failed with rc = %d, errno = %d \n", rc, errno);
+                user_msg(&data, errno, 0, HARD, msg);
+                return(1);
+            }
+            rc = cblk_close(chunk_id, CBLK_SCRUB_DATA_FLG);
+            if(rc) {
+                sprintf(msg, "cblk_close failed with rc = %d, errno = %x \n", rc, errno);
+                user_msg(&data, errno, 0, HARD, msg);
+                exit(1);
+            }
+            chunk_id = NULL_CHUNK_ID;
+            /****************************************************/
+            /* For PLUN chunk_size is same as num blocks on disk*/
+            /****************************************************/
+            chunk_size = dev_info.maxblk;
+            dev_info.blksize = (unsigned int)VLUN_BLKSIZE;
+        #endif
+	    } else {
+            if (num_instance == 0) {
+            #ifdef __HTX_LINUX__
+                 /* in case of LInux, If value in file is 0, means we are testing VLUN */
+                dev_info.maxblk = (unsigned long long)VLUN_TOTALBLOCKS;
+                dev_info.blksize = (unsigned int)VLUN_BLKSIZE;
+                lun_type = CBLK_OPN_VIRT_LUN;
+            #else
+                /* In case of AIX, value 0 means, we need to run in LEGACY mode. So error out */
+                sprintf(msg, "File: %s, exists but value = %d, this exerciser should not have been envoked. \n", file, num_instance);
+                user_msg(&data, 0, 0, HARD, msg);
+                return(rc);
+            #endif
+            } else {
+                /********************************************************/
+	            /* File exists with value > 1, we are testing VLUNS.    */
+	    	    /* VLUNs have capability to dynamically change size.    */
+	    	    /* So user request for it through chunk_size rules parm.*/
+	    	    /********************************************************/
+	 	        dev_info.maxblk 	= (unsigned long long)VLUN_TOTALBLOCKS;
+	            dev_info.blksize 	= (unsigned int)VLUN_BLKSIZE;
+		        lun_type 			= CBLK_OPN_VIRT_LUN;
+	        }
         }
     }
-
-	if(num_instance == 0) {
-		sprintf(msg, "File: %s, exists but value = %d, this exerciser should not have been envoked. \n", file, num_instance);
-		user_msg(&data, 0, 0, HARD, msg);
-		return(rc);
-	} else if(num_instance == 1) {
-		/***********************************************************/
-        /* File exists with value=1, we are testing PLUNs. We can  */
-        /* query IOCINFO on PLUNs for total blocks and block size. */
-        /***********************************************************/
-        lun_type            = CBLK_OPN_PHY_LUN;
-        rc = get_disk_info(&data, capi_device);
-        if ( rc != 0) {
-            exit(1);
-        }
-        /****************************************************/
-        /* For PLUN chunk_size is same as num blocks on disk*/
-        /****************************************************/
-        chunk_size = dev_info.maxblk + 1;
-	} else {
-        /********************************************************/
-		/* File exists with value > 1, we are testing VLUNS.    */
-		/* VLUNs have capability to dynamically change size.    */
-		/* So user request for it through chunk_size rules parm.*/
-		/********************************************************/
-		dev_info.maxblk 	= (unsigned long long)VLUN_TOTALBLOCKS;
-	    dev_info.blksize 	= (unsigned int)VLUN_BLKSIZE;
-		lun_type 			= CBLK_OPN_VIRT_LUN;
-	}
-	#else
+#else
     /***************************************************/
     /****   Get disk info using IOCINFO ioctl.      ****/
     /****   This will update maxblk and blksize.    ****/
@@ -307,7 +369,8 @@ int main(int argc, char *argv[])
     if ( rc != 0) {
         exit(1);
     }
-	#endif
+#endif
+
     /***************************************************/
     /********           Read rule file          ********/
     /***************************************************/
@@ -593,15 +656,26 @@ int main(int argc, char *argv[])
     /** if  running                                    **/
     /****************************************************/
     exit_flag = 'Y';
+#ifdef __CAPI_FLASH__
+    /* Wait for the thread (i.e. the thread for which open_flag was set) to close the LUN. */
+    while (shared_lun_id != NULL_CHUNK_ID) {
+        sleep(5);
+    }
+#endif
     while (BWRC_threads_running != 0 && wait_count > 0) {
-        sleep(10);
+        sleep(5);
         wait_count--;
     }
+
+    /********************************************/
+    /*****      Cleanup threads memory      *****/
+    /********************************************/
 
     if (BWRC_threads_running != 0) {
         sprintf(msg, "Going to cleanup memory. Since some BWRC threads are still running, ignore if any core is generated.");
         user_msg(&data, 0, 0, INFO, msg);
     }
+    cleanup_threads_mem();
 
     /* If enable_state_table flag is YES, SYNC the state table (i.e. update metadata on disk) */
     if (enable_state_table == YES) {
@@ -611,11 +685,6 @@ int main(int argc, char *argv[])
             user_msg(&data, 0, 0, INFO, msg);
         }
     }
-
-    /********************************************/
-    /*****      Cleanup threads memory      *****/
-    /********************************************/
-    cleanup_threads_mem();
 
     pthread_attr_destroy(&thread_attrs_detached);
     return rc;
@@ -941,7 +1010,7 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                     for (i = 0; i < opertn; i++) {
                         write_stamping = (((hot & 0x7FF) << 5 ) | (i & 0x1F));
                         /*************************************************************/
-                        /* Need to build buffer every time if hotness is 1 except for */
+                        /* Need to build buffer everytime if hotness is 1 except for */
                         /* the first iteration in loop. Otherwise, just update time  */
                         /* and write stamping as blkno will be same.                 */
                         /*************************************************************/
@@ -1650,7 +1719,9 @@ int fill_pattern_details(struct htx_data *htx_ds, struct thread_context *tctx)
         if (tmp_ptr != NULL) {
             strcpy (path, tmp_ptr);
         } else {
-            strcpy(path, "/usr/lpp/htx/pattern/");
+            sprintf(msg, "HTX env. is not set. Hence exiting.\nPlease setup the env. and re-run the test");
+            user_msg(htx_ds, 0, 0, INFO, msg);
+            exit(1);
 	    }
         strcat (path, tctx->pattern_id);
         rc = hxfpat(path, tctx->pattern_buffer, tctx->pattern_size);
@@ -1796,7 +1867,7 @@ void update_blkno(struct htx_data *htx_ds, struct ruleinfo *ruleptr, struct thre
         }
 #if 0
         /* No need as it is getting called in populate thread_context after update_blkno */
-        /* initialize first block and fencepost structure again as these are dependent on min_blkno and max_blkno */
+        /* initialize first block and fencepost structure again as these are dependant on min_blkno and max_blkno */
         current_tctx->first_blk = set_first_blk(htx_ds, current_tctx);
         /* DPRINT("id: %s - First block: 0x%llx, min_blkno: 0x%llx, max_blkno: 0x%llx\n", current_tctx->id, current_tctx->first_blk, current_tctx->min_blkno, current_tctx->max_blkno); */
         if (current_tctx->fencepost_index != -1) {
@@ -2054,7 +2125,7 @@ void apply_template_settings (struct thread_context *current_tctx, template *tmp
 
 /************************************************************/
 /*  Function to copy rule info to thread context structure  */
-/*  If any template is associated with rule and template    */
+/*  If any template is associated with rule and tempalte    */
 /*  variables values are defined in rule stanza also, Then  */
 /*  it will over-write template values.                     */
 /************************************************************/
@@ -2148,14 +2219,14 @@ void apply_rule_settings (struct htx_data *htx_ds, struct thread_context *curren
                 update_BWRC_zone(htx_ds, current_tctx, BWRC_tctx);
             }
 
+            current_tctx->align = ruleptr->align.value[RROBIN_INDEX(th_num, ruleptr->align.num_keywds)];
+            current_tctx->lba_align = ruleptr->lba_align.value[RROBIN_INDEX(th_num, ruleptr->lba_align.num_keywds)];
+            check_alignment(htx_ds, current_tctx);
+
             /* Set first block if there are SEQ oper defined */
             if (current_tctx->seek_breakup_prcnt != 100) {
                 current_tctx->first_blk = set_first_blk(htx_ds, current_tctx);
             }
-
-            current_tctx->align = ruleptr->align.value[RROBIN_INDEX(th_num, ruleptr->align.num_keywds)];
-            current_tctx->lba_align = ruleptr->lba_align.value[RROBIN_INDEX(th_num, ruleptr->lba_align.num_keywds)];
-            check_alignment(htx_ds, current_tctx);
 
             /**********************************************/
             /***    if num_oper is zero, check partial  ***/
@@ -2228,14 +2299,14 @@ void apply_rule_settings (struct htx_data *htx_ds, struct thread_context *curren
             /* With num_oper "0", only SEQ. operation can be defined. So,
              * change the seek prcnt of thread to be 0.
              */
-            if (ruleptr->num_oper.value[RROBIN_INDEX(th_num, ruleptr->num_oper.num_keywds)] == 0) {
+            if (ruleptr->num_oper.value[SEQ_INDEX(th_num, ruleptr->num_oper.num_keywds)] == 0) {
                 current_tctx->seek_breakup_prcnt = 0;
             } else {
                 /* If seek_breakup_prcnt is defined in rule stanza, then this will override the value if defined
                  * any in template.
                  */
-                if (ruleptr->seek_breakup_prcnt.value[RROBIN_INDEX(th_num, ruleptr->seek_breakup_prcnt.num_keywds)] != UNDEFINED) {
-					current_tctx->seek_breakup_prcnt = ruleptr->seek_breakup_prcnt.value[RROBIN_INDEX(th_num, ruleptr->seek_breakup_prcnt.num_keywds)];
+                if (ruleptr->seek_breakup_prcnt.value[SEQ_INDEX(th_num, ruleptr->seek_breakup_prcnt.num_keywds)] != UNDEFINED) {
+					current_tctx->seek_breakup_prcnt = ruleptr->seek_breakup_prcnt.value[SEQ_INDEX(th_num, ruleptr->seek_breakup_prcnt.num_keywds)];
                 } else if (current_tctx->seek_breakup_prcnt == UNDEFINED) {
                     current_tctx->seek_breakup_prcnt = DEFAULT_SEEK_PRCNT;
                 }
@@ -2249,14 +2320,13 @@ void apply_rule_settings (struct htx_data *htx_ds, struct thread_context *curren
                 update_BWRC_zone(htx_ds, current_tctx, BWRC_tctx);
             }
 
+            current_tctx->align = ruleptr->align.value[SEQ_INDEX(th_num, ruleptr->align.num_keywds)];
+            current_tctx->lba_align = ruleptr->lba_align.value[SEQ_INDEX(th_num, ruleptr->lba_align.num_keywds)];
+            check_alignment(htx_ds, current_tctx);
             /* Set first block if there are SEQ oper defined */
             if (current_tctx->seek_breakup_prcnt != 100) {
                 current_tctx->first_blk = set_first_blk(htx_ds, current_tctx);
 		    }
-
-            current_tctx->align = ruleptr->align.value[SEQ_INDEX(th_num, ruleptr->align.num_keywds)];
-            current_tctx->lba_align = ruleptr->lba_align.value[SEQ_INDEX(th_num, ruleptr->lba_align.num_keywds)];
-            check_alignment(htx_ds, current_tctx);
 
             /**********************************************/
             /***    if num_oper is zero, check partial  ***/
@@ -2267,13 +2337,13 @@ void apply_rule_settings (struct htx_data *htx_ds, struct thread_context *curren
             } else {
                 if (current_tctx->seek_breakup_prcnt == 0 || current_tctx->seek_breakup_prcnt == 100) {
                     if (current_tctx->seek_breakup_prcnt == 0) {
-                        current_tctx->num_oper[SEQ] = ruleptr->num_oper.value[RROBIN_INDEX(th_num, ruleptr->num_oper.num_keywds)];
+                        current_tctx->num_oper[SEQ] = ruleptr->num_oper.value[SEQ_INDEX(th_num, ruleptr->num_oper.num_keywds)];
                     } else {
-                        current_tctx->num_oper[RANDOM] = ruleptr->num_oper.value[RROBIN_INDEX(th_num, ruleptr->num_oper.num_keywds)];
+                        current_tctx->num_oper[RANDOM] = ruleptr->num_oper.value[SEQ_INDEX(th_num, ruleptr->num_oper.num_keywds)];
                     }
                 } else {
-                    current_tctx->num_oper[RANDOM] = (ruleptr->num_oper.value[RROBIN_INDEX(th_num, ruleptr->num_oper.num_keywds)] * current_tctx->seek_breakup_prcnt) / 100;
-                    current_tctx->num_oper[SEQ] = ruleptr->num_oper.value[RROBIN_INDEX(th_num, ruleptr->num_oper.num_keywds)]  - current_tctx->num_oper[SEQ];
+                    current_tctx->num_oper[RANDOM] = (ruleptr->num_oper.value[SEQ_INDEX(th_num, ruleptr->num_oper.num_keywds)] * current_tctx->seek_breakup_prcnt) / 100;
+                    current_tctx->num_oper[SEQ] = ruleptr->num_oper.value[SEQ_INDEX(th_num, ruleptr->num_oper.num_keywds)]  - current_tctx->num_oper[SEQ];
                 }
             }
 
@@ -2437,7 +2507,7 @@ int get_disk_info(struct htx_data *data, char *dev_name)
     if ( info.devtype == DD_SCDISK || info.devtype == DD_SCRWOPT || info.devtype == DD_CDROM)  {
         rc = get_lun(data, dev_info.diskname);
         if (rc) {
-            sprintf(msg, "Unable to retrieve SCSI ID/LUN from ODM database. rc=%d", rc);
+            sprintf(msg, "Unable to retreive SCSI ID/LUN from ODM database. rc=%d", rc);
             user_msg(data, 0, 0, HARD, msg);
             if ((close(filedes)) == -1) {
                 sprintf(msg, "CLOASE call failed!");

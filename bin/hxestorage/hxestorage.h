@@ -76,7 +76,7 @@
 
 #define DEFAULT_EEH_RETRIES         5
 #define DEFAULT_RETRY_COUNT         5
-#define DEFAULT_WAIT_COUNT          10
+#define DEFAULT_WAIT_COUNT          20
 
 #define MAX_BUFFERS                 256
 #define MAX_PATTERN_LENGTH          32
@@ -94,7 +94,7 @@
 	#define TESTCASE_TYPES              2
 	#define VLUN_BLKSIZE				4096
 	#define VLUN_TOTALBLOCKS			(1 * GB)
-
+    #define DEFAULT_CHUNK_SIZE          (64 * KB)
 #else
 	#define TESTCASE_TYPES			4
 #endif
@@ -371,7 +371,7 @@ struct thread_context {
     char first_blk_var[FIRST_BLK_VAR_LEN];
     unsigned long long first_blk;                       /* first block set based on starting block */
     char cur_blkno_var[CUR_BLKNO_VAR_LEN];
-    unsigned long long blkno[3];                        /* Explained at the beginning of this file */
+    unsigned long long blkno[3];                        /* Explained at the begining of this file */
     char align_var[ALIGN_VAR_LEN];
     int align;                                          /* Alignment for IO buffers requested */
     char lba_align_var[LBA_ALIGN_VAR_LEN];
@@ -419,7 +419,7 @@ struct thread_context {
     char cur_wbuf_var[CUR_WBUF_VAR_LEN];
     char *wbuf;                                         /* wbuf used for current operation */
     char cur_rbuf_var[CUR_RBUF_VAR_LEN];
-    char *rbuf;                                         /* rbuf used for current operation */
+    char *rbuf;                                         /* rbuf used ofr current operation */
     char reread_buf_var[REREAD_BUF_VAR_LEN];
     char *reread_buf;                                   /* pointer to reread buffer */
     char mis_detail_var[MIS_DETAIL_VAR_LEN];
@@ -433,7 +433,7 @@ struct thread_context {
     char rand_index_var[RAND_INDEX_VAR_LEN];
     unsigned long long rand_index;                      /* random index into rand_buf */
     char begin_dword_var[BEGIN_DWORD_VAR_LEN];
-    unsigned int begin_dword;                           /* beginning dword */
+    unsigned int begin_dword;                           /* begining dword */
     char trailing_dword_var[TRAILING_DWORD_VAR_LEN];
     signed long long trailing_dword;                    /* Trailing dword where to write pattern  */
 	char aio_req_queue_var[AIO_REQ_QUEUE_VAR_LEN];
