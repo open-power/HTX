@@ -225,12 +225,12 @@ int open_lun(struct htx_data *htx_ds, const char * device, struct thread_context
                     return(-1);
                 }
                 if(size <=  chunk_size) {
-                    sprintf(msg, "Cannot allocated requested size= %#llx, depricating to %#llx \n", chunk_size, size);
+                    sprintf(msg, "Cannot allocate requested size= %#llx, reducing to %#llx \n", chunk_size, size);
                     user_msg(htx_ds, 0, tctx->io_err_flag, INFO, msg);
                     chunk_size = size;
                     return(0);
                 } else {
-                    sprintf(msg, "Failed to allocated request size for VLUN, cblk_set_size failed wtih ENOMEM, device = %s \n", capi_device );
+                    sprintf(msg, "Failed to allocate request size for VLUN, cblk_set_size failed with ENOMEM, device = %s \n", capi_device );
                     user_msg(htx_ds, ENOMEM, tctx->io_err_flag, HARD, msg);
                     return(-1);
                 }
@@ -2309,7 +2309,7 @@ int sync_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop)
 #endif
 
 /*******************************************************************/
-/****   Execute a system command from a psuedo command line     ****/
+/****   Execute a system command from a pseudo command line     ****/
 /*******************************************************************/
 int run_cmd(struct htx_data *htx_ds, char *cmd_line)
 {
