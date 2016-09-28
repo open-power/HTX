@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 			}
         } else if((strcmp(data.run_type, "REG") == 0) && data.p_shm_HE->cont_on_err) {
             /* If User specifies COE in mdt file, then need to make sure all
-             * read/write call are successfull. If we see ocassional error, retry.
+             * read/write calls are successful. If we see occasional error, retry.
              */
             eeh_retries = DEFAULT_EEH_RETRIES;
         }
@@ -1010,7 +1010,7 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                     for (i = 0; i < opertn; i++) {
                         write_stamping = (((hot & 0x7FF) << 5 ) | (i & 0x1F));
                         /*************************************************************/
-                        /* Need to build buffer everytime if hotness is 1 except for */
+                        /* Need to build buffer every time if hotness is 1 except for */
                         /* the first iteration in loop. Otherwise, just update time  */
                         /* and write stamping as blkno will be same.                 */
                         /*************************************************************/
@@ -1867,7 +1867,7 @@ void update_blkno(struct htx_data *htx_ds, struct ruleinfo *ruleptr, struct thre
         }
 #if 0
         /* No need as it is getting called in populate thread_context after update_blkno */
-        /* initialize first block and fencepost structure again as these are dependant on min_blkno and max_blkno */
+        /* initialize first block and fencepost structure again as these are dependent on min_blkno and max_blkno */
         current_tctx->first_blk = set_first_blk(htx_ds, current_tctx);
         /* DPRINT("id: %s - First block: 0x%llx, min_blkno: 0x%llx, max_blkno: 0x%llx\n", current_tctx->id, current_tctx->first_blk, current_tctx->min_blkno, current_tctx->max_blkno); */
         if (current_tctx->fencepost_index != -1) {
@@ -2125,7 +2125,7 @@ void apply_template_settings (struct thread_context *current_tctx, template *tmp
 
 /************************************************************/
 /*  Function to copy rule info to thread context structure  */
-/*  If any template is associated with rule and tempalte    */
+/*  If any template is associated with rule and template    */
 /*  variables values are defined in rule stanza also, Then  */
 /*  it will over-write template values.                     */
 /************************************************************/
@@ -2507,7 +2507,7 @@ int get_disk_info(struct htx_data *data, char *dev_name)
     if ( info.devtype == DD_SCDISK || info.devtype == DD_SCRWOPT || info.devtype == DD_CDROM)  {
         rc = get_lun(data, dev_info.diskname);
         if (rc) {
-            sprintf(msg, "Unable to retreive SCSI ID/LUN from ODM database. rc=%d", rc);
+            sprintf(msg, "Unable to retrieve SCSI ID/LUN from ODM database. rc=%d", rc);
             user_msg(data, 0, 0, HARD, msg);
             if ((close(filedes)) == -1) {
                 sprintf(msg, "CLOASE call failed!");
