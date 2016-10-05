@@ -29,7 +29,7 @@ $os_ver=`grep ^VERSION_ID /etc/os-release | cut -f2 -d= | sed 's/\"//g'`;
 
 $CMVC_RELEASE = `echo \$CMVC_RELEASE`;
 if ( $CMVC_RELEASE =~ /htxltsbml/ ) {
-	@arr_htx_ver = `cat /usr/lpp/htx/etc/version`;
+	@arr_htx_ver = `cat \$HTXETC/version`;
 }
 if ( $CMVC_RELEASE =~ /htxubuntu/ ) {
         @arr_htx_ver = `dpkg-query --show "htx*"`;

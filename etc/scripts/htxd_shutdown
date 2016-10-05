@@ -20,6 +20,6 @@
 # IBM_PROLOG_END_TAG
 ########################################################
 
-ps -ef | grep -w "/usr/lpp/htx/bin/htxd" | grep -v grep | awk '{print $2}' | xargs kill -15 >/dev/null 2>&1
+ps -ef | grep -w "${HTXBIN}htxd" | grep -v grep | awk '{print $2}' | xargs kill -15 >/dev/null 2>&1
 
 

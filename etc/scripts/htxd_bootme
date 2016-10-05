@@ -55,7 +55,7 @@ htxd_bootme_on ()
 	CRONENTRY="`cat /etc/crontab | grep bootme`"
 	if [ "$CRONENTRY" == ""  ]; then
 		cp /etc/crontab /etc/crontab.ORIG
-		bootmeStuff=/usr/lpp/htx/etc/scripts/bootmeStuff
+		bootmeStuff=${HTXSCRIPTS}/bootmeStuff
 		echo "$REBOOT * * *  root $bootmeStuff >/dev/null 2>&1 &" >>/etc/crontab
 	else
 		exit 21
@@ -87,14 +87,14 @@ htxd_bootme_off ()
 	[ -e /etc/crontab.ORIG ] && cp /etc/crontab.ORIG /etc/crontab 
 
 # Remore HTXD bootme flag file
-	[ -e /usr/lpp/htx/.htxd_autostart ] && rm -f /usr/lpp/htx/.htxd_autostart || exit 31;
+	[ -e ${HTX_HOME_DIR}/.htxd_autostart ] && rm -f ${HTX_HOME_DIR}/.htxd_autostart || exit 31;
 
 # Remove the hidden "yes" file for the shutdown -t command
 	[ -e /tmp/.bootme ] && rm -f /tmp/.bootme
   
 # Remove copies of htxerr.bootme
-	[ -e /tmp/htxerr.bootme1 ] && rm /tmp/htxerr.bootme1
-	[ -e /tmp/htxerr.bootme2 ] && rm /tmp/htxerr.bootme2
+	[ -e ${HTX_LOG_DIR}/htxerr.bootme1 ] && rm ${HTX_LOG_DIR}/htxerr.bootme1
+	[ -e ${HTX_LOG_DIR}/htxerr.bootme2 ] && rm ${HTX_LOG_DIR}/htxerr.bootme2
 
 # Log bootme off
 	echo "`date +\"%D %T\"`: bootme off" >> $BM_LOG
@@ -112,7 +112,7 @@ htxd_bootme_status ()
 		exit 41;
 	fi
 
-	[ ! -e /usr/lpp/htx/.htxd_autostart ] && exit 42;
+	[ ! -e ${HTX_HOME_DIR}/.htxd_autostart ] && exit 42;
 
 }
 ###############################################################################
@@ -132,10 +132,21 @@ check_space ()
 # main
 ###############################################################################
 
-BM_LOG=/tmp/bootme.log
+  [ "$HTX_HOME_DIR" ] || {
+     install_path=`cat /var/log/htx_install_path`
+     if [ -f ${install_path}/etc/scripts/htx_env.sh ]; then
+         . ${install_path}/etc/scripts/htx_env.sh
+     else
+        echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+        echo "Either file is empty or does not contain correct install path. Hence exiting..."
+        exit
+     fi
+  }
+
+  BM_LOG=${HTX_LOG_DIR}/bootme.log
 
 # pulls REBOOT statement from /usr/lpp/htx/rules/reg/bootme/default
-	rules=/usr/lpp/htx/rules/reg/bootme/default
+	rules=${HTXREGRULES}/bootme/default
 	REBOOT=$(grep "^REBOOT:" $rules | head -n1)
 	REBOOT=${REBOOT##*: }
 	[ -z "$REBOOT" ] && { echo "Please check the value of REBOOT in: $rules" >> $BM_LOG ; exit 11; }

@@ -19,11 +19,15 @@
 #
 # IBM_PROLOG_END_TAG
 
-
-export PATH=${PATH}:/usr/lpp/htx/etc/scripts
-
-if [[ -z ${HTXMDT} ]] ; then
-	export HTXMDT=/usr/lpp/htx/mdt/
+if [[ -z ${HTX_HOME_DIR} ]] ; then
+    htx_install_path=`cat /var/log/htx_install_path`
+    if [ -f $htx_install_path/etc/scripts/htx_env.sh ]; then
+        . $htx_install_path/etc/scripts/htx_env.sh
+    else
+        echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+        echo "Either file is empty or does not contain correct install path. Hence exiting..."
+        exit 1
+    fi
 fi
 
 if [[ ! -d ${HTXMDT} ]] ; then

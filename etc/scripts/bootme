@@ -33,10 +33,6 @@
 ###############################################################################
 bootme_on ()
 {
-  [ "$HTXLPP" ] || {
-     echo "you must be logged in as htx to start bootme";
-     exit 1;
-  }
 
   # Check for free space in directories likely to cause problems if full
     check_space "/tmp" 10
@@ -48,7 +44,7 @@ bootme_on ()
     if [ "$CRONENTRY" == "" ]
     then
       cp /etc/crontab /etc/crontab.ORIG
-      bootmeStuff=/usr/lpp/htx/etc/scripts/bootmeStuff
+      bootmeStuff=${HTXSCRIPTS}/bootmeStuff
       echo "$REBOOT * * *  root $bootmeStuff >/dev/null 2>&1 &" >>/etc/crontab
     else
       echo "Crontab entry for bootme exists"
@@ -99,20 +95,20 @@ bootme_on ()
   
  
         # Check for non-zero '.htx_profile'; exit if not
-        [ -s /usr/lpp/htx/.htx_profile ] || { echo "ERROR: .htx_profile not found or zero-length"; exit; }
-        cp /usr/lpp/htx/.htx_profile /usr/lpp/htx/OLD.htx_profile
+        [ -s ${HTX_HOME_DIR}/.htx_profile ] || { echo "ERROR: .htx_profile not found or zero-length"; exit; }
+        cp ${HTX_HOME_DIR}/.htx_profile ${HTX_HOME_DIR}/OLD.htx_profile
 
         # Change keyword "autostart" in .htx_profile to appropriate value
         # This controls whether the HTX exercisers beginning running or not
         if [ "$1" != "nostart" ]
-       		then cat /usr/lpp/htx/OLD.htx_profile | \
-                sed 's/htx_autostart\ .*/htx_autostart = "yes"/' > /usr/lpp/htx/.htx_profile
-               	else cat /usr/lpp/htx/OLD.htx_profile | \
-                sed 's/htx_autostart\ .*/htx_autostart = "no"/' > /usr/lpp/htx/.htx_profile
+       		then cat ${HTX_HOME_DIR}/OLD.htx_profile | \
+                sed 's/htx_autostart\ .*/htx_autostart = "yes"/' > ${HTX_HOME_DIR}/.htx_profile
+               	else cat ${HTX_HOME_DIR}/OLD.htx_profile | \
+                sed 's/htx_autostart\ .*/htx_autostart = "no"/' > ${HTX_HOME_DIR}/.htx_profile
         fi
 
         # Causes .profile to run HTX (hxssup)
-        touch /usr/lpp/htx/.autostart
+        touch ${HTX_HOME_DIR}/.autostart
 
         # Create a hidden "yes" file to pipe into the shutdown -t command
         echo "yes" > /tmp/.bootme
@@ -196,24 +192,24 @@ bootme_off ()
     fi
               
     # restore HTX profile to manual start
-    [ -e /usr/lpp/htx/OLD.htx_profile ] || cp "/usr/lpp/htx/.htx_profile" "/usr/lpp/htx/OLD.htx_profile"
-    cat /usr/lpp/htx/OLD.htx_profile | sed 's/htx_autostart\ .*/htx_autostart = "no"/' > /usr/lpp/htx/.htx_profile
+    [ -e ${HTX_HOME_DIR}/OLD.htx_profile ] || cp "${HTX_HOME_DIR}/.htx_profile" "${HTX_HOME_DIR}/OLD.htx_profile"
+    cat ${HTX_HOME_DIR}/OLD.htx_profile | sed 's/htx_autostart\ .*/htx_autostart = "no"/' > ${HTX_HOME_DIR}/.htx_profile
 
     # cause .profile to not run hxssup
-    [ -e /usr/lpp/htx/.autostart ] && rm -f /usr/lpp/htx/.autostart
+    [ -e ${HTX_HOME_DIR}/.autostart ] && rm -f ${HTX_HOME_DIR}/.autostart
 
     # Remove the hidden "yes" file for the shutdown -t command
     [ -e /tmp/.bootme ] && rm /tmp/.bootme
   
   # Remove copies of htxerr.bootme
-    [ -e /tmp/htxerr.bootme1 ] && rm /tmp/htxerr.bootme1
-    [ -e /tmp/htxerr.bootme2 ] && rm /tmp/htxerr.bootme2
+    [ -e ${HTX_LOG_DIR}/htxerr.bootme1 ] && rm ${HTX_LOG_DIR}/htxerr.bootme1
+    [ -e ${HTX_LOG_DIR}/htxerr.bootme2 ] && rm ${HTX_LOG_DIR}/htxerr.bootme2
 
   # Remove the touched bootme.bypass file - if it exists
-    [ -e /usr/lpp/htx/bootme.bypass ] && rm /usr/lpp/htx/bootme.bypass
+    [ -e ${HTX_HOME_DIR}/bootme.bypass ] && rm ${HTX_HOME_DIR}/bootme.bypass
 
   # Remove the previous run file information
-    [ -e /usr/lpp/htx/mdt/.run_mdt_name ] && rm /usr/lpp/htx/mdt/.run_mdt_name
+    [ -e ${HTXMDT}/.run_mdt_name ] && rm ${HTXMDT}/.run_mdt_name
 
   # Log bootme off
     echo "`date +\"%D %T\"`: bootme off" >> $BM_LOG
@@ -255,7 +251,7 @@ usage ()
   echo "bootme [on] nostart: bootme will log into HTX, but will not start."
   echo
   echo "Default settings for bootme can be changed in the following file:"
-  echo "/usr/lpp/htx/rules/reg/bootme/default"
+  echo "${HTXREGRULES}/bootme/default"
   echo
 
   exit 0
@@ -283,13 +279,24 @@ check_space ()
   echo
   echo "bootme v1.14.3.15"
 
-  BM_LOG=/tmp/bootme.log
+  [ "$HTX_HOME_DIR" ] || {
+     install_path=`cat /var/log/htx_install_path`
+     if [ -f ${install_path}/etc/scripts/htx_env.sh ]; then
+         . ${install_path}/etc/scripts/htx_env.sh
+     else
+        echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+        echo "Either file is empty or does not contain correct install path. Hence exiting..."
+        exit
+     fi
+  }
+
+  BM_LOG=${HTX_LOG_DIR}/bootme.log
 
 # If the second command line arguement is bypass, only execute crontab functions
-  [ "$2" = "bypass" ] && { CRONSET_ONLY="yes"; touch /usr/lpp/htx/bootme.bypass; }
+  [ "$2" = "bypass" ] && { CRONSET_ONLY="yes"; touch ${HTX_HOME_DIR}/bootme.bypass; }
 
-# pulls REBOOT statement from /usr/lpp/htx/rules/reg/bootme/default
-  rules=/usr/lpp/htx/rules/reg/bootme/default
+# pulls REBOOT statement from ${HTXRGERULES}/bootme/default
+  rules=${HTXREGRULES}/bootme/default
   REBOOT=$(grep "^REBOOT:" $rules | head -n1)
   REBOOT=${REBOOT##*: }
   [ -z "$REBOOT" ] && { echo "Please check the value of REBOOT in: $rules"; exit; }

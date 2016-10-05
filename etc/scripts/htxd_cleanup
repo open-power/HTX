@@ -19,6 +19,16 @@
 # IBM_PROLOG_END_TAG
 
 
+[ "$HTX_HOME_DIR" ] || {
+   install_path=`cat /var/log/htx_install_path`
+   if [ -f ${install_path}/etc/scripts/htx_env.sh ]; then
+      . ${install_path}/etc/scripts/htx_env.sh
+   else
+      echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+      echo "Either file is empty or does not contain correct install path. Hence exiting..."
+     exit
+   fi
+}
 # Send SIGTERM to all the exerciser
 ps -ef|grep hxe|awk '{print $2}'|xargs kill -15 >/dev/null 2>&1
 # Send SIGTERM to all the supervisor and daemon components
@@ -33,7 +43,7 @@ ps -ef|grep hxe|awk '{print $2}'|xargs kill -9 >/dev/null 2>&1
 # Send SIGKILL to all the supervisor and daemon components
 ps -ef|grep hxs|awk '{print $2}'|xargs kill -9 >/dev/null 2>&1
 
-ps -ef | grep -w "/usr/lpp/htx/bin/htxd" | grep -v grep | awk '{print $2}' | xargs kill -9 >/dev/null 2>&1
+ps -ef | grep -w "${HTXBIN}htxd" | grep -v grep | awk '{print $2}' | xargs kill -9 >/dev/null 2>&1
 
 # Clean IPC
 for i in `ipcs -m |grep root|awk '{print $2}'`

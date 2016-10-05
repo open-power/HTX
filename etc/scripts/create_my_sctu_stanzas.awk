@@ -21,20 +21,26 @@
 
 
 BEGIN {
-	# Do not create sctu stanzas on lpars having shared processors.
+	log_dir=ENVIRON["HTX_LOG_DIR"]
 
-    	shared_processor_mode = snarf("awk -F : '/shared_processor_mode/ {print $2}' /tmp/htx_syscfg")
+        # Do not create sctu stanzas on lpars having shared processors.
+
+    	cmd = sprintf("awk -F : '/shared_processor_mode/ {print $2}' %s/htx_syscfg", log_dir);
+	shared_processor_mode = snarf(cmd);
     	if (shared_processor_mode == " yes")
     		exit 0;
 	
         # Get the number of nodes in the system
-        num_nodes = snarf("awk -F : '/Number of nodes/ {print $2}' /tmp/htx_syscfg");
+        cmd = sprintf("awk -F : '/Number of nodes/ {print $2}' %s/htx_syscfg", log_dir);
+	num_nodes = snarf(cmd);
 
 	# Get number of cores in system
-	num_cores = snarf("awk -F : '/Number of Cores/ {print $2}' /tmp/htx_syscfg");
+	cmd = sprintf("awk -F : '/Number of Cores/ {print $2}' %s/htx_syscfg", log_dir);
+	num_cores = snarf(cmd);
 
 	# Determine system SMT.
-	hw_smt = snarf("awk -F: '/Smt threads/ {print $2}' /tmp/htx_syscfg");
+	cmd = sprintf("awk -F: '/Smt threads/ {print $2}' %s/htx_syscfg", log_dir);
+	hw_smt = snarf(cmd);
         	
 	sctu_gang_size = 8;
 	num_core_gangs = int(num_cores/sctu_gang_size);
@@ -49,9 +55,9 @@ BEGIN {
                         exit 0;
                 }
 
-                system("grep 'Cores in node' /tmp/htx_syscfg > /tmp/node_config");
+                system("grep 'Cores in node' ${HTX_LOG_DIR}/htx_syscfg > ${HTX_LOG_DIR}/node_config");
 
-                cmd = sprintf("cat /tmp/node_config | cut -d '(' -f 2 | cut -d ')' -f 1 | sort -n -r | awk '(NR==2)'");
+                cmd = sprintf("cat %s/node_config | cut -d '(' -f 2 | cut -d ')' -f 1 | sort -n -r | awk '(NR==2)'", log_dir);
                 min_sctu_cores = snarf(cmd);
                 num_sctu_cores = min_sctu_cores * num_nodes;
                 num_core_gangs = int(num_sctu_cores/sctu_gang_size);
@@ -59,7 +65,8 @@ BEGIN {
                 if((num_sctu_cores % (sctu_gang_size)) > 1 ){
                         num_core_gangs = num_core_gangs + 1;
                 }
-                min_smt = snarf("awk -F : '/Min smt threads/ {print $2}' /tmp/htx_syscfg");
+                cmd = sprintf("awk -F : '/Min smt threads/ {print $2}' %s/htx_syscfg", log_dir);
+		min_smt = snarf(cmd);
 
                 for(g=0; g < num_core_gangs; g++) {
                         for(s=0; s < min_smt; s++) {
@@ -72,7 +79,7 @@ BEGIN {
 
 	# Create sctu gangs within a chip. 
 	if ( ARGV[1] ~ /CHIP/ ) {
-		cmd = sprintf("cat /tmp/htx_sctu_chip_dev | wc -l");
+		cmd = sprintf("cat %s/htx_sctu_chip_dev | wc -l", log_dir);
 		num_dev = snarf(cmd);
 
 		for(i=0; i<num_dev; i++ ) {
@@ -84,7 +91,7 @@ BEGIN {
 
 	# Create sctu gangs within a node. 
 	if ( ARGV[1] ~ /NODE/ ) {
-		cmd = sprintf("cat /tmp/htx_sctu_node_dev | wc -l");
+		cmd = sprintf("cat %s/htx_sctu_node_dev | wc -l", log_dir);
 		num_dev = snarf(cmd);
 
 		for(i=0; i<num_dev; i++ ) {
@@ -98,11 +105,11 @@ BEGIN {
 		sctu_gang_size = 2;
 		num_core_gangs = int(num_cores/sctu_gang_size);
 
-		system("grep 'CPUs in core' /tmp/htx_syscfg > /tmp/core_config");
+		system("grep 'CPUs in core' ${HTX_LOG_DIR}/htx_syscfg > ${HTX_LOG_DIR}/core_config");
 		for(g=0; g < num_core_gangs; g++) {
 			line1 = g*2 + 1;
 			line2 = g*2 + 2;
-			cmd = sprintf("awk '(NR >= %d && NR <= %d)' /tmp/core_config | cut -d '(' -f 2 | cut -c 1 | sort -n -r | awk '(NR==2)'",line1,line2);
+			cmd = sprintf("awk '(NR >= %d && NR <= %d)' %s/core_config | cut -d '(' -f 2 | cut -c 1 | sort -n -r | awk '(NR==2)'",line1,line2, log_dir);
 			smt_per_gang = snarf(cmd);
 			for(s=0; s < smt_per_gang; s++) {
 				if(s%2 == 0) {

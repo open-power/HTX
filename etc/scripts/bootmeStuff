@@ -27,12 +27,21 @@
 
 
 ###############################################################################
+htx_install_path=`cat /var/log/htx_install_path`
+if [ -f $htx_install_path/etc/scripts/htx_env.sh ]; then
+    . $htx_install_path/etc/scripts/htx_env.sh
+else
+    echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+    echo "Either file is empty or does not contain correct install path. Hence exiting..."
+    exit 1
+fi
+
 # file locations
-  PROG_DIR=/usr/lpp/htx/etc/scripts
-  SC_ERR=/tmp/sctcheckstop.err
-  rules=/usr/lpp/htx/rules/reg/bootme/default
-  blog=/tmp/bootme.log
-  Work=/tmp/bootme.work
+  PROG_DIR=${HTXSCRIPTS}
+  SC_ERR=${HTX_LOG_DIR}/sctcheckstop.err
+  rules=${HTXREGRULES}/bootme/default
+  blog=${HTX_LOG_DIR}/bootme.log
+  Work=${HTX_LOG_DIR}/bootme.work
   typeset -i count=0 scount=0 bcount=0
 
 
@@ -183,13 +192,13 @@ function logError
 
 
 #############################################################################
-# look for '/tmp/sctResult' files (indicating processor failure(s))
-  if [[ -n "$(ls /tmp/sctResult* >/dev/null 2>/dev/null)" ]]
+# look for '${HTX_LOG_DIR}/sctResult' files (indicating processor failure(s))
+  if [[ -n "$(ls ${HTX_LOG_DIR}/sctResult* >/dev/null 2>/dev/null)" ]]
      then echo "`date`:" > $SC_ERR
           echo >> $SC_ERR
           echo "SCTU failure detected during bootme execution - restart aborted" >> $SC_ERR
-          echo "Check: ls /tmp/sctResult*" >> $SC_ERR
-          ls -al /tmp/sctResult* >> $SC_ERR
+          echo "Check: ls ${HTX_LOG_DIR}/sctResult*" >> $SC_ERR
+          ls -al ${HTX_LOG_DIR}/sctResult* >> $SC_ERR
           echo >> $SC_ERR
           echo "Contact HTX for debug assistance (component exer_sct2)" >> $SC_ERR
           echo >> $SC_ERR
@@ -237,7 +246,7 @@ function logError
 
 #############################################################################
 # remove some other potentially large files
-  rm -f /tmp/aixerr_* /tmp/htx*.0* /tmp/list*
+  rm -f ${HTX_LOG_DIR}/aixerr_* ${HTX_LOG_DIR}/htx*.0* ${HTX_LOG_DIR}/list*
 
 
 #############################################################################
@@ -321,8 +330,8 @@ function timeCalc
 
 #############################################################################
 # Copy htxerr to backup locations
-  [ -e /tmp/htxerr.bootme1 ] && cp /tmp/htxerr.bootme1 /tmp/htxerr.bootme2
-  [ -e /tmp/htxerr ]         && cp /tmp/htxerr         /tmp/htxerr.bootme1
+  [ -e ${HTX_LOG_DIR}/htxerr.bootme1 ] && cp ${HTX_LOG_DIR}/htxerr.bootme1 ${HTX_LOG_DIR}/htxerr.bootme2
+  [ -e ${HTX_LOG_DIR}/htxerr ]         && cp ${HTX_LOG_DIR}/htxerr         ${HTX_LOG_DIR}/htxerr.bootme1
 
 
 #############################################################################
@@ -351,7 +360,7 @@ function timeCalc
           sync
 
           if [[ -n $(echo $BOOT_CMD | grep "shutdown") ]]
-             then $BOOT_CMD $NEW_BOOT_WAIT </tmp/.bootme
+             then $BOOT_CMD $NEW_BOOT_WAIT <${HTX_LOG_DIR}/.bootme
              else $BOOT_CMD $NEW_BOOT_WAIT
           fi
   fi

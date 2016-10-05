@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)30	1.3  src/htx/usr/lpp/htx/bin/create_eq_cfg/create_eq_cfg.c, htxconf, htxubuntu 2/9/16 03:20:08 */
-
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -40,9 +38,11 @@
 char pattern[MAX_PATTERN][MAX_PATTERN_LENGTH];
 int util_seq[MAX_SMT][MAX_UTIL_SEQ];
 char util_str[MAX_SMT][64];
+char mem_eq_rulefile[32];
 
 SYS_STAT sys_stat;
 htxsyscfg_smt_t t;
+htxsyscfg_memory_t v;
 int pvr, smt_threads;
 FILE *fp;
 
@@ -64,11 +64,13 @@ void create_cfg_p8_rdp_switch(void);
 void create_cfg_p8_swicthing_cmp(void);
 void create_cfg_th_trans_switch(void);
 void create_cfg_th_trans_mix(void);
+void get_htx_home_dir(char *);
 
 int main(int argc, char **argv)
 {
     int rc = 0, time_quantum, wof_test = 0;
     char cfg_file[128], ewm_file_name[64], htx_path[32];
+    char *tmp_ptr = NULL;
     struct stat stat_buf;
 
     rc = init_syscfg_with_malloc();
@@ -83,8 +85,21 @@ int main(int argc, char **argv)
     pvr = get_cpu_version();
     pvr = pvr >> 16;
 
-    if (strlen(strcpy(htx_path, getenv("HTX_HOME_DIR"))) == 0) {
-        strcpy(htx_path, "/usr/lpp/htx/");
+    /* Get htx_path from env. variable */
+    tmp_ptr = getenv("HTXPATH");
+    if (tmp_ptr != NULL) {
+                strcpy(htx_path, tmp_ptr);
+    } else {
+        get_htx_home_dir(htx_path);
+    }
+
+    /* Get the base page size. Based on this, we will either use default.mem.eq.4k OR */
+    /* default.mem.eq.64k rule file.                                                  */
+    rc = get_memory_details(&v);
+    if (v.page_details[PAGE_INDEX_4K].supported) {
+        strcpy(mem_eq_rulefile, "default.mem.eq.4k");
+    } else if (v.page_details[PAGE_INDEX_64K].supported) {
+        strcpy(mem_eq_rulefile, "default.mem.eq.64k");
     }
     
     /***************************************************************************************/
@@ -159,9 +174,7 @@ int main(int argc, char **argv)
     /* Below are hxeewm cfgs. should be created only if 
      * hxeewm binary is present 
      */
-    if(strlen(strcpy(ewm_file_name, getenv("HTXBIN"))) == 0)  {
-      strcpy(ewm_file_name, "/usr/lpp/htx/bin/");
-    }
+    sprintf(ewm_file_name, "%s/bin/", htx_path);
     strcat(ewm_file_name, "hxeewm");
     rc = stat(ewm_file_name, &stat_buf);
     if (rc != -1) {
@@ -211,6 +224,19 @@ int open_file (char *file_name)
         exit(1);
     }
     return 0;
+}
+
+void get_htx_home_dir(char *path)
+{
+    FILE *fp_tmp = NULL;
+
+    fp_tmp = fopen("/var/log/htx_install_path", "r");
+    if (fp_tmp == NULL) {
+            printf("ERROR: HTX environment variable HTX_HOME_DIR is not, please export HTX_HOME_DIR with value as HTX installation directory and re-try...\n");
+            exit(1);
+    }
+    fscanf(fp_tmp, "%s", path);
+    fclose(fp_tmp);
 }
 
 void make_entry(int time_quantum, int wof_test)
@@ -276,7 +302,7 @@ void create_cfg_maxpwr_switch()
         fprintf(fp, "\tN*P*C*T%d\t\tcpu\t\t\tY\t\t\t\t[50]\t\t\t\t[11111111110000000000]\t\tNA\t\tdefault.cpu.eq\n", k);
     }
     for (j = 0; j < mem_inst; j++, k++) {
-        fprintf(fp, "\tN*P*C*T%d\t\tmem\t\t\tY\t\t\t\t[50]\t\t\t\t[11111111110000000000]\t\tNA\t\tdefault.mem.eq\n", k);
+        fprintf(fp, "\tN*P*C*T%d\t\tmem\t\t\tY\t\t\t\t[50]\t\t\t\t[11111111110000000000]\t\tNA\t\t%s\n", k, mem_eq_rulefile);
     }
 }
 
@@ -397,7 +423,7 @@ void create_cfg_maxpwr_exp()
                     fprintf(fp, "\tN%dP%dC%dT%d\t\tcpu\t\tY\t\t[50]\t\t\t[%s]\t\tNA\t\tdefault.cpu.eq\n", i, j, k, m, cur_pattern);
                 }
                 for (l = 0; l < mem_inst; l++, m++) {
-                    fprintf(fp, "\tN%dP%dC%dT%d\t\tmem\t\tY\t\t[50]\t\t\t[%s]\t\tNA\t\tdefault.mem.eq\n", i, j, k, m, cur_pattern);
+                    fprintf(fp, "\tN%dP%dC%dT%d\t\tmem\t\tY\t\t[50]\t\t\t[%s]\t\tNA\t\t%s\n", i, j, k, m, cur_pattern, mem_eq_rulefile);
                 }
                 allocated_cores++;
                 if (allocated_cores == cores_per_set[pattern_num]) {
@@ -807,7 +833,7 @@ void create_cfg_100_75_50_25_util()
 
     for (i = 0; i < loop_count; i++) {
         j = 4 * i;
-        fprintf (fp, "\tN*P*C*T%d\t\tmem\t\t\tY\t\t\t\t[100]\t\t\t\t\t[1111]\t\t\t\t\tNA\t\tdefault.mem.eq\n", j);
+        fprintf (fp, "\tN*P*C*T%d\t\tmem\t\t\tY\t\t\t\t[100]\t\t\t\t\t[1111]\t\t\t\t\tNA\t\t%s\n", j, mem_eq_rulefile);
         j++;
         fprintf (fp, "\tN*P*C*T%d\t\tcpu\t\t\tY\t\t\t\t[75]\t\t\t\t\t[1110]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", j);
         j++;
