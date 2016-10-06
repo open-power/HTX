@@ -374,6 +374,13 @@ BEGIN {
 
 	if ( spm == 0 ) {
 		sctu_gang_size = 2;
+		rule_file = "rules.default"
+        if ( proc_ver == "4e" || proc_ver == "4f" ) {
+            # /* P9 Nimbus and Cumulus */
+            sctu_gang_size = 4;
+            rule_file = "default.p9"
+        }
+
 		num_core_gangs = int(num_cores/sctu_gang_size);
 		# below check is for gang_size > 2
 		if((num_cores % (sctu_gang_size)) > 1 ){
@@ -393,7 +400,7 @@ BEGIN {
                 }
                 dev_name=sprintf("sctu%d", dev_num);
 
-				mkstanza("hxesctu","cache","coherence test",dev_name,"hxesctu","rules.default","rules.default");
+				mkstanza("hxesctu","cache","coherence test",dev_name,"hxesctu",rule_file,rule_file);
 			}
 		}
 	}
@@ -450,36 +457,40 @@ BEGIN {
 		}
 	}
 
-	# Determine rule file for fpu devices.
+    # Determine rule file for fpu  and cpu devices.
 
-	if ( (proc_ver == "3e") || (proc_ver == "3f" && proc_os == "POWER6") ) {
-		# /* P6 || P6 Compat mode */
-		fpu_rf = "default.p6";
-	}
-	else if ( proc_ver == "3f" || proc_ver == "4a" ) {
-		# /* P7 and P7+*/
-		fpu_rf = "default.p7";
-	}
-	else if ( proc_ver == "4b" || proc_ver == "4d" || proc_ver == "4c" ) {
-		# /* P8 */
-		fpu_rf = "default.p8";
-	}
+    if ( (proc_ver == "3e") || (proc_ver == "3f" && proc_os == "POWER6") ) {
+        # /* P6 || P6 Compat mode */
+        rule_file = "default.p6";
+    }
+    else if ( proc_ver == "3f" || proc_ver == "4a" ) {
+        # /* P7 and P7+*/
+        rule_file = "default.p7";
+    }
+    else if ( proc_ver == "4b" || proc_ver == "4d" || proc_ver == "4c" ) {
+        # /* P8 Murano and Venice */
+        rule_file = "default.p8";
+    }
+    else if ( proc_ver == "4e" || proc_ver == "4f" ) {
+        # /* P9 Nimbus and Cumulus */
+        rule_file = "default.p9";
+    }
 
     # hxefpu64 and hxecpu stanza creation.
     if (spm == 1) {
-		num_devices = num_cpus;
+        num_devices = num_cpus;
     } else {
-		num_devices = num_cores;
+        num_devices = num_cores;
     }
 
     for(i = 0; i < num_devices; i++) {
-		dev_name = sprintf("fpu%d", i);
-		mkstanza("hxefpu64", "core", "floating_point", dev_name, "hxefpu64", fpu_rf, fpu_rf);
+        dev_name = sprintf("fpu%d", i);
+        mkstanza("hxefpu64", "core", "floating_point", dev_name, "fpu", rule_file, rule_file);
     }
 
     for(i = 0; i < num_devices; i++) {
- 		dev_name = sprintf("cpu%d", i);
-		mkstanza("hxecpu", "processor", "processor", dev_name, "cpu", "rules.default", "rules.default");
+        dev_name = sprintf("cpu%d", i);
+        mkstanza("hxecpu", "processor", "processor", dev_name, "cpu", rule_file, rule_file);
     }
 
 

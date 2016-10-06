@@ -19,6 +19,8 @@ TARGET= \
         rules.28cp0 \
         rules.215cp0 \
         rules.915cp0 \
+        default.p8 \
+        default.p9 \
         hxecpu.readme
 
 .PHONY: all clean
