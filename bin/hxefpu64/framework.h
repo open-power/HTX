@@ -43,9 +43,7 @@
 	#include <sched.h>
 	#include <sys/prctl.h>
 	#include <sys/resource.h>
-	#if !defined (__BML__)
-	#include <sys/auxv.h>
-	#endif
+	#include <xscom.h>
 #else
 	#include <sys/dr.h>
 #endif
@@ -62,7 +60,10 @@
 #endif
 
 #ifdef SCTU
+#define LOGFILE		"/tmp/sctu_log"
 #define SCTU_PP_COUNT	(256)
+#else
+#define LOGFILE		"/tmp/fpu_log"
 #endif
 
 #define HSTRCMP strcasecmp
@@ -847,7 +848,6 @@ extern struct server_data global_sdata[];
 #define			BFP_COMPARE_ONLY		0x8000					|BFP_ONLY
 #define			BFP_SELECT_ONLY			0x10000					|BFP_ONLY
 #define			BFP_FPSCR_ONLY			0x20000					|BFP_ONLY
-#define			P9_BFP_FPSCR_ONLY		(0x20000				|BFP_ONLY 	|P9_ONLY)
 #define 		BFP_TEST_ONLY			0x40000					|BFP_ONLY
 #define 		P9_BFP_MOVE_ONLY		BFP_MOVE_ONLY			|BFP_ONLY	|P9_ONLY
 #define			P9_BFP_COMPARE_ONLY		BFP_COMPARE_ONLY		|BFP_ONLY   |P9_ONLY
