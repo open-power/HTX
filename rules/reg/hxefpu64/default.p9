@@ -1,0 +1,594 @@
+* IBM_PROLOG_BEGIN_TAG 
+* This is an automatically generated prolog. 
+*  
+* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxefpu64/default.p9 1.1 
+*  
+* Licensed Materials - Property of IBM 
+*  
+* COPYRIGHT International Business Machines Corp. 2012,2016 
+* All Rights Reserved 
+*  
+* US Government Users Restricted Rights - Use, duplication or 
+* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
+*  
+* IBM_PROLOG_END_TAG 
+* Rule file for hxefpu64 exerciser running on P9.
+* For details of rule keywords,please refer README.hxefpu64
+* in /usr/lpp/htx/rules/reg/hxefpu64 dir on test machine.
+*
+* NOTE:Rule keyword & associated value should be all in one
+*	line _only_. Currently '\n' (newline) is used as
+*	delimiter to differentiate between keywords.
+*
+*
+*******************************************P9 VSX*************************************
+* P9 Only: All VSX instructions on all SMT threads with normal data
+
+rule_id						test1
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100)]
+
+* P9 Only: All VSX instructions with 50% normal & 50% denormal data zones
+
+rule_id						test2
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100)]
+
+* P9 Only: All VSX instructions with 100% denormal data zones
+
+rule_id						test3
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0]
+ins_bias_mask				[(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100)]
+
+* P9 Only: All VSX instructions with mixed data zones
+
+rule_id						test4
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100)]
+
+* P9 Only: All VSX instructions with 50% normal & 50% denormal data with all rounding modes.
+
+rule_id						test5
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100):(0x011001e400000000,100)]
+
+* P9 Only: VSX load/store all with alternate threads accessing unaligned memory location.
+
+rule_id						test6
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[80,10,80,10,80,10,80,10]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x0110018000000000,100):(0x0110018000000000,100):(0x0110018000000000,100):(0x0110018000000000,100):(0x0110018000000000,100):(0x0110018000000000,100):(0x0110018000000000,100):(0x0110018000000000,100)]
+
+****************************************P9 BFP*************************************
+* P9 Only: All BFP instructions with 100% normal data zones
+rule_id						test7
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100)]
+
+* P9 Only: All BFP instructions with 50% normal & 50% denormal data zones
+rule_id						test8
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100)]
+
+* P9 Only: All BFP instructions with 100% denormal data zones
+rule_id						test9
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0]
+ins_bias_mask				[(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100)]
+
+* P9 Only: All BFP instructions with mixed data zones
+rule_id						test10
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100)]
+
+* P9 Only: All BFP instructions with 50% normal & 50% denormal data with all rounding modes.
+rule_id						test11
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100):(0x02100000003e9400,100)]
+
+
+****************************************P9 DFP*************************************
+
+* P9 Only: All DFP instructions with mixed data zones
+rule_id						test12
+num_oper					200
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x0310000000000010,50)(0x0310000000000020,50):(0x0310000000000010,50)(0x0310000000000020,50):(0x0310000000000010,50)(0x0310000000000020,50):(0x0310000000000010,50)(0x0310000000000020,50):(0x0310000000000010,50)(0x0310000000000020,50):(0x0310000000000010,50)(0x0310000000000020,50):(0x0310000000000010,50)(0x0310000000000020,50):(0x0310000000000010,50)(0x0310000000000020,50)]
+
+* P9 Only: All DFP instructions with mixed data with all rounding modes.
+rule_id						test13
+num_oper					200
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x0310000000000030,100):(0x0310000000000030,100):(0x0310000000000030,100):(0x0310000000000030,100):(0x0310000000000030,100):(0x0310000000000030,100):(0x0310000000000030,100):(0x0310000000000030,100)]
+
+
+****************************************P9 VMX*************************************
+* P9 Only: All VMX instructions with 100% normal data zones
+rule_id						test14
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x0410000003008010,100):(0x0410000003008010,100):(0x0410000003008010,100):(0x0410000003008010,100):(0x0410000003008010,100):(0x0410000003008010,100):(0x0410000003008010,100):(0x0410000003008010,100)]
+
+
+********************************P9 Only: All Categories Mixed (VSX: 30%, VMX: 40 %, BFP: 20 %, DFP: 10 %)***************************************************
+* P9 Only:  VSX,BFP,DFP & VMX instructions on all SMT threads with normal data
+
+rule_id						test15
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40)]
+
+* P9 Only: VSX,BFP,DFP & VMX instructions on all SMT threads with denormal data
+
+rule_id						test16
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0]
+ins_bias_mask				[(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40)]
+
+* P9 Only:  VSX,BFP,DFP & VMX instructions on all SMT threads with 50% normal & 50% denormal data
+
+rule_id						test17
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40)]
+
+* P9 Only:  VSX,BFP,DFP & VMX  instructions on all SMT threads with mixed data
+
+rule_id						test18
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40)]
+
+* P9 Only:  VSX,BFP,DFP & VMX  instructions with 50% normal & 50% denormal data with all rounding modes 
+
+rule_id						test19
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40)]
+
+* P9 Only:  VSX,BFP,DFP & VMX  instructions on all SMT threads with unaligned load store 
+
+rule_id						test20
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[80,10,80,10,80,10,80,10]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40):(0x011001e400000000,30)(0x02100000003e9400,20)(0x0310000000000003,10)(0x0410000003008010,40)]
+
+*******************************************************************
+*         All instructions together (P9 and earlier)              *
+*******************************************************************
+
+****************************************ALL VSX*************************************
+* All VSX instructions on all SMT threads with normal data
+
+rule_id						test21
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100)]
+
+* All VSX instructions with 50% normal & 50% denormal data zones
+
+rule_id						test22
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100)]
+
+* All VSX instructions with 100% denormal data zones
+
+rule_id						test23
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0]
+ins_bias_mask				[(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100)]
+
+* All VSX instructions with mixed data zones
+
+rule_id						test24
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100)]
+
+* All VSX instructions with 50% normal and 50% denormal with all rounding modes
+
+rule_id						test25
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100)]
+
+* All VSX instructions with 50% normal and 50% denormal with unaligned load and store 
+
+rule_id						test26
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[80,10,80,10,80,10,80,10]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100):(0x010001ffffffffff,100)]
+
+****************************************ALL BFP*************************************
+* All BFP instructions on all SMT threads with normal data
+
+rule_id						test27
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100)]
+
+* All BFP instructions with 50% normal & 50% denormal data zones
+
+rule_id						test28
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100)]
+
+* All BFP instructions with 100% denormal data zones
+
+rule_id						test29
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0]
+ins_bias_mask				[(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100)]
+
+* All BFP instructions with mixed data zones
+
+rule_id						test30
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100)]
+
+* All BFP instructions with 50% normal and 50% denormal with all rounding modes
+
+rule_id						test31
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100)]
+
+* All BFP instructions with 50% normal and 50% denormal with unaligned load and store 
+
+rule_id						test32
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[80,10,80,10,80,10,80,10]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100):(0x02000000003fffff,100)]
+
+****************************************ALL DFP*************************************
+* All DFP instructions with mixed data zones
+
+rule_id						test33
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100)]
+
+* All DFP instructions with 50% normal and 50% denormal with all rounding modes
+
+rule_id						test34
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100)]
+
+* All DFP instructions with 50% normal and 50% denormal with unaligned load and store 
+
+rule_id						test35
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[80,10,80,10,80,10,80,10]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100):(0x030000001fffffff,100)]
+
+****************************************ALL VMX *************************************
+* All VMX instructions with normal data zones
+
+rule_id						test36
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100)]
+
+* All VMX instructions with 100% normal data with unaligned load and store 
+
+rule_id						test37
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[80,10,80,10,80,10,80,10]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100)]
+
+****************************************P9 and before: ALL Categories together*************************************
+
+* VSX,BFP,DFP & VMX instructions on all SMT threads with normal data
+
+rule_id						test38
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa,0xa,0xa,0xa,0xa,0xa,0xa,0xa]
+ins_bias_mask				[(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x0100010fffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20)]
+
+* VSX,BFP,DFP & VMX instructions on all SMT threads with denormal data
+
+rule_id						test39
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0]
+ins_bias_mask				[(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x0100010fffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20)]
+
+* VSX,BFP,DFP & VMX instructions on all SMT threads with normal & denormal data
+
+rule_id						test40
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x0100010fffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20)]
+
+* VSX,BFP,DFP & VMX  instructions on all SMT threads with mixed data
+
+rule_id						test41
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111,0x1111111111]
+ins_bias_mask				[(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x0100010fffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20)]
+
+
+* VSX,BFP,DFP & VMX  instructions with 50% normal and 50% denormal with all rounding modes 
+
+rule_id						test42
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0,1,2,3,0,1,2,3]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x0100010fffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20)]
+
+* VSX,BFP,DFP & VMX  instructions with 50% normal and 50% denormal with unaligned load and store 
+
+rule_id						test43
+num_oper					2000
+num_threads					0
+seed						[0,0,0,0,0,0,0,0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[80,10,80,10,80,10,80,10]
+fpscr						[0,0,0,0,0,0,0,0]
+data_bias_mask				[0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55]
+ins_bias_mask				[(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x0100010fffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20):(0x010001ffffffffff,40)(0x02000000003fffff,20)(0x030000001fffffff,20)(0x0400000003ffffff,20)]
+

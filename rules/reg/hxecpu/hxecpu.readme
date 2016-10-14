@@ -1,29 +1,28 @@
 README for hxecpu exerciser
 ===========================
 
-Note (02/06/11)
----------------
-README for hxecpu exerciser is same as README of hxefpu64 exerciser.All the points mentioned below is true for
-hxecpu and hxefpu64 exerciser.The only exception is that,the current rule file employed by hxecpu which is "rules.default"
-will test only fixed point cpu instructions(Branch,arithmetic,logical,rotational,cache,loads and stores etc) and will
-not test any floating point,VSX or VMX instructions.
-The rule file format for hxecpu and hxefpu64 is same.Hence all the points mentioned below is valid for hxecpu.
+Note (09/28/2016)
+-----------------
+
+README for hxecpu exerciser is a subset of README of hxefpu64 exerciser.
+All the points mentioned below is true for hxecpu and hxefpu64 exerciser.
+The only exception is that, the rule file employed by hxecpu will test only fixed point 
+cpu instructions(Branch,arithmetic,logical,rotational,cache,loads and stores etc) and will
+not test any floating point, BFP, DFP, VSX or VMX instructions.
+The rule file format for hxecpu and hxefpu64 is same.
 
 Goal:
 ----
-To verify VSU hardware using ISA correctness check method and two pass method.
+To verify VSU hardware as per POWER ISA employing only correctness check and two pass verification method.
 Run the test program with high enough throughput (at least few MIPS) to be able
 to find hardware bugs in VSU design.
 
 
 Salient Features:
 -----------------
-1) Capability for correctness checking (correctness check through VSU reference
-model).
-2) Capability to run in throughput mode (consistency check only - pass1 Vs pass2
-checking).
-3) Capability to bias FP data towards interesting corners through rule file on
-per thread basis.
+1) Capability for correctness checking (correctness check through VSU reference model).
+2) Capability to run in throughput mode (consistency check only - pass1 Vs pass2 checking).
+3) Capability to bias FP data towards interesting corners through rule file on per thread basis.
 4) Capability to bias to specific instruction sub groups on per thread basis.
 5) Seed based test case generation and recreation.
 6) Configurable instructions stream depth (num of instructions in test case).
@@ -33,7 +32,8 @@ per thread basis.
 Hardware supported & HW test scope:
 -----------------------------------
 HTX VSU test program is supported only on P6 and later systems.
-Currently with rules.default file,exerciser supports CPU fixed point instructions (arithmetic,rotate,logical,branch,cache and so on.)
+Currently with default.p9, default.p8 and rules.default file,
+exerciser supports CPU fixed point instructions (arithmetic,rotate,logical,branch,cache and so on.)
 
 Supported OS:
 -------------
@@ -44,7 +44,7 @@ BML   : y
 
 General info:
 ------------
-HTX VSU test program runs as user application on top of OS (AIX, BML & Linux).
+HTX CPU test program runs as user application on top of OS (AIX, BML & Linux).
 Incase of miscompare, exerciser logs severity 4 message and continue to run.
 HTX should create one device entry in mdt file for each processor core in
 system.
@@ -58,12 +58,11 @@ Prerequisites:
 
 Brief Description:
 -----------------
-HTX VSU test program is named hxecpu. hxecpu generates a test case which is
-a sequence of pseudo randomly picked valid VSX & BFP instructions. hxecpu
-supports two test methods:
+HTX CPU test program is named hxecpu. hxecpu generates a test case which is
+a sequence of pseudo randomly picked valid fixed point VSX, VMX instructions.
+hxecpu supports only one test methods:
 
 *	Consistency check
-*	Correctness check
 
 In consistency check method, it runs the same test case twice on hardware and
 compare the results of one run Vs another. In correctness check method, it runs
@@ -71,7 +70,7 @@ the test case on hardware and through simulation model and then compares the
 results of one run Vs another. Test case generation of thread 0 is completely
 independent of other threads. Each thread performs its build, execute and
 compare in parallel to all other threads. Test case may or may not have sync
-across them while executing. Each VSX/BFP instruction is collected in a static
+across them while executing. Each VSX/VMX instruction is collected in a static
 data structure in following format:
 
 
@@ -87,22 +86,24 @@ STREAM_DEPTH				1000
 TEST_METHOD					1
 SYNC_DISTANCE				0
 UNALIGNED_LOADS_STORES_%  	[30, 0, 100, 10]
-FPSCR						[ 0xf8, 0, 0xe8, 0x40 ]
-VSX_INS_MASK				[ 0x01001fffffffffff, 0x010000000000000f,
-		    				  0x010000000000ffff, 0x01000CB00054ffff ]
-BFP_INS_MASK				[ 0x020000000003ffff, 0x020000000001ffff,
-	 						  0x020000000000003f, 0x0200000000002949 ]
-BFP_DATA_BIAS_MASK 			[ 0x0000000055, 0x0000002233, 0x1111111111,
-							0x2222200000 ]
-INS_BIAS_MASK				[(0x01001fffffffffff, 80) (0x020000000003ffff, 20):
-							 (0x0100000000222222, 50) (0x0100000000111111, 50):
-							 (0x0100000000333333, 50) (0x0100000000444444, 50):
-							 (0x0100000000666666, 50) (0x0100000000555555, 50)]
+INS_BIAS_MASK				[(0x05001fffffffffff, 80) (0x050000000003ffff, 20):
+							 (0x0500000000222222, 50) (0x0500000000111111, 50):
+							 (0x0500000000333333, 50) (0x0500000000444444, 50):
+							 (0x0500000000666666, 50) (0x0500000000555555, 50)]
 
 
 Exerciser specific Log files:
 -----------------------------
-/tmp/fpu_miscompare.<core number>.<pid of the hxecpu process>
+1. /<HTX_LOG_DIR>/hxecpu/<tid>/seedlist.txt
+seed used by exerciser logged here if enabled.
+
+2. /<HTX_LOG_DIR>/hxefcpu/<tid>/fpu_miscompare.<core number>.<pid of the hxefpu64 process>
+miscompare file or testcase dump if enabled.
+
+3. /<HTX_LOG_DIR>/hxecpu/<tid>/instr_stats
+percentage of instruction covered or executed as selected or filtered by instruction mask in rule file.
+value 1 indicate 100% coverage otherwise 0.
+
 
 
 Understanding htxstats:
@@ -131,15 +132,8 @@ while running alone.
 
 Limitations:
 -----------
-1) Exerciser does not randomize exception enabled bits in FPSCR while running 
-the test case.
-2) Exerciser does not support FP estimate instructions.
-3) Exerciser does not support unaligned load/store control as of now.
+1) Exerciser does not support unaligned load/store control as of now.
 
-
-Known Issues:
-------------
-Rule file parameter THREADS_SYNC does not work for correctness as of now.
 
 
 Rule File Parameters:
@@ -147,7 +141,7 @@ Rule File Parameters:
 Please refer rule file to know more details about rule file parameters.
 
 
-HXEFPU Rule file Readme
+HXECPU Rule file Readme
 ======================
 
 Description:
@@ -176,7 +170,7 @@ PARENT_SEED				:	Master seed.
 
 SYNC_DISTANCE			:	Number of sync points in a test case
 STREAM_DEPTH			:	Number of instructions per test case.
-TEST_METHOD				:	Test method (1 - Correctness, 2 - Consistency)
+TEST_METHOD				:	Test method (1 - Correctness)
 
 
 Parameters that needs to be specified per thread:
@@ -185,7 +179,9 @@ UNALIGNED_LOADS_STORES_%:	Percentage of unaligned loads/stores.
 INS_BIAS_MASK			:	Specifies test case instructions biasing.
 SEED					:	Thread specific Seed.
 DUMP_TESTCASE			:	Creates log file with testcase details.
-
+LOG_SEED                :   Enable seed logging for each NUM_OPER
+TC_TIME                 :   Testcase Time Control
+NUM_PASS2               :   Number of second pass for every first pass
 
 
 Detailed Description:
@@ -239,14 +235,15 @@ Detailed Description:
 		(SMT = 4). But this parameter is not definitive. The number of threads
 		are decided based on the SMT status. It is only useful if one wants to
 		run lesser number of threads than the maximum possible on one physical
-		core. If the value of '-1' is assigned to this parameter, the thread
+		core. If the value of '0' is assigned to this parameter, the thread
 		number is decided by the exerciser itself depending on the SMT status
 		of the core.
 		Expected values:
-			-1	:	Exerciser will decide depending on SMT status.
+			0	:	Exerciser will decide depending on SMT status.
 			1	:	For ST configuration.
 			2	:	For SMT=2 configuration.
-			4	:	For SMT=4 configuration (max).
+			4	:	For SMT=4 configuration.
+			8	:	For SMT=8 configuration (max).
 
 (7) PARENT_SEED & SEED:
 		Both PARENT_SEED & SEED should be used for recreating the desired
@@ -271,8 +268,8 @@ Detailed Description:
 		parameters value.
 
 (9) TEST_METHOD:
-		Specifies test method used by exerciser. This exerciser supports 2
-		test methods, i.e. CONSISTENCY and CORRECTNESS check methods. In
+		Specifies test method used by exerciser. hxecpu exerciser supports
+		only CONSISTENCY (=1) check methods. In
 		Consistency check, same test case is run twice on the hardware and the
 		result from these two runs are compared. In Correctness mode, once the
 		test case is run on reference model and then on actual hardware. The
@@ -280,30 +277,101 @@ Detailed Description:
 		exerciser in Correctness check method is lesser than that of Consistency
 		check.
 
-(10) FPSCR:
-		Specifies per thread input FPSCR value for the test case. The value
-		should be specified in hex.
-
-			e.g. : { 0xf8, 0, 0xe8, 0x40 }
-
-		In this example, value of 0xf8 is assigned as the input FPSCR for the
-		1st thread. 0x0 as the input FPSCR of 2nd thread and so on. All the
-		values should be separated be ',' and the list should be enclosed in {}.
+(10) FPSCR: Not Applicable for hxecpu
 
 
-Instruction Filter and Bias Masks:
-----------------------------------
-		XXX_INS_MASK and INS_BIAS_MASK are 64 bit masks that are used to filter
+(11) LOG_SEED:
+        Enable seed logging feature.
+            1   :   Enable seed log
+            0   :   Disable seed log
+        Exerciser generate one seed per NUM_OPER.
+        Each seed would be logged into <HTX_LOG_DIR>/hxefpu64/<core>/<tid>/seedlist.txt
+
+(12) TC_TIME:
+        Overall testcase time in seconds, should be specified in multiple
+        of NUM_OPER. The time value is eually divided among num_opers.
+        Example: If you want to run tests for M seeds and control runtime of
+        each seed for N seconds then define NUM_OPER = M and TC_TIME=(M x N)
+        NUM_PASS2 value is ignored in this case.
+
+(13) NUM_PASS2:
+        Number of second pass for every first pass inside a NUM_OPER.
+        For each seed a testcase is executed NUM_PASS2 + 1 (first pass) times.
+
+(14) DUMP_TESTCASE:
+        Enables to dump the log file containing testcase details.
+        Expected values:
+            1   :   Enable dump
+            0   :   Disable dump
+        Example: Enable dump for thread 1 of 8 threads
+        DUMP_TESTCASE    [0,1,0,0,0,0,0,0]
+
+
+Data and Instruction Filter and Bias Masks
+------------------------------------------
+
+(15) DATA_BIAS_MASK:
+		Not used in hxecpu.
+
+		Specifies a the data biasing for both BFP and VSX instructions.
+		There are following interesting data zones for Floating Point nos.
+
+
+			-Normalized No			 0					+Normalized No
+		<-|----------------|-------------|-------------|----------------|->
+		-Inf				-Denorm			+Denorm						+Inf
+
+		This exerciser supports biasing the FP nos to following zones:
+			(1) NORMAL
+			(2) DENORMAL
+			(3) QNAN
+			(4) NEAR_INF(Normal nos towards infinity)
+			(5) INF
+			(6) SNAN
+			(7) ZERO
+			(8) DENORM_TOW_Z(denormal nos towards zero)
+			(9) DENORM_TOW_N(denormal nos towards normal zone)
+			(10)NORM_TOW_DN(small normal nos)
+
+		This mask is 64-bit wide. Out of that lower-order 40 bits will be
+		used for specifying the data biasing towards the zones mentioned above.
+		Rest should be ideally kept as 0s. Numbers placed in low significant
+		nibbles represent the percentage of data bias for that zone.
+
+		Detailed bit mask representation :
+
+		0.......23|24:27|28:31|32:35|36:39|40:43|44:47|48:51|52:55|56:59|60:63
+		---------- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+					(10)  (9)   (8)   (7)   (6)   (5)   (4)   (3)   (2)   (1)
+
+
+		A value of 0x0 to 0xA should be placed in the nibble location for each
+		data zones. 0x0 - 0%, 0x1 - 10% and so on up to 0xa being 100%.
+
+			e.g. : { 0x1111111111, 0x000000000A, 0x0005050000, 0x0000340300 }
+
+					Thread 0: 10% data of each data type.
+					Thread 1: 100% Normal numbers.
+					Thread 2: 50% Zeros and 50% Infinities.
+					Thread 3: 30% SNaNs, 40% Infinity and 30% QNaNs
+
+		While writting BFP_DATA_BIAS_MASK, please ensure that all the bias
+		percentages for a given thread sum up to 100%. If not, BFP_ALL will be
+		assiged residue.
+
+(16) INS_BIAS_MASK:
+
+		INS_BIAS_MASK are 64 bit masks that are used to filter
 		out instructions from getting built into test case and to specify
 		instructions bias. Following format is used to specify per thread
 		masks of these parameters.
 
 
-			Bits: 0:7 | 8:15 16:23 24:31 32:39 40:47 48:55 56:63
-				 ----   ----------------------------------------
-				  ^						^
-				  |						|
-			 Base Category			Sub Category
+			Bits: 0:7       8:10 11 12:15 16:23 24:31 32:39 40:47 48:55 56:63
+				 ----       ---- -- ----------------------------------
+				  ^				 ^   	    	^
+				  |				 |   	    	|
+			 Base Category	P9 Only Bit	  	Sub Category
 
 		(a) Base Category:
 			This is the basic category of instructions. This exerciser supports
@@ -314,6 +382,8 @@ Instruction Filter and Bias Masks:
 				0x01 : VSX Instructions
 				0x02 : BFP Instructions
 				0x03 : DFP Instructions
+				0x04 : VMX Instructions
+				0x05 : CPU Instructions
 
 		(b) Sub Category:
 			For providing fine grained instructions bias control, each category
@@ -322,7 +392,51 @@ Instruction Filter and Bias Masks:
 			specify biasing at a sub-category level. Details of these sub-
 			categories are given under various base categories.
 
-(11) VSX_INS_MASK:
+		This parameter is used to define the biasing of various instruction sub
+		groups in the test case. There are several sub groups under each group
+		of BFP, VSX. Using this parameter, the generated instruction stream can
+		be biased towards one or few instruction sub groups. For example, 100%
+		biasing towards BFP DP load/store will generate a stream that will only
+		have DP load/store instructions. Other stream can be generated having
+		only computational instructions. Very fine level of biasing can be
+		achieved by using the instruction sub groups mentioned above. Relative
+		biasing between BFP and VSX instructions can also be achieved using
+		this parameter.
+
+			e.g. : 			{(0x05001fffffffffff, 80) (0x050000000003ffff, 20):
+                             (0x0500000000222222, 50) (0x0500000000111111, 50):
+                             (0x0500000000333333, 50) (0x0500000000444444, 50):
+                             (0x0500000000666666, 50) (0x0500000000555555, 50)}
+
+		The parameter declaration is in the form of various ordered-pairs of
+		instruction masks and percentage (<mask>, <%>). The ordered-pairs for
+		different threads should be separated by ':' character. And the entire
+		list should be enclosed in a {} pair.
+
+		Thread 0: The parameter declaration above sets a biasing of 80% for all
+				  VSX instructions and 20% for all BFP instructions. The stream
+				  generated  will have 80% of VSX instruction. Among 80% VSX
+				  instructions, relative percent of various sub groups will be
+				  equal. Similarly, the relative biasing of various sub groups
+				  of BFP will be equal. To know about all the subgroups and
+				  their bit positions please refer rule parameter XXX_BIAS_MASK
+				  for respective group.
+
+					<------------------ Thread 0 ------------------>
+					(0x01001fffffffffff, 80) (0x020000000003ffff, 20):
+					 ------------------  ---  ------------------  ---
+								^			^			^			^
+								|			|			|			|
+						  VSX_BIAS_MASK	  %age    BFP_BIAS_MASK   %age
+
+
+                Similarly, instructions biasing can be specified for up to 8
+                threads, each entry should be separated by delimeter `:`
+--------
+Appendix
+--------
+
+(1) Instruction Masks For VSX:
 		Specifies a bit mask that is used to pick VSX instructions from the
 		master table and copy into enabled instructions table. The mask is a
 		64-bit enable instructions mask. This and all other "instruction masks
@@ -375,7 +489,9 @@ Instruction Filter and Bias Masks:
 				29 : VSX_MISC_ONLY /* logical, merge, splat, permute, shift */
 				8-28: Not defined yet.
 
-(12) BFP_INS_MASK :
+(2) Instruction Masks For BFP:
+		Not used in hxecpu.
+
 		Specifies a bit mask that is used to pick BFP instructions from the
 		master table and copy into enabled instructions table. The mask is a
 		64-bit enable instructions mask. The encoding of this mask is also
@@ -403,98 +519,4 @@ Instruction Filter and Bias Masks:
 				45 : BFP_TEST_ONLY
 				8-44 : Not defined yet.
 
-
-(13) BFP_DATA_BIAS_MASK:
-		Specifies a the data biasing for both BFP and VSX instructions.
-		There are following interesting data zones for Floating Point nos.
-
-
-			-Normalized No			 0					+Normalized No
-		<-|----------------|-------------|-------------|----------------|->
-		-Inf				-Denorm			+Denorm						+Inf
-
-		This exerciser supports biasing the FP nos to following zones:
-			(1) NORMAL
-			(2) DENORMAL
-			(3) QNAN
-			(4) NEAR_INF(Normal nos towards infinity)
-			(5) INF
-			(6) SNAN
-			(7) ZERO
-			(8) DENORM_TOW_Z(denormal nos towards zero)
-			(9) DENORM_TOW_N(denormal nos towards normal zone)
-			(10)NORM_TOW_DN(small normal nos)
-
-		This mask is 64-bit wide. Out of that lower-order 40 bits will be
-		used for specifying the data biasing towards the zones mentioned above.
-		Rest should be ideally kept as 0s. Numbers placed in low significant
-		nibbles represent the percentage of data bias for that zone.
-
-		Detailed bit mask representation :
-
-		0.......23|24:27|28:31|32:35|36:39|40:43|44:47|48:51|52:55|56:59|60:63
-		---------- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
-					(10)  (9)   (8)   (7)   (6)   (5)   (4)   (3)   (2)   (1)
-
-
-		A value of 0x0 to 0xA should be placed in the nibble location for each
-		data zones. 0x0 - 0%, 0x1 - 10% and so on up to 0xa being 100%.
-
-			e.g. : { 0x1111111111, 0x000000000A, 0x0005050000, 0x0000340300 }
-
-					Thread 0: 10% data of each data type.
-					Thread 1: 100% Normal numbers.
-					Thread 2: 50% Zeros and 50% Infinities.
-					Thread 3: 30% SNaNs, 40% Infinity and 30% QNaNs
-
-		While writting BFP_DATA_BIAS_MASK, please ensure that all the bias
-		percentages for a given thread sum up to 100%. If not, BFP_ALL will be
-		assiged residue.
-
-(14) INS_BIAS_MASK:
-		This parameter is used to define the biasing of various instruction sub
-		groups in the test case. There are several sub groups under each group
-		of BFP, VSX. Using this parameter, the generated instruction stream can
-		be biased towards one or few instruction sub groups. For example, 100%
-		biasing towards BFP DP load/store will generate a stream that will only
-		have DP load/store instructions. Other stream can be generated having
-		only computational instructions. Very fine level of biasing can be
-		achieved by using the instruction sub groups mentioned above. Relative
-		biasing between BFP and VSX instructions can also be achieved using
-		this parameter.
-
-			e.g. : 			{(0x01001fffffffffff, 80) (0x020000000003ffff, 20):
-                             (0x0100000000222222, 50) (0x0100000000111111, 50):
-                             (0x0100000000333333, 50) (0x0100000000444444, 50):
-                             (0x0100000000666666, 50) (0x0100000000555555, 50)}
-
-		The parameter declaration is in the form of various ordered-pairs of
-		instruction masks and percentage (<mask>, <%>). The ordered-pairs for
-		different threads should be separated by ':' character. And the entire
-		list should be enclosed in a {} pair.
-
-		Thread 0: The parameter declaration above sets a biasing of 80% for all
-				  VSX instructions and 20% for all BFP instructions. The stream
-				  generated  will have 80% of VSX instruction. Among 80% VSX
-				  instructions, relative percent of various sub groups will be
-				  equal. Similarly, the relative biasing of various sub groups
-				  of BFP will be equal. To know about all the subgroups and
-				  their bit positions please refer rule parameter XXX_BIAS_MASK
-				  for respective group.
-
-					<------------------ Thread 0 ------------------>
-				{	(0x01001fffffffffff, 80) (0x020000000003ffff, 20):
-					 ------------------  ---  ------------------  ---
-								^			^			^			^
-								|			|			|			|
-						  VSX_BIAS_MASK	  %age    BFP_BIAS_MASK   %age
-
-
-				Similarly, instructions biasing can be specified for up to 4
-				threads.
-(15) DUMP_TESTCASE:
-	Enables to dump the log file containing testcase details.
-		Expected values:
-			1	:	Enable dump
-			0	:	Disable dump
 

@@ -2,13 +2,14 @@ include ../../../htx.mk
 
 TARGET= \
 	rules.default \
-        rules.64.SAO \
-        rules.CacheBias \
-        rules.InterNode \
-        rules.LwarxStwcx \
+	default.p9 \
+    rules.64.SAO \
+    rules.CacheBias \
+    rules.InterNode \
+    rules.LwarxStwcx \
 	rules.chip \
 	rules.node \
-        hxesctu.readme
+    hxesctu.readme
 
 .PHONY: all clean
 

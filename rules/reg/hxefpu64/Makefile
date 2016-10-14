@@ -4,6 +4,7 @@ TARGET= \
 	default.p6 \
         default.p7 \
         default.p8 \
+        default.p9 \
         default.bfp \
         default.dfp \
         default.vsx \
