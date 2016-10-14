@@ -32,5 +32,52 @@
 #define MAX_ECG_NAME_LENGTH		512
 #define MAX_OPTION_LIST_LENGTH	512
 
+#define MAX_DEVICE_PER_SCREEN 34
+#define DEV_ID_MAX_LENGTH 40
+
+typedef struct
+{
+	char device_name[DEV_ID_MAX_LENGTH];
+	char run_status[5];
+	char day_of_year[20];
+	char last_update_time[11];
+	char cycle_count[28];
+	char stanza_count[28];
+	char last_error_day[11];
+	char last_error_time[11];
+	char slot_port[12];
+	char error_count[28];
+	
+} query_device_entry;
+
+typedef struct
+{
+	char running_mdt_name[MAX_ECG_NAME_LENGTH];
+	char current_system_time[26];
+	char test_started_time[26];
+	char device_entry_count[26];
+	char display_device_count[26];
+	char system_error_flag[5];
+} query_header;
+
+typedef union
+{
+	query_header *p_query_header;
+	query_device_entry *p_query_entry;
+} query_details;
+
+
+typedef struct
+{
+	char		device_name[DEV_ID_MAX_LENGTH];
+	char		device_status[16];
+	unsigned short	slot;
+	unsigned short	port;
+	char		adapt_desc[12];
+	char		device_desc[16];
+} activate_halt_entry;
+
+
+
 #endif
 

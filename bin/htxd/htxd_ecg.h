@@ -45,7 +45,7 @@ typedef struct
 {
 	int	enable_flag;
 	int	debug_flag;
-	int wof_test;
+	int offline_cpu;
 	char	config_file[128];
 }htxd_ecg_equaliser_details;
 
@@ -56,6 +56,7 @@ typedef struct htxd_ecg_info_struct
 	struct htxd_ecg_info_struct *	ecg_info_next;
 	struct htxd_ecg_info_struct *	ecg_info_previous;
 	char							ecg_name[MAX_ECG_NAME_LENGTH];
+	char 				ecg_start_time[26];
 	int								ecg_status;
 	char							ecg_description[20];
 	int								ecg_shm_key;
@@ -76,6 +77,7 @@ typedef struct
 {
 	htxd_ecg_info *		ecg_info_list;
 	int			loaded_device_count;
+	int			ecg_device_count;
 	int			ecg_list_length;
 	htxd_ecg_info *		current_loading_ecg_info;
 	int			message_queue_key;
@@ -137,6 +139,7 @@ extern int			htxd_get_running_ecg_count(void);
 extern char *			htxd_get_running_ecg_name(void);
 extern int			htxd_set_shm_with_exercisers_values_for_dr_restart(char *);
 extern int			htxd_get_running_ecg_list(char *);
+extern char *			htxd_get_ecg_start_time(void);
 extern int			htxd_get_total_device_count(void);
 
 #endif

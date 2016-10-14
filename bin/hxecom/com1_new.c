@@ -57,6 +57,8 @@
 #define BACKOUT_SEMID		shm_Private->BackoutSemid
 
 extern   struct htx_data htx_ds;
+extern char global_htx_home_dir[256];
+extern char global_htx_log_dir[256];	
 
 static void DefineGLOBALSems(int ExerNo);
 static void MasterInit(char * hostname);
@@ -185,7 +187,7 @@ int DefineShm(char * hostname)
             HE_exit(EX_SHMAT8);
          }
 		 /* kill all hxecom procs except this one, and remove all shared mem and 			semaphones */
-		 sprintf(msg_text, "/usr/lpp/htx/runcleanup/hxecom.runcleanup %d",PID);
+		 sprintf(msg_text, "%s/runcleanup/hxecom.runcleanup %d", global_htx_home_dir, PID);
 		 system(msg_text);
         /*********************************************************************/
          /* Old shared memory has been deleted.  Start over -- we may not be  */
@@ -335,7 +337,7 @@ int DefineMySems(int ExerNo)
       HE_exit(EX_SEMCREAT2);
    }
 
-		sprintf(msg,"echo %x >> /tmp/hxecom_sids ",MY_HXECOM_KEY+ExerNo);
+		sprintf(msg,"echo %x >> %shxecom_sids ", MY_HXECOM_KEY+ExerNo, global_htx_log_dir);
 		system(msg);
 
    /* Start in state with write sleeping.                                     */
@@ -355,6 +357,7 @@ static void StopMasterInit(void)
 static void StartMasterInit(char *hostname)
 {
    FILE * config_des;
+   char temp_string[300];
 /*   char * fullname, name[10]=LSTAT_FILE;   
 #ifdef __HTX_LINUX__
    if((fullname = uname_s(name))==NULL){
@@ -365,10 +368,13 @@ static void StartMasterInit(char *hostname)
    fullname = name;
 #endif
 */
-   config_des = fopen(LSTAT_FILE,"a");
+
+   sprintf(temp_string, "%s/%s", global_htx_log_dir, LSTAT_FILE);
+   config_des = fopen(temp_string, "a");
    fclose(config_des);
 
-   config_des = fopen(CONFIG_FILE,"w");
+   sprintf(temp_string, "%s/%s", global_htx_log_dir, CONFIG_FILE);
+   config_des = fopen(temp_string, "w");
    fprintf(config_des, "#Below are the remote addresses of machines\n");
    fprintf(config_des, "#tested with this run.  The address are from the\n");
    fprintf(config_des, "#rule COMNET_NAME.  This file can be used with\n");

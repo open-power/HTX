@@ -23,9 +23,8 @@
 
 #define UTILIZATION_QUEUE_LENGTH     20
 #define MAX_UTIL_SEQUENCE_LENGTH     10
-#define FILENAME	"/usr/lpp/htx/htx_eq.cfg"
-#define LOGFILE       "/tmp/eq_status"
-#define LOGFILE_SAVE  "/tmp/eq_status_save"
+#define LOGFILE       "eq_status"
+#define LOGFILE_SAVE  "eq_status_save"
 
 #define UTIL_LEFT	0
 #define UTIL_RIGHT	1
@@ -64,7 +63,7 @@ typedef struct run_time_thread_config_structure run_time_thread_config;
 struct test_config_structure {
     uint32                      time_quantum;
     uint16                      num_tests_configured;
-    uint32                      wof_test;
+    uint32                      offline_cpu;           /* Flag to make cpu offline. only supported for Linux */
     uint32                      startup_time_delay;
     uint32                      log_duration;
     run_time_thread_config      *thread;

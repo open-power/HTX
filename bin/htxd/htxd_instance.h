@@ -75,12 +75,13 @@ extern void			htxd_set_equaliser_conf_file(char *);
 extern char *			htxd_get_equaliser_conf_file(void);
 extern void			htxd_set_equaliser_debug_flag(int);
 extern int			htxd_get_equaliser_debug_flag(void);
-extern void			htxd_set_equaliser_wof_test_flag(int);
-extern int			htxd_get_equaliser_wof_test_flag(void);
+extern void			htxd_set_equaliser_offline_cpu_test_flag(int);
+extern int			htxd_get_equaliser_offline_cpu_test_flag(void);
 extern int			htxd_is_hang_monitor_initialized(void);
 extern void			htxd_remove_hang_monitor(void);
 extern int			htxd_is_hotplug_monitor_initialized(void);
 extern void			htxd_remove_hotplug_monitor(void);
+extern int			htxd_get_system_header_info_error_count(void);
 extern void			htxd_set_system_header_info_shm_id(int);
 extern int			htxd_get_system_header_info_shm_id(void);
 extern void			htxd_set_exer_table_shm_id(int);
@@ -88,5 +89,8 @@ extern int			htxd_get_exer_table_shm_id(void);
 extern tsys_hdr *		htxd_get_system_header_info(void);
 extern void			htxd_set_init_syscfg_flag(int);
 extern int			htxd_is_init_syscfg(void);
+extern int			htxd_get_test_running_state(void);
+extern void			htxd_set_test_running_state(int);
+extern int			htxd_get_ecg_sem_id(void);
 
 #endif

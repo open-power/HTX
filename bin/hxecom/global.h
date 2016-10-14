@@ -148,8 +148,8 @@ extern char *   sys_errlist[];
 
 #define SLASH_CHR       '/'
 #define SLASH_TXT       "/"
-#define CONFIG_FILE	    "/tmp/htxcom.config"
-#define LSTAT_FILE      "/tmp/htxstats2"
+#define CONFIG_FILE	    "htxcom.config"
+#define LSTAT_FILE      "htxstats2"
 #define RULE_PATH	    "../rules/reg/hxecom"
 #define PATTERN_PATH	"../pattern"
 

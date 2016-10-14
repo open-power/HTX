@@ -76,6 +76,22 @@ void htxd_set_daemon_state(int temp_state)
 	htxd_global_instance->run_state = temp_state;
 }
 
+
+
+
+int htxd_get_test_running_state(void)
+{
+	return htxd_global_instance->is_test_active;
+}
+
+
+void htxd_set_test_running_state(int temp_state)
+{
+	htxd_global_instance->is_test_active = temp_state;
+}
+
+
+
 void htxd_set_init_syscfg_flag(int new_state)
 {
 	htxd_global_instance->init_syscfg_flag = new_state;
@@ -201,15 +217,15 @@ int htxd_get_equaliser_debug_flag(void)
 	return htxd_global_instance->equaliser_debug_flag;
 }
 
-void htxd_set_equaliser_wof_test_flag(int value)
+void htxd_set_equaliser_offline_cpu_flag(int value)
 {
-	htxd_global_instance->wof_test = value;
+	htxd_global_instance->enable_offline_cpu = value;
 }
 
 
-int htxd_get_equaliser_wof_test_flag(void)
+int htxd_get_equaliser_offline_cpu_flag(void)
 {
-	return htxd_global_instance->wof_test;
+	return htxd_global_instance->enable_offline_cpu;
 }
 
 
@@ -404,7 +420,7 @@ void init_htxd_instance(htxd *p_htxd_instance)
 	p_htxd_instance->equaliser_pid			= 0;
 	p_htxd_instance->port_number			= HTXD_DEFAULT_PORT;
 	p_htxd_instance->run_level			= 0;
-	p_htxd_instance->run_state			= HTXD_DAEMON_UNVALIDATED;
+	p_htxd_instance->run_state			= HTXD_DAEMON_IDLE;
 	p_htxd_instance->trace_level			= 0;
 	p_htxd_instance->p_child_pid_list		= NULL;
 	p_htxd_instance->p_profile			= NULL;
@@ -419,6 +435,8 @@ void init_htxd_instance(htxd *p_htxd_instance)
 	p_htxd_instance->equaliser_debug_flag		= 0;
 	p_htxd_instance->is_auto_started		= 0;
 	p_htxd_instance->init_syscfg_flag		= FALSE;
+	p_htxd_instance->master_client_mode		= 0;
+	p_htxd_instance->is_test_active			= 0;
 }
 
 
@@ -523,7 +541,11 @@ int htxd_update_command_object(char *command_string)
 	start_position++;
 
 	start_position += htxd_get_string_value(command_string + start_position, temp_string);
-	strcpy(p_htxd_instance->p_command->ecg_name, temp_string);
+	if( (strlen(temp_string) > 0) && (strchr(temp_string, '/') == NULL) ) {
+		sprintf(p_htxd_instance->p_command->ecg_name, "%s/mdt/%s", global_htx_home_dir, temp_string);
+	} else {
+		strcpy(p_htxd_instance->p_command->ecg_name, temp_string);
+	}
 
 	start_position++;
 
@@ -593,6 +615,17 @@ void htxd_set_system_header_info_shm_id(int system_header_info_shm_id)
 
 
 
+int htxd_get_system_header_info_error_count(void)
+{
+	htxd_ecg_manager *p_ecg_manager;
+
+	p_ecg_manager = htxd_get_ecg_manager();
+
+	return p_ecg_manager->system_header_info->error_count;
+}
+
+
+
 int htxd_get_system_header_info_shm_id(void)
 {
 	htxd_ecg_manager *p_ecg_manager;
@@ -632,4 +665,15 @@ tsys_hdr * htxd_get_system_header_info(void)
 	p_ecg_manager = htxd_get_ecg_manager();
 
 	return p_ecg_manager->system_header_info;
+}
+
+
+int htxd_get_ecg_sem_id(void)
+{
+	htxd_ecg_manager *p_ecg_manager;
+
+
+	p_ecg_manager = htxd_get_ecg_manager();
+
+	return p_ecg_manager->ecg_info_list->ecg_sem_id;
 }

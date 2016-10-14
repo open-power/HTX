@@ -65,7 +65,7 @@ int htxd_start_equaliser(void)
 		printf("DEBUG: equaliser process started with pid <%d>\n", equaliser_pid);
 		htxd_set_equaliser_pid(equaliser_pid);
 	#ifdef __HTX_LINUX__
-		if ((htxd_get_equaliser_wof_test_flag()) == 1) {
+		if ((htxd_get_equaliser_offline_cpu_flag()) == 1) {
 			rc = do_the_bind_proc(equaliser_pid);
 			if (rc < 0) {
 				sprintf(temp_str, "binding equaliser process to core 0 failed.\n");
@@ -101,7 +101,7 @@ void htxd_execute_run_setup_script(char *ecg_name)
 {
 	char command_string[512];
 
-	sprintf(command_string, "%s %s 2> %s", RUN_SETUP_SCRIPT, ecg_name, RUN_SETUP_ERROR_OUTPUT);
+	sprintf(command_string, "%s/etc/scripts/%s %s > %s/%s 2>&1", global_htx_home_dir, RUN_SETUP_SCRIPT, ecg_name, global_htxd_log_dir, RUN_SETUP_ERROR_OUTPUT);
 	system(command_string);
 }
 
@@ -119,7 +119,7 @@ int htxd_load_hxsmsg(htxd_profile *p_profile)
 	switch(hxsmsg_pid)
 	{
 	case 0:
-		strcpy(hxsmsg_path, HTX_PATH);
+		strcpy(hxsmsg_path, global_htx_home_dir);
 		strcat(hxsmsg_path, "/bin/hxsmsg");
 
 		if(p_profile->auto_start == 0) {
@@ -151,7 +151,7 @@ int htxd_load_hxsmsg(htxd_profile *p_profile)
 	default:
 		htxd_set_htx_msg_pid(hxsmsg_pid);
 	#ifdef __HTX_LINUX__
-		if ((htxd_get_equaliser_wof_test_flag()) == 1) {
+		if ((htxd_get_equaliser_offline_cpu_flag()) == 1) {
 			rc = do_the_bind_proc(hxsmsg_pid);
 			if (rc < 0) {
 				sprintf(temp_str, "binding hxsmsg process to core 0 failed.\n");
@@ -174,17 +174,18 @@ int htxd_load_hxsmsg(htxd_profile *p_profile)
 int htxd_load_hxstats(void)
 {
 	int hxstats_pid, rc = 0;
-	char hxsstats_path[512], temp_str[128];
+	char hxsstats_path[512], temp_str[300];
 
 
 	hxstats_pid = htxd_create_child_process();
 	switch(hxstats_pid)
 	{
 	case 0:
-		strcpy(hxsstats_path, HTX_PATH);
+		strcpy(hxsstats_path, global_htx_home_dir);
 		strcat(hxsstats_path, "/bin/hxstats");
 
-		execl(hxsstats_path, "hxstats", "/tmp/htxstats", "30", (char *) 0 );
+		sprintf(temp_str, "%s/htxstats", global_htx_log_dir);
+		execl(hxsstats_path, "hxstats", temp_str, "30", (char *) 0 );
 
 		printf("DEBUG: hxstats load failed <errno : %d> !!!\n", errno); fflush(stdout);
 		exit(errno);
@@ -198,7 +199,7 @@ int htxd_load_hxstats(void)
 
 	htxd_reset_FD_close_on_exec_flag();
 #ifdef __HTX_LINUX__
-	if ((htxd_get_equaliser_wof_test_flag()) == 1) {
+	if ((htxd_get_equaliser_offline_cpu_flag()) == 1) {
 		rc = do_the_bind_proc(hxstats_pid);
 		if (rc < 0) {
 			sprintf(temp_str, "binding hxstats process to core 0 failed.\n");
@@ -252,7 +253,7 @@ int htxd_load_exerciser(struct htxshm_HE *p_HE)
 			putenv("MEMORY_AFFINITY=MCM");
 		}
 
-		strcpy(exerciser_path, HTX_PATH);
+		strcpy(exerciser_path, global_htx_home_dir);
 		strcat(exerciser_path, "/bin/");
 		strcat(exerciser_path, exerciser_name);
 
@@ -266,14 +267,18 @@ int htxd_load_exerciser(struct htxshm_HE *p_HE)
 			strcpy(run_mode, "REG");
 		}
 
-		strcpy(rule_path, HTX_PATH);
-		strcat(rule_path, "/rules/");
 		if(emc_mode == 1) {
-			strcat(rule_path, "emc/");
-			strcat(rule_path, p_HE->emc_rules);
+			if(p_HE->emc_rules[0] != '/') {
+				sprintf(rule_path, "%s/rules/emc/%s", global_htx_home_dir, p_HE->emc_rules);
+			} else {
+				strcpy(rule_path, p_HE->emc_rules);
+			}
 		} else {
-			strcat(rule_path, "reg/");
-			strcat(rule_path, p_HE->reg_rules);
+			if(p_HE->reg_rules[0] != '/') {
+				sprintf(rule_path, "%s/rules/reg/%s", global_htx_home_dir, p_HE->reg_rules);
+			} else {
+				strcpy(rule_path, p_HE->reg_rules);
+			}
 		}
 
 /* system("export EXTSHM=OFF"); */
@@ -345,8 +350,9 @@ int htxd_option_method_run_mdt(char **result)
 	htxd_ecg_info * p_ecg_info_to_run;
 	char command_ecg_name[MAX_ECG_NAME_LENGTH];
 	htxd_ecg_manager *ecg_manager;
-	char trace_str[512];
+	char trace_str[512], cmd[128];
 	int return_code;
+	char temp_str[512];
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_run_mdt");
@@ -362,7 +368,7 @@ int htxd_option_method_run_mdt(char **result)
 	ecg_manager = htxd_get_ecg_manager();
 
 	if(command_ecg_name[0] == '\0') {
-		strcpy(command_ecg_name, DEFAULT_ECG_NAME);
+		sprintf(command_ecg_name, "%s/mdt/%s", global_htx_home_dir, DEFAULT_ECG_NAME);
 	}
 
 	*result = malloc(1024);
@@ -387,9 +393,10 @@ int htxd_option_method_run_mdt(char **result)
 	/* start hxsmsg process if it is not already started */
 	if(htxd_get_htx_msg_pid() == 0) {
 		htxd_truncate_error_file();
+		htxd_truncate_message_file();
 		htxd_load_hxsmsg(htxd_instance->p_profile);
 		HTXD_TRACE(LOG_ON, "run started htxsmsg process");
-		htxd_send_message ("System wakeup for responding", 0, HTX_SYS_INFO, HTX_SYS_MSG);
+		htxd_send_message ("HTX Daemon wakeup for responding", 0, HTX_SYS_INFO, HTX_SYS_MSG);
 	}
 
 	if(htxd_is_daemon_selected()  != TRUE) {
@@ -406,6 +413,15 @@ int htxd_option_method_run_mdt(char **result)
 		htxd_send_message (trace_str, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 		HTXD_TRACE(LOG_ON, trace_str);
 
+		sprintf(temp_str, "cp %s %s/mdt/mdt ; sync", command_ecg_name, global_htx_home_dir);
+		system(temp_str);
+
+		if( strstr(command_ecg_name, "camss") != NULL) {
+			sprintf(trace_str, "updating camss mdt <%s>", command_ecg_name);
+			HTXD_TRACE(LOG_OFF, trace_str);
+			sprintf(cmd, "%s/etc/scripts/%s %s", global_htx_home_dir, CAMSS_MDT_UPDATE_SCRIPT, command_ecg_name);
+			system(cmd);
+		}
 
 		/* execute run setup script for this MDT */
 		htxd_execute_run_setup_script(command_ecg_name);
@@ -452,7 +468,7 @@ int htxd_option_method_run_mdt(char **result)
 
 #ifdef __HTX_LINUX__
 	/* start hotplug monitor */
-	if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_wof_test_flag() != 1) {
+	if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
 		htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
 		HTXD_TRACE(LOG_ON, "run started hotplug monitor");
 	}
@@ -471,6 +487,7 @@ int htxd_option_method_run_mdt(char **result)
 	}
 
 	htxd_instance->run_state = HTXD_DAEMON_RUNNING;
+	htxd_set_test_running_state(HTXD_TEST_ACTIVATED);
 	strcpy(ecg_manager->running_ecg_name, command_ecg_name);
 
 	/* to DEBUG */
@@ -486,9 +503,12 @@ int htxd_option_method_run_mdt(char **result)
 		sprintf(*result, "ECG (%s) Activated\nWARNING: few devices are unable to start since they may be already loaded under another ECG(s)", command_ecg_name);
 	} else {
 		sprintf(*result, "ECG (%s) Activated.", command_ecg_name);
-		sprintf(trace_str, "date +\"ECG (%s) was activated on %%x at %%X %%Z\" >>/tmp/htxd.start.stop.time", command_ecg_name);
+		sprintf(trace_str, "date +\"ECG (%s) was activated on %%x at %%X %%Z\" >>%s/%s", command_ecg_name, global_htxd_log_dir, HTXD_START_STOP_LOG);
 		system(trace_str);
 	}
+
+	/* have to set shm key to system header shared memory so that htx stats is able to connect */
+	htxd_set_system_header_info_shm_with_current_shm_key(p_ecg_info_to_run->ecg_shm_key);
 
 	htxd_send_message (*result, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 	HTXD_TRACE(LOG_ON, *result);
@@ -507,7 +527,8 @@ int htxd_option_method_select_mdt(char **result)
 	htxd_ecg_info * p_ecg_info_to_select;
 	char command_ecg_name[MAX_ECG_NAME_LENGTH];
 	htxd_ecg_manager *ecg_manager;
-	char trace_str[512];
+	char trace_str[512], cmd[128];
+	char temp_str[512];
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_select_mdt");
@@ -541,7 +562,7 @@ int htxd_option_method_select_mdt(char **result)
 
 
 	if(command_ecg_name[0] == '\0') {
-		strcpy(command_ecg_name, DEFAULT_ECG_NAME);
+		sprintf(command_ecg_name, "%s/mdt/%s", global_htx_home_dir, DEFAULT_ECG_NAME);
 	}
 
 	if(htxd_is_file_exist(command_ecg_name) == FALSE) {
@@ -558,7 +579,7 @@ int htxd_option_method_select_mdt(char **result)
 			return 1;
 		}
 		htxd_instance->p_ecg_manager = ecg_manager;
-		htxd_send_message ("System wakeup for responding", 0, HTX_SYS_INFO, HTX_SYS_MSG);
+		htxd_send_message ("HTX Daemon wakeup for responding", 0, HTX_SYS_INFO, HTX_SYS_MSG);
 	}
 
 	p_ecg_info_list = htxd_get_ecg_info_list(htxd_instance->p_ecg_manager);
@@ -571,6 +592,18 @@ int htxd_option_method_select_mdt(char **result)
 		p_ecg_info_list = p_ecg_info_list->ecg_info_next;
 	}
 
+	/* copy run mdt to current mdt */
+	sprintf(temp_str, "cp %s %s/mdt/mdt ; sync", command_ecg_name, global_htx_home_dir);
+	system(temp_str);
+
+	/* update for camss mdt */
+	if( strstr(command_ecg_name, "camss") != NULL) {
+		sprintf(trace_str, "updating camss mdt <%s>", command_ecg_name);
+		HTXD_TRACE(LOG_OFF, trace_str);
+		sprintf(cmd, "%s/etc/scripts/%s %s", global_htx_home_dir, CAMSS_MDT_UPDATE_SCRIPT, command_ecg_name);
+		system(cmd);
+	}
+
 	/* execute run setup script for this MDT */
 	htxd_execute_run_setup_script(command_ecg_name);
 
@@ -581,6 +614,7 @@ int htxd_option_method_select_mdt(char **result)
 	/* start hxsmsg process if it is not already started */
 	if(htxd_get_htx_msg_pid() == 0) {
 		htxd_truncate_error_file();
+		htxd_truncate_message_file();
 		htxd_load_hxsmsg(htxd_instance->p_profile);
 		HTXD_TRACE(LOG_ON, "run started htxsmsg process");
 	}
@@ -602,7 +636,7 @@ int htxd_option_method_select_mdt(char **result)
 		sprintf(*result, "ECG (%s) is slected\nWARNING: few devices are unable to start since they may be already loaded under another ECG(s)", command_ecg_name);
 	} else {
 		sprintf(*result, "ECG (%s) is selected", command_ecg_name);
-		sprintf(trace_str, "date +\"ECG (%s) was selected on %%x at %%X %%Z\" >>/tmp/htxd.start.stop.time", command_ecg_name);
+		sprintf(trace_str, "date +\"ECG (%s) was selected on %%x at %%X %%Z\" >>%s/%s", command_ecg_name, global_htxd_log_dir, HTXD_START_STOP_LOG);
 		system(trace_str);
 	}
 

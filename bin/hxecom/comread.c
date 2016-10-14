@@ -92,6 +92,8 @@ static void SendReadAckToSemServ(struct CoordMsg * CMsg, struct sockaddr_in * de
  
 SOCKET TestSock; 
 
+extern char global_htx_log_dir[256];
+
 /***************************************************************************
  * GCC Sucks !! It would not allow two pre-processor directives in a single 
  * line. So all this for a single line difference ..   
@@ -900,21 +902,21 @@ ReqPktSize(int WriteIdx, u_short bufmin, u_short bufmax, u_short num_oper, u_sho
 	hxfmsg(stats, HTXERROR(EX_WRITE5,ERRNO), HTX_HE_INFO, msg_text);
 #endif
 	rc = StreamRead(SemServSock, (char *)&CMsg, sizeof(struct CoordMsg));
-	NetToHostBsize_t(&CMsg.ID.Bsize); 
+	/*NetToHostBsize_t(&CMsg.ID.Bsize); */
 
 	if(rc == -1 || ntohl(CMsg.msg_type ) != PKTSIZES) { 
 		sprintf(msg_text, "Error : getting number of packets random packet sizes generated -rc = %d, %s \n", rc, STRERROR(errno));
         hxfmsg(stats, HTXERROR(EX_WRITE8,ERRNO), HTX_HE_SOFT_ERROR, msg_text);
         return(EX_WRITE8);
     }
-	if(CMsg.ID.Bsize.bufmin != bufmin || CMsg.ID.Bsize.bufmax != bufmax || CMsg.ID.Bsize.num_oper != num_oper) { 
+	if(ntohs(CMsg.ID.Bsize.bufmin) != bufmin || ntohs(CMsg.ID.Bsize.bufmax) != bufmax || ntohs(CMsg.ID.Bsize.num_oper) != num_oper) { 
 		sprintf(msg_text, "Error : PKTSIZES corrupted. Actual buffers = %d, %d, %d. Expected = %d, %d, %d \n",
-		CMsg.ID.Bsize.bufmin, CMsg.ID.Bsize.bufmax, CMsg.ID.Bsize.num_oper, bufmin, bufmax, num_oper);
+		ntohs(CMsg.ID.Bsize.bufmin), ntohs(CMsg.ID.Bsize.bufmax), ntohs(CMsg.ID.Bsize.num_oper), bufmin, bufmax, num_oper);
 		hxfmsg(stats, HTXERROR(EX_WRITE8,ERRNO), HTX_HE_SOFT_ERROR, msg_text);
         return(EX_WRITE8);
     }
  
-	if(CMsg.ID.Bsize.num_pktsizes != num_pktsize_req) { 
+	if(ntohs(CMsg.ID.Bsize.num_pktsizes) != num_pktsize_req) { 
 		sprintf(msg_text, "Fewer Number of random packet sizes generated Requested = %d, Actual = %d \n",num_pktsize_req, CMsg.ID.Bsize.num_pktsizes); 
 		hxfmsg(stats, 0, HTX_HE_INFO, msg_text);
 		num_pktsize_req = CMsg.ID.Bsize.num_pktsizes ; 
@@ -1051,9 +1053,12 @@ static void WriteLocalStats(struct cum_rw LSTATS[], int NoStanzas, char ConnectS
 {
     int    stanza;
     FILE * config_des = NULL;
+    char temp_string[300];
 	/*return;*/
 
-    config_des = fopen(LSTAT_FILE, "a");
+
+    sprintf(temp_string, "%s/%s", global_htx_log_dir, LSTAT_FILE);
+    config_des = fopen(temp_string, "a");
 
     GlobalWait(FILE_SEM, stats);
 

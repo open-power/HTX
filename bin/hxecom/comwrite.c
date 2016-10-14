@@ -115,6 +115,7 @@ static void good_bytes_wrote(struct cum_rw * Lstats, struct htx_data * pstats,
                                           struct htx_data * stats, int bytes, char ConnectStr[]);
 static int GetUniqueWIdx(struct htx_data * stats);
 
+extern char global_htx_log_dir[256];
 
 /***************************************************************************
  * GCC Sucks !! It would not allow two pre-processor directives in a single
@@ -570,7 +571,10 @@ if( strcmp (InetNtoa(WriterID.sock.sin_addr, tmpaddr, stats),
 				#endif 
 					if(shm_COMSEM->loop[WriterIdx].num_pktsizes != num_pktsizes_req)
 						num_pktsizes_req = shm_COMSEM->loop[WriterIdx].num_pktsizes; 
-						memcpy(bsize, shm_COMSEM->loop[WriterIdx].rand_pktsize, (sizeof(u_short) * num_pktsizes_req));  			
+						/*memcpy(bsize, shm_COMSEM->loop[WriterIdx].rand_pktsize, (sizeof(u_short) * num_pktsizes_req)); */ 
+						for( i = 0; i < num_pktsizes_req; i++) {
+							bsize[i] = ntohs(shm_COMSEM->loop[WriterIdx].rand_pktsize[i]);
+						}
 				} else { 
 					num_pktsizes_req = rule[stanza].num_oper ; 
 					for(i = 0; i < rule[stanza].num_oper; i ++) {
@@ -939,9 +943,12 @@ static void WriteLocalStats(struct cum_rw LSTATS[], int NoStanzas, char ConnectS
 {
     int   stanza;
     FILE *config_des = NULL;
+    char temp_string[300];
 	/*eturn;*/
 
-    config_des = fopen(LSTAT_FILE, "a");
+
+    sprintf(temp_string, "%s/%s", global_htx_log_dir, LSTAT_FILE);
+    config_des = fopen(temp_string, "a");
 
     GlobalWait(FILE_SEM, stats);
 
@@ -1611,7 +1618,7 @@ GetPktSizes(SOCKET msgsock, struct bufsize_t Bsize, struct htx_data * stats) {
 	 */  
 	
 	 int i, rc = 0 ; 
-	 u_short WriterIdx, num_pktsize_req, bufmin, bufmax, num_oper; 
+	 u_short WriterIdx, num_pktsize_req, bufmin, bufmax, num_oper, temp_buf_size; 
 	 struct CoordMsg CMsg; 
 
 	 WriterIdx 		 = Bsize.WriterIdx; 
@@ -1655,7 +1662,8 @@ GetPktSizes(SOCKET msgsock, struct bufsize_t Bsize, struct htx_data * stats) {
     }
 
 	 for(i =0 ; i < num_pktsize_req; i++) { 
-		shm_COMSEM->loop[WriterIdx].rand_pktsize[i] = bufmin + random() % (bufmax - bufmin);   
+		temp_buf_size = bufmin + random() % (bufmax - bufmin);
+		shm_COMSEM->loop[WriterIdx].rand_pktsize[i] = htons((u_short) 0xffff & temp_buf_size);   
 	 }
 	 /* 3 */ 
 #ifdef __DEBUG__
@@ -1666,12 +1674,15 @@ GetPktSizes(SOCKET msgsock, struct bufsize_t Bsize, struct htx_data * stats) {
 	 /* Inform reader which packet is coming up, how many random packets we generated     
 	  * I need to connect writer socket before sending packets packets 
 	  */   
-	 CMsg.msg_type = htonl(PKTSIZES); 
-	 CMsg.ID.Bsize.WriterIdx = htonl(WriterIdx) ; 
-	 CMsg.ID.Bsize.bufmin = htonl(bufmin) ; 
-	 CMsg.ID.Bsize.bufmax = htonl(bufmax) ; 
-	 CMsg.ID.Bsize.num_oper = htonl(num_oper) ; 
-	 CMsg.ID.Bsize.num_pktsizes = htonl(num_pktsize_req) ; 
+	
+	CMsg.msg_type = htonl(PKTSIZES);
+        CMsg.ID.Bsize.WriterIdx = htons((u_short) 0xffff & WriterIdx);
+        CMsg.ID.Bsize.bufmin = htons((u_short) 0xffff & bufmin);
+        CMsg.ID.Bsize.bufmax = htons((u_short) 0xffff & bufmax);
+        CMsg.ID.Bsize.num_oper = htons((u_short) 0xffff & num_oper) ;
+        CMsg.ID.Bsize.num_pktsizes = htons((u_short) 0xffff & num_pktsize_req) ;
+
+
 #ifdef __DEBUG__
  	 sprintf(stats->msg_text, "WriterIdx=%d, GetPktSizes: 3.1 \n", WriterIdx);
      hxfmsg(stats, HTXERROR(EX_COMSEM2,0), HTX_HE_INFO, stats->msg_text);

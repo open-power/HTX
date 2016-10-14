@@ -117,6 +117,9 @@ static struct shm_coord_t  * shm_COORD  = (struct shm_coord_t *)NULL;
 struct shm_hxecom_t        * shm_HXECOM = (struct shm_hxecom_t *)NULL;
 
 char comhostname[32];
+char global_htx_log_dir[256] = "/tmp";
+char global_exer_log_dir[256] = "/tmp";
+char global_htx_home_dir[256] = {'\0'};
 /******************************************************************************/
 /***  End of Global Variable Definitions  *************************************/
 /******************************************************************************/
@@ -169,6 +172,8 @@ int main(int argc, char *argv[])
 	int netmask;
 	int mymask;
 	char addrStr[30];
+	char *temp_env_val_ptr = NULL;
+	char temp_string[300];
 	
 	sprintf(tmper,"%s",argv[1]);
 	ComName = tmper;
@@ -218,6 +223,24 @@ int main(int argc, char *argv[])
     sigaction(SIGQUIT, &sigvector, NULL);
     sigaction(SIGHUP,  &sigvector, NULL);
 
+	temp_env_val_ptr = getenv("HTX_HOME_DIR");
+	if( (temp_env_val_ptr != NULL) && (strlen(temp_env_val_ptr) > 0) ) {
+		strcpy(global_htx_home_dir, temp_env_val_ptr);
+	} else {
+		printf("HTX environment is not setup, please setup HTX environment and re-tr\ny");
+		printf("to setup HTX environment on same shell execute: . htx_setup.sh\n");
+		printf("exiting...\n\n");
+		exit(1);
+	}
+
+	temp_env_val_ptr = getenv("HTX_LOG_DIR");
+	if( (temp_env_val_ptr != NULL) && (strlen(temp_env_val_ptr) > 0) ) {
+		strcpy(global_htx_log_dir, temp_env_val_ptr);
+	}
+	
+	if( (STATS.htx_exer_log_dir != NULL) && (strlen(STATS.htx_exer_log_dir) > 0) ) {
+		strcpy(global_exer_log_dir, STATS.htx_exer_log_dir);
+	}
 
 /********************************************************************/
 /* Setup Coordinator sockets                                        */
@@ -336,15 +359,16 @@ int main(int argc, char *argv[])
 	/*TWM2*/
 	/* get the netmask and use it to set up the Broadcast address */
 
-	sprintf(MSG_TEXT, "netstat -in| grep %s | awk {'print $1'} > /tmp/out", addrStr);
+	sprintf(temp_string, "%s/out", global_exer_log_dir);
+	sprintf(MSG_TEXT, "netstat -in| grep %s | awk {'print $1'} > %s", addrStr, temp_string);
 	system(MSG_TEXT);
-	f_data=fopen("/tmp/out","r");
+	f_data=fopen(temp_string, "r");
 	fscanf(f_data,"%s",value);    /* get interface name */
 	fclose(f_data);
 
-	sprintf(MSG_TEXT, "ifconfig %s | awk {'print $4'} > /tmp/out", value);
+	sprintf(MSG_TEXT, "ifconfig %s | awk {'print $4'} > %s", value, temp_string);
 	system(MSG_TEXT);
-	f_data=fopen("/tmp/out","r");
+	f_data=fopen(temp_string, "r");
 	fscanf(f_data,"%s",value);    /* get mask value  form 0xfffffe00*/
 	fclose(f_data);
 	sscanf(value,"%x",&netmask);
@@ -1328,11 +1352,13 @@ int  getBroadcastAddr( char * ipaddr, int *brdcst )
  char * strptr;
  char msgtxt[128];
  FILE *fd;
+ char temp_string[300];
 
- sprintf(msgtxt, "ip addr show | awk ' /%s/ { print $4 }' >/tmp/out ", ipaddr );
+ sprintf(temp_string, "%s/out", global_exer_log_dir);
+ sprintf(msgtxt, "ip addr show | awk ' /%s/ { print $4 }' >%s ", ipaddr, temp_string);
  system(msgtxt);
 
- fd = fopen( "/tmp/out", "r");
+ fd = fopen( temp_string, "r");
  fscanf(fd, "%s", brdstr );
 #ifdef __DEBUG__
  printf("ip_addr = %s, brdstr: %s\n",ipaddr, brdstr);
@@ -1356,12 +1382,14 @@ int com_hxfmsg(struct htx_data *p, int err, enum sev_code  sev, char *text)
   char    disp_time[30], disp_time1[30];
   struct  tm   *asc_time, asc_time1;
   long    call_time;
+  char temp_string[300];
 
   if (*(p->run_type) == 'O') {
      hxfmsg(p,err, sev, text);
   } else {
      if ( firsttime ) {
-         comlogfd = fopen("/tmp/coordstats", "w");
+         sprintf(temp_string, "%s/coordstats", global_exer_log_dir);
+         comlogfd = fopen(temp_string, "w");
          firsttime = 0;
      }
 

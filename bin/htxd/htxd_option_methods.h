@@ -45,7 +45,7 @@ typedef struct
 extern void init_option_list(void);
 extern int htxd_validate_command_requirements(htxd *, char *);
 extern void htxd_init_option_method(htxd_option_method_object *);
-extern int htxd_process_command(char **);
+extern int htxd_process_command(char **, int *);
 //int htxd_process_all_active_ecg(ecg_process_function, char *);
 
 extern int htxd_option_method_create_mdt OPTION_METHOD_ARGS;
@@ -75,5 +75,19 @@ extern int htxd_option_method_select_mdt OPTION_METHOD_ARGS;
 extern int htxd_option_method_exersetupinfo OPTION_METHOD_ARGS;
 extern int htxd_option_method_bootme OPTION_METHOD_ARGS;
 extern int htxd_option_method_query OPTION_METHOD_ARGS;
+extern int htxd_option_method_screen_2 OPTION_METHOD_ARGS;
+extern int htxd_option_method_screen_4 OPTION_METHOD_ARGS;
+extern int htxd_option_method_screen_5 OPTION_METHOD_ARGS;
+extern int htxd_option_method_get_file OPTION_METHOD_ARGS;
+extern int htxd_option_method_get_daemon_state OPTION_METHOD_ARGS;
+extern int htxd_option_method_coe_soe OPTION_METHOD_ARGS;
+extern int htxd_option_method_activate_halt OPTION_METHOD_ARGS;
+extern int htxd_option_method_device_count OPTION_METHOD_ARGS;
+extern int htxd_option_method_test_activate_halt OPTION_METHOD_ARGS;
+extern int htxd_option_method_config_net OPTION_METHOD_ARGS;
+extern int htxd_option_method_append_net_mdt OPTION_METHOD_ARGS;
+extern int htxd_option_method_test_net OPTION_METHOD_ARGS;
+extern int htxd_option_method_set_htx_env OPTION_METHOD_ARGS;
+extern int htxd_option_method_get_htx_env OPTION_METHOD_ARGS;
 
 #endif

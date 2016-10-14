@@ -186,10 +186,12 @@ void update_thread_config(char *affinity, thread_config_params cur_config)
                 num_of_cores = 1;
             }
             for (l = 0; l < num_of_cores; l++, core_num++) {
-                /* Exclude N0P0C0T* if wof testing is enabled */
-                if (test_config.wof_test && core_num == 0 && chip_num == 0 && node_num == 0) {
+            #ifdef __HTX_LINUX__
+                /* Exclude N0P0C0T* if offlining cpu is enabled */
+                if (test_config.offline_cpu && core_num == 0 && chip_num == 0 && node_num == 0) {
                     continue;
                 }
+            #endif
                 if (chr_ptr[3][0] == '*') {
                     thread_num = 0;
                     num_of_threads = get_num_of_cpus_in_core(node_num, chip_num, core_num);
@@ -213,7 +215,9 @@ void update_thread_config(char *affinity, thread_config_params cur_config)
                     th = &test_config.thread[num_tests];
                     memcpy(&(th->th_config), &cur_config, sizeof(thread_config_params));
                     th->th_config.lcpu = get_logical_cpu_num(node_num, chip_num, core_num, thread_num);
+                #ifdef __HTX_LINUX__
                     th->th_config.pcpu = get_logical_2_physical(th->th_config.lcpu);
+                #endif
                     sprintf(dev_name_str, "%s%d", th->th_config.dev_name, th->th_config.lcpu);
                     htxd_send_message (dev_name_str, 0, HTX_SYS_INFO, HTX_SYS_MSG);
                     strcpy(th->th_config.dev_name, dev_name_str);
@@ -230,7 +234,7 @@ void update_thread_config(char *affinity, thread_config_params cur_config)
                     if ((k == (shm_addr.hdr_addr)->num_entries) && (exer_found == 0)) {
                         sprintf(msg, "Exerciser %s defined in config file is not found in MDT file currently being run.\nHence, equaliser process exiting.", th->th_config.dev_name);
                         htxd_send_message(msg, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
-                        return;
+                        return(-1);
                     }
                     num_tests++;
                 }
@@ -249,14 +253,14 @@ int read_config(void)
 	int exer_found, i, j, k, rc = 0;
 	char line[MAX_LINE_SIZE], *chr_ptr[MAX_PARAMS_IN_ROW], *buf, keywd[64], msg[256];
 	char found_quantum = 0;
-	char affinity_str[16], filename[45];
+	char affinity_str[16], filename[160];
 	char *cfg_file;
     thread_config_params cur_config;
 
 
 	cfg_file = htxd_get_equaliser_conf_file();
 
-	sprintf(filename, "%s/", HTX_PATH);
+	sprintf(filename, "%s/", global_htx_home_dir);
 	strcat(filename, cfg_file);
 
 	/* printf("filename : <%s>\n", filename); */
@@ -271,7 +275,7 @@ int read_config(void)
 	if (rc) {
 	    exit(1);
 	}
-	test_config.wof_test = 0;
+	test_config.offline_cpu = 0;
 
 	while (1) {
 		rc = get_line(line, MAX_LINE_SIZE, fp);  /* gets one line at a time from config file  */
@@ -304,8 +308,8 @@ int read_config(void)
                 sscanf(line, "%*s %*s %d", &pattern_length);
                 length_flag = 1;
             }
-            else if (strcmp(keywd, "wof_test") == 0) {
-                sscanf(line, "%*s %*s %d", &test_config.wof_test);
+            else if (strcmp(keywd, "offline_cpu") == 0) {
+                sscanf(line, "%*s %*s %d", &test_config.offline_cpu);
 			}
 			else if ((chr_ptr[i++] = strtok(line," \n\t")) != NULL) {
 				/*sprintf(msg, "chr_ptr[0]: %s\n", chr_ptr[0]);
@@ -330,7 +334,7 @@ int read_config(void)
 					cur_config.utilization_sequence[j++] = atoi(buf);
 				}
 				if (buf != NULL && j == MAX_UTIL_SEQUENCE_LENGTH) {
-					sprintf(msg, "Only up to 10 values are valid for utilization sequence. For %s, more than 10 values are provided for it in config file.\nHence Equaliser process will exit.", cur_config.dev_name);
+					sprintf(msg, "Only upto 10 values are valid for utlization sequence. For %s, more than 10 values are provided for it in config file.\nHence Equaliser process will exit.", cur_config.dev_name);
 					htxd_send_message(msg, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
 					return(-1);
 				}
@@ -511,6 +515,8 @@ void htxd_equaliser(void)
 	union shm_pointers shm_addr_wk;     /* work ptr into shm                 */
 	struct sigaction sigvector;      /* structure for signals */
 	run_time_thread_config *thread;
+	char equaliser_log_file[300];
+	char equaliser_log_file_save[300];
 
   /*
    ***********************  beginning of executable code  *******************
@@ -521,6 +527,8 @@ void htxd_equaliser(void)
 
 	shm_addr = htxd_get_equaliser_shm_addr();
 	semhe_id = htxd_get_equaliser_semhe_id();
+	sprintf(equaliser_log_file, "%s/%s", global_htxd_log_dir, LOGFILE);
+	sprintf(equaliser_log_file_save, "%s/%s", global_htxd_log_dir, LOGFILE_SAVE);
 
   /*
    *************************  Set default SIGNAL handling  **********************
@@ -541,14 +549,14 @@ void htxd_equaliser(void)
   	(void) sigaction(SIGQUIT, &sigvector, (struct sigaction *) NULL);
   	(void) sigaction(SIGTERM, &sigvector, (struct sigaction *) NULL);
 
-  	rc = stat(LOGFILE, &buf1);
+  	rc = stat(equaliser_log_file, &buf1);
   	if ((rc == 0) || ((rc == -1 ) && (errno != ENOENT))) {
-		remove(LOGFILE);
+		remove(equaliser_log_file);
 	}
 
-	rc = stat(LOGFILE_SAVE, &buf1);
+	rc = stat(equaliser_log_file_save, &buf1);
 	if ((rc == 0) || ((rc == -1 ) && (errno != ENOENT))) {
-		remove(LOGFILE_SAVE);
+		remove(equaliser_log_file_save);
 	}
 
 
@@ -613,18 +621,18 @@ void htxd_equaliser(void)
 		htxd_send_message(msg, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 		sleep(test_config.startup_time_delay);
 	}
-	log_fp = fopen(LOGFILE, "w");
+	log_fp = fopen(equaliser_log_file, "w");
 	tm_log_save = time((long *) 0);
 	printf("DEBUG: point 6\n");
 	while(1) {
 
 		clock = time((long *) 0);
 		if((clock - tm_log_save) >= test_config.log_duration ) {
-			sprintf(workstr, "cp %s %s", LOGFILE, LOGFILE_SAVE);
+			sprintf(workstr, "cp %s %s", equaliser_log_file, equaliser_log_file_save);
 			system(workstr);
 			fclose(log_fp);
 			tm_log_save = clock;
-			log_fp = fopen(LOGFILE, "w");
+			log_fp = fopen(equaliser_log_file, "w");
 		}
 		thread = test_config.thread;
 		for (i=0; i < test_config.num_tests_configured; i++, thread++) {
@@ -659,17 +667,20 @@ void htxd_equaliser(void)
 							}
 							else {
 								p_htxshm_HE->equaliser_halt = 1;
-                                if (test_config.wof_test) {
+                            #ifdef __HTX_LINUX__
+                                if (test_config.offline_cpu) {
                                     /* bring CPU offline. This will automatically make process to unbind */
                                     sprintf (str1, "echo 0 > /sys/devices/system/cpu/cpu%d/online", thread->th_config.pcpu);
                                     system(str1);
 							    }
+                            #endif
 							}
 						}
 						else if((action == 1) && (p_htxshm_HE->equaliser_halt == 1)) {
 							clock = time((long *) 0);
 							p_tm = ctime(&clock);
-                            if (test_config.wof_test) {
+                        #ifdef __HTX_LINUX__
+                            if (test_config.offline_cpu) {
                                 /* bring CPU online and bind the process to that */
                                 sprintf (str1, "echo 1 > /sys/devices/system/cpu/cpu%d/online", thread->th_config.pcpu);
                                 system(str1);
@@ -680,6 +691,7 @@ void htxd_equaliser(void)
                                     exit(1);
                                 }
                             }
+                        #endif
 							sprintf(msg, "Sending SIGCONT to %s at %s", thread->th_config.dev_name, p_tm);
 							fprintf (log_fp, "%s", msg);
 							if(htxd_get_equaliser_debug_flag() == 1) {

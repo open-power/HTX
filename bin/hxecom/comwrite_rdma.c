@@ -112,6 +112,8 @@ static void RecvAddrExc(SOCKET msgsock, struct mr_triplet rmr_info, struct htx_d
 static void hex_dump(unsigned char * buf, int dlen ); 
 void Detach_COMSEM_RDMA(void);
 
+extern char global_htx_log_dir[256];
+
 /* Global udapl instance */
 static struct dapl_device *dapl_instance_ptr = NULL;
 static int WriterIdx; 
@@ -755,9 +757,12 @@ static void WriteLocalStats(struct cum_rw LSTATS[], int NoStanzas, char ConnectS
 {
     int   stanza;
     FILE *config_des = NULL;
+    char temp_string[300];
 	/*eturn;*/
 
-    config_des = fopen(LSTAT_FILE, "a");
+
+    sprintf(temp_string, "%s/%s", global_htx_log_dir, LSTAT_FILE);
+    config_des = fopen(temp_string, "a");
 
     GlobalWait(FILE_SEM, stats);
 

@@ -164,8 +164,8 @@ int  htxcmd_receive_response(int socket_fd, htxcmd_response *response)
 	fflush(stdout); */
 
 	response->return_code = atoi(temp_buffer);
-	/* printf("response->return_code <%d>\n", response->return_code); */
-	fflush(stdout);
+	/* printf("response->return_code <%d>\n", response->return_code); 
+	fflush(stdout); */
 
 	memset(temp_buffer, 0, sizeof(temp_buffer) );
 	return_code = htxd_receive_bytes(socket_fd, temp_buffer, RESPONSE_STRING_LENGTH);

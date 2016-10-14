@@ -66,6 +66,7 @@ int htxd_start_daemon(htxd *htxd_instance)
 	char *				command_buffer		= NULL;
 	char *				command_result		= NULL;
 	int					command_return_code	= 0;
+	int				command_type;
 	char			trace_string[256];
 
 
@@ -142,7 +143,7 @@ int htxd_start_daemon(htxd *htxd_instance)
 
 		/* process the received command */
 		HTXD_TRACE(LOG_OFF, "daemon start processing command");
-		command_return_code = htxd_process_command(&command_result);
+		command_return_code = htxd_process_command(&command_result, &command_type);
 
 		/* handling if command did not generate result buffer */		
 		if(command_result == NULL) {
@@ -161,7 +162,7 @@ int htxd_start_daemon(htxd *htxd_instance)
 
 		/* send back command result to client */
 		HTXD_TRACE(LOG_OFF, "daemon sending the result to client");
-		result = htxd_send_response(new_fd, command_result, command_return_code);
+		result = htxd_send_response(new_fd, command_result, command_type, command_return_code);
 		if(result == -1)
 		{
 			return result;
@@ -204,7 +205,6 @@ void htxd_cleanup_system_shm(void)
 
 	htxd_delete_ecg_manager();
 
-	htxd_set_daemon_state(HTXD_DAEMON_UNVALIDATED);
 }
 
 
@@ -280,6 +280,8 @@ int htxd_idle_daemon(void)
 	}
 
 	htxd_cleanup_system_shm();
+	htxd_set_daemon_state(HTXD_DAEMON_IDLE);
+	htxd_set_test_running_state(HTXD_TEST_HALTED);
 
 	return 0;
 }

@@ -101,6 +101,9 @@
 struct htx_data htx_ds;
 int in_wait_loop=0;
 
+char global_htx_log_dir[256] = "/tmp";
+char global_htx_home_dir[256] = {'\0'};
+
 struct shm_phxecom_t  * shm_pHXECOM = 0;
 
 struct shm_hxecom_t   * shm_HXECOM  = NULL;
@@ -213,7 +216,22 @@ int  main(int argc, char *argv[])
 	struct htx_data * stats = (struct htx_data *)&htx_ds;
 
 	int   deff;
+	char *temp_env_val_ptr = NULL;
 
+	temp_env_val_ptr = getenv("HTX_HOME_DIR");
+	if( (temp_env_val_ptr != NULL) && (strlen(temp_env_val_ptr) > 0) ) {
+		strcpy(global_htx_home_dir, temp_env_val_ptr);
+	} else {
+		printf("HTX environment is not setup, please setup HTX environment and re-tr\ny");
+		printf("to setup HTX environment on same shell execute: . htx_setup.sh\n");
+		printf("exiting...\n\n");
+		exit(11);
+	}
+
+	temp_env_val_ptr = getenv("HTX_LOG_DIR");
+	if( (temp_env_val_ptr != NULL) && (strlen(temp_env_val_ptr) > 0) ) {
+		strcpy(global_htx_log_dir, temp_env_val_ptr);
+	}
 
 /************************************************************************/
 /* Get/test for valid option flags.                                     */
@@ -312,7 +330,7 @@ int  main(int argc, char *argv[])
     shm_pHXECOM->BrokenPipes = 0;
     shm_pHXECOM->starttime = time(NULL);
 	/* see if we are running bootme and set flag. */
-	sprintf(msg_text,"/usr/lpp/htx/etc/scripts/pscheck bootme");
+	sprintf(msg_text,"%s/etc/scripts/pscheck bootme", global_htx_home_dir);
     shm_pHXECOM->bootme = system(msg_text);
 
 
@@ -584,7 +602,7 @@ int  main(int argc, char *argv[])
 			/*this should kill all the children that have not shutdown by now.*/
 			/*It needs the process id of this hxecom so that it does not kill */
     		/* this parent */
-			sprintf(msg_text,"/usr/lpp/htx/etc/scripts/pscheck %d",getpid());
+			sprintf(msg_text,"%s/etc/scripts/pscheck %d",global_htx_home_dir, getpid());
 			system(msg_text);
             HE_exit(0);
         }
@@ -718,7 +736,7 @@ static void StopReader(struct htx_data * Stats, struct id_t * ServerID, char * T
     FixSockAddr(&ReaderTestID.sock);
     NetToHostId_t(&ReaderTestID);
 
-	sprintf(Stats->msg_text,"/usr/lpp/htx/etc/scripts/pscheck %d check",ReaderTestID.the_pid);
+	sprintf(Stats->msg_text,"%s/etc/scripts/pscheck %d check", global_htx_home_dir, ReaderTestID.the_pid);
 	rc=system(Stats->msg_text);
 	if(rc) {
 		/* stop the reader */
@@ -1269,7 +1287,7 @@ static void SIGTERM_hdl(int sig, int code, struct sigcontext * scp)
 		/*this should kill all the children that have not shutdown by now.*/
 		/*It needs the process id of this hxecom so that it does not kill */
 		/* this parent */
-		sprintf(msg_text,"/usr/lpp/htx/etc/scripts/pscheck %d",getpid());
+		sprintf(msg_text,"%s/etc/scripts/pscheck %d", global_htx_home_dir, getpid());
 		system(msg_text);
 		HE_exit(0);
 	}
@@ -1309,7 +1327,7 @@ static void Shutdown(struct CoordMsg CMsg, struct sockaddr_in * Coord)
     StreamWrite(ToLocalCoordSock, (char *)&CMsg, sizeof(CMsg));
     closesocket(ToLocalCoordSock);
 	/* take everyone else with you here */
-	sprintf(msg_text,"/usr/lpp/htx/etc/scripts/pscheck %d",getpid());
+	sprintf(msg_text,"%s/etc/scripts/pscheck %d", global_htx_home_dir, getpid());
 	system(msg_text);
     HE_exit(0);
 }
@@ -1525,6 +1543,7 @@ static void SetUpOtherHosts(char *ThisComName)
 	char msg_text[1024];
 	struct sockaddr_in thiscom;
 	struct htx_data * stats = (struct htx_data *)&htx_ds;
+	char	temp_string[300];
 
 	if(shm_HXECOM->OneSysFlag) return;
 
@@ -1538,8 +1557,9 @@ static void SetUpOtherHosts(char *ThisComName)
 
 
     /* if other_ids files exists */
-    if( (f_other=fopen("/tmp/other_ids","r"))==NULL) {
-      sprintf(msg_text, "Error opening /tmp/other_ids: %s\n", STRERROR(errno));
+    sprintf(temp_string, "%s/other_ids", global_htx_log_dir);	
+    if( (f_other=fopen(temp_string,"r"))==NULL) {
+      sprintf(msg_text, "Error opening %s: %s\n", temp_string, STRERROR(errno));
       hxfmsg(stats, HTXERROR(EX_OTHERID, ERRNO), HTX_HE_HARD_ERROR, msg_text);
       HE_exit(EX_OTHERID);
     } 
@@ -1583,7 +1603,7 @@ static void SetUpOtherHosts(char *ThisComName)
 		if(fullip) {
 			if(strcmp(this_save_id,id)!=0) {
 				if((tmpadr = inet_addr(id)) < 0) {
-					sprintf(msg_text+strlen(msg_text),"Bad ip address found in /tmp/other_ids file\n");
+					sprintf(msg_text+strlen(msg_text),"Bad ip address found in %s file\n", temp_string);
 					hxfmsg(stats, HTXERROR(EX_OTHERID2,ERRNO), HTX_HE_HARD_ERROR, msg_text);
 					HE_exit(EX_OTHERID2);
 				
@@ -1599,7 +1619,7 @@ static void SetUpOtherHosts(char *ThisComName)
 				strcpy(usesubnet,subnetbase);
 				strcat(usesubnet,id);
 				if((tmpadr = inet_addr(usesubnet)) < 0) {
-					sprintf(msg_text+strlen(msg_text),"Bad ip address found in /tmp/other_ids file\n");
+					sprintf(msg_text+strlen(msg_text),"Bad ip address found in %s file\n", temp_string);
 					hxfmsg(stats, HTXERROR(EX_OTHERID3,ERRNO), HTX_HE_HARD_ERROR, msg_text);
 					HE_exit(EX_OTHERID3);
 				
@@ -1618,8 +1638,11 @@ static void WriteConfig(char * remoteIP)
    	FILE *config_des;
    	char Line[81];
 	struct htx_data * stats = (struct htx_data *)&htx_ds;
+	char temp_string[300];
 
-    config_des = fopen(CONFIG_FILE, "r+");
+
+    sprintf(temp_string,"%s/%s", global_htx_log_dir, CONFIG_FILE);
+    config_des = fopen(temp_string, "r+");
     GlobalWait(FILE_SEM, stats);
     while(fgets(Line, 80, config_des) != NULL) {
         /* Skip comments in file.                    */

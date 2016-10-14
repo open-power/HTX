@@ -30,6 +30,7 @@
 #include "htxd_ecg.h"
 #include "htxd_common_define.h"
 #include "htxd_thread.h"
+#include "htxd_define.h"
 
 
 #define		HTXD_LIGHTWEIGHT		10
@@ -40,13 +41,6 @@
 #define		HTXD_TRACE_LOW			1
 #define		HTXD_TRACE_MEDIUM		2
 #define		HTXD_TRACE_HIGH			3
-
-
-#define		HTXD_DAEMON_UNVALIDATED		0
-#define		HTXD_DAEMON_IDLE		1
-#define		HTXD_DAEMON_SELECTED		2
-#define		HTXD_DAEMON_RUNNING		3
-#define		HTXD_DAEMON_BUSY		4
 
 
 typedef struct
@@ -83,12 +77,14 @@ typedef struct
 	int			dr_reconfig_restart;
 	int			dr_is_done; /* check usage */
 	int			equaliser_debug_flag;
-	int         wof_test;
+	int         enable_offline_cpu;
 	union shm_pointers	equaliser_shm_addr;
 	int			equaliser_semhe_id;
 	char *			equaliser_conf_file;
 	int			is_auto_started;
 	int			init_syscfg_flag;
+	int			master_client_mode;
+	int			is_test_active;
 } htxd;
 
 extern htxd *htxd_global_instance;

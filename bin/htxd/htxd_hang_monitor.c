@@ -140,7 +140,7 @@ int htxd_start_hang_monitor(htxd_thread **hang_monitor_thread)
 
 		return_code = htxd_thread_create(*hang_monitor_thread);
 	#ifdef __HTX_LINUX__
-		if ((htxd_get_equaliser_wof_test_flag()) == 1) {
+		if ((htxd_get_equaliser_offline_cpu_flag()) == 1) {
 			rc = do_the_bind_thread((*hang_monitor_thread)->thread_id);
 			if (rc < 0) {
 	            sprintf(temp_str, "binding hang monitor process to core 0 failed.\n");
