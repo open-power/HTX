@@ -54,7 +54,7 @@ int htxd_cleanup_ecg_ipc(htxd_ecg_info *p_ecg_info)
 /* Cleanup equaliser realted setting */
 int htxd_cleanup_equaliser_setting()
 {
-	htxd_set_equaliser_wof_test_flag(0);
+	htxd_set_equaliser_offline_cpu_flag(0);
 	#ifdef __HTX_LINUX__
 	    htx_unbind_process();
 	#endif
@@ -117,7 +117,7 @@ int htxd_unload_exercisers(htxd_ecg_info *p_ecg_info_list)
 		}
 	}
 
-	for(i = 0; i < EXER_RUNNING_CHECK_COUNT; i++) {
+	while(1) {
 		sleep(WAIT_TIME_TO_STOP_EXER);
 		exer_still_running = htxd_count_exer_still_running(p_ecg_info_list);
 		if(exer_still_running == 0) {
@@ -132,6 +132,7 @@ int htxd_unload_exercisers(htxd_ecg_info *p_ecg_info_list)
 
 	p_ecg_manager = htxd_get_ecg_manager();
 	p_ecg_manager->loaded_device_count -= number_of_exercisers_to_stop;
+	p_ecg_manager->ecg_device_count -= number_of_exercisers_to_stop;
 
 	HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_unload_exercisers");
 	return 0;
@@ -144,7 +145,7 @@ void htxd_execute_post_run_script(char *ecg_name)
 {
 	char post_script_command_line[256];
 
-	sprintf(post_script_command_line, "/usr/lpp/htx/etc/scripts/exer_cleanup %s 2>/tmp/res_cleanup", ecg_name);
+	sprintf(post_script_command_line, "%s/etc/scripts/exer_cleanup %s >%s/exer_cleanup.ouput 2>&1", global_htx_home_dir, ecg_name, global_htxd_log_dir);
 	system(post_script_command_line);
 }
 
@@ -164,10 +165,6 @@ int htxd_option_method_shutdown_mdt(char **result)
 	htxd_instance = htxd_get_instance();
 	strcpy(command_ecg_name, htxd_get_command_ecg_name() );
 
-	if(command_ecg_name[0] == '\0') {
-		strcpy(command_ecg_name, DEFAULT_ECG_NAME );
-	}
-
 	*result = malloc(100);
 
 	if( htxd_is_daemon_idle() == TRUE) {
@@ -177,7 +174,14 @@ int htxd_option_method_shutdown_mdt(char **result)
 		return 1;
 	}
 
-	if(htxd_is_file_exist(command_ecg_name)	== FALSE) {
+	/* if MDT name is not provided try to get it from system */
+	if(command_ecg_name[0] == '\0') {
+		if(htxd_is_daemon_selected()  == TRUE) {
+			strcpy(command_ecg_name, htxd_instance->p_ecg_manager->selected_ecg_name);
+		} else {
+			strcpy(command_ecg_name, htxd_get_running_ecg_name());
+		}
+	} else if(htxd_is_file_exist(command_ecg_name)	== FALSE) { /* checking provided MDT name */
 		sprintf(*result, "specified mdt<%s> is invalid", command_ecg_name);
 		HTXD_TRACE(LOG_OFF, *result);
 		HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_option_method_shutdown_mdt");
@@ -211,7 +215,7 @@ int htxd_option_method_shutdown_mdt(char **result)
 	HTXD_TRACE(LOG_OFF, "shutdown cleanup ipc");
 	htxd_cleanup_ecg_ipc(p_ecg_info_node_to_remove);
 
-	if (htxd_get_equaliser_wof_test_flag() == 1) {
+	if (htxd_get_equaliser_offline_cpu_flag() == 1) {
 		HTXD_TRACE(LOG_OFF, "Unload equaliser setting");
 		htxd_cleanup_equaliser_setting();
 	}
@@ -229,11 +233,14 @@ int htxd_option_method_shutdown_mdt(char **result)
 		htxd_idle_daemon();
 	}
 
+	/* delete bootme entries */
+	sprintf(temp_str, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
+	system(temp_str);
 
 /*	htxd_display_exer_table();	 */
 
 	sprintf(*result, "ECG (%s) shutdown successfully", command_ecg_name);
-	sprintf(temp_str, "date +\"ECG (%s) was shutdown on %%x at %%X %%Z\" >>/tmp/htxd.start.stop.time", command_ecg_name);
+	sprintf(temp_str, "date +\"ECG (%s) was shutdown on %%x at %%X %%Z\" >>%s/%s", command_ecg_name, global_htxd_log_dir, HTXD_START_STOP_LOG);
 	system(temp_str);
 
 	HTXD_TRACE(LOG_ON, *result);
@@ -255,7 +262,7 @@ int htxd_shutdown_all_mdt(void)
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_shutdown_all_mdt");
 	htxd_instance = htxd_get_instance();
 
-	if( (htxd_get_daemon_state() == HTXD_DAEMON_IDLE) || (htxd_get_daemon_state() == HTXD_DAEMON_UNVALIDATED)) {
+	if (htxd_get_daemon_state() == HTXD_DAEMON_IDLE)  {
 		HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_shutdown_all_mdt");
 		return 1;
 	}

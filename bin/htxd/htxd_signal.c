@@ -117,10 +117,10 @@ void pids_of_hxssup_alarm_handler()
 	char         temp_string[500];
 
 
-	sprintf(temp_string,"echo \"==========# Pids of all htx-processes at `date` #========= \n\" >> /tmp/htxps");
+	sprintf(temp_string,"echo \"==========# Pids of all htx-processes at `date` #========= \n\" >> %s/htxps", global_htxd_log_dir);
 	system(temp_string);
 
-	sprintf(temp_string,"ps -flL %d >> /tmp/htxps &",getpid());
+	sprintf(temp_string,"ps -flL %d >> %s/htxps &",getpid(), global_htxd_log_dir);
 	system(temp_string);
 }
 
@@ -138,6 +138,7 @@ void htxd_sig_usr1_handler(int sig)
 	char	msg_text[512];
 	char	*running_mdt_name;
 	int	rc;
+	char	temp_string[300];
 
 
 	sprintf(msg_text, "htxd_sig_usr1_handler: entered SIGUSR1 handler");
@@ -161,7 +162,7 @@ void htxd_sig_usr1_handler(int sig)
 	cpus_dr = _system_configuration.ncpus;
 	
 	/* Create a new MDT having only processor stanzas */
-	sprintf(cmd,"cat /dev/null | htxconf.awk > /usr/lpp/htx/mdt/mdt.%d",getpid());
+	sprintf(cmd,"cat /dev/null | htxconf.awk > %s/mdt/mdt.%d",global_htx_home_dir, getpid());
 	system(cmd);
 
 	rc = update_syscfg();
@@ -171,7 +172,7 @@ void htxd_sig_usr1_handler(int sig)
 	}
 
 	/* This code is added for defect(775699) to handle 'smtctl' scaleup problem in AIX */
-	sprintf(cmd, "smtctl > /tmp/smtctl");
+	sprintf(cmd, "smtctl > %s/smtctl", global_htx_log_dir);
 	system(cmd);
 
 	/* Changes for the feature(664034) hxssup dr enhancement .The intention of this code is to restart
@@ -179,15 +180,15 @@ void htxd_sig_usr1_handler(int sig)
 	sprintf(msg_text, "mdt file selected is: %s", running_mdt_name);
 	htxd_send_message(msg_text, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 
-	sprintf(cmd,"cat %s | awk '/:/ {sub(/[0-9]*:/, \"\", $0);print }' | sort | uniq | awk '{printf(\"%%s \",$0);}END {printf(\"\\n\")}' > /tmp/devices_dr ",running_mdt_name);
+	sprintf(cmd,"cat %s | awk '/:/ {sub(/[0-9]*:/, \"\", $0);print }' | sort | uniq | awk '{printf(\"%%s \",$0);}END {printf(\"\\n\")}' > %s/devices_dr ",running_mdt_name, global_htxd_log_dir);
 	system(cmd);
 
 	sprintf(mdtfile,"mdt.%d",getpid());
 
-	sprintf(cmd,"cat /usr/lpp/htx/mdt/%s | create_mdt_with_devices.awk `cat /tmp/devices_dr | awk '{ print $0}'` >%s",mdtfile, DR_MDT_NAME);
+	sprintf(cmd,"cat %s/mdt/%s | create_mdt_with_devices.awk `cat %s/devices_dr | awk '{ print $0}'` >%s/mdt/%s",global_htx_home_dir, mdtfile, global_htxd_log_dir, global_htx_home_dir,DR_MDT_NAME);
 	system(cmd);
 
-	strcpy(mdt_dr, DR_MDT_NAME);
+	sprintf(mdt_dr, "%s/mdt/%s", global_htx_home_dir,DR_MDT_NAME);
 
 	if(strncmp( htxd_get_dr_restart_flag(), "yes", 3) == 0) {
 		alarm(0);  /* Disable previous alarm */
@@ -480,7 +481,7 @@ void htxd_dr_child_sig_dr_handler(int sig)
 	int dr_sem_value;
 	int dr_alarm_value;
 	char msg_text[512];
-
+	char temp_msg[128];
 
 	printf("DEBUG: DR child - htxd_dr_child_sig_dr_handler is called\n");
 
@@ -504,7 +505,140 @@ void htxd_dr_child_sig_dr_handler(int sig)
 		}
 	}
 
-	sprintf(msg_text,"DR_child_handler: dr_reconfig output:pre:%d, check:%d, doit:%d, post:%d, posterror:%d,add: %d, rem:%d, cpu:%d, mem:%d, lcpu:%d, bcpu:%d\n", DRinfo.pre, DRinfo.check, DRinfo.doit, DRinfo.post, DRinfo.posterror,DRinfo.add, DRinfo.rem, DRinfo.cpu, DRinfo.mem, DRinfo.lcpu, DRinfo.bcpu);
+    sprintf(msg_text,"DR: reconfig output from DR_child_handler:");
+    if ( DRinfo.add ) {
+            sprintf(temp_msg,"add=%d,",DRinfo.add);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.rem ) {
+            sprintf(temp_msg,"rem=%d,",DRinfo.rem);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.cpu ) {
+            sprintf(temp_msg,"cpu=%d,",DRinfo.cpu);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.mem ) {
+            sprintf(temp_msg,"mem=%d,",DRinfo.mem);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.check ) {
+            sprintf(temp_msg,"check=%d,",DRinfo.check);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.pre ) {
+            sprintf(temp_msg,"pre=%d,",DRinfo.pre);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.doit ) {
+            sprintf(temp_msg,"doit=%d,",DRinfo.doit);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.post ) {
+            sprintf(temp_msg,"post=%d,",DRinfo.post);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.posterror ) {
+            sprintf(temp_msg,"posterror=%d,",DRinfo.posterror);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.force ) {
+            sprintf(temp_msg,"force=%d,",DRinfo.force);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.bindproc ) {
+            sprintf(temp_msg,"bindproc=%d,",DRinfo.bindproc);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.softpset ) {
+            sprintf(temp_msg,"softpset=%d,",DRinfo.softpset);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.hardpset ) {
+            sprintf(temp_msg,"hardpset=%d,",DRinfo.hardpset);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.plock ) {
+            sprintf(temp_msg,"plock=%d,",DRinfo.plock);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.pshm ) {
+            sprintf(temp_msg,"pshm=%d,",DRinfo.pshm);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.ent_cap ) {
+            sprintf(temp_msg,"ent_cap=%d,",DRinfo.ent_cap);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.var_wgt ) {
+            sprintf(temp_msg,"var_wgt=%d,",DRinfo.var_wgt);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.splpar_capable ) {
+            sprintf(temp_msg,"splpar_capable=%d,",DRinfo.splpar_capable);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.splpar_shared ) {
+            sprintf(temp_msg,"splpar_shared=%d,",DRinfo.splpar_shared);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.splpar_capped ) {
+            sprintf(temp_msg,"splpar_capped=%d,",DRinfo.splpar_capped);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.cap_constrained ) {
+            sprintf(temp_msg,"cap_constrained=%d,",DRinfo.cap_constrained);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.migrate ) {
+            sprintf(temp_msg,"migrate=%d,",DRinfo.migrate);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.hibernate ) {
+            sprintf(temp_msg,"hibernate=%d,",DRinfo.hibernate);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.partition ) {
+            sprintf(temp_msg,"partition=%d,",DRinfo.partition);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.workload_partition ) {
+            sprintf(temp_msg,"workload_partition=%d,",DRinfo.workload_partition);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.checkpoint ) {
+            sprintf(temp_msg,"checkpoint=%d,",DRinfo.checkpoint);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.restart ) {
+            sprintf(temp_msg,"restart=%d,",DRinfo.restart);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.topology_update ) {
+            sprintf(temp_msg,"topology_update=%d,",DRinfo.topology_update);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.acc_update ) {
+            sprintf(temp_msg,"acc_update=%d,",DRinfo.acc_update);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.chlmb ) {
+            sprintf(temp_msg,"chlmb=%d,",DRinfo.chlmb);
+            strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.lcpu ) {
+        sprintf(temp_msg,"lcpu=%d,",DRinfo.lcpu);
+        strcat(msg_text, temp_msg);
+    }
+    if ( DRinfo.bcpu ) {
+        sprintf(temp_msg,"bcpu=%d,",DRinfo.bcpu);
+        strcat(msg_text, temp_msg);
+    }
+    if( DRinfo.req_memsz_change ) {
+            sprintf(temp_msg,"req_memsz_change=%ll,",DRinfo.req_memsz_change);
+            strcat(msg_text, temp_msg);
+    }
+
 	htxd_send_message(msg_text, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 
 #ifdef __ENT_CAP__

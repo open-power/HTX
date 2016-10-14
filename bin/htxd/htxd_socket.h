@@ -29,13 +29,15 @@ extern int htxd_set_socket_option(int);
 extern int htxd_bind_socket(int, struct sockaddr_in *, int);
 extern int htxd_listen_socket(int);
 extern int htxd_select(int);
+extern int htxd_select_timeout(int, int);
 extern int htxd_accept_connection(int, struct sockaddr_in *, socklen_t *);
 extern int htxd_receive_command_length(int);
 extern char * htxd_receive_command(int);
 extern int htxd_send_ack_command_length(int);
 extern int htxd_send_response_length(int, int);
-extern int htxd_send_response(int, char *, int);
+extern int htxd_send_response(int, char *, int, int);
 extern  int htxd_receive_bytes(int, char *, int);
+extern int htxd_send_heart_beat_response(int , char *);
 
 
 #endif

@@ -33,7 +33,7 @@
 #include "htxd_util.h"
 
 
-#define HTX_PROFILE "/usr/lpp/htx/.htx_profile"
+#define HTX_PROFILE ".htx_profile"
 #define PROFILE_STANZA_SIZE 4096
 
 
@@ -179,13 +179,15 @@ int htxd_init_profile(htxd_profile **p_profile)
 
 	CFG__SFT *profile_fd;
 	char	profile_stanza[PROFILE_STANZA_SIZE];
+	char temp_string[300];
 
 	if(*p_profile == NULL) {
 		*p_profile = htxd_create_profile();
 	}
 
 	/* opening htx profile file */
-	profile_fd = htxd_open_profile(HTX_PROFILE);
+	sprintf(temp_string, "%s/%s", global_htx_home_dir, HTX_PROFILE);
+	profile_fd = htxd_open_profile(temp_string);
 	if( (profile_fd != (CFG__SFT *)NULL)  &&
 		(cfgcrdsz(profile_fd, profile_stanza, sizeof(profile_stanza), (char *) NULL) == CFG_SUCC) ) {
 

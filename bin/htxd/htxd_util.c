@@ -147,6 +147,19 @@ int htxd_is_file_exist(char *filename)
 
 
 
+int htxd_verify_home_path(void)
+{
+	struct stat file_status;
+	int return_code;
+	char temp_string[300];
+
+	sprintf(temp_string, "%s/.htx_profile", global_htx_home_dir);
+	return_code = stat(temp_string, &file_status);
+
+	return return_code;
+}
+
+
 char *htxd_unquote(char *s)
 {
 	char t[100], *t_ptr = t, *s_save = s;
@@ -435,13 +448,15 @@ int htxd_execute_shell_profile(void)
 {
 	int return_status;
 	int return_code;
-	char trace_string[256];
+	char trace_string[300];
 
 
 #ifdef  __HTX_LINUX__
-	return_status = system("/bin/bash /usr/lpp/htx/.bash_profile > /tmp/htxd_bash_profile_output 2>&1");
+	sprintf(trace_string, "/bin/bash %s/etc/scripts/htx_setup.sh > %s/htxd_htx_setup_output 2>&1", global_htx_home_dir, global_htxd_log_dir);
+	return_status = system(trace_string);
 #else
-	return_status = system("/usr/lpp/htx/.profile > /tmp/htxd_bash_profile_output 2>&1");
+	sprintf(trace_string, "%s/.profile > %s/htxd_profile_output 2>&1", global_htx_home_dir, global_htxd_log_dir);
+	return_status = system(trace_string);
 #endif
 
 	return_code = WEXITSTATUS(return_status);
@@ -454,14 +469,36 @@ int htxd_execute_shell_profile(void)
 }
 
 
+
 int htxd_truncate_error_file(void)
 {
 	int return_code;
+	char temp_string[300];
 
-	return_code = truncate(HTX_ERR_LOG_FILE, 0);
+
+
+	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_ERR_LOG_FILE);
+	
+	return_code = truncate(temp_string, 0);
 
 	return return_code;
 }
+
+
+
+int htxd_truncate_message_file(void)
+{
+	int return_code;
+	char temp_string[300];
+
+	
+	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_MSG_LOG_FILE);
+	return_code = truncate(temp_string, 0);
+
+	return return_code;
+}
+
+
 
 #ifdef __HTX_LINUX__
 /* Function binds a given TID  to any thread of core 0 */

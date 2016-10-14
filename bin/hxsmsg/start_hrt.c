@@ -24,6 +24,7 @@
  */
 
 
+#include <unistd.h>
 #include "hxsmsg.h"
 
 #define BAD_RETURN (pid_t) -1
@@ -67,10 +68,8 @@ pid_t start_heart(char *heartbeat_dev, char *heartbeat_cycle)
   /*
    ***  Data and Functions Definitions/Declarations  **************************
    */
-  	char HTXPATH[128];         /* string variable for $HTXPATH            */
   	char error_msg[1024];      /* error message string                    */
   	char exec_string[192];     /* string for exec() system call           */
-  	char *htxpath_ptr;         /* points to HTXPATH environmental variable*/
   	char pipe_input_id[32];    /* input device id for pipe                */
 
   	extern char *program_name;  /* this program's name (argv[0])          */
@@ -112,23 +111,7 @@ pid_t start_heart(char *heartbeat_dev, char *heartbeat_cycle)
 	  			(void) set_signal_hdl(SIGTERM,
 			    	(void (*)(int, int, struct sigcontext *)) SIG_DFL);
 	  
-	  			if ((htxpath_ptr = getenv("HTXPATH")) == NULL)
-				{
-
-#ifdef	__HTX_LINUX__
-					(void) htx_strncpy(HTXPATH, "/usr/bin/htx", (DIM(HTXPATH) - 1));	    	
-#else
-					(void) htx_strncpy(HTXPATH, "/usr/lpp/htx", (DIM(HTXPATH) - 1));
-#endif
-				}	
-	  			else
-				{
-	    				(void) htx_strncpy(HTXPATH, htxpath_ptr, 
-(DIM(HTXPATH) - 1));
-				}
-	  
-	  			(void) htx_strncpy(exec_string, HTXPATH, (DIM(exec_string) - 1));
-	  			(void) htx_strcat(exec_string, "/bin/hxsstress");
+				sprintf(exec_string, "%s/bin/hxsstress", global_htx_home_dir);
 
 	  			errno = 0;
 	  			if (sprintf(pipe_input_id, "%d", pipe_dev[0]) < 0)

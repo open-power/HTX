@@ -34,41 +34,8 @@
 
 
 
-#ifdef LIC_ENABLE
-/* validating htx license key */
-int htxd_license_key(char **result_string)
-{
-	int	alloc_size;
-	char    tmp_error_str[512];
-	int	return_code;
-	char	*updated_result;
-
-
-	tmp_error_str[0] = '\0';
-	return_code = htx_license_key_validate(tmp_error_str);
-	if(return_code != 0) {
-		alloc_size = 1024;
-		updated_result = malloc(alloc_size);
-		if(updated_result == NULL) {
-			sprintf(tmp_error_str, "Error: malloc failed while allocating updated_result, alloc_size is <%d>\n", alloc_size);
-			HTXD_TRACE(LOG_ON, tmp_error_str);
-			exit(-1);
-		}
-		
-		sprintf(updated_result, "Error <%d>: HTX license key validation failed. %s", return_code, tmp_error_str);	
-		*result_string = updated_result;
-		return -1;
-	} else {
-		htxd_set_daemon_state(HTXD_DAEMON_IDLE);
-	}
-
-	return 0;
-}
-#endif
-
-
 /* process input command and generates output result string */
-int htxd_process_command(char **result_string)
+int htxd_process_command(char **result_string, int *p_command_type)
 {
 	int index;
 	int return_code;
@@ -84,18 +51,8 @@ int htxd_process_command(char **result_string)
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_process_command");
 
-	if(htxd_get_daemon_state() == HTXD_DAEMON_UNVALIDATED) {
-#ifdef LIC_ENABLE
-	return_code = htxd_license_key(result_string);
-	if(return_code != 0) {
-		return return_code;
-	}
-#else
-	htxd_set_daemon_state(HTXD_DAEMON_IDLE);
-#endif
-	}
-
 	index = htxd_get_command_index();
+	*p_command_type = option_list[index].command_type;
 
 	return_code = option_list[index].option_method(&temp_result);
 

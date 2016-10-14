@@ -27,6 +27,7 @@
 
 extern char *	htxd_unquote(char *);
 extern int	htxd_is_file_exist(char *);
+extern int	htxd_verify_home_path(void);
 extern int	htxd_get_time_details(time_t, char *, char *, char *);
 extern void	htxd_set_FD_close_on_exec_flag(void);
 extern void	htxd_reset_FD_close_on_exec_flag(void);
@@ -41,6 +42,7 @@ extern short	htxd_send_message(char *, int, int, mtyp_t);
 extern short send_message(char *, int, int, mtyp_t);
 extern int 	htxd_execute_shell_profile(void);
 extern int	htxd_truncate_error_file(void);
+extern int	htxd_truncate_message_file(void);
 
 #ifdef __HTX_LINUX__
 	extern int do_the_bind_proc(pid_t);

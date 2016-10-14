@@ -91,6 +91,8 @@ short send_signal(pid_t process_id, int signal_number)
   	short exit_code;           /* exit program return code                */
 
 	FILE *fp;
+	
+	char temp_str[256];
 
 
   /*
@@ -108,7 +110,8 @@ short send_signal(pid_t process_id, int signal_number)
 		process_id);
 		
 		errno = 0;
-		fp = fopen("/usr/lpp/htx/.autostart", "r");
+		sprintf(temp_str, "%s/.autostart",global_htx_home_dir);
+		fp = fopen(temp_str, "r");
 		errno_save = errno;
 		if (fp == NULL && errno_save == 2)
 		{

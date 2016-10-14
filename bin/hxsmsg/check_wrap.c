@@ -260,7 +260,7 @@ errno: %d (%s).\n",
            */
 			if(msg_archive_flag == TRUE)
 			{ /* copy the message file to next archive file */
-				sprintf(command_str, "cp /tmp/htxmsg /tmp/htxmsg.%d", archive_sequence_count);
+				sprintf(command_str, "cp %s/htxmsg %s/htxmsg.%d", global_htx_log_dir, global_htx_log_dir, archive_sequence_count);
 				system_call = TRUE;
 				system(command_str);
 				system_call = FALSE;

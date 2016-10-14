@@ -25,6 +25,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include "htxd_define.h"
 #include "htxd_util.h"
 #include "htxd_trace.h"
 
@@ -32,11 +33,11 @@
 int htxd_option_method_create_mdt(char **result_string)
 {
 	int return_code;
-	char trace_string[256];
+	char trace_string[300];
 	int stanza_count;
 	FILE *fp;
 
-	*result_string = malloc(256);
+	*result_string = malloc(512);
 	if(*result_string == NULL) {
 		sprintf(trace_string, "Error: malloc failed with errno <%d>", errno);	
 		HTXD_TRACE(LOG_ON, trace_string);
@@ -44,7 +45,8 @@ int htxd_option_method_create_mdt(char **result_string)
 	}
 
 	return_code = htxd_execute_shell_profile();
-	fp = popen("grep HE_name /usr/lpp/htx/mdt/mdt.bu 2>/dev/null | wc -l", "r");
+	sprintf(trace_string, "grep HE_name %s/mdt/mdt.bu 2>/dev/null | wc -l", global_htx_home_dir);
+	fp = popen(trace_string, "r");
 	if(fp == NULL) {
 		sprintf(trace_string, "Error: popen failed with errno <%d>", errno);
 		strcpy(*result_string, trace_string);
@@ -66,7 +68,7 @@ int htxd_option_method_create_mdt(char **result_string)
 		strcpy(trace_string, *result_string);
 		HTXD_TRACE(LOG_ON, trace_string);
 	} else {
-		sprintf(*result_string, "Error: mdt creation is failed, please check error at log file <%s>.", "/tmp/htxd_bash_profile_output");
+		sprintf(*result_string, "Error: mdt creation is failed, please check error at log file <%s/htxd_bash_profile_output>.", global_htxd_log_dir);
 		strcpy(trace_string, *result_string);
 		HTXD_TRACE(LOG_ON, trace_string);
 		return -1;

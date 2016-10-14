@@ -66,6 +66,7 @@ int             errno_save;
 char            error_msg[512];
 int             exit_code;
 int             savemask;
+char		global_htx_log_dir[256];
 
 /*
  * NAME: main()
@@ -127,6 +128,9 @@ int	main(int argc, char *argv[])
 	int             shm_id, mem_id, shmkey;
 	off_t           filelength = 0;
 	struct htxshm_HE *HE = NULL, *HE_ptr = NULL;
+	char		*temp_env_val_ptr = NULL;
+	char		*default_log_dir = "/tmp";
+
 
 	exit_code = GOOD;
 	program_name = argv[0];
@@ -141,6 +145,17 @@ int	main(int argc, char *argv[])
 		exit(2);
 	}
 #endif
+	temp_env_val_ptr = getenv("HTX_LOG_DIR");
+	if(temp_env_val_ptr == NULL) {
+		strcpy(global_htx_log_dir, default_log_dir);
+	} else {
+		if(strlen(temp_env_val_ptr) == 0) {
+			strcpy(global_htx_log_dir, default_log_dir);
+		} else {
+			strcpy(global_htx_log_dir, temp_env_val_ptr);
+		}
+	}
+
 
 	/*
 	 * First things first.  Let's go ahead and access the IPC message
@@ -555,7 +570,8 @@ int	main(int argc, char *argv[])
 							 HTX_SYS_SOFT_ERROR,
 							       HTX_SYS_MSG);
 						}	/* endif */
-						system("touch /tmp/htxstats_done");
+						sprintf(workstr, "touch %s/htxstats_done", global_htx_log_dir);
+						system(workstr);
 					}	/* endif */
 				}	/* endif */
 				if (((char *) header) && sigtermflag == 0) {

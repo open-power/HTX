@@ -313,6 +313,32 @@ int htxd_get_device_error_sem_status(int device_sem_id, int device_position)
 } 
 
 
+int htxd_get_global_activate_halt_sem_status(int sem_id)
+{
+	struct semid_ds device_sembuffer;
+	int sem_status = -1;
+	
+	
+	sem_status = semctl(sem_id, 0, GETVAL, &device_sembuffer);
+
+	return sem_status;
+}
+
+
+
+
+int htxd_set_global_activate_halt_sem_status(int sem_id, int value)
+{
+	struct semid_ds device_sembuffer;
+	int return_code;
+	
+	return_code = SEMCTL(sem_id, 0, SETVAL, value);	
+
+	return return_code;
+}
+
+
+
 int htxd_create_dr_sem(void)
 {
 	int dr_sem_id = -1;

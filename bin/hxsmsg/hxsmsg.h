@@ -51,12 +51,13 @@
 /* 
  ***  file name #defines  *****************************************************
  */
-
-#define CKPT_FILE "/tmp/hxsmsg_ckpt"
-#define ERR_LOG "/tmp/htxerr"
-#define ERR_SAVE_LOG "/tmp/htxerr_save"
-#define MSG_LOG "/tmp/htxmsg"
-#define MSG_SAVE_LOG "/tmp/htxmsg_save"
+extern char global_htx_home_dir[256];
+extern char global_htx_log_dir[256];
+extern char CKPT_FILE[256];
+extern char ERR_LOG[256];
+extern char ERR_SAVE_LOG[256];
+extern char MSG_LOG[256];
+extern char MSG_SAVE_LOG[256];
 
 
 /* 
@@ -95,5 +96,6 @@
   long   checksum;              /* ckpt structure checksum                   */
 } ckpt;
 
+void set_htx_home_log_path(void);
 
 #endif  /* HXSMSG_H */

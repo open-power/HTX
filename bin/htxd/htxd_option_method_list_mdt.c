@@ -28,23 +28,35 @@
 #include <errno.h>
 
 #include "htxd.h"
+#include "htxd_define.h"
 
+#define DIR_ENTRY_LENGTH 256
 #define LIST_ITEM_LENGTH 256
-#define	BUFFER_INCREMENT_LEVEL 1024
+#define	BUFFER_LENGTH 1024
 
 int htxd_list_files(char *path_name, char **file_list)
 {
 	DIR *p_dir;
 	struct dirent * p_dir_entry;
-	int i = 0;
+	int i = 1;
 	char list_item[LIST_ITEM_LENGTH];
-	int list_length = 0;
-	int list_buffer_length = BUFFER_INCREMENT_LEVEL;
+	FILE *fp_command;
+	char command_string[128];
+	int dir_entry_count;
 
-	*file_list = malloc(list_buffer_length);
+
+
+	sprintf(command_string, "ls -l %s | wc -l", path_name);	
+	fp_command = popen(command_string, "r");
+	fscanf(fp_command, "%d", &dir_entry_count);
+	pclose(fp_command);
+
+	*file_list = malloc((dir_entry_count * DIR_ENTRY_LENGTH) + BUFFER_LENGTH);
 	if(*file_list == NULL) {
 		return -1;
 	}
+
+	memset(*file_list, 0, (dir_entry_count * DIR_ENTRY_LENGTH) + BUFFER_LENGTH);
 
     p_dir = opendir(path_name);
     if(p_dir == NULL) {
@@ -53,31 +65,32 @@ int htxd_list_files(char *path_name, char **file_list)
     }
 
     while ( (p_dir_entry = readdir(p_dir) ) != NULL) {
-        if( (strcmp (p_dir_entry->d_name, ".") == 0) ||	/* skip . entry				*/
-            (strcmp (p_dir_entry->d_name, "..") == 0 )) {	/* skip .. entry			*/
-            continue;
-        }
-        sprintf(list_item, "%2d) %-30s", ++i, p_dir_entry->d_name);
-		list_length += strlen(list_item);
-		if(list_buffer_length > (list_length + 100) ) {
-			strcat(*file_list, list_item);
-		} else {
-			list_buffer_length += BUFFER_INCREMENT_LEVEL;
-			*file_list = realloc(*file_list, list_buffer_length);
-			if(*file_list == NULL) {
-				return -1;
-			}
-			strcat(*file_list, list_item);
+		if( p_dir_entry->d_name[0] == '.') { 	/* skip hidden filies			*/
+			continue;
 		}
-        if( i % 2 == 0) {
-            strcat(*file_list, "\n");
-        }
-    }
 
-    if(closedir(p_dir)) {
-        perror("dir close failed");
-       	return -1; 
-    }
+		if((i % 2 == 0) && strlen(p_dir_entry->d_name) > 25) { 
+			strcat(*file_list, "\n");
+		}
+
+		sprintf(list_item, "%2d) %-30s", i, p_dir_entry->d_name);
+		strcat(*file_list, list_item);
+
+		if((i % 2 == 1) && strlen(p_dir_entry->d_name) > 25) { 
+			strcat(*file_list, "\n");
+		}
+
+		if( i % 2 == 0) {
+			strcat(*file_list, "\n");
+		}
+
+		i++;
+	}
+
+	if(closedir(p_dir)) {
+		perror("dir close failed");
+	}
+
 
     return 0;
 }
@@ -86,8 +99,10 @@ int htxd_list_files(char *path_name, char **file_list)
 int htxd_option_method_list_mdt(char **result)
 {
 	int return_code = 0;
+	char temp_string[300];
 
-	return_code = htxd_list_files("/usr/lpp/htx/mdt", result);
+	sprintf(temp_string, "%s/%s", global_htx_home_dir, MDT_DIR);
+	return_code = htxd_list_files(temp_string, result);
 
 	return return_code;
 }

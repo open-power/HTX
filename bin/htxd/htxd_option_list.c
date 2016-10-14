@@ -56,4 +56,18 @@ void init_option_list(void)
 	option_list[index++].option_method = htxd_option_method_exersetupinfo;
 	option_list[index++].option_method = htxd_option_method_bootme;
 	option_list[index++].option_method = htxd_option_method_query;
+	option_list[index++].option_method = htxd_option_method_screen_2;
+	option_list[index++].option_method = htxd_option_method_screen_4;
+	option_list[index++].option_method = htxd_option_method_screen_5;
+	option_list[index++].option_method = htxd_option_method_get_file;
+	option_list[index++].option_method = htxd_option_method_get_daemon_state;
+	option_list[index++].option_method = htxd_option_method_coe_soe;
+	option_list[index++].option_method = htxd_option_method_activate_halt;
+	option_list[index++].option_method = htxd_option_method_device_count;
+	option_list[index++].option_method = htxd_option_method_test_activate_halt;
+	option_list[index++].option_method = htxd_option_method_config_net;
+	option_list[index++].option_method = htxd_option_method_append_net_mdt;
+	option_list[index++].option_method = htxd_option_method_test_net;
+	option_list[index++].option_method = htxd_option_method_set_htx_env;
+	option_list[index++].option_method = htxd_option_method_get_htx_env;
 }

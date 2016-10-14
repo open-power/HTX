@@ -163,7 +163,7 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
  *	Get some memory to work with.
  */
     //print_log(LOGMSG,"HTXPATH = %s\n", HTXPATH);
-    script_list_file = malloc(strlen(HTX_PATH) + strlen(HE_SCRIPT_FILE) + 3);
+    script_list_file = malloc(strlen(global_htx_home_dir) + strlen(HE_SCRIPT_FILE) + 3);
     msg_text = malloc(MSG_TEXT_SIZE);
     cmdOutput = malloc(MSG_TEXT_SIZE);
     cmd_string = malloc(HTXD_PATH_MAX);
@@ -175,7 +175,7 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
 /*
  *	check access to HE_SCRIPT_FILE file
  */
-    script_list_file = strcpy(script_list_file, HTX_PATH);
+    script_list_file = strcpy(script_list_file, global_htx_home_dir);
     script_list_file = strcat(script_list_file, "/");
     script_list_file = strcat(script_list_file, HE_SCRIPT_FILE);
     if (0 != (rc = access(script_list_file, R_OK))) {
@@ -231,8 +231,8 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
  *  output going to a file in /tmp which is unique to the run.
  */
     (void) sprintf(cmd_string,
-		   "awk 'BEGIN {f=1} /%s/ { f=0; print \"%s/\" $2 \" %s >/tmp\" substr($2,index($2,\"/\")) \".%s.out 2>&1\" } END {exit f}' %s > %s 2>&1",
-		   pattern, HTX_PATH, device_name, device_name, script_list_file, p_temp_filename);
+		   "awk 'BEGIN {f=1} /%s/ { f=0; print \"%s/\" $2 \" %s >%s\" substr($2,index($2,\"/\")) \".%s.out 2>&1\" } END {exit f}' %s > %s 2>&1",
+		   pattern, global_htx_home_dir, device_name, global_htxd_log_dir, device_name, script_list_file, p_temp_filename);
 
     ct_script_cmd = MSG_TEXT_SIZE;
     rc = run_cmd(cmd_string, script_cmd, &ct_script_cmd, p_temp_filename);

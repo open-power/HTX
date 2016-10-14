@@ -180,6 +180,7 @@ void htxd_init_ecg_manager(htxd_ecg_manager* ecg_manager)
 {
 	ecg_manager->ecg_info_list = NULL;
 	ecg_manager->loaded_device_count = 0;
+	ecg_manager->ecg_device_count = 0;
 	ecg_manager->ecg_list_length = 0;
 	ecg_manager->current_loading_ecg_info = NULL;
 	ecg_manager->message_queue_key = 0;
@@ -907,7 +908,7 @@ int htxd_init_equaliser_info( htxd_ecg_info *p_ecg_info)
 	p_ecg_info->ecg_equaliser_info.enable_flag	= 0;
 	p_ecg_info->ecg_equaliser_info.debug_flag	= 0;
 	p_ecg_info->ecg_equaliser_info.config_file[0]	= '\0';
-	p_ecg_info->ecg_equaliser_info.wof_test = 0;
+	p_ecg_info->ecg_equaliser_info.offline_cpu = 0;
 
 	mdt_fd = cfgcopsf (p_ecg_info->ecg_name);
 	if (mdt_fd == (CFG__SFT *) NULL) {
@@ -934,15 +935,15 @@ int htxd_init_equaliser_info( htxd_ecg_info *p_ecg_info)
 				p_ecg_info->ecg_equaliser_info.debug_flag = atoi(htxd_unquote(temp_str));
 				htxd_set_equaliser_debug_flag(p_ecg_info->ecg_equaliser_info.debug_flag);
 			}
-			return_code = cfgcskwd("wof_test", default_mdt_snz, temp_str);
+			return_code = cfgcskwd("offline_cpu", default_mdt_snz, temp_str);
 			if(return_code ==  CFG_SUCC) {
-				p_ecg_info->ecg_equaliser_info.wof_test = atoi(htxd_unquote(temp_str));
-				htxd_set_equaliser_wof_test_flag(p_ecg_info->ecg_equaliser_info.wof_test);
+				p_ecg_info->ecg_equaliser_info.offline_cpu = atoi(htxd_unquote(temp_str));
+				htxd_set_equaliser_offline_cpu_flag(p_ecg_info->ecg_equaliser_info.offline_cpu);
 			#ifdef __HTX_LINUX__
 				/* Also, get the SMT for core 0, if WOF test is enabled as this will be
 				 * while binding the threads/processes to core 0.
 				 */
-				if (p_ecg_info->ecg_equaliser_info.wof_test == 1) {
+				if (p_ecg_info->ecg_equaliser_info.offline_cpu == 1) {
 					smt = get_smt_status(0);
 					return_code = do_the_bind_proc(getpid());
 					if (return_code < 0) {
@@ -998,6 +999,7 @@ int htxd_init_ecg_info(htxd_ecg_manager *this_ecg_manager, char *new_ecg_name)
 	p_current_ecg_info->ecg_shm_exerciser_entries = 0;
 	strcpy( p_current_ecg_info->ecg_name, new_ecg_name);
 	p_current_ecg_info->ecg_status = ECG_UNLOADED;
+	sprintf(p_current_ecg_info->ecg_start_time, "%lu", time((long *) 0) );
 
 	next_key_offset = htxd_get_next_key_offset(this_ecg_manager);
 
@@ -1036,6 +1038,7 @@ int htxd_init_ecg_info(htxd_ecg_manager *this_ecg_manager, char *new_ecg_name)
 
 	p_current_ecg_info->ecg_shm_addr.hdr_addr->num_entries = p_current_ecg_info->ecg_shm_exerciser_entries;
 	(this_ecg_manager->ecg_list_length)++;
+	this_ecg_manager->ecg_device_count += p_current_ecg_info->ecg_shm_exerciser_entries;
 
 	HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_init_ecg_info");
 	return 0;
@@ -1194,11 +1197,34 @@ char * htxd_get_running_ecg_name(void)
 }
 
 
+
+char * htxd_get_ecg_start_time(void)
+{
+	htxd_ecg_manager *p_ecg_manager;
+
+	p_ecg_manager = htxd_get_ecg_manager();
+
+	return p_ecg_manager->ecg_info_list->ecg_start_time;
+}
+
+
+
 int htxd_get_total_device_count(void)
 {
 	htxd_ecg_manager *p_ecg_manager;
 
 	p_ecg_manager = htxd_get_ecg_manager();
 
-	return p_ecg_manager->loaded_device_count;
+	return p_ecg_manager->ecg_device_count;
+}
+
+
+
+int htxd_get_loaded_device_count(void)
+{
+	htxd_ecg_manager *p_ecg_manager;
+
+	p_ecg_manager = htxd_get_ecg_manager();
+
+	return p_ecg_manager->exer_table_length;
 }

@@ -27,6 +27,7 @@
 #include <sched.h>
 #include <errno.h>
 
+#include "htxd_define.h"
 #include "htxd_util.h"
 #include "htxd_profile.h"
 #include "htxd_instance.h"
@@ -143,10 +144,11 @@ void hotplug_reconfig_restart(void)
 
 	running_ecg_name = htxd_get_running_ecg_name();
 
-	sprintf(msg_text, "cp %s /usr/lpp/htx/mdt/mdt", running_ecg_name);
+	sprintf(msg_text, "cp %s %s/mdt/mdt", running_ecg_name, global_htx_home_dir);
 	system(msg_text);
 
-	htxd_set_shm_with_exercisers_values_for_dr_restart("/usr/lpp/htx/mdt/mdt");
+	sprintf(msg_text, "%s/mdt/mdt", global_htx_home_dir);
+	htxd_set_shm_with_exercisers_values_for_dr_restart(msg_text);
 
 	/* set default file descriptors reopen on exec */
 	htxd_set_value_FD_close_on_exec_flag(0);
@@ -206,7 +208,7 @@ int hotplug_monitor_create_mdt(void)
 	sprintf(hotplug_str, "start recreating mdt files");
 	hotplug_debug_log(hotplug_str);
 
-	sprintf(hotplug_str, "cd /usr/lpp/htx/etc/scripts ; /usr/lpp/htx/bin/show_syscfg > /tmp/htx_syscfg; devconfig > /tmp/hotplug_devconfig_out 2>&1");
+	sprintf(hotplug_str, "cd %s/etc/scripts ; %s/bin/show_syscfg > %s/htx_syscfg; devconfig > %s/hotplug_devconfig_out 2>&1", global_htx_home_dir, global_htx_home_dir, global_htx_log_dir, global_htxd_log_dir);
 	system(hotplug_str);
 
 	return 0;	

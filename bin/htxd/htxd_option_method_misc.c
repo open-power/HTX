@@ -39,8 +39,10 @@
 #include "htxd_signal.h"
 #include "htxd_trace.h"
 #include "htxd_define.h"
+#include "htxd_common_define.h"
 
-
+#define SCREEN_MODE_2 2
+#define SCREEN_MODE_4 4
 
 extern int htxd_run_HE_script(char *, char *, int *);
 extern int htxd_get_ecg_list_length(htxd_ecg_manager *);
@@ -164,7 +166,7 @@ int htxd_get_device_run_status(struct htxshm_HE *p_HE, htxd_ecg_info *p_ecg_info
 		} else {
 			strcpy(status_result, "ER");
 		}	
-	} else if( (p_HE->equaliser_halt == 1) || ( (device_sem_status = htxd_get_device_run_sem_status(device_sem_id, device_position) ) != 0) ) {
+	} else if( (p_HE->equaliser_halt == 1) || ( (device_sem_status = htxd_get_device_run_sem_status(device_sem_id, device_position) ) != 0) || (htxd_get_global_activate_halt_sem_status(device_sem_id) == 1) ) {
 		strcpy(status_result, "ST");
 	} else if( (p_HE->max_cycles != 0) && (p_HE->cycles >= p_HE->max_cycles) ) {
 		strcpy(status_result, "CP");
@@ -567,6 +569,10 @@ int htxd_activate_device(htxd_ecg_info *p_ecg_info_to_activate, char *p_command_
 	char *p_device_name = NULL;
 
 
+	if(htxd_is_list_regular_expression(p_command_option_list) == TRUE) {
+		htxd_expand_device_name_list(p_ecg_info_to_activate, p_command_option_list);
+	}
+
 	p_device_name = strtok(p_command_option_list, " ");
 	while(p_device_name != NULL) {
 
@@ -680,6 +686,10 @@ int htxd_suspend_device(htxd_ecg_info *p_ecg_info_to_suspend, char *p_command_op
 	char *p_device_name = NULL;
 
 
+	if(htxd_is_list_regular_expression(p_command_option_list) == TRUE) {
+		htxd_expand_device_name_list(p_ecg_info_to_suspend, p_command_option_list);
+	}	
+
 	p_device_name = strtok(p_command_option_list, " ");
 	while(p_device_name != NULL) {
 
@@ -720,7 +730,7 @@ int htxd_option_method_suspend(char **command_result)
 
 	htxd_ecg_info *p_ecg_info_list = NULL;
 	htxd_option_method_object suspend_method;
-	char *temp_option_list = NULL;
+	char temp_option_list[MAX_OPTION_LIST_LENGTH];
 	int option_list_length;
 	int device_entries_present;
 
@@ -742,10 +752,6 @@ int htxd_option_method_suspend(char **command_result)
 
 	option_list_length = strlen(suspend_method.command_option_list);
 	if(option_list_length > 0) {
-		temp_option_list = malloc(option_list_length + STRING_EXTRA_SPACE);
-		if(temp_option_list == NULL) {
-			return 1;
-		}
 		strcpy(temp_option_list, suspend_method.command_option_list);
 	}
 
@@ -758,24 +764,18 @@ int htxd_option_method_suspend(char **command_result)
 
 		if( option_list_length > 0) {
 			suspend_method.return_code = htxd_suspend_device(p_ecg_info_list, suspend_method.command_option_list, *command_result);	
-			strcpy(temp_option_list, suspend_method.command_option_list);
 		} else {
 			suspend_method.return_code = htxd_suspend_all_device(p_ecg_info_list, *command_result);	
 		}
 	} else {
 		if( option_list_length > 0) {
 			suspend_method.return_code = htxd_process_all_active_ecg_device(htxd_suspend_device, suspend_method.command_option_list, *command_result);
-			strcpy(temp_option_list, suspend_method.command_option_list);
 		} else {
 			suspend_method.return_code = htxd_process_all_active_ecg(htxd_suspend_all_device, *command_result);
 		}
 	}
 
 	htxd_get_common_command_result(ACTIVE_SUSPEND_STATE, p_ecg_info_list, temp_option_list, *command_result);
-
-	if(temp_option_list != NULL) {
-		free(temp_option_list);
-	}
 
 	return suspend_method.return_code;
 
@@ -1112,6 +1112,10 @@ int htxd_coe_device(htxd_ecg_info *p_ecg_info_to_coe, char *p_command_option_lis
 	char *p_device_name = NULL;
 
 
+	if(htxd_is_list_regular_expression(p_command_option_list) == TRUE) {
+		htxd_expand_device_name_list(p_ecg_info_to_coe, p_command_option_list);
+	}
+
 	p_device_name = strtok(p_command_option_list, " ");
 	while(p_device_name != NULL) {
 
@@ -1228,6 +1232,10 @@ int htxd_soe_device(htxd_ecg_info *p_ecg_info_to_soe, char *p_command_option_lis
 	char *p_device_name = NULL;
 
 
+	if(htxd_is_list_regular_expression(p_command_option_list) == TRUE) {
+		htxd_expand_device_name_list(p_ecg_info_to_soe, p_command_option_list);
+	}
+
 	p_device_name = strtok(p_command_option_list, " ");
 	while(p_device_name != NULL) {
 
@@ -1341,19 +1349,19 @@ void htxd_bootme_error_string(int error_code, char ** result_string)
 		sprintf(*result_string, "Error: Not sufficient space, failed to start bootme");
 		break;
 	case 11:
-		sprintf(*result_string, "Error: Please check the value of REBOOT in /usr/lpp/htx/rules/reg/bootme/default, failed to start bootme");
+		sprintf(*result_string, "Error: Please check the value of REBOOT in %s/rules/reg/bootme/default, failed to start bootme", global_htx_home_dir);
 		break;
 	case 12:
-		sprintf(*result_string, "Error: Please check the value of BOOT_CMD in /usr/lpp/htx/rules/reg/bootme/default, failed to start bootme");
+		sprintf(*result_string, "Error: Please check the value of BOOT_CMD in %s/rules/reg/bootme/default, failed to start bootme", global_htx_home_dir);
 		break;
 	case 13:
-		sprintf(*result_string, "Error: Please check the value of BOOT_WAIT in /usr/lpp/htx/rules/reg/bootme/default, failed to start bootme");
+		sprintf(*result_string, "Error: Please check the value of BOOT_WAIT in %s/rules/reg/bootme/default, failed to start bootme", global_htx_home_dir);
 		break;
 	case 21:
 		sprintf(*result_string, "bootme is already on");
 		break;
 	case 31:
-		sprintf(*result_string, "bootme flag file </usr/lpp/htx/.htxd_autostart> was missing");
+		sprintf(*result_string, "bootme flag file <%s/.htxd_autostart> was missing", global_htx_home_dir);
 		break;
 	case 32:
 		sprintf(*result_string, "bootme is already off");
@@ -1362,7 +1370,7 @@ void htxd_bootme_error_string(int error_code, char ** result_string)
 		sprintf(*result_string, "bootme status : off");
 		break;
 	case 42:
-		sprintf(*result_string, "bootme status : inconsistent state, bootme cron entry is present, bootme flag file </usr/lpp/htx/.htxd_autostart> was missing");
+		sprintf(*result_string, "bootme status : inconsistant state, bootme cron entry is present, bootme flag file <%s/.htxd_autostart> was missing", global_htx_home_dir);
 		break;
 	case 0:
 		break;
@@ -1384,16 +1392,10 @@ int htxd_option_method_bootme(char **command_result)
 	int bootme_status;
 	char *running_mdt_name;
 	int bootme_return_code;
+	char temp_string[300];
 
 
 	htxd_init_option_method(&bootme_method);
-
-	bootme_method.return_code = htxd_validate_command_requirements(bootme_method.htxd_instance, bootme_method.error_string);
-	if(bootme_method.return_code != 0) {
-		*command_result = malloc(EXTRA_BUFFER_LENGTH);
-		strcpy(*command_result, bootme_method.error_string);
-		return bootme_method.return_code;
-	}
 
 	*command_result = malloc( 2 * 1024);
 	if(*command_result == NULL) {
@@ -1413,38 +1415,53 @@ int htxd_option_method_bootme(char **command_result)
 		strcpy(temp_option_list, bootme_method.command_option_list);
 		
 		if( strcmp(temp_option_list, "on") == 0 ) {
-			sprintf(trace_string, "%s on", HTXD_BOOTME_SCRIPT);
+			bootme_method.return_code = htxd_validate_command_requirements(bootme_method.htxd_instance, bootme_method.error_string);
+			if(bootme_method.return_code != 0) {
+				strcpy(*command_result, bootme_method.error_string);
+
+				if(temp_option_list != NULL) {
+					free(temp_option_list);
+				}
+
+				return bootme_method.return_code;
+			}
+			sprintf(trace_string, "%s/etc/scripts/%s on", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
 			bootme_status = system(trace_string);
 			bootme_return_code = WEXITSTATUS(bootme_status);
 			if(bootme_return_code == 0) {
 				running_mdt_name = htxd_get_running_ecg_name();
-				p_boot_flag = fopen(HTXD_AUTOSTART_FILE, "w");
+				sprintf(temp_string, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
+				p_boot_flag = fopen(temp_string, "w");
 				if(p_boot_flag == NULL) {
 					sprintf(trace_string, "fopen failed with errno = <%d>", errno);
 					HTXD_TRACE(LOG_ON, trace_string);
-					sprintf(*command_result, "bootme on failed, could not set bootme flag file <%s>", HTXD_AUTOSTART_FILE);
-					sprintf(trace_string, "%s off", HTXD_BOOTME_SCRIPT);
+					sprintf(*command_result, "bootme on failed, could not set bootme flag file <%s>", temp_string);
+					sprintf(trace_string, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
 					system(trace_string);
 				} else {
 					fprintf(p_boot_flag, "%s", running_mdt_name);
 					fclose(p_boot_flag);
 					strcpy(*command_result, "bootme on is completed successfully");
+					sprintf(trace_string, "cp %s %s-htxd_bootme", running_mdt_name, running_mdt_name);
+					system(trace_string);	
 				}
 			} else {
 				htxd_bootme_error_string(bootme_return_code, command_result);
 			}
 
 		} else if(  strcmp(temp_option_list, "off") == 0 ) {
-			sprintf(trace_string, "%s off", HTXD_BOOTME_SCRIPT);
+			sprintf(trace_string, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
 			bootme_status = system(trace_string);
 			bootme_return_code = WEXITSTATUS(bootme_status);
 			if(bootme_return_code == 0) {
 				strcpy(*command_result, "bootme off is completed successfully");
+				sprintf(trace_string, "rm -f %s/mdt/*-htxd_bootme >/dev/null 2>&1", global_htx_home_dir);
+				system(trace_string);
 			} else {
 				htxd_bootme_error_string(bootme_return_code, command_result);
 			}
 		} else if( strcmp(temp_option_list, "status") == 0 ) {
-			sprintf(trace_string, "%s status", HTXD_BOOTME_SCRIPT);
+			sprintf(trace_string, "%s/etc/scripts/%s status", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
 			bootme_status = system(trace_string);
 			bootme_return_code = WEXITSTATUS(bootme_status);
 			if(bootme_return_code == 0) {
@@ -1477,10 +1494,16 @@ int htxd_option_method_exersetupinfo(char **command_result)
 	struct htxshm_HE *p_HE;
 	int exer_setup_info_flag = 1;
 	int i;
+	char trace_string[256];
 
 
 	htxd_init_option_method(&exersetupinfo_method);
 	*command_result = malloc(EXTRA_BUFFER_LENGTH);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
 
 	exersetupinfo_method.return_code = htxd_validate_command_requirements(exersetupinfo_method.htxd_instance, exersetupinfo_method.error_string);
 	if(exersetupinfo_method.return_code != 0) {
@@ -1524,14 +1547,16 @@ int htxd_getstats_ecg(htxd_ecg_info * p_ecg_info_to_getstats, char **command_res
 
 	int return_code = 0;
 	int  htx_stats_pid;
+	char temp_string[300];
 
 	/* get HTX stats program PID */
 	htx_stats_pid = htxd_get_htx_stats_pid();
 
 	/* truncate the existing stats file */
-	if(truncate(HTX_STATS_SEND_FILE, 0) == -1) {
+	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_STATS_SEND_FILE);
+	if(truncate(temp_string, 0) == -1) {
 		if(errno == ENOENT ) {
-			if(creat(HTX_STATS_SEND_FILE, 0) >= 0) {
+			if(creat(temp_string, 0) >= 0) {
 			} else {
 			}
 				
@@ -1549,7 +1574,8 @@ int htxd_getstats_ecg(htxd_ecg_info * p_ecg_info_to_getstats, char **command_res
 	sleep(5);
 
 	/* read the HTX stats file to string buffer */
-	return_code = htxd_read_file(HTX_STATS_FILE, command_result); 
+	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_STATS_FILE);
+	return_code = htxd_read_file(temp_string, command_result); 
 	
 	return return_code;
 }
@@ -1570,7 +1596,7 @@ int htxd_option_method_getstats(char **command_result)
 	*command_result = NULL;
 
 	if(command_ecg_name[0] == '\0') {
-		strcpy(command_ecg_name, DEFAULT_ECG_NAME );
+		sprintf(command_ecg_name, "%s/mdt/%s", global_htx_home_dir, DEFAULT_ECG_NAME );
 	}
 
 	return_code = htxd_validate_command_requirements(htxd_instance, error_string);
@@ -1611,8 +1637,10 @@ int htxd_option_method_getstats(char **command_result)
 int htxd_option_method_geterrlog(char **command_result)
 {
 	int return_code;
+	char temp_string[300];
 
-	return_code = htxd_read_file(HTX_ERR_LOG_FILE, command_result); 
+	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_ERR_LOG_FILE);
+	return_code = htxd_read_file(temp_string, command_result); 
 	if(return_code != 0) {
 		if(*command_result != 0) {
 			free(*command_result);
@@ -1631,15 +1659,17 @@ int htxd_option_method_geterrlog(char **command_result)
 int htxd_option_method_clrerrlog(char **command_result)
 {
 	int return_code;
+	char temp_string[300];
 
+	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_ERR_LOG_FILE);
 	*command_result = malloc(512);
 	if(*command_result == NULL) {
 		return -1;
 	}
 
-	return_code = truncate(HTX_ERR_LOG_FILE, 0);
+	return_code = truncate(temp_string, 0);
 	if(return_code == -1) {
-		sprintf(*command_result, "Error : failed to truncate htx stats file to send <%s>, errno = <%d>", HTX_ERR_LOG_FILE, errno);
+		sprintf(*command_result, "Error : failed to truncate htx stats file to send <%s>, errno = <%d>", temp_string, errno);
 	
 	} else {
 		strcpy(*command_result, "HTX error log file cleared successfully");
@@ -1650,6 +1680,54 @@ int htxd_option_method_clrerrlog(char **command_result)
 
 
 
+int htxd_option_method_get_file(char **command_result)
+{
+	int return_code = 0;
+	htxd *htxd_instance;
+	char filename[512];
+	char *running_mdt_name;
+	int  htx_stats_pid;
+	char command_string[128];
+
+
+	htxd_instance = htxd_get_instance();
+
+	strcpy(filename, htxd_instance->p_command->option_list);
+
+	if(strcmp(STATS_FILE_STRING,  filename) == 0) {
+		htx_stats_pid = htxd_get_htx_stats_pid();
+		htxd_send_SIGUSR1(htx_stats_pid);
+		sleep(5);
+
+		sprintf(filename,"%s/%s", global_htx_log_dir, HTX_STATS_FILE);
+
+	} else if(strcmp(RUNNING_MDT_STRING, filename) == 0) {
+		running_mdt_name = htxd_get_running_ecg_name();	
+		strcpy(filename, running_mdt_name);
+
+	} else if(strcmp(MDT_LIST, filename) == 0) {
+		sprintf(command_string, "ls %s/%s > %s/%s", global_htx_home_dir, MDT_DIR, global_htxd_log_dir, MDT_LIST_FILE);
+		system(command_string);
+		sprintf(filename, "%s/%s", global_htxd_log_dir, MDT_LIST_FILE);
+	}
+
+	return_code = htxd_read_file(filename, command_result);	
+	if(return_code != 0) {
+		if(*command_result != 0) {
+			free(*command_result);
+		}
+		*command_result = malloc(HTX_ERR_MESSAGE_LENGTH);
+		if(*command_result == NULL) {
+			return 1;
+		}
+		sprintf(*command_result,"Error: failed to get command result");
+		
+	}
+
+	return return_code;	
+}
+
+
 
 int htxd_option_method_cmd(char **command_result)
 {
@@ -1657,16 +1735,18 @@ int htxd_option_method_cmd(char **command_result)
 	int return_code;
 	char command_string[512];
 	htxd *htxd_instance;
+	char temp_string[300];
 
 	htxd_instance = htxd_get_instance();
 
-	sprintf(command_string, "echo \" Error: failed to execute command <%s> \" >%s; sync",  htxd_instance->p_command->option_list, HTX_CMD_RESULT_FILE);
+	sprintf(temp_string, "%s/%s", global_htxd_log_dir, HTX_CMD_RESULT_FILE);
+	sprintf(command_string, "echo \" Error: failed to execute command \<%s\> \" >%s; sync",  htxd_instance->p_command->option_list, temp_string);
 	system(command_string);
 
-	sprintf(command_string, " (%s) > %s 2>&1 ; sync", htxd_instance->p_command->option_list, HTX_CMD_RESULT_FILE);
+	sprintf(command_string, " (%s) > %s 2>&1 ; sync", htxd_instance->p_command->option_list, temp_string);
 	system(command_string);
 
-	return_code = htxd_read_file(HTX_CMD_RESULT_FILE, command_result);
+	return_code = htxd_read_file(temp_string, command_result);
 	if(return_code != 0) {
 		if(*command_result != 0) {
 			free(*command_result);
@@ -1688,20 +1768,43 @@ int htxd_option_method_set_eeh(char **command_result)
 
 	int return_code = 0;
 	htxd *htxd_instance;
+	char *ptr_env = NULL;
+	char trace_string[256];
+
 
 	htxd_instance = htxd_get_instance();
 
 	*command_result = malloc(512);
-	
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
 
-	if( (strlen(htxd_instance->p_command->option_list) == 0) || (strcmp(htxd_instance->p_command->option_list, "1") == 0) ) {
-		unsetenv("HTX_EEH_OFF");
-		strcpy(*command_result, "set eeh flag successfully");
+	if(strlen(htxd_instance->p_command->option_list) == 0) {
+		ptr_env = getenv("HTXEEH");	
+		if(ptr_env == NULL) {
+			strcpy(*command_result, "HTXEEH is not set");
+		} else {
+			sprintf(*command_result, "HTXEEH value is %s", ptr_env);
+		}
+	} else  if(strcmp(htxd_instance->p_command->option_list, "1") == 0)  {
+		return_code = setenv("HTXEEH", "1", 1);
+		if(return_code != 0) {
+			sprintf(*command_result, "Error while setting HTXEEH environment variable, return code =<%d>, errono=<%d>", return_code, errno);
+		} else {
+			strcpy(*command_result, "set eeh flag successfully");
+		}
 	} else if(strcmp(htxd_instance->p_command->option_list, "0") == 0) {
-		setenv("HTX_EEH_OFF", "1", 1);
-		strcpy(*command_result, "unset eeh flag successfully");
+		return_code = setenv("HTXEEH", "0", 1);
+		if(return_code != 0) {
+			sprintf(*command_result, "Error while setting HTXEEH environment variable, return code =<%d>, errono=<%d>", return_code, errno);
+		} else {
+			strcpy(*command_result, "unset eeh flag successfully");
+		}
 	} else {
-		strcpy(*command_result, "Error : failed while setting eeh flag because of invalid argument, valid argument is 1 or 0");
+		strcpy(*command_result, "Error : failed while setting eeh flag (HTXEEH) because of invalid argument, valid argument is 1 or 0");
+		return_code = -1;
 	}
 
 	return return_code;
@@ -1713,19 +1816,43 @@ int htxd_option_method_set_kdblevel(char **command_result)
 
 	int return_code = 0;
 	htxd *htxd_instance;
+	char *ptr_env = NULL;
+	char trace_string[256];
+
 
 	htxd_instance = htxd_get_instance();
 
 	*command_result = malloc(512);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
 
-	if( (strlen(htxd_instance->p_command->option_list) == 0) || (strcmp(htxd_instance->p_command->option_list, "1") == 0) ) {
-		setenv("HTXKDBLEVEL", "0", 1);
-		strcpy(*command_result, "set kdb level flag successfully");
+	if(strlen(htxd_instance->p_command->option_list) == 0) {
+		ptr_env = getenv("HTXKDBLEVEL");	
+		if(ptr_env == NULL) {
+			strcpy(*command_result, "HTXKDBLEVEL is not set");
+		} else {
+			sprintf(*command_result, "HTXKDBLEVEL value is %s", ptr_env);
+		}
+	} else  if(strcmp(htxd_instance->p_command->option_list, "1") == 0)  {
+		return_code = setenv("HTXKDBLEVEL", "1", 1);
+		if(return_code != 0) {
+			sprintf(*command_result, "Error while setting HTXKDBLEVEL environment variable, return code =<%d>, errono=<%d>", return_code, errno);
+		} else {
+			strcpy(*command_result, "set kdb level flag successfully");
+		}
 	} else if(strcmp(htxd_instance->p_command->option_list, "0") == 0) {
-		setenv("HTXKDBLEVEL", "0", 1);
-		strcpy(*command_result, "unset kdb level  flag successfully");
+		return_code = setenv("HTXKDBLEVEL", "0", 1);
+		if(return_code != 0) {
+			sprintf(*command_result, "Error while setting HTXKDBLEVEL environment variable, return code =<%d>, errono=<%d>", return_code, errno);
+		} else {
+			strcpy(*command_result, "unset kdb level flag successfully");
+		}
 	} else {
-		strcpy(*command_result, "Error : failed while setting kdb level flag because of invalid argument, valid argument is 1 or 0");
+		strcpy(*command_result, "Error : failed while setting kdb level flag (HTXKDBLEVEL) because of invalid argument, valid argument is 1 or 0");
+		return_code = -1;
 	}
 
 	return return_code;
@@ -1738,15 +1865,23 @@ int htxd_option_method_set_kdblevel(char **command_result)
 
 int htxd_option_method_set_hxecom(char **command_result)
 {
+	char temp_string[300];
 
 	*command_result = malloc(512);
+	if(*command_result == NULL) {
+		sprintf(temp_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, temp_string);
+		return -1;
+	}
+
 
 	if( htxd_is_file_exist("/build_net") == FALSE) {
 		strcpy(*command_result,"Error : hxecom needs the build_net script, network setup for hxecom cannot be done");
 		return -1;
 	}
 
-	system("/usr/lpp/htx/ecg/ecg_net");
+	sprintf(temp_string, "%s/ecg/ecg_net", global_htx_home_dir);
+	system(temp_string);
 	strcpy(*command_result,"hxecom setup completed successfully (ecg_net is appeneded to ecg.bu");
 	
 	return 0;
@@ -1754,22 +1889,118 @@ int htxd_option_method_set_hxecom(char **command_result)
 
 
 
+int htxd_option_method_set_htx_env(char **command_result)
+{
+
+	int return_code = 0;
+	htxd *htxd_instance;
+	char variable[128] = "";
+	char value[128] = "";
+	char trace_string[256];
+
+
+	htxd_instance = htxd_get_instance();
+
+	*command_result = malloc(512);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+
+	if(strlen(htxd_instance->p_command->option_list) == 0) {
+		strcpy(*command_result, "Please provide environment variable and value");
+		return 1;
+	}
+
+	sscanf(htxd_instance->p_command->option_list, "%s %s", variable, value);
+	if(strlen(variable) == 0) {
+		strcpy(*command_result, "could not find environment variable");
+		return 1;
+	}
+
+	return_code = setenv(variable, value, 1);
+	if(return_code  != 0) {
+		sprintf(*command_result, "Error : setenv returned while setting environment varibale <%s> with value <%s>, return  code <%d> and errno <%d>", variable, value, return_code, errno);
+		return return_code;
+	}
+
+	sprintf(*command_result, "environment variable <%s> is set with <%s> successfully", variable, value);
+
+	return return_code;
+}
+
+
+
+int htxd_option_method_get_htx_env(char **command_result)
+{
+
+	htxd *htxd_instance;
+	char variable[128] = "";
+	char *value = NULL;
+	char trace_string[256];
+
+
+	htxd_instance = htxd_get_instance();
+
+	*command_result = malloc(512);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+
+	if(strlen(htxd_instance->p_command->option_list) == 0) {
+		strcpy(*command_result, "Please provide environment variable");
+		return 1;
+	}
+
+	sscanf(htxd_instance->p_command->option_list, "%s", variable);
+	if(strlen(variable) == 0) {
+		strcpy(*command_result, "could not find environment variable");
+		return 1;
+	}
+
+	value = getenv(variable);
+	if(value  == NULL) {
+		sprintf(*command_result, "environment variable <%s> is not defined", variable);
+		return 1;
+	}
+
+	sprintf(*command_result, "environment variable <%s> value is <%s>", variable, value);
+
+	return 0;
+}
+
+
 
 int htxd_option_method_getvpd(char **command_result)
 {
 	int return_code;
-	char vpd_command_string[256];
+	char vpd_command_string[512];
+	char trace_string[256];
+	char temp_string[300];
 
-	sprintf(vpd_command_string, "%s > %s", HTX_VPD_SCRIPT, HTX_VPD_FILE);
+
+	sprintf(temp_string, "%s/%s", global_htxd_log_dir, HTX_VPD_FILE);
+	sprintf(vpd_command_string, "%s/etc/scripts/%s > %s", global_htx_home_dir, HTX_VPD_SCRIPT, temp_string);
 
 	system(vpd_command_string);
 
-	return_code = htxd_read_file(HTX_VPD_FILE, command_result);
+	return_code = htxd_read_file(temp_string, command_result);
 	if(return_code != 0) {
 		if(*command_result != 0) {
 			free(*command_result);
 		}
 		*command_result = malloc(512);
+		if(*command_result == NULL) {
+			sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+			HTXD_TRACE(LOG_ON, trace_string);
+			return -1;
+		}
+
 		sprintf(*command_result, "Error : while getting VPD information");
 	}
 	return return_code;
@@ -1870,11 +2101,19 @@ int htxd_option_method_getecgsum(char **command_result)
 	int return_code = 0;
 	htxd_ecg_info * p_ecg_info_list;
 	char command_ecg_name[MAX_ECG_NAME_LENGTH];
+	char trace_string[256];
+
 
 	htxd_instance = htxd_get_instance();
 	strcpy(command_ecg_name, htxd_get_command_ecg_name() );
 
 	*command_result = malloc(EXTRA_BUFFER_LENGTH *4);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
 
 	return_code = htxd_validate_command_requirements(htxd_instance, error_string);
 	if(return_code != 0) {
@@ -1906,11 +2145,21 @@ int htxd_option_method_getecglist(char **command_result)
 	int mdt_count = 0;
 	int return_code;
 	char trace_string[256];
+	char temp_string1[300];
+	char temp_string2[300];
 
 
-	return_code = htxd_get_regular_file_count(MDT_DIR);
+	sprintf(temp_string1, "%s/%s", global_htx_home_dir, MDT_DIR); 
+	sprintf(temp_string2, "%s/%s", global_htxd_log_dir, MDT_LIST_FILE); 
+	return_code = htxd_get_regular_file_count(temp_string1);
 	if(return_code == -1) {
 		*command_result = malloc(256);
+		if(*command_result == NULL) {
+			sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+			HTXD_TRACE(LOG_ON, trace_string);
+			return -1;
+		}
+
 		strcpy(*command_result, "Error while accessing MDT directory");
 		HTXD_TRACE(LOG_ON, *command_result);
 		return -1;
@@ -1919,12 +2168,12 @@ int htxd_option_method_getecglist(char **command_result)
 
 	if(mdt_count > 0) {
 
-		return_code = htxd_wrtie_mdt_list(MDT_DIR, MDT_LIST_FILE, mdt_count, "w", " ");
+		return_code = htxd_wrtie_mdt_list(temp_string1, temp_string2, mdt_count, "w", " ");
 		if(return_code == -1) {
 			HTXD_TRACE(LOG_ON, "htxd_wrtie_mdt_list returns qith -1");
 			return -1;
 		}
-		return_code = htxd_read_file(MDT_LIST_FILE, command_result);
+		return_code = htxd_read_file(temp_string2, command_result);
 		if(return_code != 0) {
 			sprintf(trace_string, "htxd_read_file() returned with %d", return_code);
 			HTXD_TRACE(LOG_ON, trace_string);
@@ -1932,6 +2181,12 @@ int htxd_option_method_getecglist(char **command_result)
 		}
 	} else {
 		*command_result = malloc(256);
+		if(*command_result == NULL) {
+			sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+			HTXD_TRACE(LOG_ON, trace_string);
+			return -1;
+		}
+
 		strcpy(*command_result, "No files present in MDT directory");
  
 	}
@@ -1994,6 +2249,10 @@ int htxd_get_common_command_result_ecg(int mode, htxd_ecg_info *p_ecg_info, char
 			p_HE++;
 		}
 	} else {
+		if(htxd_is_list_regular_expression(option_list) == TRUE) {
+			htxd_expand_device_name_list(p_ecg_info, option_list);
+		}
+
 		p_device_name = strtok(option_list, " ");
 		while(p_device_name != NULL) {
 			p_HE = (struct htxshm_HE *)(p_ecg_info->ecg_shm_addr.hdr_addr + 1);
@@ -2054,3 +2313,790 @@ int htxd_get_common_command_result(int mode, htxd_ecg_info *p_ecg_info, char *op
 	return return_code;
 }
 
+
+
+void htxd_get_screen_5_row_entry(struct htxshm_HE *p_HE, htxd_ecg_info * p_ecg_info_to_query, int device_position, char *query_device_entry)
+{
+	char device_run_status[5];
+	char device_coe_soe_status[5];
+	char device_active_suspend_status[15];
+	char last_update_day_of_year[10];
+	char last_update_time[80];
+	char last_error_day_of_year[10];
+	char last_error_time[80];
+
+	htxd_get_device_run_status(p_HE, p_ecg_info_to_query, device_position, device_run_status);
+	htxd_get_device_active_suspend_status(p_ecg_info_to_query->ecg_sem_id, device_position, device_active_suspend_status);
+	htxd_get_device_coe_soe_status(p_HE, device_coe_soe_status);
+	htxd_get_time_details(p_HE->tm_last_upd, NULL, last_update_day_of_year, last_update_time);
+	if(p_HE->tm_last_err != 0) {
+		htxd_get_time_details(p_HE->tm_last_err, NULL, last_error_day_of_year, last_error_time);
+	} else {
+		strcpy(last_error_day_of_year, "NA");
+		strcpy(last_error_time, "NA");
+	}
+
+	sprintf (query_device_entry, "<%s> <%s> <%s> <%s> <%d> <%d> <%s> <%s> |",
+		p_HE->sdev_id,
+		device_run_status,
+		last_update_day_of_year,
+		last_update_time,
+		p_HE->cycles,
+		p_HE->test_id,
+		last_error_day_of_year,
+		last_error_time
+	);
+
+}
+
+
+
+int htxd_screen_5_all_device(htxd_ecg_info * p_ecg_info_to_screen_5, int device_start_position, char *command_result)
+{
+	struct htxshm_HE *p_HE;
+	int i;
+	char screen_5_row_entry[256];
+	int return_code = 0;
+	int display_device_count;
+	int error_count;
+
+
+
+	display_device_count = p_ecg_info_to_screen_5->ecg_shm_exerciser_entries - device_start_position;
+	if(display_device_count > (SCREEN_5_ENTRIES_PER_PAGE)) {
+		display_device_count = SCREEN_5_ENTRIES_PER_PAGE;
+	}
+
+	error_count = htxd_get_system_header_info_error_count();
+
+	sprintf(command_result, "%d %d %d %s %lu %s |", 
+		display_device_count,
+		error_count,
+		p_ecg_info_to_screen_5->ecg_shm_exerciser_entries, 
+		p_ecg_info_to_screen_5->ecg_name,
+		time((long *) 0),
+		htxd_get_ecg_start_time()
+	);
+
+	p_HE = (struct htxshm_HE *)(p_ecg_info_to_screen_5->ecg_shm_addr.hdr_addr + 1);
+
+	p_HE += device_start_position;
+
+	for(i = 0; ( (i < p_ecg_info_to_screen_5->ecg_shm_exerciser_entries) && ((i < SCREEN_5_ENTRIES_PER_PAGE)) ); i++) {
+		htxd_get_screen_5_row_entry(p_HE, p_ecg_info_to_screen_5, i + device_start_position, screen_5_row_entry);
+		strcat(command_result, screen_5_row_entry);
+
+		p_HE++;
+	}
+	
+	return return_code;
+
+}
+
+
+
+int htxd_option_method_screen_5(char **command_result)
+{
+
+	htxd_ecg_info * p_ecg_info_list;
+	htxd_option_method_object screen_5_method;
+	int device_display_start_position;
+	int result_size = 1024 * 10;
+	char trace_string[256];
+
+
+
+	htxd_init_option_method(&screen_5_method);
+
+	*command_result = malloc(result_size);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	memset(*command_result, 0, (result_size) );
+
+	screen_5_method.return_code = htxd_validate_command_requirements(screen_5_method.htxd_instance, screen_5_method.error_string);
+	if(screen_5_method.return_code != 0) {
+		strcpy(*command_result, screen_5_method.error_string);
+		return screen_5_method.return_code;
+	}
+
+	p_ecg_info_list = htxd_get_ecg_info_list(screen_5_method.htxd_instance->p_ecg_manager);
+
+	if(p_ecg_info_list == NULL) {
+		sprintf(*command_result, "Internal error, could not find any running ecg");
+		return 1;	
+	}
+
+	device_display_start_position = atoi(screen_5_method.command_option_list);
+
+	if(device_display_start_position > p_ecg_info_list->ecg_shm_exerciser_entries) {
+		sprintf(*command_result, "Internal error, device position crossing the max limit");
+		return 1;
+	}
+
+	screen_5_method.return_code = htxd_screen_5_all_device(p_ecg_info_list, device_display_start_position, *command_result);
+
+	return screen_5_method.return_code;
+}
+
+
+
+
+void htxd_get_screen_2_4_row_entry(struct htxshm_HE *p_HE, htxd_ecg_info * p_ecg_info, int device_position, activate_halt_entry *p_activate_halt_row, int screen_mode)
+{
+	char device_run_status[5];
+	char device_active_suspend_status[15];
+	int sem_status;
+
+
+	if(screen_mode == SCREEN_MODE_2) {
+		sem_status = htxd_get_device_run_sem_status(p_ecg_info->ecg_sem_id, device_position);
+		if(sem_status == 0) {
+			strcpy(p_activate_halt_row->device_status, " ACTIVE ");
+		} else{
+			strcpy(p_activate_halt_row->device_status, " HALTED ");
+		}
+	} else if(screen_mode == SCREEN_MODE_4) {
+		if(p_HE->cont_on_err == HTX_SOE) {
+			strcpy(p_activate_halt_row->device_status, "  HOE   ");
+		} else {
+			strcpy(p_activate_halt_row->device_status, "  COE   ");
+		}
+	}
+
+	strcpy(p_activate_halt_row->device_name, p_HE->sdev_id);
+	p_activate_halt_row->slot = p_HE->slot;
+	p_activate_halt_row->port = p_HE->port;
+	strcpy(p_activate_halt_row->adapt_desc, p_HE->adapt_desc);
+	strcpy(p_activate_halt_row->device_desc, p_HE->device_desc);
+}	
+
+	
+
+int htxd_screen_2_4_all_device(htxd_ecg_info * p_ecg_info, int device_start_position, char *command_result, int screen_mode)
+{
+	struct htxshm_HE	*p_HE;
+	activate_halt_entry	*p_activate_halt_row;
+	int			i;
+	int			return_code = 0;
+
+
+	p_activate_halt_row = (activate_halt_entry*) command_result;
+
+	p_HE = (struct htxshm_HE *)(p_ecg_info->ecg_shm_addr.hdr_addr + 1);
+
+	p_HE += device_start_position;
+
+	for(i = device_start_position; ( (i < p_ecg_info->ecg_shm_exerciser_entries) && (i < (SCREEN_2_4_DEVICES_PER_PAGE+device_start_position)) ); i++) {
+		htxd_get_screen_2_4_row_entry(p_HE, p_ecg_info, i, p_activate_halt_row, screen_mode);
+
+		p_HE++;
+		p_activate_halt_row++;
+	}
+	
+	return return_code;
+
+}
+
+
+
+int htxd_option_method_screen_4(char **command_result)
+{
+	
+	htxd_ecg_info * p_ecg_info_list;
+	htxd_option_method_object screen_4_method;
+	int device_display_start_position;
+	char trace_string[256];
+
+
+	htxd_init_option_method(&screen_4_method);
+
+	*command_result = malloc(1024 * 10);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return 1;
+	}
+
+	memset(*command_result, 0, (1024 * 10) );
+
+	screen_4_method.return_code = htxd_validate_command_requirements(screen_4_method.htxd_instance, screen_4_method.error_string);
+	if(screen_4_method.return_code != 0) {
+		strcpy(*command_result, screen_4_method.error_string);
+		return screen_4_method.return_code;
+	}
+
+	p_ecg_info_list = htxd_get_ecg_info_list(screen_4_method.htxd_instance->p_ecg_manager);
+
+	if(p_ecg_info_list == NULL) {
+		sprintf(*command_result, "Internal error, could not find any running ecg");
+		return 1;	
+	}
+
+	device_display_start_position = atoi(screen_4_method.command_option_list);
+
+	if(device_display_start_position > p_ecg_info_list->ecg_shm_exerciser_entries) {
+		sprintf(*command_result, "Internal error, device position crossing the max limit");
+		return 1;
+	}
+
+	screen_4_method.return_code = htxd_screen_2_4_all_device(p_ecg_info_list, device_display_start_position, *command_result, SCREEN_MODE_4);
+
+	return screen_4_method.return_code;
+}
+
+
+
+void htxd_get_screen_2_row_entry(struct htxshm_HE *p_HE, htxd_ecg_info * p_ecg_info, int device_position, activate_halt_entry *p_activate_halt_row)
+{
+	char device_run_status[5];
+	char device_active_suspend_status[15];
+	int sem_status;
+
+
+	sem_status = htxd_get_device_run_sem_status(p_ecg_info->ecg_sem_id, device_position);
+	if(sem_status == 0) {
+		strcpy(p_activate_halt_row->device_status, " ACTIVE ");
+	} else{
+		strcpy(p_activate_halt_row->device_status, " HALTED ");
+	}
+
+	strcpy(p_activate_halt_row->device_name, p_HE->sdev_id);
+	p_activate_halt_row->slot = p_HE->slot;
+	p_activate_halt_row->port = p_HE->port;
+	strcpy(p_activate_halt_row->adapt_desc, p_HE->adapt_desc);
+	strcpy(p_activate_halt_row->device_desc, p_HE->device_desc);
+}	
+
+	
+
+int htxd_screen_2_all_device(htxd_ecg_info * p_ecg_info_to_screen_2, int device_start_position, char *command_result)
+{
+	struct htxshm_HE *p_HE;
+	int i;
+//	char screen_5_row_entry[256];
+	int return_code = 0;
+	activate_halt_entry *p_activate_halt_row;
+
+
+	p_activate_halt_row = (activate_halt_entry*) command_result;
+
+	p_HE = (struct htxshm_HE *)(p_ecg_info_to_screen_2->ecg_shm_addr.hdr_addr + 1);
+
+	p_HE += device_start_position;
+
+	for(i = device_start_position; ( ( i < p_ecg_info_to_screen_2->ecg_shm_exerciser_entries) && (i < SCREEN_5_ENTRIES_PER_PAGE) ) ; i++) {
+		htxd_get_screen_2_row_entry(p_HE, p_ecg_info_to_screen_2, i, p_activate_halt_row);
+		//strcat(command_result, screen_5_row_entry);
+
+		p_HE++;
+		p_activate_halt_row++;
+	}
+	
+	return return_code;
+
+}
+
+
+
+int htxd_option_method_screen_2(char **command_result)
+{
+	
+	htxd_ecg_info * p_ecg_info_list;
+	htxd_option_method_object screen_2_method;
+	int device_display_start_position;
+	char trace_string[256];
+
+
+	htxd_init_option_method(&screen_2_method);
+
+	*command_result = malloc(1024 * 10);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return 1;
+	}
+
+	memset(*command_result, 0, (1024 * 10) );
+
+	screen_2_method.return_code = htxd_validate_command_requirements(screen_2_method.htxd_instance, screen_2_method.error_string);
+	if(screen_2_method.return_code != 0) {
+		strcpy(*command_result, screen_2_method.error_string);
+		return screen_2_method.return_code;
+	}
+
+	p_ecg_info_list = htxd_get_ecg_info_list(screen_2_method.htxd_instance->p_ecg_manager);
+
+	if(p_ecg_info_list == NULL) {
+		sprintf(*command_result, "Internal error, could not find any running ecg");
+		return 1;	
+	}
+
+	device_display_start_position = atoi(screen_2_method.command_option_list);
+
+	if(device_display_start_position > p_ecg_info_list->ecg_shm_exerciser_entries) {
+		sprintf(*command_result, "Internal error, device position crossing the max limit");
+		return 1;
+	}
+
+	screen_2_method.return_code = htxd_screen_2_4_all_device(p_ecg_info_list, device_display_start_position, *command_result, SCREEN_MODE_2);
+
+	return screen_2_method.return_code;
+}
+
+
+
+int htxd_toggle_coe_soe(htxd_ecg_info *p_ecg_info, int device_position, int operation_mode, int operation)
+{
+
+	struct htxshm_HE	*p_HE;
+	int			i;
+	
+
+	p_HE = (struct htxshm_HE *)(p_ecg_info->ecg_shm_addr.hdr_addr + 1);
+
+	if(operation_mode == HTX_SINGLE_DEVICE) {
+		p_HE+=device_position;	
+		if(p_HE->cont_on_err == 1) {
+			p_HE->cont_on_err = 0;
+		} else {
+			p_HE->cont_on_err = 1;
+		}
+	} else if (operation_mode == HTX_SCREEN_DEVICES) {
+		p_HE+=device_position;
+		for(i = 0; (i < p_ecg_info->ecg_shm_exerciser_entries) && (i < 15); i++) {
+			p_HE->cont_on_err = operation;
+			p_HE++;
+		}
+	} else if (operation_mode == HTX_ALL_DEVICES) {
+		for(i = 0; i < p_ecg_info->ecg_shm_exerciser_entries; i++) {
+			p_HE->cont_on_err = operation;
+			p_HE++;
+		}
+	}
+
+	return 0;
+}
+
+
+
+int htxd_option_method_coe_soe(char **command_result)
+{
+	
+	htxd_ecg_info			*p_ecg_info_list;
+	htxd_option_method_object	coe_soe_method;
+	int				device_position;
+	int				operation_mode;
+	int				operation;
+	char				trace_string[256];
+
+
+	htxd_init_option_method(&coe_soe_method);
+
+	*command_result = malloc(1024 * 10);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return 1;
+	}
+
+	memset(*command_result, 0, (1024 * 10) );
+
+	coe_soe_method.return_code = htxd_validate_command_requirements(coe_soe_method.htxd_instance, coe_soe_method.error_string);
+	if(coe_soe_method.return_code != 0) {
+		strcpy(*command_result, coe_soe_method.error_string);
+		return coe_soe_method.return_code;
+	}
+
+	p_ecg_info_list = htxd_get_ecg_info_list(coe_soe_method.htxd_instance->p_ecg_manager);
+
+	if(p_ecg_info_list == NULL) {
+		sprintf(*command_result, "Internal error, could not find any running ecg");
+		return 1;	
+	}
+
+	sscanf(coe_soe_method.command_option_list, "%d %d %d", &device_position, &operation_mode, &operation);
+
+	if(device_position > p_ecg_info_list->ecg_shm_exerciser_entries) {
+		sprintf(*command_result, "Internal error, device position crossing the max limit");
+		return 1;
+	}
+
+	htxd_toggle_coe_soe(p_ecg_info_list, device_position, operation_mode, operation);
+
+	return coe_soe_method.return_code;
+}
+
+
+
+
+int htxd_toggle_activate_halt(htxd_ecg_info *p_ecg_info, int device_position, int operation_mode, int operation)
+{
+
+	int device_run_status;
+	int                     i;
+
+
+	if(operation_mode == HTX_SINGLE_DEVICE) {
+		device_run_status = htxd_get_device_run_sem_status(p_ecg_info->ecg_sem_id, device_position);	
+		if(device_run_status == 1) {
+			htxd_set_device_run_sem_status(p_ecg_info->ecg_sem_id, device_position, 0);
+		} else {
+			htxd_set_device_run_sem_status(p_ecg_info->ecg_sem_id, device_position, 1);
+		}
+	} else if (operation_mode == HTX_SCREEN_DEVICES) {
+		for(i = 0; (i < p_ecg_info->ecg_shm_exerciser_entries) && (i < 15); i++) {
+			htxd_set_device_run_sem_status(p_ecg_info->ecg_sem_id, device_position + i, operation);
+		}
+	} else if (operation_mode == HTX_ALL_DEVICES) {
+		for(i = 0; i < p_ecg_info->ecg_shm_exerciser_entries; i++) {
+			htxd_set_device_run_sem_status(p_ecg_info->ecg_sem_id, device_position + i, operation);
+		}
+	}
+
+	return 0;
+}
+
+
+
+int htxd_option_method_activate_halt(char **command_result)
+{
+	
+	htxd_ecg_info * p_ecg_info_list;
+	htxd_option_method_object activate_halt_method;
+	int device_position;
+	int operation_mode;
+	int operation;
+	char trace_string[256];
+
+
+	htxd_init_option_method(&activate_halt_method);
+
+	*command_result = malloc(1024 * 10);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return 1;
+	}
+
+	memset(*command_result, 0, (1024 * 10) );
+
+	activate_halt_method.return_code = htxd_validate_command_requirements(activate_halt_method.htxd_instance, activate_halt_method.error_string);
+	if(activate_halt_method.return_code != 0) {
+		strcpy(*command_result, activate_halt_method.error_string);
+		return activate_halt_method.return_code;
+	}
+
+	p_ecg_info_list = htxd_get_ecg_info_list(activate_halt_method.htxd_instance->p_ecg_manager);
+
+	if(p_ecg_info_list == NULL) {
+		sprintf(*command_result, "Internal error, could not find any running ecg");
+		return 1;	
+	}
+
+	sscanf(activate_halt_method.command_option_list, "%d %d %d", &device_position, &operation_mode, &operation);
+
+	if(device_position > p_ecg_info_list->ecg_shm_exerciser_entries) {
+		sprintf(*command_result, "Internal error, device position crossing the max limit");
+		return 1;
+	}
+
+	htxd_toggle_activate_halt(p_ecg_info_list, device_position, operation_mode, operation);
+
+	return activate_halt_method.return_code;
+}
+
+
+
+
+int htxd_option_method_device_count(char **command_result)
+{
+	
+	int device_count;
+	char trace_string[256];
+
+
+	*command_result = malloc(64);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	memset(*command_result, 0, (64) );
+
+	device_count = htxd_get_loaded_device_count();
+	sprintf(*command_result, "%d", device_count);
+
+
+	return 0;
+}
+
+
+
+int htxd_option_method_get_daemon_state(char **command_result)
+{
+	int daemon_state;
+	int test_running_state;
+	char trace_string[256];
+
+
+	*command_result = malloc(64);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	memset(*command_result, 0, (64) );
+
+	daemon_state = htxd_get_daemon_state();
+	test_running_state = htxd_get_test_running_state();
+	sprintf(*command_result, "%d %d", daemon_state, test_running_state);
+
+
+	return 0;
+}
+
+
+
+int htxd_option_method_test_activate_halt(char **command_result)
+{
+
+#ifdef __HTX_LINUX__
+	union semun semctl_arg;
+#else
+	union semun
+	{
+		int val;
+		struct semid_ds *buf;
+		unsigned short *array;
+	} semctl_arg;
+#endif
+
+	int ecg_sem_id;
+	int ecg_test_sem_status;
+	int sem_length;
+	int total_number_of_device;
+	int running_exer_count;
+	int exer_counter;
+	int exer_system_halted;
+	int exer_error_halted;
+	int exer_operation_halted;
+	int exer_exited;
+	int is_all_exer_stopped = 0;
+	int delay_counter = 0;
+	int max_halt_wait_time = 600;
+	int delay_slice = 3;
+	struct htxshm_HE *p_HE;
+	htxd *p_htxd_instance;
+	char trace_string[256];
+
+
+
+	*command_result = malloc(256);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	memset(*command_result, 0, (256) );
+
+	ecg_sem_id = htxd_get_ecg_sem_id();	
+	ecg_test_sem_status = htxd_get_global_activate_halt_sem_status(ecg_sem_id);
+	if(ecg_test_sem_status == 0) {
+		htxd_set_global_activate_halt_sem_status(ecg_sem_id, 1);
+
+		running_exer_count = htxd_get_total_device_count();
+		total_number_of_device = running_exer_count + htxd_get_max_add_device();
+		sem_length = (total_number_of_device * SEM_PER_EXER) + SEM_GLOBAL;
+		semctl_arg.array = (ushort*) malloc((sem_length * sizeof(ushort) ));
+		if(semctl_arg.array == NULL) {
+			sprintf(*command_result, "Unable to allocate memory for semctl GETVAL array.  errno = %d.", errno);
+			HTXD_TRACE(LOG_ON, *command_result);
+			return 1;
+		}
+	
+		p_htxd_instance = htxd_get_instance();
+		p_HE = (struct htxshm_HE *) (p_htxd_instance->p_ecg_manager->ecg_info_list->ecg_shm_addr.hdr_addr + 1);
+
+		while(delay_counter < max_halt_wait_time) {
+			semctl(ecg_sem_id, 0, GETALL, semctl_arg);
+			exer_counter = exer_system_halted = exer_error_halted = exer_operation_halted = exer_exited = 0;
+
+			while(exer_counter < running_exer_count) {
+				if(semctl_arg.array[(exer_counter * SEM_PER_EXER + SEM_GLOBAL + 2)] == 1) {
+					exer_system_halted++;
+				} else if(semctl_arg.array[(exer_counter * SEM_PER_EXER + SEM_GLOBAL + 1)] == 1) {
+					exer_error_halted++;
+				} else if(semctl_arg.array[(exer_counter * SEM_PER_EXER + SEM_GLOBAL )] == 1) {
+					exer_operation_halted++;
+				} else if( (p_HE + exer_counter) -> PID == 0) {
+					exer_exited++;
+				} else {
+					break;
+				}
+
+				exer_counter++;
+			}
+
+			if(running_exer_count  <= (exer_system_halted + exer_error_halted + exer_operation_halted + exer_exited) ) {
+				is_all_exer_stopped = 1;
+				break;
+			}	
+
+			sleep(delay_slice);
+			delay_counter += delay_slice;
+		}
+
+		free(semctl_arg.array);
+
+		htxd_set_test_running_state(0);
+
+		if ( is_all_exer_stopped == 0) {
+			sprintf(*command_result, "Warning: Not all HE's stopped within allowed time.  System will continue...");
+			return 1;	
+		} else {
+			sprintf(*command_result, "All Hardware Exercisors are stopped");	
+			return 0;
+		}
+
+	} else {
+		htxd_set_global_activate_halt_sem_status(ecg_sem_id, 0);
+		htxd_set_test_running_state(1);
+		sprintf(*command_result, "Test is activated");
+	}
+	
+
+	return 0;
+}
+
+
+
+int htxd_option_method_config_net(char **command_result)
+{
+	
+	htxd_option_method_object config_net_method;
+	char bpt_name[256];
+	char command_string[256];
+	char trace_string[256];
+
+
+	htxd_init_option_method(&config_net_method);
+
+	*command_result = malloc(256);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	memset(*command_result, 0, (256) );
+
+	sscanf(config_net_method.command_option_list, "%s", bpt_name);
+
+	if(strcmp(bpt_name, NO_BPT_NAME_PROVIDED) == 0) {
+#ifdef __HTX_LINUX__
+		sprintf(command_string, "build_net help y y > %s/%s 2>&1", global_htxd_log_dir, BUILD_NET_LOG);
+#else
+		sprintf(command_string, "cd /; build_net help y y > %s/%s 2>&1", global_htxd_log_dir, BUILD_NET_LOG);
+#endif
+	} else {
+		if(htxd_is_file_exist(bpt_name) == FALSE) {
+			sprintf(*command_result, "provided bpt file <%s> is not present", bpt_name);
+			return 1;
+		}
+#ifdef __HTX_LINUX__
+		sprintf(command_string, "build_net %s > %s/%s 2>&1", bpt_name, global_htxd_log_dir, BUILD_NET_LOG);
+#else
+		sprintf(command_string, "cd /; build_net %s > %s/%s 2>&1", bpt_name, global_htxd_log_dir, BUILD_NET_LOG);
+#endif
+	}
+	system(command_string); 
+
+
+	sprintf(*command_result, "%s", "test network config is completed, please verify with ping test");
+
+	return 0;
+}
+
+
+
+int htxd_option_method_append_net_mdt(char **command_result)
+{
+	htxd_option_method_object append_net_mdt_method;
+	char mdt_name[300];
+	char temp_string[256];
+	char command_string[256];
+	char trace_string[256];
+
+
+	htxd_init_option_method(&append_net_mdt_method);
+
+	*command_result = malloc(384);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	memset(*command_result, 0, (384) );
+
+	sscanf(append_net_mdt_method.command_option_list, "%s", mdt_name);
+	if( (strlen(mdt_name) > 0) && (strchr(mdt_name, '/') == NULL) ) {
+		sprintf(temp_string, "%s/mdt/%s", global_htx_home_dir, mdt_name);
+	} else {
+		strcpy(temp_string, mdt_name);
+	}
+	if(htxd_is_file_exist(temp_string) == FALSE) {
+		sprintf(*command_result, "provided mdt <%s> is not present", mdt_name);
+		return 1;
+	}
+
+	sprintf(command_string, "%s/mdt/mdt_net %s >%s/%s  2>&1", global_htx_home_dir, mdt_name, global_htxd_log_dir, MDT_NET_LOG);
+	system(command_string); 
+
+	sprintf(*command_result, "net.mdt is appaned to mdt <%s>", mdt_name);
+
+	return 0;
+}
+
+
+
+int htxd_option_method_test_net(char **command_result)
+{
+
+	char command_string[64];
+	FILE *fp_ping_test;
+	int test_status;
+
+
+	*command_result = malloc(384);
+	if(*command_result == NULL) {
+		return -1;
+	}
+
+	memset(*command_result, 0, (384) );
+
+	sprintf(command_string, "pingum | grep -i \"All networks ping Ok\" | wc -l");
+	fp_ping_test = popen(command_string, "r");
+	if(fp_ping_test == NULL) {
+		sprintf(*command_result, "pingum command execution failed");
+		return 2;
+	}
+	fscanf(fp_ping_test, "%d", &test_status);
+	pclose(fp_ping_test);
+
+	if(test_status == 1) {
+		sprintf(*command_result, "pingum test is success");
+		return 0;
+	} else {
+		sprintf(*command_result, "pingum test is failed");
+		return 1;
+	}
+	return 0;
+}

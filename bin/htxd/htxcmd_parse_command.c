@@ -186,7 +186,7 @@ int htxcmd_get_command_name(int argument_count, char *argument_vector[], htxcmd_
 		break;
 	}
 	if(i >= argument_count) {
-		htxcmd_display_usage("Error : no valid command is provided");
+		htxcmd_display_usage("Error : no valid command option is provided");
 		exit(1);
 	}
 	htxcmd_validate_command_name(p_command_object);
@@ -225,11 +225,6 @@ char * htxcmd_get_ecg_name(int argument_count, char *argument_vector[], char *ec
 				exit(1);
 			}
 		}
-	}
-
-	if( (strlen(ecg_name) > 0) && (strchr(ecg_name, '/') == NULL) ) {
-		strcpy(temp_error_string, ecg_name);
-		sprintf(ecg_name, "/usr/lpp/htx/mdt/%s", temp_error_string);
 	}
 
 	return ecg_name;

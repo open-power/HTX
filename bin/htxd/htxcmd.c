@@ -35,35 +35,37 @@ void htxcmd_display_usage(char *error_text)
 	if(error_text != NULL) {
 		printf("%s\n", error_text);
 	}
-	printf("Usage: htxd [-sut <host name>] [-port <port number>] OPTIONS\n");
+	printf("Usage: htxcmdline [-sut <host name>] [-port <port number>] OPTIONS\n");
 	printf("\tFollowing are the OPTIONS\n");
 	printf("\t-set_eeh [<EEH flag( 1 0r 0)>]\n");
 	printf("\t-set_kdblevel [<kdb level flag ( 1 or 0)>]\n");
-	printf("\t-set_hxecom\n");
+	printf("\t-set_htx_env <variable> <value>\n");
+	printf("\t-get_htx_env <variable>\n");
 	printf("\t-bootme [ on | off | status ]\n");
 	printf("\t-createmdt\n");
 	printf("\t-listmdt\n");
 	printf("\t-refresh\n");
-	printf("\t-select [-ecg <ecg_name>]\n");
-	printf("\t-run [-ecg <ecg_name>]\n");
-	printf("\t-shutdown [-ecg <ecg_name>]\n");
+	printf("\t-select [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-run [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-shutdown [-mdt|-ecg <mdt_name>]\n");
 	printf("\t-getactecg\n");
-	printf("\t-query [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-activate [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-suspend [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-terminate [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-restart [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-coe [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-soe [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-status [<device_name1> <device_name2> ...] [-ecg <ecg_name>]\n");
-	printf("\t-getstats [-ecg <ecg_name>]\n");
-	printf("\t-getecgsum [-ecg <ecg_name>]\n");
-	printf("\t-exersetupinfo [-ecg <ecg_name>]\n");
+	printf("\t-query [<device_name1> <device_name2> ...] [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-activate [<device_name1> <device_name2> ...] [mdt|-ecg <mdt_name>]\n");
+	printf("\t-suspend [<device_name1> <device_name2> ...] [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-terminate [<device_name1> <device_name2> ...] [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-restart [<device_name1> <device_name2> ...] [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-coe [<device_name1> <device_name2> ...] [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-soe [<device_name1> <device_name2> ...] [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-status [<device_name1> <device_name2> ...] [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-getstats [-mdt|-ecg <mdt_name>]\n");
+	printf("\t-getecgsum [-mdt|-ecg <met_name>]\n");
+	printf("\t-exersetupinfo [-mdt|-ecg <mdt_name>]\n");
 	printf("\t-getecglist\n");
 	printf("\t-geterrlog\n");
 	printf("\t-clrerrlog\n");
 	printf("\t-getvpd\n");
 	printf("\t-cmd <command to execute>\n");
+	printf("\nPlease Note: -ecg option is provided for backward compatibility, -mdt option is preferred\n\n");
 
 }
 

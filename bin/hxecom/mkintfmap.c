@@ -42,11 +42,15 @@
 
 #define INTF_MAP_LINE_SIZE  135
 
+char global_htx_log_dir[256] = "/tmp";
+
 main(int argc, char *argv[])
 {
 	int fid,fd,rc;
 	unsigned int num_of_intf=0;
 	char *fbuff= NULL;
+	char *temp_env_val_ptr = NULL;
+	char temp_string[300];
 
 	if(0x1 == argc) {
 		printf("\nmkintfmap: PCI device name missing\n");
@@ -62,7 +66,13 @@ main(int argc, char *argv[])
 	printf("The device class option passed is %d\n",num_of_intf);
 #endif
 
-	if((fid = fopen("/tmp/intf_map.txt", "w+")))
+	temp_env_val_ptr = getenv("HTX_LOG_DIR");
+	if( (temp_env_val_ptr != NULL) && (strlen(temp_env_val_ptr) > 0) ) {
+		strcpy(global_htx_log_dir, temp_env_val_ptr);
+	}
+
+	sprintf(temp_string, "%s/intf_map.txt", global_htx_log_dir);
+	if((fid = fopen(temp_string, "w+")))
 	{
 
 		fd= open("/dev/miscchar", O_RDWR);
@@ -97,7 +107,7 @@ main(int argc, char *argv[])
 	}
 	else
 	{
-		printf("mkintfmap:There is some problem in opening the file /tmp/intf_map.txt \n");
+		printf("mkintfmap:There is some problem in opening the file %s \n", temp_string);
 	}
 	return(0);
 }

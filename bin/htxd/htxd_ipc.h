@@ -53,6 +53,8 @@ extern int			htxd_set_device_error_sem_status(int, int, int);
 extern int			htxd_create_dr_sem(void);
 extern int			htxd_set_dr_sem_value(int);
 extern int			htxd_get_dr_sem_value(void);
+extern int			htxd_get_global_activate_halt_sem_status(int);
+extern int			htxd_set_global_activate_halt_sem_status(int, int);
 
 
 #endif

@@ -56,10 +56,18 @@ int msg_save_log = -1;     /* Message Save Log File Descriptor             */
 int msgqid = -1;           /* Message queue id                             */
 int queue_id = -1;
 int pipe_dev[2] = {-1, -1}; /* pipe device array                           */
+char global_htx_log_dir[256]={'\0'};
+char global_htx_home_dir[256]={'\0'};
+char CKPT_FILE[256];
+char ERR_LOG[256];
+char ERR_SAVE_LOG[256];
+char MSG_LOG[256];
+char MSG_SAVE_LOG[256];
 
 pid_t hxsstress_PID = -1;  /* hxsstress "heartbeat" program PID            */
 
 
+extern void set_htx_home_log_path(void);
 /*
  * NAME: main()
  *                                                                    
@@ -203,6 +211,13 @@ int main(int argc, char *argv[])
    ***  Beginning of Executable Code  *****************************************
    */
 
+	set_htx_home_log_path();
+	sprintf(CKPT_FILE, "%s/hxsmsg_ckpt", global_htx_log_dir);
+	sprintf(ERR_LOG, "%s/htxerr", global_htx_log_dir);
+	sprintf(ERR_SAVE_LOG, "%s/htxerr_save", global_htx_log_dir);
+	sprintf(MSG_LOG, "%s/htxmsg", global_htx_log_dir);
+	sprintf(MSG_SAVE_LOG, "%s/htxmsg_save", global_htx_log_dir);
+
   	if (set_signal_hdl(SIGTERM, SIGTERM_hdl) != GOOD)
 	{
     		main_exit_code |= BAD_SET_SIGTERM;
@@ -281,3 +296,37 @@ int main(int argc, char *argv[])
   	exit(main_exit_code);           /* terminate program                */
 
 } /* main() */
+
+
+
+/* set HTX home and log directory */
+void set_htx_home_log_path(void)
+{
+	char *temp_env_val_ptr = NULL;
+	char *default_log_dir = "/tmp";
+
+	
+	temp_env_val_ptr = getenv("HTX_HOME_DIR");
+	if(temp_env_val_ptr == NULL) {
+		printf("HTX_HOME_DIR is not set, exiting...\n");
+		exit(11);
+	} else {
+		if(strlen(temp_env_val_ptr) == 0) {
+			printf("HTX_HOME_DIR is not set, exiting...\n");
+			exit(12);
+		} else {
+			strcpy(global_htx_home_dir, temp_env_val_ptr);
+		}
+	}
+	
+	temp_env_val_ptr = getenv("HTX_LOG_DIR");
+	if(temp_env_val_ptr == NULL) {
+		strcpy(global_htx_log_dir, default_log_dir);
+	} else {
+		if(strlen(temp_env_val_ptr) == 0) {
+			strcpy(global_htx_log_dir, default_log_dir);
+		} else {
+			strcpy(global_htx_log_dir, temp_env_val_ptr);
+		}
+	}
+}

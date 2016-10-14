@@ -24,12 +24,16 @@
 #define HTXD__OPTION__HEADER
 
 
+#define HTXCMDLINE_COMMAND	1
+#define HTXSCREEN_COMMAND	2
+
 typedef struct
 {
 	char	option_string[128];
 	int		(*option_method)(char **);
 	int		parameter_flag;
 	int		running_ecg_display_flag;
+	int	command_type;
 }option;
 
 
