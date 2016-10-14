@@ -17,6 +17,25 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+static char sccsid[] = "@(#)70  1.2  src/htx/usr/lpp/htx/lib/htxmp64/htxmp_new.c, htx_libhtxmp, htxfedora 10/8/10 04:38:36"; 
+
+/*
+ * COMPONENT_NAME: htx_libhtxmp 
+ *
+ * FUNCTIONS:
+ *
+ * ORIGINS: 27
+ *
+ * IBM CONFIDENTIAL -- (IBM Confidential Restricted when
+ * combined with the aggregated modules for this product)
+ * OBJECT CODE ONLY SOURCE MATERIALS
+ * (C) COPYRIGHT International Business Machines Corp. 1988, 1990, 1991
+ * All Rights Reserved
+ *
+ * US Government Users Restricted Rights - Use, duplication or
+ * disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
+ */
+
 
 #include <stdio.h>
 #include <pthread.h>
@@ -434,7 +453,7 @@ mp_destroy( struct htx_data * htx_ds ) {
 	sleep(1); 
 	rc = pthread_join(stats_th_tid, &tresult);
 	if(rc != 0) { 
-		sprintf(htx_ds->msg_text,"pthread_join failed ! errno %d :(%d): tnum=%d\n", errno, rc, stats_th_tid);
+		sprintf(htx_ds->msg_text,"pthread_join failed ! errno %d :(%d): tnum=%lu\n", errno, rc, stats_th_tid);
         hxfmsg(htx_ds, HTX_HE_HARD_ERROR , rc , htx_ds->msg_text);
 		return(-1); 
 	} 
@@ -461,7 +480,8 @@ hxfupdate(char type, struct htx_data * data) {
         mp_struct * mp = global_mp_struct;
         long clock;
         char msg_buf[1024];
-	int lockinit1 = 0;
+	int lockinit1, lock_ret, lock_ret_1;
+	lockinit1 = lock_ret = lock_ret_1 = 0;
 	char    msg_send[MSG_TEXT_SIZE];
         if((new_mp == 1) && (type == UPDATE)) {
 
@@ -536,9 +556,30 @@ hxfupdate(char type, struct htx_data * data) {
    		 }	
 		else if (lockinit1 == EBUSY){
 			/*if lock already taken by UPD or ERR call, block the current execution*/
-			pthread_mutex_lock(&hxfupdate_mutex);
-			rc=htx_message(data,msg_send);
-			pthread_mutex_unlock (&hxfupdate_mutex);
+
+			lock_ret = pthread_mutex_lock(&hxfupdate_mutex);
+			if (lock_ret!=0  ) {
+			        if (( lock_ret == EAGAIN ) || ( lock_ret == EBUSY ))  {
+                       			usleep(10);
+		                       	lock_ret_1 = pthread_mutex_lock(&hxfupdate_mutex);
+	        		       	if(lock_ret_1!=0){
+	        	        		sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under MESSAGE = %d \n",lock_ret_1);
+		        	        	hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+
+                		 	}
+			        }
+		        	else {
+ 	        			sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under MESSAGE even after retrying = %d \n",lock_ret);
+			               	hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+			        }
+			}
+			htx_message(data,msg_send);
+			lock_ret = pthread_mutex_unlock (&hxfupdate_mutex);
+			if (lock_ret!=0  ) {
+				sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_unlock failed under MESSAGE = %d \n",lock_ret);
+				hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+			}
+			
 		}
 		else{
                 	sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate_tsafe: pthread_mutex_unlock failed for errno = %d \n",lockinit1);
@@ -548,23 +589,86 @@ hxfupdate(char type, struct htx_data * data) {
 
 	else if(type == UPDATE){
 		/*in UPD call, we need to block the thread which is currently updating the shm of exerciser*/
-		pthread_mutex_lock(&hxfupdate_mutex);
+
+		lock_ret = pthread_mutex_lock(&hxfupdate_mutex);
+		if (lock_ret!=0  ) {
+			if (( lock_ret == EAGAIN ) || ( lock_ret == EBUSY ))  {
+				usleep(10);
+				lock_ret_1 = pthread_mutex_lock(&hxfupdate_mutex);
+				if(lock_ret_1!=0){
+					sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under UPDATE = %d \n",lock_ret_1);
+					hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+				}
+			}
+			else {
+				sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under UPDATE = %d \n",lock_ret);
+				hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+		       }
+		}
+                
 		hxfupdate_tunsafe((type), (data));
-		pthread_mutex_unlock (&hxfupdate_mutex);		
+
+		lock_ret = pthread_mutex_unlock (&hxfupdate_mutex);
+		if (lock_ret!=0  ) {
+			sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_unlock failed under MESSAGE = %d \n",lock_ret);
+			hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+		}
+
 	}
 
 	else if ((type == ERROR) || (type == FINISH) || (type == RECONFIG)){
 		/*take lock and make ERR call*/
-   		pthread_mutex_lock (&hxfupdate_mutex); 
-   		rc=hxfupdate_tunsafe((type), (data)); 
-   		pthread_mutex_unlock (&hxfupdate_mutex); 
+                lock_ret = pthread_mutex_lock(&hxfupdate_mutex);
+                if (lock_ret!=0  ) {
+                        if (( lock_ret == EAGAIN ) || ( lock_ret == EBUSY ))  {
+                                usleep(10);
+                                lock_ret_1 = pthread_mutex_lock(&hxfupdate_mutex);
+                                if(lock_ret_1!=0){
+                                        sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under ERROR/FINISH/RECONFIG = %d \n",lock_ret_1);
+                                        hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+                                }
+                        }
+                	else {
+                        	sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under ERROR/FINISH/RECONFIG even after retrying= %d \n",lock_ret);
+	                        hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+        	       }
+		}
+
+                hxfupdate_tunsafe((type), (data));
+
+                lock_ret = pthread_mutex_unlock (&hxfupdate_mutex);
+                if (lock_ret!=0  ) {
+                        sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_unlock failed under ERROR/FINISH/RECONFIG = %d \n",lock_ret);
+                        hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+                }
+
 	}
 
 	else if (type == START){
 		hxfupdate_once_init();
-   		pthread_mutex_lock (&hxfupdate_mutex); 
-   		rc=hxfupdate_tunsafe((type), (data)); 
-   		pthread_mutex_unlock (&hxfupdate_mutex); 
+                lock_ret = pthread_mutex_lock(&hxfupdate_mutex);
+                if (lock_ret!=0  ) {
+                        if (( lock_ret == EAGAIN ) || ( lock_ret == EBUSY ))  {
+                                usleep(10);
+                                lock_ret_1 = pthread_mutex_lock(&hxfupdate_mutex);
+                                if(lock_ret_1!=0){
+                                        sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under START = %d \n",lock_ret_1);
+                                        hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+                                }
+                        }
+                	else {
+                        	sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_lock failed under START even after retrying= %d \n",lock_ret);
+	                        hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+        	       }
+		}
+                hxfupdate_tunsafe((type), (data));
+
+                lock_ret = pthread_mutex_unlock (&hxfupdate_mutex);
+                if (lock_ret!=0  ) {
+                        sprintf(msg_buf, "HTXMP LIB ERROR : hxfupdate: pthread_mutex_unlock failed under START = %d \n",lock_ret);
+                        hxfmsg(global_mp_htx_ds, rc, HTX_HE_HARD_ERROR, msg_buf);
+                }
+
 	}
 
 	else{

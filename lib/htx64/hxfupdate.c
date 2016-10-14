@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)92	1.29.6.15  src/htx/usr/lpp/htx/lib/htx64/hxfupdate.c, htx_libhtx, htxubuntu 1/12/16 05:27:10 */
+static char sccsid[] = "@(#)92	1.29.6.15  src/htx/usr/lpp/htx/lib/htx64/hxfupdate.c, htx_libhtx, htxubuntu 1/12/16 05:27:10";
 
 #define addw(msw, lsw, num) \
 { \
@@ -89,6 +89,7 @@
 #include <hxiconv.h>
 #include <htxlibdef.h>
 #include <scr_info64.h>
+#include <libgen.h>
 #include "hxihtxmp_vars_new.h"
 #ifdef _DR_HTX_
 #include <sys/dr.h> /* DR reconfig changes */
@@ -114,7 +115,6 @@ int pseudo_dev_count=0;
 struct  htxshm_hdr      *tmp_p_shm_hdr = 0;
 tmisc_shm *rem_shm_addr;
 int rem_shm_id;
-
 
 #define msqid        (data->msqid)
 #define sem_id       (data->sem_id)
@@ -173,7 +173,7 @@ int hxfadd(char *server_ip, struct htxshm_HE add_HE, char *ecg)
   indx = 0;
   sprintf(str_msg,"%4x %4x %4x %s", cmd,subcmd,indx,ecg);
   tmp_str = (char*)htx_malloc( (strlen(str_msg)+9));
-  sprintf(tmp_str,"%8x",strlen(str_msg));
+  sprintf(tmp_str,"%8lx",strlen(str_msg));
   strcat(tmp_str,str_msg);
   tmp_str[strlen(str_msg)+8] = '\0';
   if ((numbytes=send(sockfd, tmp_str, strlen(tmp_str), 0)) == -1) {
@@ -300,6 +300,9 @@ int hxfupdate_tunsafe(char call, struct htx_data *data)
   int system_halt_status;
 
 	char    msg_send[MSG_TEXT_SIZE];
+	char stat_fname[ENV_VAR_SIZE], log_dir[ENV_VAR_SIZE];
+	char *dev_id, *he_name;
+	char *tmp_path_temp;
 
   union semun {
      int val;
@@ -380,6 +383,40 @@ int hxfupdate_tunsafe(char call, struct htx_data *data)
   for (i = 0; (i < 4) && (data->run_type[i] != '\0'); i++)
     data->run_type[i] = toupper ((int) data->run_type[i]);
   call = toupper ((int) call);
+
+/* for creating device specific directories for keeping device logs */
+if ( call == 'S' ) {
+
+	tmp_path_temp = getenv("HTX_LOG_DIR");
+	if (tmp_path_temp == NULL){
+		strcpy(data->htx_log_dir, "/tmp/");
+	}
+	else{
+		if ((strlen ((char*)strcpy(log_dir,tmp_path_temp)))<ENV_VAR_SIZE){
+			strcpy(data->htx_log_dir,tmp_path_temp);
+			printf("data->htx_log_dir %s",data->htx_log_dir);
+		}
+		else{
+			fprintf(stderr, "%s\n", "directory path creation exceeded the allowed limit");
+               		fflush(stderr);
+               		exit(0);
+       		 }
+	}
+
+	dev_id = basename(data->sdev_id);
+	he_name = basename(data->HE_name);
+
+	snprintf(stat_fname,ENV_VAR_SIZE,"mkdir -p %shtx/%s/%s",data->htx_log_dir,he_name,dev_id);
+	system(stat_fname);
+	snprintf(data->htx_exer_log_dir,ENV_VAR_SIZE,"%shtx/%s/%s/",data->htx_log_dir,he_name,dev_id);
+
+	int ret = setenv("HTX_EXER_LOG_DIR",data->htx_exer_log_dir,1);
+	if(ret){
+       	        fprintf(stderr, "%s\n", "environment var setting failed");
+                fflush(stderr);
+	}
+}
+
 
   if ((strcmp (data->run_type, "REG") != 0) && (strcmp (data->run_type, "EMC") != 0) && (call != 'M') && (call != 'E')) {
 	if ( call == 'S' ) {
@@ -473,7 +510,7 @@ int hxfupdate_tunsafe(char call, struct htx_data *data)
           data->severity_code = (enum sev_code )7;
           (void) sprintf(data->msg_text,
                      "%-18s%-20s err=%-8.8x sev=%-1.1u %-14s\n\
-Stopped - cycles run (%d) = max_cycles (%d).\n\n",
+Stopped - cycles run (%llu) = max_cycles (%llu).\n\n",
                      data->sdev_id,
                      &disp_time[4],
                      data->error_code,
@@ -482,7 +519,7 @@ Stopped - cycles run (%d) = max_cycles (%d).\n\n",
                      p_shm_HE->cycles,
                      p_shm_HE->max_cycles);
           sendp(data, HTX_HE_MSG);
-	  while (p_shm_HE->max_cycles) {
+	  while ((p_shm_hdr)->shutdown == 0 && p_shm_HE->max_cycles) {
             sleep(1);
           } /* endwhile */
         } /* endif */
@@ -694,7 +731,7 @@ Unable to access HTX message queue.\nerrno = %d",
          data->error_code = errno;
          data->severity_code = HTX_SYS_HARD_ERROR;
          (void) sprintf(data->msg_text,
-                     "%s for %s: Error in hxfupdate function.\n\ Unable to get HTX shared memory for rem_shm_id.\nerrno = %d\n",
+                     "%s for %s: Error in hxfupdate function.\n Unable to get HTX shared memory for rem_shm_id.\nerrno = %d\n",
                      data->HE_name,
                      data->sdev_id,
                      data->error_code);
@@ -712,7 +749,7 @@ Unable to access HTX message queue.\nerrno = %d",
          data->error_code = errno;
          data->severity_code = HTX_SYS_HARD_ERROR;
          (void) sprintf(data->msg_text,
-                     "%s for %s: Error in hxfupdate function.\n\ Unable to attach to HTX shared memory for rem_shm_addr.\nerrno = %d\n",
+                     "%s for %s: Error in hxfupdate function.\n Unable to attach to HTX shared memory for rem_shm_addr.\nerrno = %d\n",
                      data->HE_name,
                      data->sdev_id,
                      data->error_code);
@@ -735,7 +772,7 @@ Unable to access HTX message queue.\nerrno = %d",
          data->error_code = errno;
          data->severity_code = HTX_SYS_HARD_ERROR;
          (void) sprintf(data->msg_text,
-                     "%s for %s: Error in hxfupdate function.\n\ Unable to get HTX shared memory for exer_info .\nerrno = %d\n",
+                     "%s for %s: Error in hxfupdate function.\n Unable to get HTX shared memory for exer_info .\nerrno = %d\n",
                      data->HE_name,
                      data->sdev_id,
                      data->error_code);
@@ -783,7 +820,7 @@ Unable to access HTX message queue.\nerrno = %d",
          data->error_code = errno;
          data->severity_code = HTX_SYS_HARD_ERROR;
          (void) sprintf(data->msg_text,
-                     "%s for %s: Error in hxfupdate function.\n\ smkey for exerciser is -1.\n",
+                     "%s for %s: Error in hxfupdate function.\n smkey for exerciser is -1.\n",
                      data->HE_name,
                      data->sdev_id);
 
@@ -994,7 +1031,7 @@ Unable to find %s in HTX shared memory structure.\n",
 
     lockinit1 = pthread_rwlockattr_init(&rwlattr_update);
     if (lockinit1!=0  ) {
-        if ( lockinit1 == (EAGAIN || ENOMEM) ) {
+	if ((lockinit1 == EAGAIN) || (lockinit1 == ENOMEM)){
             usleep(10);
             lockinit1_1=pthread_rwlockattr_init(&rwlattr_update);
             if(lockinit1_1 !=0){
@@ -1040,7 +1077,7 @@ Unable to find %s in HTX shared memory structure.\n",
         } /* endif */
 
         }
-        else if ( lockinit1 == (EAGAIN || ENOMEM) ) {
+	else if ((lockinit1 == EAGAIN) || (lockinit1 == ENOMEM)){
             usleep(10);
         lockinit1_1=pthread_rwlock_init(&(p_shm_HE->HE_rwlock_hxfupdate),&rwlattr_update);
             if(lockinit1_1 !=0){
@@ -1097,7 +1134,7 @@ Unable to find %s in HTX shared memory structure.\n",
 /*                                                                          */
 /****************************************************************************/
 
-void htx_update(struct htx_data *data)
+int htx_update(struct htx_data *data)
 {
 	int rc1,rc2;
 	rc1 = rc2 =0;
@@ -1164,7 +1201,7 @@ void htx_update(struct htx_data *data)
   data->good_writes = 0;
   data->num_instructions = 0;
 
-  return;
+  return 0;
 
 } /* htx_update() */
 
@@ -1360,7 +1397,7 @@ int htx_get_msg(struct htx_data *data, char *msg_send)
 	return(0);
 }
 
-void htx_message(struct htx_data *data, char* msg_send){
+int htx_message(struct htx_data *data, char* msg_send){
 
 	/* htx_message for sending messages to the message queue for normal messages or error messages*/
 
@@ -1547,7 +1584,7 @@ void htx_error(struct htx_data *data, char* msg_send){
 			(void) system(libhtx_HOE);
 		}
 
-  return(0);
+  return;
 
 } /* htx_error() */
 
