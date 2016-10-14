@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-static char sccsid[] = "@(#)18	1.1  src/htx/usr/lpp/htx/lib/libsimstub/simulate_stub.c, exer_fpu, htxubuntu 1/4/16 03:56:51";
 
 #include "fpu_common_struct_prot.h"
 
