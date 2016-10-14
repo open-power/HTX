@@ -21,22 +21,22 @@
 
 
 # Print the memory configure
-/usr/lpp/htx/bin/hxefabricbus  /dev/ablink OTH /usr/lpp/htx/rules/reg/hxefabricbus/default.xyz query_memconf > /dev/null 2>&1
+${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.xyz query_memconf > /dev/null 2>&1
 
 # Print the memory configure
-/usr/lpp/htx/bin/hxefabricbus  /dev/ablink OTH /usr/lpp/htx/rules/reg/hxefabricbus/default.xyz query_maskconf > /dev/null 2>&1
+${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.xyz query_maskconf > /dev/null 2>&1
 
-cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk                                              > ${HTXMDT}mdt.xyzlink
+cat ${HTXMDT}/mdt.all | create_mdt_with_devices.awk                                              > ${HTXMDT}/mdt.xyzlink
 
 echo "Creating mdt.xyzlink ..."
-echo                                                                                            >> /usr/lpp/htx/mdt/mdt.xyzlink
-echo 'xyzlink:'                                                                                 >> /usr/lpp/htx/mdt/mdt.xyzlink
-echo -e '\tHE_name = "hxefabricbus"                      '    					>> /usr/lpp/htx/mdt/mdt.xyzlink
-echo -e '\tadapt_desc = "Chip to Chip"                   '   					>> /usr/lpp/htx/mdt/mdt.xyzlink
-echo -e '\tdevice_desc = "Memory BW"                     '    					>> /usr/lpp/htx/mdt/mdt.xyzlink
-echo -e '\treg_rules = "hxefabricbus/default.xyz"        '                         		>> /usr/lpp/htx/mdt/mdt.xyzlink
-echo -e '\temc_rules = "hxefabricbus/default.xyz"        '                         		>> /usr/lpp/htx/mdt/mdt.xyzlink
-echo -e '\tcont_on_err = "NO"      			 '                                      >> /usr/lpp/htx/mdt/mdt.xyzlink
-echo 												>> /usr/lpp/htx/mdt/mdt.xyzlink
-ln -sf /usr/lpp/htx/mdt/mdt.xyzlink /usr/lpp/htx/ecg/ecg.xyzlink
+echo                                                                                            >> ${HTXMDT}/mdt.xyzlink
+echo 'xyzlink:'                                                                                 >> ${HTXMDT}/mdt.xyzlink
+echo -e '\tHE_name = "hxefabricbus"                      '    					>> ${HTXMDT}/mdt.xyzlink
+echo -e '\tadapt_desc = "Chip to Chip"                   '   					>> ${HTXMDT}/mdt.xyzlink
+echo -e '\tdevice_desc = "Memory BW"                     '    					>> ${HTXMDT}/mdt.xyzlink
+echo -e '\treg_rules = "hxefabricbus/default.xyz"        '                         		>> ${HTXMDT}/mdt.xyzlink
+echo -e '\temc_rules = "hxefabricbus/default.xyz"        '                         		>> ${HTXMDT}/mdt.xyzlink
+echo -e '\tcont_on_err = "NO"      			 '                                      >> ${HTXMDT}/mdt.xyzlink
+echo 												>> ${HTXMDT}/mdt.xyzlink
+ln -sf ${HTXMDT}/mdt.xyzlink ${HTXECG}/ecg.xyzlink
 

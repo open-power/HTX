@@ -44,7 +44,7 @@ then
 
 else
 	# If equaliser configuration file not present, print message and exit
-	echo " Equaliser configuration file htx_eq.cfg not provided in /usr/lpp/htx/ "
+	echo " Equaliser configuration file htx_eq.cfg not provided in ${HTX_HOME_DIR} "
 	echo " Will not be able to create the equaliser mdt file mdt.eq"
 fi
 

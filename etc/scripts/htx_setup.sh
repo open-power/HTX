@@ -21,115 +21,20 @@
 
 # Functions to print message in proper format
 
-# This function prints message to both terminal and HTXNoise
-# Takes 1 or 2 arguments:
-#	1 argument : Just the string to be printed with date.
-#	2 arguments: 1st arg is the string. 2nd arg is return code.
-print_htx_log()
-{
-	if [[ -n "$1" && -n "$2" ]]
-	then
-		if [[ $2 -eq 0 ]]
-		then
-			echo "[`date`]: $1. return=$2" | tee -a $HTXNoise
-		else
-			echo "[`date`]: [ERROR($2)] $1 failed. return=$2" | tee -a $HTXNoise
-		fi
-	else
-		echo "[`date`]: $1" | tee -a $HTXNoise
-	fi
-}
 
+# Source htx_env.sh to get all exports/alias/functions
+  HTX_HOME_DIR=`cat /var/log/htx_install_path`
+  export HTX_HOME_DIR=${HTX_HOME_DIR}/
+  if [ -f $HTX_HOME_DIR/etc/scripts/htx_env.sh ]; then
+      . $HTX_HOME_DIR/etc/scripts/htx_env.sh
+  else
+      echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+      echo "Either file is empty or does not contain correct install path. Hence exiting..."
+      exit 1
+  fi
 
-# Same as above function but printf to HTXNoise _only_
-print_htx_log_only()
-{
-	if [[ -n "$1" && -n "$2" ]]
-	then
-		if [[ $2 -eq 0 ]]
-		then
-			echo "[`date`]: $1. return=$2" >> $HTXNoise
-		else
-			echo "[`date`]: [ERROR($2)] $1 failed. return=$2" >> $HTXNoise
-		fi
-	else
-		echo "[`date`]: $1" >> $HTXNoise
-	fi
-}
-	
-xe() 
-{
-     SAVDISP=$DISPLAY
-     DISPLAY=""; export DISPLAY
-     efile=`tpath $* 2>/dev/null`
-     if [ -z "$efile" ]
-     then /usr/bin/e $*
-     else /usr/bin/e $efile
-     fi
-     DISPLAY=$SAVDISP; export DISPLAY
-}
-
-ez() 
-{
-     if [ $# -ne 0 ]
-     then arg1=$1
-         [ -f "$arg1.lstZ" ] || { echo "$arg1.lstZ not found."; return [1]; }
-     fi
-     if [ ! -f "$arg1.lstZ" ]
-     then arg1=
-          while [ -z "$arg1" ]
-          do echo "Enter filename without suffix:"
-             read arg1
-          done
-          [ -f "$arg1.lstZ" ] || { echo "$arg1.lstZ not found."; return [1]; }
-     fi
-     zcat $arg1.lstZ > /tmp/$arg1.list; chmod 444 /tmp/$arg1.list
-     e /tmp/$arg1.list; rm -f /tmp/$arg1.list
-}
-
-pz()
-{    CCFLAG=
-     for i in $*
-     do [ "$i" != "-cc" ] || { CCFLAG=-cc; shift; continue; }
-        zcat $i.lstZ > /tmp/$i.list
-        cd /tmp; printlist $CCFLAG $i.list | print -nb -plot; cd - >/dev/null
-        rm -rf /tmp/$i.list
-     done
-}
-
-pl()
-{
-    printlist $* | print -nb -plot
-}
-
-prt3800()
-{
-    pr -l60 -f -n $* | /bin/print rpe
-}
-
-t()
-{
-    a=`pwd | grep com`
-    b=`pwd | grep R2`
-    if [ -z "$a" -a  -z "$b" ]
-    then
-        c=0;
-    else
-        if [ -n "$a" ]
-        then
-              cd com R2
-        else
-              cd R2 com
-        fi
-    fi
-}
-
-ttyis()
-{     echo $* > /.ttytype
-      TERM="$*"
-      export TERM
-}
-
+print_htx_log "exported HTX_HOME_DIR=$HTX_HOME_DIR"
+print_htx_log "exported PATH=$PATH"
 
 # Check if this script is invoked by root/equivalent. 
 # If not, then return with error
@@ -150,10 +55,6 @@ ttyis()
      print_htx_log "HTX is already running..." 
      exit 1
   }
-
-
-# Source htx_env.sh so that all exports and alias become available.
-  . /usr/lpp/htx/etc/scripts/htx_env.sh
 
   print_htx_log "exporting PATH=$PATH"
 
@@ -238,11 +139,10 @@ ttyis()
     return
   fi
 
-  if [ -f ${HTXLPP}.autostart ] && [ -f $HTX_LOG_PATH/mpath_parts ] ; then
-    if [ `cat $HTX_LOG_PATH/mpath_parts | wc -l` != 0 ] ; then
+  # Work-around for autostartup problems
+  if [ -f ${HTXLPP}.autostart ] && [ ! -f ${HTXLPP}.no_bootme_restart_delay ] ; then
     htx_print_log "sleeping 120 seconds for bootme with multipath"
     sleep 120
-    fi
   fi
 
   # To execute post boot commands for bootme
@@ -294,8 +194,15 @@ ttyis()
   fi
 
 # Export ZLIB variables to start testing corsa hardware.
-  print_htx_log "exporting ZLIB_DEFLATE_IMPL=1, ZLIB_INFLATE_IMPL=1, ZLIB_CARD=0, ZLIB_INFLATE_THRESHOLD=0"
-  export ZLIB_DEFLATE_IMPL=1; export ZLIB_INFLATE_IMPL=1; export ZLIB_CARD=0; export ZLIB_INFLATE_THRESHOLD=0;
+  if [ -f /dev/genwqe0_card ] # PCIe Corsa
+  then
+    print_htx_log "exporting ZLIB_DEFLATE_IMPL=1, ZLIB_INFLATE_IMPL=1, ZLIB_CARD=0, ZLIB_INFLATE_THRESHOLD=0"
+    export ZLIB_DEFLATE_IMPL=1; export ZLIB_INFLATE_IMPL=1; export ZLIB_CARD=0; export ZLIB_INFLATE_THRESHOLD=0;
+  elif [ -f /dev/cxl/afu0.0s ] # CAPI card of some form.
+  then
+    print_htx_log "Exporting ZLIB_ACCELERATOR=CAPI, ZLIB_CARD=-1"
+    export ZLIB_ACCELERATOR=CAPI; export ZLIB_CARD=-1;
+  fi
 
 # Below logic is to increase cgroup max thread limit.
 # If not done, this will cause failure of multiple exercisers

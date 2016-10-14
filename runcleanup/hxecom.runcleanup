@@ -53,7 +53,7 @@ do
 done
 
 
-if [ -f /usr/lpp/htx/.build_net_ran ];
+if [ -f ${HTX_HOME_DIR}/.build_net_ran ];
 then
 	echo "build_net_ran flag set"
 
@@ -62,18 +62,18 @@ then
        	    mv /etc/hosts.hxecom /etc/hosts
 	fi
 
-        if [ -f /usr/lpp/htx/etc/scripts/mdt.all.hxecom ];
+        if [ -f ${HTXSCRIPTS}/mdt.all.hxecom ];
         then
-            mv /usr/lpp/htx/etc/scripts/mdt.all.hxecom /usr/lpp/htx/mdt/mdt.all
+            mv ${HTXSCRIPTS}/mdt.all.hxecom ${HTXMDT}/mdt/mdt.all
         fi
         if [ -f /etc/sysconfig/network/routes.bak ];
         then
             mv /etc/sysconfig/network/routes.bak /etc/sysconfig/network/routes
-            if [ -f /usr/lpp/htx/gateip ];
+            if [ -f ${HTX_HOME_DIR}/gateip ];
             then
-              gateip=$(cat /usr/lpp/htx/gateip | awk '{print $1 }')
+              gateip=$(cat ${HTX_HOME_DIR}/gateip | awk '{print $1 }')
               route add default gw $gateip 2>/dev/null
-              rm /usr/lpp/htx/gateip
+              rm ${HTX_HOME_DIR}/gateip
             fi
         fi
         echo "Removing ip_crossover module..."
@@ -83,7 +83,7 @@ then
 	done
         /sbin/rmmod ip_crossover 2>/dev/null
         echo "Restoring the oritinal network setup...."
-		if [ -f /usr/lpp/htx/.bond_config ] ;
+		if [ -f ${HTX_HOME_DIR}/.bond_config ] ;
 		then
 			res=$(lsmod | grep bonding );
 			if [ -n "$res" ];   
@@ -99,7 +99,7 @@ then
 				done
 				echo "removed bonding"
 			fi
-			rm /usr/lpp/htx/.bond_config
+			rm ${HTX_HOME_DIR}/.bond_config
 		fi
 		if [ -f "/etc/ifcfg_bak/chngd_eths" ];
 		then 
@@ -160,7 +160,7 @@ then
            mv /etc/sysctl.conf.hxecom /etc/sysctl.conf
         fi
         rm /tmp/net_config >/dev/null 2>&1
-	rm /usr/lpp/htx/.build_net_ran
+	rm ${HTX_HOME_DIR}/.build_net_ran
 else
 	echo "build_net_ran flag not set"
 fi

@@ -2,6 +2,6 @@
 
 echo "-------------------------------------------------------------------------------" >>${HTX_LOG_DIR}/fpuLog
 
-echo "Executing CPU runsetup on $(date)" >> ${HTX_LOG_DIR}/fpuLog
+echo "Executing FPU runsetup on $(date)" >> ${HTX_LOG_DIR}/fpuLog
 rm -rf ${HTX_LOG_DIR}/fpu*_seedlist.txt 2>/dev/null
 

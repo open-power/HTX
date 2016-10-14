@@ -19,12 +19,9 @@
 #
 # IBM_PROLOG_END_TAG
 
-
-  [ "$HTXLPP" ] || { echo "you must be logged in as htx to execute this command" && exit; }
-
-  proc_ver=`grep Version /tmp/htx_syscfg | awk -F: '{print $2}'`
+  proc_ver=`grep Version ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}'`
   proc_ver_dec=`printf %d $proc_ver`
-  shared_proc_mode=`grep shared_processor_mode /tmp/htx_syscfg | awk '{print $3}'`
+  shared_proc_mode=`grep shared_processor_mode ${HTX_LOG_DIR}/htx_syscfg | awk '{print $3}'`
   
   echo "Creating mdt files. Please wait a moment."
   cat /dev/null | ${HTXSCRIPTS}/htxconf.awk > ${HTXMDT}mdt.all
@@ -45,7 +42,7 @@
   if [[ $BTF_SHIFT_ENV -eq 1 ]];
   then
       echo "Setting up shift automation for hxecom"
-      /usr/bin/build_net bpt y n /tmp/networks 2> /dev/null
+      /usr/bin/build_net bpt y n ${HTX_LOG_DIR}/networks 2> /dev/null
       ${HTXMDT}/mdt_net mdt.bu
   fi
 
@@ -108,7 +105,7 @@
 
 	if [[ "$shared_proc_mode" = "no" ]];
 	then
-		num_nodes=`awk -F : '/Number of nodes/ {print $2}' /tmp/htx_syscfg`
+		num_nodes=`awk -F : '/Number of nodes/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg`
 		if [ $num_nodes -gt 1 ]
 		then
 			echo "Creating mdt.sctu.InterNode ..."
@@ -117,7 +114,7 @@
 		fi
 
 		#Background for SCTU chip and node mdts
-		/usr/lpp/htx/bin/hxesctu SCTU_DEV
+		${HTXBIN}/hxesctu SCTU_DEV
 		create_my_mdt default > ${HTXMDT}/mdt.sctu.chip
 		cp ${HTXMDT}/mdt.sctu.chip ${HTXMDT}/mdt.sctu.node
 
@@ -133,50 +130,50 @@
 	# assuming core.GB (which is derived out of mdt.core_wo_cpu) does not run on P7 system. (hardcoding rulefile to fpu_cpu_combo.p8)
 	create_my_mdt fpu:fpu_cpu_combo.p8 > ${HTXMDT}/mdt.core_wo_cpu
 	
-	if [ -f /tmp/mpath_parts ]; then
-		hxestorage_default=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_buster=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_easytier=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
-		hxestorage_cache=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_comm_db_opk=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`
-		hxestorage_comm_db_pk=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
-		hxestorage_app_server=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
-		hxestorage_web_server=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
-		hxestorage_hpc_comp_node=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
-		hxestorage_hpc_io_node=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
-		hxestorage_business_int_db_pk=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
-		hxestorage_business_int_db_opk=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
-		hxestorage_4K_seq_write=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
-		hxestorage_4K_seq_read=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
-		hxestorage_256K_seq_write=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
-		hxestorage_256K_seq_read=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
-		hxestorage_4K_rand_write=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
-		hxestorage_4K_rand_read=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
-		hxestorage_camss_cloud=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
-		hxestorage_camss_video_streaming=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
-		hxestorage_camss_med_imaging=`cat /tmp/rawpart /tmp/dvdwpart /tmp/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
+	if [ -f ${HTX_LOG_DIR}/mpath_parts ]; then
+		hxestorage_default=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+		hxestorage_buster=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+		hxestorage_easytier=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
+		hxestorage_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+		hxestorage_comm_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`
+		hxestorage_comm_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
+		hxestorage_app_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
+		hxestorage_web_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
+		hxestorage_hpc_comp_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
+		hxestorage_hpc_io_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
+		hxestorage_business_int_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
+		hxestorage_business_int_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
+		hxestorage_4K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
+		hxestorage_4K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
+		hxestorage_256K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
+		hxestorage_256K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
+		hxestorage_4K_rand_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
+		hxestorage_4K_rand_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
+		hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
+		hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
+		hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
 	else
-		hxestorage_default=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_buster=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_easytier=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
-		hxestorage_cache=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:hd.cache ",$0)}'`
-		hxestorage_comm_db_opk=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`		
-		hxestorage_comm_db_pk=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
-		hxestorage_app_server=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
-		hxestorage_web_server=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
-		hxestorage_hpc_comp_node=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
-		hxestorage_hpc_io_node=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
-		hxestorage_business_int_db_pk=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
-		hxestorage_business_int_db_opk=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
-		hxestorage_4K_seq_write=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
-		hxestorage_4K_seq_read=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
-		hxestorage_256K_seq_write=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
-		hxestorage_256K_seq_read=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
-		hxestorage_4K_rand_write=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
-		hxestorage_4K_rand_read=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
-		hxestorage_camss_cloud=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
-                hxestorage_camss_video_streaming=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
-		hxestorage_camss_med_imaging=`cat /tmp/rawpart /tmp/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
+		hxestorage_default=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+		hxestorage_buster=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+		hxestorage_easytier=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
+		hxestorage_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:hd.cache ",$0)}'`
+		hxestorage_comm_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`		
+		hxestorage_comm_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
+		hxestorage_app_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
+		hxestorage_web_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
+		hxestorage_hpc_comp_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
+		hxestorage_hpc_io_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
+		hxestorage_business_int_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
+		hxestorage_business_int_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
+		hxestorage_4K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
+		hxestorage_4K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
+		hxestorage_256K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
+		hxestorage_256K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
+		hxestorage_4K_rand_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
+		hxestorage_4K_rand_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
+		hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
+                hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
+		hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
 	fi
 
 	#Remove all storage mdts first and then create them fresh

@@ -30,7 +30,7 @@ do
       echo "Cleaning ${aa%.runcleanup} ...." 2>&1 | tee -a $HTXNoise
       . $file 2>&1 | tee -a $HTXNoise
     else
-     if [ -e "/usr/lpp/htx/.build_net_ran" ]
+     if [ -e "${HTX_HOME_DIR}/.build_net_ran" ]
      then
       echo "Cleaning ${aa%.runcleanup} ...." 2>&1 | tee -a $HTXNoise
       . $file 2>&1 | tee -a $HTXNoise

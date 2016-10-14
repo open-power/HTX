@@ -22,18 +22,29 @@
 
 unset NOSAVE ECGFILE g_flag save_flag warning_flag STRESS shutdown_flag is_running run_flag no_stxclient
 
+[ "$HTX_HOME_DIR" ] || {
+   install_path=`cat /var/log/htx_install_path`
+   if [ -f ${install_path}/etc/scripts/htx_env.sh ]; then
+       . ${install_path}/etc/scripts/htx_env.sh
+   else
+      echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+      echo "Either file is empty or does not contain correct install path. Hence exiting..."
+      exit
+   fi
+}
+
 export HTXD_STARTUP_MODE=ON
 export HTX_EEH_OFF=TRUE
 export HTXKDBLEVEL=1
-export PATH=$PATH:/usr/lpp/htx/bin:/usr/lpp/htx/etc/scripts_stx:/usr/lpp/htx/etc/scripts
+export PATH=$PATH:${HTXBIN}:${HTXETC}/scripts_stx:${HTXSCRIPTS}
 
 unset NOSAVE ECGFILE g_flag save_flag warning_flag STRESS shutdown_flag run_flag no_stxclient
 
 ulimit -c unlimited
           
-. /usr/lpp/htx/.bash_profile
+. ${HTX_HOME_DIR}/.bash_profile
 
-cd ${HTXLPP}/bin
+cd ${HTX_HOME_DIR}/bin
 #pwd
 
 sync; sync
@@ -46,7 +57,7 @@ if [ $NSEM -lt $NSEM_WANTED ]; then
 fi
      
 echo "Starting HTX Daemon... "
-echo "/usr/lpp/htx/bin/htxd > /tmp/daemon_log 2>&1"
-	/usr/lpp/htx/bin/htxd 
+echo "${HTXBIN}/htxd > ${HTX_LOG_DIR}/daemon_log 2>&1"
+	${HTXBIN}/htxd 
 sleep 2
 

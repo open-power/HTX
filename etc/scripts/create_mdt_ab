@@ -20,24 +20,24 @@
 
 
 # Print the memory configure
-/usr/lpp/htx/bin/hxefabricbus  /dev/ablink OTH /usr/lpp/htx/rules/reg/hxefabricbus/default.ab query_memconf >/dev/null 2>&1
+${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.ab query_memconf >/dev/null 2>&1
 
 # Print the mask configure
-/usr/lpp/htx/bin/hxefabricbus /dev/ablink OTH /usr/lpp/htx/rules/reg/hxefabricbus/default.ab query_maskconf >/dev/null 2>&1
+${HTXBIN}/hxefabricbus /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.ab query_maskconf >/dev/null 2>&1
 
 
 
-cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk                                              > ${HTXMDT}mdt.ablink
+cat ${HTXMDT}/mdt.all | create_mdt_with_devices.awk                                              > ${HTXMDT}/mdt.ablink
 
 echo "Creating mdt.ablink ..."
-echo                                                                                            >> /usr/lpp/htx/mdt/mdt.ablink
-echo 'ablink:'                                                                                  >> /usr/lpp/htx/mdt/mdt.ablink
-echo -e '\tHE_name = "hxefabricbus"                     '     					>> /usr/lpp/htx/mdt/mdt.ablink
-echo -e '\tadapt_desc = "Node to Node"                  '    					>> /usr/lpp/htx/mdt/mdt.ablink
-echo -e '\tdevice_desc = "Memory BW"                    '     					>> /usr/lpp/htx/mdt/mdt.ablink
-echo -e '\treg_rules = "hxefabricbus/default.ab"        '                          		>> /usr/lpp/htx/mdt/mdt.ablink
-echo -e '\temc_rules = "hxefabricbus/default.ab"        '                          		>> /usr/lpp/htx/mdt/mdt.ablink
-echo -e '\tcont_on_err = "NO"     			'                                       >> /usr/lpp/htx/mdt/mdt.ablink
-echo                                                                                       	>> /usr/lpp/htx/mdt/mdt.ablink
-ln -sf /usr/lpp/htx/mdt/mdt.ablink /usr/lpp/htx/ecg/ecg.ablink
+echo                                                                                            >> ${HTXMDT}/mdt.ablink
+echo 'ablink:'                                                                                  >> ${HTXMDT}/mdt.ablink
+echo -e '\tHE_name = "hxefabricbus"                     '     					>> ${HTXMDT}/mdt.ablink
+echo -e '\tadapt_desc = "Node to Node"                  '    					>> ${HTXMDT}/mdt.ablink
+echo -e '\tdevice_desc = "Memory BW"                    '     					>> ${HTXMDT}/mdt.ablink
+echo -e '\treg_rules = "hxefabricbus/default.ab"        '                          		>> ${HTXMDT}/mdt.ablink
+echo -e '\temc_rules = "hxefabricbus/default.ab"        '                          		>> ${HTXMDT}/mdt.ablink
+echo -e '\tcont_on_err = "NO"     			'                                       >> ${HTXMDT}/mdt.ablink
+echo                                                                                       	>> ${HTXMDT}/mdt.ablink
+ln -sf ${HTXMDT}/mdt.ablink ${HTXECG}/ecg.ablink
 

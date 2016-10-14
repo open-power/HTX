@@ -21,8 +21,12 @@
 
 BEGIN {
 
+# Get HTX_LOG_DIR export variable
+LOG_DIR = snarf("echo $HTX_LOG_DIR");
+
 # Determine no. of chips on the system
-no_of_chips = snarf("cat /tmp/htx_syscfg | grep \"Number of chips\" | awk -F: '{print $2}'");
+cmd = sprintf("cat %s/htx_syscfg | grep \"Number of chips\" | awk -F: '{print $2}'", LOG_DIR);
+no_of_chips = snarf(cmd);
 #printf("No. of chips: %d\n", no_of_chips);
 rule_file = sprintf("%s", ARGV[1]);
 

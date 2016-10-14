@@ -20,13 +20,24 @@
 # IBM_PROLOG_END_TAG
 #------------------------------------------------------------------------------
 
+  if [[ -z ${HTX_HOME_DIR} ]] ; then
+    htx_install_path=`cat /var/log/htx_install_path`
+    if [ -f $htx_install_path/etc/scripts/htx_env.sh ]; then
+        . $htx_install_path/etc/scripts/htx_env.sh
+    else
+        echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+        echo "Either file is empty or does not contain correct install path. Hence exiting..."
+        exit 1
+    fi
+  fi
+
   OS=`uname -o`
   [ -f /etc/SuSE-release ]   && OS_VERSION=`head -n 1 /etc/SuSE-release`;
   [ -f /etc/redhat-release ] && OS_VERSION=`cat /etc/redhat-release`;
   [ -z "$OS_VERSION" ]       && OS_VERSION=`cat /etc/issue 2>/dev/null`
 
   KERNEL_VERSION=`uname -r`
-  [ -f /usr/lpp/htx/etc/version ] && HTX_VERSION=`cat /usr/lpp/htx/etc/version 2>/dev/null` || HTX_VERSION=`rpm -qa 2>/dev/null | grep htx`
+  [ -f ${HTXETC}/version ] && HTX_VERSION=`cat ${HTXETC}/version 2>/dev/null` || HTX_VERSION=`rpm -qa 2>/dev/null | grep htx`
   HOST_NAME=`hostname`
   SERIAL_NO=`cat /proc/device-tree/system-id 2>/dev/null || echo "Not Found"`
   TYPE_MODEL_NO=`cat /proc/device-tree/model 2>/dev/null || echo "Not Found"`
@@ -50,15 +61,11 @@
 
 
 # cat README.patch file
-  [ -f /usr/lpp/htx/README.patch ] && {
+  [ -f ${HTX_HOME_DIR}/README.patch ] && {
      echo
      echo "Applied patches"
      echo "---------------"
-     cat /usr/lpp/htx/README.patch
+     cat ${HTX_HOME_DIR}/README.patch
      echo
    }
    
-     
-   
-       
-
