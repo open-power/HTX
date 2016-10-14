@@ -77,7 +77,7 @@
 
 #define MAX_STRIDE_SZ 	4*KB
 
-char  page_size[MAX_NUM_PAGE_SIZES][4]={"4K","64K","16M","16G"};
+char  page_size[MAX_NUM_PAGE_SIZES][4]={"4K","64K","2M","16M","16G"};
 struct rule_format r, stanza[MAX_STANZAS], *stanza_ptr;
 char shm_max[50], shm_all[50];
 unsigned int g_thread_count; /* thread count tracker to make stanza = 1 after mem allocation completion by all threads*/
@@ -280,14 +280,12 @@ int main(int argc, char *argv[])
 /* set htx_data flag to make supervisor aware that we want to receive SIGUSR2 in case of hotplug add/remove */
 
 /* Notify Supervisor of exerciser start */
-    if (priv.standalone != 1) {
 #ifdef __HTX_LINUX__
-		STATS_VAR_INIT(hotplug_cpu, 1)
+	STATS_VAR_INIT(hotplug_cpu, 1)
 #endif
-         STATS_HTX_UPDATE(START)
-    	 STATS_HTX_UPDATE(UPDATE)
+	STATS_HTX_UPDATE(START)
+	STATS_HTX_UPDATE(UPDATE)
 
-    }
 
     displaym(HTX_HE_INFO,DBG_MUST_PRINT,"%s %s %s %s %d\n",stats.HE_name,stats.sdev_id,stats.run_type,\
                    priv.rules_file_name,priv.debug);
@@ -296,6 +294,14 @@ int main(int argc, char *argv[])
         re_initialize_global_vars();
         exit(0);
     }
+    if((!(strlen(stats.htx_log_dir))) || (!(strlen(stats.htx_exer_log_dir)))){
+        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"htx lib log direcories found to be htx_log_dir= %s and htx_exer_log_dir= %s, thus updating them to '/tmp/'\n",
+            stats.htx_log_dir,stats.htx_exer_log_dir);
+        strcpy(stats.htx_log_dir,"/tmp/");
+        strcpy(stats.htx_exer_log_dir,"/tmp/");
+
+    }
+
 
 /* Check if AME is enabled on system */
 #ifndef __HTX_LINUX__
@@ -664,7 +670,7 @@ long long new_seg_size		 = mem_info.total_mem_avail/(32 * KB);
 
 	if (stanza_ptr->max_mem_flag == TRUE ) {
 	    if(stanza_ptr->affinity == FALSE) {
-		if (i < PAGE_INDEX_16M) {
+		if (i < PAGE_INDEX_2M) {
 		    max_mem = (stanza_ptr->mem_percent/100.0) * mem_info.pdata[i].free;
 
 	    } else {
@@ -1083,7 +1089,18 @@ void * run_test_operation(void *tn)
     int bind_flag = FALSE;
 	int i,j;
     displaym(HTX_HE_INFO,DBG_IMP_PRINT,"Thread(%d):Inside run_test_operation\n",ti);
-	if (stanza_ptr->run_mode == RUN_MODE_CONCURRENT) {
+    if (stanza_ptr->bind_proc == 1 && stanza_ptr->bind_method == 0){
+		if (stanza_ptr->run_mode == RUN_MODE_NORMAL){
+            if (priv.bind_proc != -1) {
+                bind_cpu_num = priv.bind_proc;
+                bind_flag    = TRUE;
+            }
+        } else {
+            bind_cpu_num = ti;
+            bind_flag    = TRUE;
+        }
+    }
+	if ((stanza_ptr->run_mode == RUN_MODE_CONCURRENT) && (bind_flag == TRUE)) {
 #ifndef __HTX_LINUX__
 		if(cpu_dr_set != ti)
 #endif
@@ -1120,17 +1137,6 @@ void * run_test_operation(void *tn)
         do_the_bind_proc(BIND_TO_THREAD, UNBIND_ENTITY,-1);
     }
 
-     if (stanza_ptr->bind_proc == 1 && stanza_ptr->bind_method == 0){
-	if (stanza_ptr->run_mode == RUN_MODE_NORMAL){
-            if (priv.bind_proc != -1) {
-                bind_cpu_num = priv.bind_proc;
-                bind_flag    = TRUE;
-            }
-        } else {
-            bind_cpu_num = ti;
-            bind_flag    = TRUE;
-        }
-    }
 
     if (bind_flag) {
 #ifndef __HTX_LINUX__
@@ -1501,9 +1507,15 @@ int fill_pattern_details(int pi, char *str, int *line)
                         "error - %d (%s)\n",*line, str, errno, strerror(errno));
             }
 
-		    if (!(strlen ((char*)strcpy(buff,getenv("HTXPATTERNS"))))){
-        		strcpy(buff,"/usr/lpp/htx/pattern/");
-    		}
+            char* pat_tmp_ptr = getenv("HTXPATTERNS");
+            if(pat_tmp_ptr == NULL){
+                displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s(): env variable HTXPATTERNS is not set,pat_tmp_ptr=%p"
+                ", thus exiting..\n",__LINE__,__FUNCTION__,pat_tmp_ptr);
+                return (-1);
+                
+            }else{
+                strcpy(buff,pat_tmp_ptr);
+            }
             strcat(buff,r.pattern_name[pi]);
             display(HTX_HE_INFO, DBG_INFO_PRINT,
                      "#fill_pattern_details:In (pattern name = %s) size = %d\n",
@@ -1908,6 +1920,18 @@ int get_rule(int * line, FILE *fp)
                 exit(1);
             }              /* end else */
         }
+        else if ((strcmp(keywd,"SEG_SIZE_2M")) == 0)
+        {
+            sscanf(s,"%*s %ld", &r.seg_size[PAGE_INDEX_2M]);
+            if (r.seg_size[PAGE_INDEX_2M] < (2*MB))
+            {
+                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %ld "
+                        "(segment size not in valid range)\n",*line, keywd, \
+                        r.seg_size[PAGE_INDEX_2M]);
+                exit(1);
+            }              /* end else */
+        }
+
         else if ((strcmp(keywd,"SEG_SIZE_16M")) == 0)
         {
             sscanf(s,"%*s %ld", &r.seg_size[PAGE_INDEX_16M]);
@@ -1948,6 +1972,16 @@ int get_rule(int * line, FILE *fp)
                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %d "
                         "(number segments not in valid range)\n",*line, keywd,\
                         r.num_seg[PAGE_INDEX_64K]);
+                exit(1);
+            }              /* endif */
+        }
+        else if ((strcmp(keywd,"NUM_SEG_2M")) == 0)
+        {
+            sscanf(s,"%*s %d",&r.num_seg[PAGE_INDEX_2M]);
+            if (r.num_seg[PAGE_INDEX_2M] < 0) {
+                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %d "
+                        "(number segments not in valid range)\n",*line, keywd,\
+                        r.num_seg[PAGE_INDEX_2M]);
                 exit(1);
             }              /* endif */
         }
@@ -2732,10 +2766,8 @@ mem_info.pdata[2].free);
     char tmpstr[500];
     FILE *fp;
     unsigned long avail_16m,avail_16g,free_16m,free_16g,file_exists=0;
-	char log_dir[40];
-	if (!(strlen ((char*)strcpy(log_dir,getenv("HTX_LOG_DIR"))))){
-		strcpy(log_dir,"/tmp/");
-	}
+	char log_dir[256];
+	strcpy(log_dir,stats.htx_log_dir);
 
 	strcat(log_dir,"/freepages");
     /*if ((fp=fopen("/tmp/freepages","r"))==NULL) {*/
@@ -2914,31 +2946,6 @@ int fill_mem_info_data_linux(void)
 	}
     displaym(HTX_HE_INFO,DBG_MUST_PRINT,"shmmax: %llu \n", strtoul(shm_max,NULL,10));
 
-#if 0
-	fp = popen("cat /proc/sys/kernel/shmall","r");
-	if (fp == NULL) {
-		displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,
-				 "popen failed: errno(%d)\n", errno);
-		goto error_exit;
-	}
-	ret  = fscanf(fp,"%s",&shm_all);
-	if (ret == 0 || ret == EOF) {
-		displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,
-				 "Could not read page size config from pipe\n");
-		goto error_exit;
-	}
-	pclose(fp);
-
-	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"shmall: %llu \n", strtoul(shm_all,NULL,10));
-	if (strtoul(shm_all,NULL,10) < 268435456) {
-    	ret = system ("echo 268435456 > /proc/sys/kernel/shmall");
-    	if (ret < 0){
-        	displaym(4,DBG_MUST_PRINT,"unable to change the /proc/sys/kernel/shmall variable\n");
-    	}
-		displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Changing the /proc/sys/kernel/shmall variable to 256MB\n");
-	}
-#endif
-
 	/*
 	 * Determine the page size config for the system
 	 */
@@ -2959,6 +2966,7 @@ int fill_mem_info_data_linux(void)
 	/* Initialize all page sizes to unsupported */
 	mem_info.pdata[PAGE_INDEX_4K].supported  = FALSE;
 	mem_info.pdata[PAGE_INDEX_64K].supported = FALSE;
+	mem_info.pdata[PAGE_INDEX_2M].supported = FALSE;
 	mem_info.pdata[PAGE_INDEX_16M].supported = FALSE;
 	mem_info.pdata[PAGE_INDEX_16G].supported = FALSE;
 
@@ -3081,6 +3089,7 @@ int fill_mem_info_data_linux(void)
 
 	/* Assume support for huge pages */
 	mem_info.lpage_type = TRUE;
+    int huge_page_idx,huge_page_size;
 
 	/*
 	 * Check if /proc/ppc64/lparcfg contains the string: cmo_enabled
@@ -3105,54 +3114,62 @@ int fill_mem_info_data_linux(void)
 
 	display(HTX_HE_INFO,DBG_MUST_PRINT,"VRM enabled=%d\n", vrm_enabled);
 
-	fp=popen("cat /proc/meminfo | grep HugePages_Total | awk '{print $2}' ","r");
-	if (fp == NULL) {
-    	displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,
-    				 "popen failed: errno(%d)\n", errno);
-    	goto error_exit;
-	}
-	ret=fscanf(fp,"%lu\n",&mem_info.pdata[PAGE_INDEX_16M].avail);
-	if (ret == 0 || ret == EOF) {
-    	displaym(HTX_HE_INFO, DBG_MUST_PRINT,
-    			 "Could not read num avail 16M pages from pipe (HugePages_Total  not found)\n");
-	 mem_info.lpage_type = FALSE;
-	}
-	pclose(fp);
 	fp=popen("cat /proc/meminfo | grep Hugepagesize | awk '{print $2}' ","r");
 	if (fp == NULL) {
 		displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,
 			"popen failed: errno(%d)\n", errno);
 		goto error_exit;
 	}
-	ret=fscanf(fp,"%lu\n",&mem_info.pdata[PAGE_INDEX_16M].psize);
+	ret=fscanf(fp,"%lu\n",&huge_page_size);
 	if (ret == 0 || ret == EOF) {
 		displaym(HTX_HE_INFO, DBG_MUST_PRINT,
-							 "Could not read psize 16M from pipe(Hugepagesize not found\n");
+							 "Could not read huge_page_size from pipe(Hugepagesize not found\n");
 		mem_info.lpage_type = FALSE;
 	}
-	mem_info.pdata[PAGE_INDEX_16M].psize = mem_info.pdata[PAGE_INDEX_16M].psize * KB;
+	huge_page_size  = huge_page_size * KB;
+    if(huge_page_size == (2 * MB)){
+        huge_page_idx = PAGE_INDEX_2M;
+    }else if (huge_page_size == (16* MB)){
+        huge_page_idx = PAGE_INDEX_16M;
+    }
+    else{
+        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"huge_page_size=%d, is neither 2M or 16M,ignoring huge page size\n",huge_page_size);
+    }
+    mem_info.pdata[huge_page_idx].psize = huge_page_size;
 	pclose(fp);
-	if (!vrm_enabled && mem_info.pdata[PAGE_INDEX_16M].psize == (16 *MB)) {
+
+	fp=popen("cat /proc/meminfo | grep HugePages_Total | awk '{print $2}' ","r");
+	if (fp == NULL) {
+		displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,
+			"popen failed: errno(%d)\n", errno);
+		goto error_exit;
+	}
+	ret=fscanf(fp,"%lu\n",&mem_info.pdata[huge_page_idx].avail);
+	if (ret == 0 || ret == EOF) {
+    	displaym(HTX_HE_INFO, DBG_MUST_PRINT,
+    			 "Could not read num avail HugePages_Total  from pipe (HugePages_Total  not found)\n");
+	 mem_info.lpage_type = FALSE;
+	}
+	pclose(fp);
+	if (!vrm_enabled && ((huge_page_size == (2 * MB)) || (huge_page_size == (16 *MB)))) {
 		fp=popen("cat /proc/meminfo | grep HugePages_Free | awk '{print $2}' ","r");
 		if (fp == NULL) {
 			displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,
 				"popen failed: errno(%d)\n", errno);
 			goto error_exit;
 		}
-	ret=fscanf(fp,"%lu\n",&mem_info.pdata[PAGE_INDEX_16M].free);
+	ret=fscanf(fp,"%lu\n",&mem_info.pdata[huge_page_idx].free);
 	if (ret == 0 || ret == EOF) {
 		displaym(HTX_HE_INFO, DBG_MUST_PRINT,
-			"Could not read num free 16M pages from pipe(HugePages_Free not found)\n");
+			"Could not read num free HugePages_Free from pipe(HugePages_Free not found)\n");
 	}
 	pclose(fp);
 
-	char log_dir[40];
-    if (!(strlen ((char*)strcpy(log_dir,getenv("HTX_LOG_DIR"))))){
-        strcpy(log_dir,"/tmp/");
-    }
+	char log_dir[256];
+	strcpy(log_dir,stats.htx_log_dir);
 	strcat(log_dir,"/freepages");
 	if ((fp=fopen(log_dir,"r"))==NULL) {
-		displaym(HTX_HE_INFO,DBG_MUST_PRINT, "fopen of memory free pages (%s) failed with errno:%d\n",errno,log_dir);
+		displaym(HTX_HE_INFO,DBG_MUST_PRINT, "fopen of memory free pages (%s) failed with errno:%d\n",log_dir,errno);
 	}
 	else {
 		ret=fscanf(fp,"avail_16M=%lu,avail_16G=%lu,free_16M=%lu,free_16G=%lu",&avail_16m,\
@@ -3190,15 +3207,17 @@ int fill_mem_info_data_linux(void)
     mem_info.pdata[base_pg_idx].avail = KB * mem_info.pdata[base_pg_idx].avail;
     mem_info.pdata[base_pg_idx].free = KB * mem_info.pdata[base_pg_idx].free;
 	if (mem_info.lpage_type == TRUE) {
-		mem_info.pdata[PAGE_INDEX_16M].avail = 16*MB * mem_info.pdata[PAGE_INDEX_16M].avail;
-		mem_info.pdata[PAGE_INDEX_16M].free = 16*MB * mem_info.pdata[PAGE_INDEX_16M].free;
-		mem_info.pdata[PAGE_INDEX_16M].supported = TRUE;
-		if( mem_info.pdata[PAGE_INDEX_16M].psize != (16*MB)) {
+		mem_info.pdata[huge_page_idx].avail = huge_page_size * mem_info.pdata[huge_page_idx].avail;
+		mem_info.pdata[huge_page_idx].free =  huge_page_size * mem_info.pdata[huge_page_idx].free;
+        
+		mem_info.pdata[huge_page_idx].supported = TRUE;
+		if( mem_info.pdata[huge_page_idx].psize != (huge_page_size)) {
+            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"huge_page_size = %d, unsupported huge page size, exiting!\n",mem_info.pdata[huge_page_idx].psize);
 			exit(1);
 		}
                 if(file_exists){
-                mem_info.pdata[PAGE_INDEX_16M].avail = 16*MB * avail_16m;
-                mem_info.pdata[PAGE_INDEX_16M].free = 16*MB * (free_16m);
+                mem_info.pdata[huge_page_idx].avail = huge_page_size * avail_16m;
+                mem_info.pdata[huge_page_idx].free = huge_page_size * (free_16m);
                 }
 	}
 
@@ -3217,9 +3236,9 @@ int fill_mem_info_data_linux(void)
 
 	if ( mem_info.lpage_type ) {
     	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Large page is supported \n");
-        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Large page size  = %lu\n",mem_info.pdata[PAGE_INDEX_16M].psize);
-    	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Large page avail = %lu\n",mem_info.pdata[PAGE_INDEX_16M].avail);
-    	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Large page free  = %lu\n",mem_info.pdata[PAGE_INDEX_16M].free);
+        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Large page size  = %lu\n",mem_info.pdata[huge_page_idx].psize);
+    	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Large page avail = %lu\n",mem_info.pdata[huge_page_idx].avail);
+    	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Large page free  = %lu\n",mem_info.pdata[huge_page_idx].free);
 	}
 
    	for (i = 0; i < MAX_NUM_PAGE_SIZES; i++){
@@ -3286,8 +3305,14 @@ int read_cmd_line(int argc,char *argv[]) {
         strcpy (priv.rules_file_name, argv[3]);
     }
     else { /*Default value */
-        /*strcpy(priv.rules_file_name,"/usr/lpp/htx/rules/reg/hxemem64/maxmem");*/
-		strcpy(priv.rules_file_name,getenv("HTXREGRULES"));
+        char* rules_tmp_ptr = getenv("HTXREGRULES");
+        if(rules_tmp_ptr == NULL){
+            displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s(): env variable HTXREGRULES is not set,rules_tmp_ptr=%p"
+            ", thus exiting..\n",__LINE__,__FUNCTION__,rules_tmp_ptr);
+            exit(1);
+        }else{
+            strcpy(priv.rules_file_name,rules_tmp_ptr);
+        }
 		strcat(priv.rules_file_name,"/hxemem64/maxmem");
     }
 
@@ -3638,7 +3663,7 @@ int allocate_buffers()
       * Current implementation uses the vm_mem_policy() sys call with early_lru=1 setting
       */
 /*    if (r.run_mode == RUN_MODE_CONCURRENT) {*/
-	if (stanza_ptr->run_mode == RUN_MODE_CONCURRENT) {
+	if ((stanza_ptr->run_mode == RUN_MODE_CONCURRENT) && (stanza_ptr->bind_proc == TRUE)) {
         do_the_bind_proc(BIND_TO_PROCESS, j,-1);
     }
     for(i = 0; i < MAX_NUM_PAGE_SIZES; i++) {
@@ -3907,7 +3932,6 @@ int allocate_shm_with_specified_page_size_linux( int ti, int page_size_index)
     char **shr_mem_ptr;
     int *pshmid;
     unsigned long *shm_size_ptr=mem_info.tdata_hp[ti].page_wise_t[page_size_index].shm_sizes;
-    unsigned long psize;
 
     display(HTX_HE_INFO,DBG_IMP_PRINT,"Start of allocate_shm_with_specified_page_size(%d)\n",page_size_index);
 
@@ -3934,16 +3958,10 @@ int allocate_shm_with_specified_page_size_linux( int ti, int page_size_index)
                         (sizeof(char *)*mem_info.tdata_hp[ti].page_wise_t[page_size_index].num_of_segments));
 
     memflg = (IPC_CREAT | IPC_EXCL |SHM_R | SHM_W);
-    if (page_size_index == PAGE_INDEX_4K) psize = (4*KB);
-    else if (page_size_index == PAGE_INDEX_64K) psize = (64*KB);
-    else if (page_size_index == PAGE_INDEX_16M) {
-        psize = (unsigned long)(16*MB);
+    if ((page_size_index == PAGE_INDEX_16M) || (page_size_index == PAGE_INDEX_2M)) {
         #ifdef KERNEL_2_6
         memflg |= (SHM_HUGETLB);
         #endif
-    }
-    else if (page_size_index == PAGE_INDEX_16G) {
-        psize = (unsigned long)(16*GB);
     }
 
     for (i = 0; i < mem_info.tdata_hp[ti].page_wise_t[page_size_index].num_of_segments;  i++) {
@@ -4010,8 +4028,14 @@ int fill_buffers(int ti)
     struct stat fstat;
     int nr=0,nw=0,nc=0;
 
-    if (!(strlen ((char*)strcpy(pattern_nm,getenv("HTXPATTERNS"))))){
-        strcpy(pattern_nm,"/usr/lpp/htx/pattern/");
+
+    char* pat_tmp_ptr = getenv("HTXPATTERNS");
+    if(pat_tmp_ptr == NULL){
+        displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s(): env variable HTXPATTERNS is not set,pat_tmp_ptr=%p"
+        ", thus exiting..\n",__LINE__,__FUNCTION__,pat_tmp_ptr);
+        return(-1);
+    }else{
+        strcpy(pattern_nm,pat_tmp_ptr);
     }
     strcat(pattern_nm,stanza_ptr->pattern_name[0]);
     pat_size = stanza_ptr->pattern_size[0];
@@ -5777,10 +5801,8 @@ int save_buffers(int ti, unsigned long rc, struct segment_detail sd, \
             displaym(HTX_HE_SOFT_ERROR, DBG_MUST_PRINT, "#3.save_buffers\n");
 
             /* Size of the page=4096. If it is last page, it can be less */
-			char log_dir[40];
-		    if (!(strlen ((char*)strcpy(log_dir,getenv("HTX_LOG_DIR"))))){
-     		   strcpy(log_dir,"/tmp/");
-    		}
+			char log_dir[256];
+			strcpy(log_dir,stats.htx_exer_log_dir);
 			strcat(log_dir,"/hxemem");
             buffer_size = (tmp_shm_size>=(4*KB)) ? (4*KB):tmp_shm_size;
             sprintf(fname,"%s.%s.shmem.%d.%d_addr_0x%016lx_offset_%d",log_dir,stanza_ptr->rule_id,\
@@ -5972,8 +5994,13 @@ int chek_if_ramfs(void)
     int filedes=0;
     unsigned int mode_flag;
     char pattern_nm[256];
-    if (!(strlen ((char*)strcpy(pattern_nm,getenv("HTXPATTERNS"))))){
-        strcpy(pattern_nm,"/usr/lpp/htx/pattern/");
+    char* pat_ptr = getenv("HTXPATTERNS");
+    if(pat_ptr == NULL){
+        displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s(): env variable HTXPATTERNS is not set,pat_ptr=%p"
+        ", thus exiting..\n",__LINE__,__FUNCTION__,pat_ptr);
+        exit(1);
+    }else{
+        strcpy(pattern_nm,pat_ptr);
     }
     strcat(pattern_nm,"/HEXFF");
 
@@ -6154,17 +6181,18 @@ int fill_srad_data()
 #else
 	FILE *fp;
 	char command[200],fname[100];
-	char log_dir[40];
 	int cur_node, num_procs, lcpu;
 	int srad_mem_avail, srad_mem_free;
 
-    if (!(strlen ((char*)strcpy(fname,getenv("HTX_LOG_DIR"))))){
-        strcpy(fname,"/tmp/");
-    }
+    strcpy(fname,stats.htx_exer_log_dir);
 	strcat(fname,"/mem_node_details");
-	/*sprintf(command,"/usr/lpp/htx/etc/scripts/get_mem_node_details.sh > %s",fname);*/
-    if (!(strlen ((char*)strcpy(command,getenv("HTXSCRIPTS"))))){
-        strcpy(log_dir,"/usr/lpp/htx/etc/scripts/");
+    char* scripts_tmp_ptr = getenv("HTXSCRIPTS");
+    if(scripts_tmp_ptr == NULL){
+        displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s(): env variable HTXSCRIPTS is not set,scripts_tmp_ptr=%p"
+        ", thus exiting..\n",__LINE__,__FUNCTION__,scripts_tmp_ptr);
+        return (-1);
+    }else{
+        strcpy(command,scripts_tmp_ptr);
     }
 	sprintf(command, "%s/get_mem_node_details.sh > %s", command, fname);
 	
@@ -6408,9 +6436,7 @@ int detailed_display(){
     char dump_file[100],msg[1000];
     FILE *fp;
 
-    if (!(strlen ((char*)strcpy(dump_file,getenv("HTX_LOG_DIR"))))){
-        strcpy(dump_file,"/tmp/");
-    }
+    strcpy(dump_file,stats.htx_exer_log_dir);
 	strcat(dump_file,"/htx_mem_detail");
 
 

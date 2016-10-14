@@ -19,12 +19,45 @@
 
 #include "fabricbus.h"
 
+#define P9_NIMBUS_NODE_MASK 0x0000000000007800
+#define P9_NIMBUS_CHIP_MASK 0x0000000000000700
+#define P9_NIMBUS_CORE_MASK 0x000000000000007C
+
+/*
+0111 1000 0000 0000  8 possible nodes   >> 11
+0000 0111 0000 0000  8 possible chips   >> 8
+0000 0000 0111 1100  24 possible cores  >> 2
+0000 0000 0000 0011  4 possible threads
+*/
+
+
+#define P9_CUMULUS_NODE_MASK 0x0000000000007800
+#define P9_CUMULUS_CHIP_MASK 0x0000000000000700
+#define P9_CUMULUS_CORE_MASK 0x0000000000000078
+
+/*
+0111 1000 0000 0000  8 possible nodes   >> 11
+0000 0111 0000 0000  8 possible chips   >> 8
+0000 0000 0111 1000  12 possible core chiplets  >> 3
+0000 0000 0000 0111  8 possible threads
+*/
+
 #define P8_NODE_MASK 0x00001C00
 #define P8_CHIP_MASK 0x00000380
 #define P7_NODE_MASK 0x00000380
 #define P7_CHIP_MASK 0x00000060
 #define P6_NODE_MASK 0x000000E0
 #define P6_CHIP_MASK 0x00000018
+
+/* P9 macros for CUMULUS */
+#define P9_CUMULUS_GET_NODE(_PIR_)   ((_PIR_ & P9_CUMULUS_NODE_MASK) >> 11)
+#define P9_CUMULUS_GET_CHIP(_PIR_)   ((_PIR_ & P9_CUMULUS_CHIP_MASK) >> 8)
+#define P9_CUMULUS_GET_CORE(_PIR_)   ((_PIR_ & P9_CUMULUS_CORE_MASK) >> 3)
+
+/* P9 macros for NIMBUS */
+#define P9_NIMBUS_GET_NODE(_PIR_)   ((_PIR_ & P9_NIMBUS_NODE_MASK) >> 11)
+#define P9_NIMBUS_GET_CHIP(_PIR_)   ((_PIR_ & P9_NIMBUS_CHIP_MASK) >> 8)
+#define P9_NIMBUS_GET_CORE(_PIR_)   ((_PIR_ & P9_NIMBUS_CORE_MASK) >> 2)
 
 #define P8_GET_NODE(_PIR_) 	 (( _PIR_ & P8_NODE_MASK) >> 10)
 #define P8_GET_CHIP(_PIR_)   (( _PIR_ & P8_CHIP_MASK) >> 7)
@@ -80,10 +113,10 @@ read_hardware_config(SYS_CONF_TYP * scfg, unsigned int tot_cpus, unsigned int pv
     }
 #else
 	FILE *fp;
-	char command[200],fname[100];
+	char command[200],fname[256];
 	int rad, lcpu, nrads, num_procs;
 
-	strcpy(fname,getenv("HTX_LOG_DIR"));
+	strcpy(fname,htx_d.htx_exer_log_dir);
 	sprintf(fname,"%s/node_details.%d",fname,getpid());
     /*sprintf(command,"/usr/lpp/htx/etc/scripts/get_node_details.sh "
             "> %s\n",fname);*/
@@ -189,14 +222,19 @@ read_hardware_config(SYS_CONF_TYP * scfg, unsigned int tot_cpus, unsigned int pv
 			i++;
 			continue;
 		}
-		if(pvr == PVR_POWER8_MURANO || pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) {
+        if(pvr == PVR_POWER9_NIMBUS){
+            node = P9_NIMBUS_GET_NODE(l_p[i]);
+            chip = P9_NIMBUS_GET_CHIP(l_p[i]);
+        } else if(pvr == PVR_POWER9_CUMULUS){
+            node = P9_CUMULUS_GET_NODE(l_p[i]);
+            chip = P9_CUMULUS_GET_CHIP(l_p[i]);
+        } else if(pvr == PVR_POWER8_MURANO || pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) {
 			node = P8_GET_NODE(l_p[i]);
 			chip = P8_GET_CHIP(l_p[i]);
     	} else if(pvr == PVR_POWER7 || pvr == PVR_POWER7PLUS) {
         	node = P7_GET_NODE(l_p[i]);
         	chip = P7_GET_CHIP(l_p[i]);
-    	} else
-        if(pvr == PVR_POWER6) {
+    	} else if(pvr == PVR_POWER6) {
 			node = P6_GET_NODE(l_p[i]);
 			chip = P6_GET_CHIP(l_p[i]);
 		} else {
@@ -260,6 +298,11 @@ get_physical_number(unsigned int cpu, unsigned int mem_alloc, unsigned int pvr) 
    	if(l_p[cpu] == NO_CPU_DEFINED)
 		return(-1);
 	if(mem_alloc == 3) {
+        if(pvr == PVR_POWER9_NIMBUS)
+            return(P9_NIMBUS_GET_NODE(l_p[cpu]));
+        if(pvr == PVR_POWER9_CUMULUS)
+             return(P9_CUMULUS_GET_NODE(l_p[cpu]));
+        
 		if(pvr == PVR_POWER8_MURANO || pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) {
 			return(P8_GET_NODE(l_p[cpu]));
     	} else if(pvr == PVR_POWER7 || pvr == PVR_POWER7PLUS) {
@@ -270,6 +313,10 @@ get_physical_number(unsigned int cpu, unsigned int mem_alloc, unsigned int pvr) 
         	return(-1);
     	}
    	} else if(mem_alloc == 4) {
+        if(pvr == PVR_POWER9_NIMBUS)
+            return(P9_NIMBUS_GET_CHIP(l_p[cpu]));
+        if(pvr == PVR_POWER9_CUMULUS)
+             return(P9_CUMULUS_GET_CHIP(l_p[cpu]));
 		if(pvr == PVR_POWER8_MURANO || pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) {
 			return(P8_GET_PHYSICAL_CHIP(l_p[cpu]));
         } else if(pvr == PVR_POWER7 || pvr == PVR_POWER7PLUS) {
@@ -819,6 +866,10 @@ memory_per_thread(unsigned int pvr) {
         return(2 * P8_MURANO_MAX_CORES_PER_CHIP * P8_L3CACHE_SIZE);
     } else if(pvr == PVR_POWER8_VENICE || pvr == PVR_POWERP8P_GARRISION) {
         return(2 * P8_VENICE_MAX_CORES_PER_CHIP * P8_L3CACHE_SIZE);
+    }else if(pvr == PVR_POWER9_NIMBUS){
+        return(2 * P9_NIMBUS_MAX_CORES_PER_CHIP * P9_L3CACHE_SIZE);
+    }else if(pvr == PVR_POWER9_CUMULUS){
+        return(2 * P9_CUMULUS_MAX_CORES_PER_CHIP * P9_L3CACHE_SIZE);
     } else {
         sprintf(msg_buf, " %s, Illegal PVR = %#x \n", __FUNCTION__, pvr);
         hxfmsg(&htx_d, 0, HTX_HE_HARD_ERROR, msg_buf);

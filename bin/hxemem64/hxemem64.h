@@ -53,6 +53,7 @@
 
 #define DEF_SEG_SZ_4K       256*MB
 #define DEF_SEG_SZ_64K      DEF_SEG_SZ_4K
+#define DEF_SEG_SZ_2M       DEF_SEG_SZ_4K
 #define DEF_SEG_SZ_16M      DEF_SEG_SZ_4K
 #define DEF_SEG_SZ_16G      16*GB
 #define STATS_VAR_INC(var, val) \
@@ -76,12 +77,13 @@
 #define DBG_DEBUG_PRINT 3
 
 /* Page indexes  0 - Index for page size 4k, 1 -Index for page size 64k,
- * 2 - Index for page size 16M, 3 - Index for page size 16G
+ * 2 - Index for page size 2M, 3 - Index for page size 16M, 4 - Index for page size 16G.
  */
 #define PAGE_INDEX_4K    0
 #define PAGE_INDEX_64K   1
-#define PAGE_INDEX_16M   2
-#define PAGE_INDEX_16G   3
+#define PAGE_INDEX_2M    2
+#define PAGE_INDEX_16M   3
+#define PAGE_INDEX_16G   4
 
 #define LINUX_DMA_BLOCK_SIZE 1024
 
@@ -93,7 +95,7 @@ enum nx_mem_oper_type { CDC_CRC=0, CDC, BYPASS, C_CRC, C_ONLY };
 typedef unsigned long long       uint64;
 typedef unsigned int             uint32;
 
-#define MAX_NUM_PAGE_SIZES  4   /* 4K, 64K, 16M, 16G */
+#define MAX_NUM_PAGE_SIZES  5   /* 4K, 64K, 2M,16M, 16G */
 #define SW_PAT_OFF			0
 #define SW_PAT_ON			1
 #define SW_PAT_ALL			2
