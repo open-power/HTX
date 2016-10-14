@@ -3,9 +3,9 @@
 #########################################################################
 
 $mdtname = $ARGV[0];
-
+$mdtpath = $ENV{"HTXMDT"};
 if($mdtname eq "") {
-	chdir("/usr/lpp/htx/mdt");
+	chdir($mdtpath);
 	while(1) {
 		@res = `ls`;
 		$line = "";
@@ -23,18 +23,18 @@ if($mdtname eq "") {
 			next;
 		}
 		if($mdtname eq "") {
-			$mdtfile = "/usr/lpp/htx/mdt/mdt.bu";
+			$mdtfile = $mdtpath . "/mdt.bu";
 		} else {  
-			$mdtfile = "/usr/lpp/htx/mdt/$mdtname";
+			$mdtfile = $mdtpath . "/$mdtname";
 		}
 		last;
 	}
 } else {  
-	$mdtfile = "/usr/lpp/htx/mdt/$mdtname";
+	$mdtfile = $mdtpath . "/$mdtname";
 }
 
 #read in the net.mdt file
-$netfile = "/usr/lpp/htx/mdt/net.mdt";
+$netfile = $mdtpath . "/net.mdt";
 
 unless (open (MDT_NET,"$netfile")) {
 	die ("Can't open $netfile file!\n");
@@ -64,7 +64,7 @@ print("Open $mdtfile to insert the new lines\n");
 unless (open (MDT_FILE,"$mdtfile")) {
 	die ("Can't open $mdtfile file!\n");
 }
-$tmpfile = "/usr/lpp/htx/mdt/net.tmp";
+$tmpfile = $mdtpath . "/net.tmp";
 unless (open (TMP_FILE,">$tmpfile")) {
 	die ("Can't open $tmpfile file!\n");
 }
@@ -99,7 +99,7 @@ while($line ne "") {
 		if($match) {
 REDO:
 			$line = <MDT_FILE>;
-			while($line !~ /:/ && $line ne "") {
+			while($line !~ /:$/ && $line ne "") {
 				$line = <MDT_FILE>;
 			}
 			$match1="";

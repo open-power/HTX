@@ -173,7 +173,7 @@ sub configure_network_for_ubuntu {
 
 	$source_file="/etc/network/interfaces.d/htx-$iface.cfg"; 
 	# Form the ethernet Line 
-	$line = "iface $iface inet static\n" . "\taddress  $ipaddr \n" . "\tnetmask  $netmask\n" . "\tbroadcast  $broadcast\n"; 
+	$line = "auto $iface\n" . "iface $iface inet static\n" . "\taddress  $ipaddr \n" . "\tnetmask  $netmask\n" . "\tbroadcast  $broadcast\n"; 
 	print DEBUG_FILE ("$line writing to file $source_file \n"); 
 	`rm $source_file 2>/dev/null`; 
 	unless (open (OUT_FILE,">$source_file")) { 

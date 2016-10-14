@@ -226,7 +226,8 @@ if($ans =~ /d/i) {
 }
 
 # now do the changes:
-chdir("/usr/lpp/htx/rules/reg/hxecom");
+$hxecom_rules_dir = $ENV{"HTXREGRULES"} . "/hxecom"; 
+chdir($hxecom_rules_dir);
 foreach $file (@dolist) {
 	print("change file $file\n");
 	unless (open (IN_FILE,"$file")) {

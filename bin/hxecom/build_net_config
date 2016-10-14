@@ -1,0 +1,2810 @@
+#!/usr/bin/perl
+
+
+#
+# @(#)63  1.79  src/htx/usr/lpp/htx/bin/hxecom/build_net, exer_com, htxubuntu 12/16/15 00:47:28
+#
+
+############################################################################
+# Script Globals can be tuned to change script behaviour. 
+# To Enable paramters - 
+#	1. Set yes to enable. 
+#	2. Set "" to disable. 
+############################################################################
+
+# 1. Enable detailed on screen log information. Default - disabled.  
+$print_on_screen="";
+# 2. Enable Jumbo Frames on all loopback interfaces. 
+#	Default - Use existing interface attributes.   
+$all_jumbo="";
+# 3. Enable RDMA on all RDMA capable adapters. 
+#	Default - yes for all RoCE. 
+#			- for IB defaults to IPoIB, set this to override IPoIB and 
+#			run RDMA testcase. 
+$USE_RDMA="yes"; #set this to enable rdma testing with hxecom.
+
+# 5. Use Defaults - Default set to "yes", uses existing adapter settings. 
+#	Set bpt variables to enable/disable different interface attributes. 	
+#	If set to "no" then build_net would randomizes the supported interface 
+#	attributes. 
+$force_defaults="yes"; 
+
+#INTSTRUCTIONS:: 
+#1. If you already have a profile named prof_name built run: 
+#   build_net prof_name
+#   This will configure your networks based on the info in the profile.
+#2. If you don't have a profile built:
+#   Run build_net help   
+#       to get a profile template file for your system. 
+#       With the help option, build_net asks you 2 questions, then looks
+#       at all the network cards in your system and outputs a profile
+#       template to a file in the current directory called bpt.
+#       You can then fill in the profile template and run
+#       build_net bpt    to configure your networks.
+#       for help knowing what to put in a profile vi bprof file in the
+#       same directory as build_net. 
+#       
+#       The template will contain random parms for the ethernet devices. 
+#		You can change these or specify use_defaults "yes". You need to know
+#       The valid values for the parms if you intend to change them. You can
+#		use smit ethernet  on any aix system with the device to find out what
+#		the valid values are for the device. 
+
+
+@profile = "";  #global array for profile data
+
+$saveprofname="";
+$pat_count=0;
+
+#stuff on the device lines in profile
+$dev_name ="";
+$mlx_dev = ""; 
+$net_id ="";
+$use_defaults=""; 
+$mtu ="";
+$jumbo_frames ="";
+$testcase=""; 
+$tx_tcp_reseg=""; 
+$rx_tcp_reseg=""; 
+$cksum=""; 
+$ia = "" ; 
+$iface="";
+$port = ""; 
+$loc_code ="";
+$PdDvLn ="";
+$other_sys="";
+$device_type="";
+$tok_recv_q="";
+$crossover_count=0; 
+$num_pairs = 0; 
+@pairs="";    #list of devs example dev1 dev2   
+$DAT_CONF_DEFAULT="/etc/dat.conf"; 
+$opensm_pingum_delay = 0;
+
+
+# Testcases Supported by Hxecom till now 
+$TCP="TCP";
+$IPoIB="IPoIB";
+$RDMA="RDMA"; 
+
+$prof = $ARGV[0];   # pass in a profile if you have one or help 
+$onesys = $ARGV[1];  # y or n
+$use_automation = $ARGV[2]; 
+# used while executing su - htx. dev config file executes a script which in turn calls
+# buildnet with this argument "build_net help y n /tmp/net_iface". User may execute
+# "build_net bpt y n /tmp/networks" to set test interfaces.
+$net_iface_file=$ENV{"HTX_LOG_DIR"}."/net_iface";
+$run_automate=""; 
+if($ARGV[3]) 
+{
+	$run_automate = $ARGV[3]; 
+}
+
+# To get function name
+sub __FUNC__ {
+    $func = "";
+    $func = (caller 1)[3] ;
+    if($func ne ""){
+        $func;
+    }
+    else{
+        "main";
+    }
+}
+
+# Build_net debug log file. format: build_net.log.<pid>
+$buildnet_logfile=$ENV{"HTX_LOG_DIR"}."/build_net.log." . $$;
+
+#Opening Build_net debug log file
+unless (open (DEBUG_LOG,">$buildnet_logfile")) {
+    die ("Can't open $buildnet_logfile file!\n");
+}
+
+#you can force build_net to use the default parm values by passing in "y"
+
+$automation_successfully=""; 	
+if(!$prof) {
+	print("Runtime build_net setup is no longer supported.\nRun \"build_net help\"\n	to create a profile template called \"bpt\"\n");
+	print("Edit \"bpt\" to specify comnet and test network connections.\n\nThen rerun build_net like this:\n\"build_net bpt\"\n");
+	exit(0);
+}
+
+if(-e "/etc/network/interfaces") {
+	`mkdir -p /etc/config_bk `;
+	$interface_file = "/etc/config_bk/interfaces.bk";
+	if (-e $interface_file) {
+    	&debug_log(__FUNC__,__LINE__," /etc/network/interfaces file backup exists in /etc/config_bk/interfaces.bk\n");
+	}else{
+    	&debug_log(__FUNC__,__LINE__,"Taking /etc/network/interfaces file backup in /etc/config_bk/interfaces.bk\n"); 
+	    `cp /etc/network/interfaces /etc/config_bk/interfaces.bk`;
+	}
+}
+
+`rm /tmp/bndone 2>/dev/null`;
+
+if($prof) { &debug_log(__FUNC__,__LINE__,"Using input profile $prof\n"); }
+else {&debug_log(__FUNC__,__LINE__,"Not Using input profile.\n"); }
+
+$res = `uname -r`;
+chomp($res);
+$len = length($res);
+
+# Interface vs device mapping. 
+$new_naming =  0; 
+# Linux has introduced Predictable Network Interface Names http://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/ 
+# So first find out what does ethernet naming convention 
+$entname="eth";
+$eniface="eth";
+$res = `ip link show 2>/dev/null | awk ' /eth[0-9]/ { print \$2}' | cut -d: -f 1`; 
+$res=&trim($res); 
+if($res) { 
+	$new_naming =  0 ; 
+} 
+$new_enname=""; 
+$new_eniface=""; 
+$new_naming = 0; 
+$res = `ip link show 2>/dev/null | awk ' /en[a-z,A-Z,0-9]/ { print \$2}' | cut -d: -f 1`;
+if($res) { 
+	# Predictable Network Interface Nameing Convention 
+	$new_naming = 1; 
+	$new_enname="en"; 
+	$new_eniface="en"; 
+}
+#comnet interface is names as netXX in Predictable Network Interface Nameing Convention
+$netface="net"; 
+#IPoIB interfaces .. 
+$ibname="ib";
+$ibiface="ib";
+
+#Team interfaces
+$tmname="tm";
+$tmiface="tm";
+$bondiface="bond";
+$bondname="bond";
+
+#RDMA interfaces ..
+$hcaname="mlx"; 
+$ia=""; 
+
+# BPT FILE 
+$BPT=$ENV{"HTX_HOME_DIR"} ."/bpt";
+# Name of mdt to be created 
+$mdtname=$ENV{"HTXMDT"}."/net.mdt";
+$ecgname=$ENV{"HTXECG"}."/net.ecg";
+
+@nets_used="";
+%nets="";
+$net_count=0;
+$gotcom="";
+@other_ids="";
+@other_comnames="";
+$crash="";
+
+#Get the hostname of this lpar. and set all these vars...
+$this_host_number=0;
+$next_host_number=0;
+$comhostname="";
+$dcomhostname="";
+$com_dev="";
+$com_iface="";
+$com_ip="";
+$classB_net ="";
+$testmask="";
+$no_comdev="";
+
+$help="";
+$dma_optomize="";
+$int_optomize="";
+
+
+# Register for SIGINT handler 
+$SIG{'INT'} = 'cleanup';
+# If we fail somewhere then register our cleanup function.... 
+END { 
+	&cleanup(); 
+} 
+
+
+$KERNEL_26 = "";
+$KERNEL_REL = ""; 
+$KERNEL_REL = `uname -r`; 
+$KERNEL_REL = &trim($KERNEL_REL); 
+
+$res = `uname -r`;
+@un = "";
+@un = split(/\./,$res);
+if($un[0] == 2 && $un[1] == 6)
+{
+    &debug_log(__FUNC__,__LINE__,"Running on $KERNEL_REL  Kernel, build_net would use ip_crossover \n");
+    $KERNEL_26 = "yes";
+	# setup for modprobe to find ip_crossover kernel module  
+	&setup_ip_crossover(); 
+} else {
+    &debug_log(__FUNC__,__LINE__,"Running on $KERNEL_REL Kernel \n");
+}
+
+#lscfg geneally takes time to gather system info, so do it once and reuse results. 
+@lscfg = `lscfg`; 
+
+# This would let my cleanup function called only once. 
+# If SIGINT is called then cleanup gets called twice.  
+$cleanup_done=0;
+
+#This will clean up /etc/hosts file. Removes buildnet defined existing test network hostnames
+&clean_hosts_nets();
+ 
+if($prof =~ /help/i) {
+	`rm $ENV{"HTX_LOG_DIR"}."/saveprof" 2>/dev/null`;
+	if($run_automate) {
+            unless (open (TEST_IFACE,">$run_automate")) {
+                die ("Can't open $run_automate file!\n");
+            }
+	}
+
+	$help="yes";
+	$bpt_file = $BPT;
+	&make_temp("$bpt_file");
+	#if help run and argv[3] specified then dump out hxecom test networks 
+	#in argv[3] and exit
+	if($run_automate) {
+		#writes test interface details in /tmp/net_iface file
+		close(TEST_IFACE); 
+		exit(0); 
+	}
+	&automate_setup("$bpt_file"); 
+} else {
+	$crash="yes";    #force crash on miscompare
+}
+
+if($run_automate)
+{
+	unless (open (LOOP_NETWORK,"$run_automate")) {
+            die ("Can't open $run_automate file!\n");
+        }
+	@loops = <LOOP_NETWORK>;
+	close(LOOP_NETWORK);
+	&write_bpt_file($prof,@loops); 
+}	
+if($automation_successfully) { 
+	#We will come here as a result of setup 
+	#Let rest of script use the new bpt
+		
+	#Its not help run, treat it like profile.
+	$prof=$BPT;
+	$help=""; 
+	$onesys="";
+	
+	if( !(-e $prof)) { 
+		print("$prof doesnt exists \n"); 
+		exit(0);
+	}
+} 
+print("Running build_net bpt to configure test networks .... \n");
+# now read in the profile if it exists. 
+unless (open (IN_FILE,"$prof")) {
+	die ("Can't open $prof file!\n");
+}
+@profile = <IN_FILE>;
+foreach $line (@profile) {
+	chomp($line);
+}
+close(IN_FILE);
+
+#create a new profile based on the info I get from the user. 
+#use 4 profnames in round robin fashen so the user can check back to see
+#what his last seed was if need be.
+$saveprofname = $ENV{"HTX_LOG_DIR"}."/saveprof";
+unless (open (PROF_FILE,">$saveprofname")) {
+	die ("Can't open $saveprofname file!\n");
+}
+
+#get the onesys value from users profile or from user input.
+if($onesys =~ /y/) {
+	print PROF_FILE ("onesys=y\n") if(!$help);
+}
+if(!$onesys) {
+	$onesys=&get_onesys();
+} 
+&get_comdev();
+
+
+&debug_log(__FUNC__,__LINE__,"onesys is |$onesys| \n");
+
+
+print("Running Linux version of build_net.\n");
+
+# Cleanup data from previous runs 
+$res = `/bin/rm /etc/set_onesys > /dev/null 2>&1`;
+$res = `/bin/rm /tmp/other_ids > /dev/null 2>&1`;
+$res=`/bin/cp /etc/hosts /etc/hosts.hxecom`;
+$res = `rm -rf /etc/ifcfg_bak/ >/dev/null 2>&1`;
+$res = `mkdir -p /etc/ifcfg_bak `;
+#take out the ip_crossover modules loaded if any.
+@res = `lsmod | grep ip_crossover | awk '{print \$1}'`;
+foreach $modul (@res) {
+	chomp($modul);
+	if($modul) {
+		`rmmod $modul`;
+    }
+}
+
+if($onesys =~ /n/) {
+	unless (open (OTHER_IDS,">/tmp/other_ids")) {
+		die ("Can't open /tmp/other_ids file!\n");
+	}
+	#1. Get the other ip addresses. 
+	#2. Am I the master 
+	&set_other_ids();    # also sets server and client.
+	foreach $id (@other_ids) {
+		print OTHER_IDS ("$id\n");
+	}
+	close(OTHER_IDS);
+}
+
+&set_this_host_number();
+
+&set_next_host_number();
+
+$stresslevel=&get_stresslevel();
+&debug_log(__FUNC__,__LINE__,"stresslevel set to $stresslevel\n");
+
+&set_comhostname();
+
+#now I have to find the net work cards 
+#get all the data in the nets[net_count]{names} array.
+
+&get_nets_linux();
+
+close(PROF_FILE);
+
+
+if($onesys =~ /y/) {
+	# now that all the nets are gathered and numbered I need to make
+	# sure the nets are paired up ok 
+	for($x=100; $x<223; $x++) {
+		if($nets_used[$x] > 0) {
+			if($nets_used[$x] < 2) {
+				print("The net $x does not have a matching pair\n");
+				print"Manually edit bpt file and then run buildnet using command: build_net bpt\n\n";
+				exit(0);
+			}
+		}
+	}
+} else {
+	if(!$gotcom) {
+		print("You did not list a com net please rerun build_net, after you fix the $prof profile.\n");
+		exit(0);
+	} 
+}
+
+# before running thru all the nets, I need to put default values in
+# the net.mdt file 
+&debug_log(__FUNC__,__LINE__,"Init net.mdt file\n");
+&init_mdt();
+
+unless (open (SET_ONESYS,">/etc/set_onesys")) {
+	die ("Can't open /etc/set_onesys file!\n");
+}
+#turn off firewall
+&debug_log(__FUNC__,__LINE__,"Shutting down Firewall ....\n");
+print SET_ONESYS (" service iptables stop 2>/dev/null\n");
+#RHEL 
+print SET_ONESYS ("systemctl stop firewalld 2>/dev/null \n"); 
+print SET_ONESYS ("systemctl disable firewalld 2>/dev/null \n"); 
+print SET_ONESYS ("systemctl stop firewalld.service 2>/dev/null \n");
+#SUSE11 
+print SET_ONESYS ("/etc/init.d/SuSEfirewall2_setup stop 2>/dev/null \n");
+#SUSE12
+print SET_ONESYS ("systemctl  disable SuSEfirewall2 2>/dev/null \n"); 
+print SET_ONESYS ("systemctl stop SuSEfirewall2  2>/dev/null \n");
+print SET_ONESYS ("systemctl stop SuSEfirewall2.service 2>/dev/null \n"); 
+print SET_ONESYS ("systemctl disable SuSEfirewall2.service 2>/dev/null \n"); 
+
+# flush iptables settings
+print SET_ONESYS ("iptables -F 2>/dev/null \n"); 
+
+#**************************** START LOOP TO CONFIG **********************
+#now fix up the rules files  and mdt file and configure the networks 
+#loop thru all the collected network structures. 
+&debug_log(__FUNC__,__LINE__,"loop thru.. $net_count networks\n");
+
+#*************************************************************************
+
+&do_linux_net_loop();
+
+
+print("\n");
+
+close(SET_ONESYS);
+$res = `chmod +x /etc/set_onesys > /dev/null 2>&1`;
+
+# run the /etc/set_onesys script 
+&debug_log(__FUNC__,__LINE__,"Run /etc/set_onesys script\n");
+$res = `/etc/set_onesys > /dev/null 2>&1`;
+
+# backup the saveprof file incase the next run of build_net fails and
+# clears out the current saveprof file
+$savename="$saveprofname" . ".bak";
+&debug_log(__FUNC__,__LINE__,"cp $saveprofname $savename\n");
+`cp $saveprofname $savename`;
+
+$res = `cp /etc/hosts /etc/hosts.htx`;
+if($ecgname) {
+	$res = `cp $mdtname $ecgname`;
+}
+`echo "done" >/tmp/bndone`;
+
+if($opensm_pingum_delay == 1) {
+	&debug_log(__FUNC__,__LINE__,"wait for opensmd...\n");
+	sleep(60);
+}
+
+sleep(1);
+$cmd = system("/usr/bin/pingum");
+$res = $cmd >> 8;
+if($res == 0){
+	&debug_log(__FUNC__,__LINE__,"All networks ping OK\n\n");
+}
+else{
+	&debug_log(__FUNC__,__LINE__,"Some network(s) did not ping\n");
+}
+sleep(1);
+exit(0);    #end here...  
+
+#################################################################################
+### Function Definition Starts here 
+#################################################################################
+
+#################################################################################
+### Function name:        debug_log
+### Function arguments:   Function name, Line Number, Data
+### Function description: Print/Save data in particular format. Enable 
+###			  $print_on_screen for on screen logs. Default Behaviour: 
+###			  Stores log in /tmp/build_net.log.<pid> file
+#################################################################################
+
+sub debug_log {
+	local($func_name,$line_num,$print_data) = @_;
+	$print_line = "";
+	$tag = "build_net";
+	$res=`date +"%d-%m-%Y %X"`;
+	chop($res);
+	if($print_on_screen)
+	{
+		print "$print_data";
+	}
+	else
+	{
+		$print_line = "[" . $res . "] [" . $tag . "] [" . $func_name . "] [" . $line_num . "]  " . $print_data;
+		print DEBUG_LOG ("$print_line");
+	}
+}
+
+sub cleanup { 
+	if($comhostname && $cleanup_done == 0) { 
+
+    	# reset the host name to the comnet name.. At exit ... .
+ 	   	&debug_log(__FUNC__,__LINE__,"hostname $comhostname\n");
+    	$res = `hostname $comhostname`;
+		$cleanup_done = 1; 
+	}
+	&debug_log(__FUNC__,__LINE__,"build_net script will now exit \n"); 
+	exit(0); 
+} 
+sub set_comhostname {
+	local($sys1,$line);
+
+	$line=get_line_from_profile("comhostname");
+	$sys1 = &get_value($line);
+
+	print PROF_FILE ("comhostname=$sys1\n");
+}
+
+sub get_stresslevel() {
+	local($sys1,$line);
+
+	$line=get_line_from_profile("stresslevel");
+	@tmper=split(/=/,$line);
+	$sys1 = &get_value($line);
+
+	print PROF_FILE ("stresslevel=$sys1\n");
+	return($sys1);
+}
+sub set_other_ids() {
+	local($sys1,$line,$cnt,$gotcip);
+	
+	$line=get_line_from_profile("other_ids");
+	$sys1 = &get_value($line);
+	if(!$sys1) {
+			print("The other_ids key is empty in the profile $prof\n");		
+			exit(0);
+	}
+	@other_ids="";
+	@other_ids=split(/:/,$sys1);
+	if($other_ids[0] !~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/) {
+		$other_ids[0] = &mygetip($other_ids[0]);
+	}
+	$len=@other_ids;
+	if($len < 2) {
+		print("I need the other_ids filled in, with ip addresses of the other hosts in this test. \n");
+		print("$line\n");
+		exit(0);
+	}
+
+	@other_ids="";
+	@other_ids=split(/:/,$sys1);
+	if(!$sys1) {
+			print("I need some input other_ids line! $sys1\n");		
+			exit(1);
+	}
+	$sys1="";
+	$cnt=0;
+	$gotcip="";
+	foreach $id (@other_ids) {
+		$id =~ s/[^_#0-9a-zA-Z\/+]*$//;
+		$id =~ s/^[^_#0-9a-zA-Z\/+]*//;
+
+		if($id !~ /\d{1,3}.\d{1,3}.\d{1,3}.(\d{1,3})/) {
+			$id = &mygetip($id);
+		} 
+		if($id eq $com_ip) {
+			$gotcip="yes";
+		}
+		if($sys1) {
+			$sys1="$sys1" . ":" . "$id";
+		} else {
+			$sys1="$id";
+		}
+		$other_comnames[$cnt++]=&mygethostname($id);
+	}
+	if(!$gotcip) {
+		print("This hosts ip was not in the other_ids list\n");
+		exit(1);
+	}
+	print PROF_FILE ("other_ids=$sys1\n");
+}
+
+sub set_this_host_number() {
+	local($sys1,$line);
+	$line=get_line_from_profile("thishostid");
+	$sys1 = &get_value($line);
+	print PROF_FILE ("thishostid=$sys1\n");
+	$this_host_number=$sys1;
+	return($sys1);
+}
+
+#This function writes next_host_number value to /tmp/saveprof file.
+
+sub set_next_host_number() {
+	local($sys1,$line);
+    if($onesys =~ /y/i) {
+        $line=get_line_from_profile("nexthostid");
+        $sys1 = &get_value($line);
+        print PROF_FILE ("nexthostid=$sys1\n");
+        $next_host_number=$sys1;
+    }
+	return($sys1);
+}
+sub get_onesys() {
+	local($sys1);
+	if($prof && $prof !~ /help/i) {
+		$line=get_line_from_profile("onesys");
+		$sys1 = &get_value($line);
+ 
+
+	} else {
+		while(1) {
+			print("Is this a one system test? y or n\n");
+			$sys1=<STDIN>;
+			chop($sys1);
+			if($sys1 =~ /y/i || $sys1 =~ /n/i) {
+				last;
+			} else {print("answer is $sys1, Please enter y or n, try again\n");}
+		}
+
+ 
+#		while(1) {
+#			print("Do you want a pattern that is the ent device name ex: ent4 y or n\n");
+#			$nsys1=<STDIN>;
+#			chop($nsys1);
+#			if($nsys1 =~ /y/i || $nsys1 =~ /n/i) {
+#				last;
+#			} else {print("answer is $nsys1, Please enter y or n, try again\n");}
+#		}
+		$nsys1="no";
+		
+	}
+
+	print PROF_FILE ("onesys=$sys1\n") if(!$help);
+	
+
+	
+	if($sys1 =~ /y/i) { 
+		&debug_log(__FUNC__,__LINE__,"Setup for one system network test\n");
+		return("y");
+	} else { 
+		&debug_log(__FUNC__,__LINE__,"Setup for multiple system network test\n");
+		return("n");
+	}
+}
+
+sub get_line_from_profile() {
+	local($key,$flag) = @_;
+	local($line);
+	foreach $line (@profile) {
+		if($line =~ /^#/) { next; }
+		if($line =~ /^\s*$key[\s=]/) {
+			$line =~ s/#.*//;
+			return($line);
+		}
+	}
+	if(!$flag) {
+		if(!$line) {
+			print("The $key key is not set in the profile $prof\n");
+			exit(0);
+		}
+	}
+	return("");
+}
+
+sub get_device_type_linux() {
+    local($device)=@_;
+    local($line,$cnt,$location,$device_type);
+    $device_type="Unknown";
+	$location="N/A"; 
+    $grab="";
+    foreach $line (@lscfg) {
+        chomp($line);
+        if($line =~ /^\+\s$device\s/) {
+            $grab="yes";
+            ($it,$de,$location) = split(/\s+/,$line);
+            chomp($location);
+        }
+        
+        if($grab) {
+            if($line =~ /14101103/ || $line =~ /14109910/) {
+                $device_type = "concho";
+                last;
+            } elsif($line =~ /14106803/ || $line =~ /1410bc10/) {
+                $device_type = "coleman";
+                last;
+            } elsif ($line =~ /1410ec02/ || $line =~ /1410eb02/ || $line =~ /14103258/) {
+                #note in linux sr and lr have same id??
+                $device_type = "king";
+                last;
+            } elsif ($line =~ /14106902/ || $line =~ /14106802/ | $line =~ /14102710/ || $line =~ /14102610/) {
+                $device_type = "goliad";
+                last;
+            } elsif ($line =~ /14108902/ || $line =~ /14108802/ || $line =~ /14107a10/) {
+                $device_type = "duval";
+                last;
+            } elsif ($line =~ /1410ba02/ || $line =~ /1410bb02/ ) {
+                $device_type = "victoria";
+                last;
+            } elsif ($line =~ /14103f03/ || $line =~ /14104003/ || $line =~ /IBM 2 PORT PCIe/ || $line =~ /14105e10/) {
+                $device_type = "elpaso";
+                last;
+            } elsif ($line =~ /Interpartition/) {
+                $device_type = "virtual_ent";
+                last;
+			}
+        }
+    }
+    &debug_log(__FUNC__,__LINE__,"device_type =$device_type. ");
+    if($device_type =~ /Unknown/i) {
+        #get the type from ethtool -i ethX
+        $res = `ethtool -i $device | grep driver: 2>/dev/null`;
+        &debug_log(__FUNC__,__LINE__,"driver=$res \n");
+        if($res =~ /e1000/) {
+            $device_type = "e1000";
+        } elsif($res =~ /e100/) {
+            $device_type = "scurry";
+        } elsif($res =~ /hea/i) {
+            $device_type = "HEA";
+        } elsif($res =~ /pcnet32/i) {
+            $device_type = "phoenix";
+        } elsif($res =~ /acenic/i) {
+            $device_type = "galaxy";
+        } elsif($res =~ /ibmveth/i) {
+            $device_type = "virtual_ent";
+        } elsif($res =~ /s2io/i || $res =~ /Neterion/i) {
+            $device_type = "king_victoria";
+        } elsif($res =~ /cxgb3/i) {
+            $device_type = "Red_River_10G";
+        } elsif($res =~ /ixgbe/i) {
+            $device_type = "Knox_10G";
+        } elsif($res =~ /bnx2/i || $res =~ /tg3/i) {
+            $device_type = "broadcom";     # nemo 4 port too I think
+        } elsif($res =~ /qla3xxx/i) {
+            $device_type = "QLogic3_TOE";
+        } elsif($res =~ /qla4xxx/i) {
+            $device_type = "QLogic4_TOE";
+        }elsif($res =~ /qlge/i) {
+            $device_type = "Qlogic_10G";
+        } elsif($res =~ /cxgb4/) {
+            $device_type = "Red_River_2";
+		} elsif($res =~ /mlx4_en/) { 
+			$device_type = "Mellanox"; 
+		} elsif($res =~ /sfc/i) { 
+			$device_type = "SolarFlare"; 
+        } else {
+            &debug_log(__FUNC__,__LINE__,"Unknown driver type in get_device_type_linux\n");
+        }
+    }
+    return($location, $device_type);
+}
+
+
+
+
+sub get_dev() {
+	local($iface_name) = @_;
+	#takes in the interface name and retuns the device name for 
+	#Linux.
+	if($iface_name=~/$ibiface/) {
+		$iface_name =~ s/$ibiface/$ibname/;
+	} elsif($iface_name =~ /$tmiface/) {
+		#Network Team interface
+        $iface_name =~ s/$tmiface/$tmname/;
+    }elsif($iface_name =~ /$eniface/) {
+		$iface_name =~ s/$eniface/$entname/;
+	} elsif($iface_name =~ /$netface/) { 
+		$iface_name =~ s/$iface_name/$iface_name/; 	
+	} elsif($iface_name =~ /$new_eniface/) { 
+		$iface_name =~ s/$iface_name/$iface_name/;
+	} elsif($iface_name =~ /$new_eniface/) { 
+		$iface_name = s/$new_eniface/$new_enname/;
+	} elsif($iface_name =~ /$hcaname/) { 
+		$iface_name = $iface_name; 
+	} elsif($iface_name =~ /$bondiface/) {
+        #Network Bond interface
+        $iface_name =~ s/$bondiface/$bondname/;
+    }else {
+		return(Unknown); 
+	}
+	#its returning the device name not the interface. 
+	return($iface_name);
+}
+
+sub get_iface() {
+	local($line) = @_;
+	local($iface_name);
+	@tmper=split(/\s+/,$line); 
+	$iface_name = $tmper[0];
+	if($line=~/$ibname/) {
+		$iface_name =~ s/$ibname/$ibiface/;
+	} elsif($line =~ /$tmname/) {
+		#Network Team interface
+        $iface_name =~ s/$tmname/$tmiface/;
+    } elsif($line =~ /$bondname/) {
+        #Network Bond interface
+        $iface_name =~ s/$bondname/$bondiface/;
+    }elsif($line =~ /$entname/) {
+		$iface_name =~ s/$entname/$eniface/;
+	} elsif($line =~ /$new_enname/) { 
+		$iface_name=~ s/$new_enname/$new_eniface/;	
+	} elsif($line =~ /$hcaname/) { 
+		$iface_name = $ia; 
+	} else {
+		print ("Can't get the iface name\n");
+		exit(0);
+	}
+	return($iface_name);
+}
+
+sub add_rhosts_nets() {
+	local($hostname) = @_;
+	local($fileToChange,@host_lines);
+	$fileToChange = "/.rhosts";
+	
+	@host_lines="";
+	if(-e $fileToChange) {
+		unless (open (HOST_FILE,"$fileToChange")) {
+			die ("Can't open $fileToChange file!\n");
+		}
+
+		@host_lines=<HOST_FILE>;
+		close(HOST_FILE);
+		$newfile="";
+	} 
+
+	unless (open (TMP_OUT,">tmp_out")) {
+		die ("Can't open tmp_out file doing tmp_out file!\n");
+	}
+	
+	$not_done = "y";
+	foreach $line (@host_lines) {
+		if($line =~ /$hostname\s/) {
+			$line = "$hostname    root\n";
+			$not_done = "";
+		}     
+		print TMP_OUT ("$line");
+	}
+	if($not_done) {
+		print TMP_OUT ("$hostname    root\n");
+	}
+
+	close(TMP_OUT);
+	$result = `cp tmp_out $fileToChange`;
+	$result = `rm tmp_out`;
+}
+
+sub add_hosts_nets() {
+	local($hostname,$ipaddr) = @_;
+	local($fileToChange,@host_lines);
+	$fileToChange = "/etc/hosts";
+	@host_lines="";
+	&debug_log(__FUNC__,__LINE__,"add_hosts_nets $hostname,$ipaddr to /etc/hosts\n");
+	unless (open (HOST_FILE,"$fileToChange")) {
+		die ("Can't open $fileToChange file!\n");
+	}
+
+	@host_lines=<HOST_FILE>;
+	close(HOST_FILE);
+
+	unless (open (TMP_OUT,">tmp_out")) {
+		die ("Can't open tmp_out file doing tmp_out file!\n");
+	}
+	$not_done = "y";
+	foreach $line (@host_lines) {
+		if($line =~ /$hostname\s/) {
+			$line = "$ipaddr $hostname\n";
+			$not_done = "";
+		}     
+		print TMP_OUT ("$line");
+	}
+	if($not_done) {
+		print TMP_OUT ("$ipaddr $hostname\n");
+	}
+
+	close(TMP_OUT);
+	$result = `cp tmp_out $fileToChange`;
+	$result = `rm tmp_out`;
+}
+
+  
+sub check_net_id {
+	local($net_id) = @_;
+	local($i);
+
+	if($net_id !~ /\d{1,3}/ && $net_id !~ /com/i && $net_id !~ /n/i) {
+		print("net_id |$net_id| is bad in profile. Fix the $prof profile.\n");
+		return(-1);
+	} 
+    if($onesys =~ /n/) {
+        for($i=0; $i<$net_count; $i++) {
+            if($nets[$i]{net_id} == $net_id) {
+		print("net_id |$net_id| is a dup in profile  Fix the $prof profile.\n");
+		return(-1);
+            }
+        }
+    }
+    if($net_id < 100 || $net_id > 223) {
+        print("Net number must be >= 100 and  <= 223 \n");
+        print("Use differnt net id number.\n");
+		return(-1);
+    }
+    if($onesys =~ /y/) {
+        ++$nets_used[$net_id];
+        if($nets_used[$net_id] > 2) {
+            print("You used net $net_id more than twice.\n");
+            return(-1);
+        }
+        if($nets_used[$net_id] == 2) {
+            return(2);
+        }
+    }
+    return(0);
+}
+
+
+#######################################################################################
+# These function does a sanity check whether User specified correct settings in bpt file. 
+########################################################################################
+
+sub get_ib_info {
+	$newline="$dev_name $net_id $device_type  $mlx_dev  $port $testcase  $loc_code ";
+    $nets[$net_count]{port} = $port;
+	$nets[$net_count]{ia} = $mlx_dev; 
+	print PROF_FILE ("$newline\n");
+	&debug_log(__FUNC__,__LINE__,"newline=$newline\n");
+	$nets[$net_count]{line}="$newline";
+}
+
+sub get_hca_info { 
+	$newline="$dev_name $net_id $device_type  $ia  $port $testcase  $loc_code "; 
+	print PROF_FILE ("$newline\n");
+	&debug_log(__FUNC__,__LINE__,"get_hca_info:$newline\n"); 
+	$nets[$net_count]{line}="$newline";
+	$nets[$net_count]{net_iface} = $ia; 
+	$nets[$net_count]{ia} = $ia;
+	$nets[$net_count]{port} = $port; 
+	
+
+}
+
+sub get_ent_info {
+
+	$valid="yes"; 	
+	if($jumbo_frames =~ /n/i && $mtu > 1514) {
+		print("Forcing mtu size to 1500, you have to turn on jumbo_frames to have mtu larger than 1514\n");
+		$mtu = 1500;
+	}
+	if($jumbo_frames =~ /y/i && $mtu == 1500) {
+		print("Forcing mtu size to 9000 for jumbo_frames setting.\n");
+		$mtu = 9000;
+	}
+
+	$newline="$dev_name $net_id $device_type $use_defaults $mtu $jumbo_frames  $testcase $loc_code ";
+	print PROF_FILE ("$newline\n");
+	&debug_log(__FUNC__,__LINE__,"new_line = $newline\n");
+	$nets[$net_count]{line}="$newline";
+} 
+
+sub init_mdt {
+
+    unless (open (MDT_FILE,">$mdtname")) {
+        die ("Can't open $mdtname file!\n");
+    }
+
+    print MDT_FILE ("default:\n");
+    print MDT_FILE ("         HE_name = \"\"\n");
+    print MDT_FILE ("         adapt_desc = \"\"\n");
+    print MDT_FILE ("         device_desc = \"\"\n");
+    print MDT_FILE ("         reg_rules = \"\"\n");
+    print MDT_FILE ("         emc_rules = \"\"\n");
+    print MDT_FILE ("         dma_chan = \"0\"\n");
+    print MDT_FILE ("         idle_time = \"0\"\n");
+    print MDT_FILE ("         load_seq = \"32768\"\n");
+    print MDT_FILE ("         max_run_tm = \"7200\"\n");
+    print MDT_FILE ("         port = \"0\"\n");
+    print MDT_FILE ("         slot = \"0\"\n");
+    print MDT_FILE ("         max_cycles = \"0\"\n");
+    print MDT_FILE ("         hft = \"0\"\n");
+    print MDT_FILE ("         cont_on_err = \"YES\"\n");
+    print MDT_FILE ("         halt_level = \"1\"\n");
+    print MDT_FILE ("         start_halted = \"n\"\n");
+    print MDT_FILE ("\n");
+
+    close(MDT_FILE);
+
+}
+sub make_rule()
+{
+	local($this_net, $testcase) = @_;
+	$second="";
+
+	&debug_log(__FUNC__,__LINE__,"Set up rules file for $dev_name, rule $nets[$this_net]{rule_name}, testcase=$testcase\n");
+
+    $rules_file = $ENV{"HTXREGRULES"}."/hxecom/$nets[$this_net]{rule_name}";
+
+    if($rules_file =~ /nets/) {
+        $second = 1;
+    }
+
+    &make_new_rule($rules_file,$this_net, $testcase);
+
+    return;
+}
+sub make_new_rule() {
+	local($rules_file,$this_net, $TC) = @_;
+	local($pat);
+    $reps = 1;
+	$bufmin = "10"; 
+	$bufmax = "9000"; 
+	$bufinc = "1001"; 
+    $ioAlarm = 6000;
+	$numOper = 300; 
+	$debug_pattern="";
+	$bufseed = int(rand(4096)) + 11 ; 
+	# Hack, till we support random packet sizes with RDMA. 
+	if($TC =~ /RDMA/ && $stresslevel==6) { 
+		$stresslevel=5; 
+	}
+
+    if ($stresslevel==2) {
+            $bufmax = 10500;
+            $bufmin = 7500;
+            $numOper = 300;
+			$bufinc =  914; 
+            $ioAlarm = 6000;
+			$debug_pattern = 1;
+    } elsif ($stresslevel==3) {
+            $bufmax = 15000;
+            $bufmin = 5000;
+            $bufinc = 999;
+            $numOper = 1500;
+            $reps = 2;
+            $ioAlarm = 6000;
+			$debug_pattern = 1;
+    } elsif ($stresslevel==4) {
+			$bufmax = 25000; 
+			$bufmin = 13100; 
+			$bufinc = 4000; 
+            if($PdDvLn =~/14105e01/ || $PdDvLn =~/14100401/ ) {
+                $reps = 10;
+                $numOper = 2000;
+            } else {
+				$numOper = 5000; 
+                $reps = 5;
+            }
+            $ioAlarm = 6000;
+			$debug_pattern = 0;
+    } elsif ($stresslevel==5) {
+            $bufmax = 65000;
+            $bufmin = 30000;
+			$bufinc = 10531; 
+            if($PdDvLn =~/14105e01/ || $PdDvLn =~/14100401/ ) {
+                $reps = 20;
+			} else { 
+                $reps = 5;
+            }
+            $numOper = 10000;
+            $ioAlarm = 6000;
+			$debug_pattern = 1;
+	} elsif ($stresslevel==6) { 
+			$bufmax = 60000;
+			$bufmin = 30000;
+			$bufinc = -1;  
+            $numOper = 10000;
+            $reps = 5;
+			$ioAlarm = 6000;
+			$debug_pattern = 1;
+	}  elsif ($stresslevel==7) { 
+			# Aims at higher Performance. 
+			$bufmin = 65000; 
+			$bufmax = 65000; 
+			$bufinc = 914; 
+			$numOper = 10000; 
+			$reps = 10;
+			$ioAlarm = 6000;
+			$debug_pattern = 0; 
+			$no_compare = 1; 
+    } elsif ($stresslevel=~ /dma/i) {
+            $bufmin = 65000;
+            $bufmax = 65000;
+			$bufinc = 914; 
+			$numOper = 2000;
+			$debug_pattern = 0;
+			$reps = 20;
+            $ioAlarm = 6000;
+			$no_compare = 1;
+    } elsif ($stresslevel=~ /int/i) {
+            $bufmin = 1;
+            $bufmax = 200;
+			$bufinc = 1; 
+			$numOper = 300;
+	}
+
+    unless (open (RULE_FILE,">$rules_file")) {
+        die ("Can't open $rules_file file!\n");
+    }
+	# /* create a rules file for hxecom */
+	print RULE_FILE ("* rule file for $nets[$this_net]{rule_name}\n");
+	print RULE_FILE ("RULE_ID=00000000\n");
+	$pat=&merge_pattern();
+	print RULE_FILE ("PATTERN_ID=$pat\n");
+	if($TC =~ /$RDMA/) { 
+		print RULE_FILE ("COMNET_NAME=$comhostname\n"); 
+		print RULE_FILE ("TESTNET_NAME=$comhostname\n");
+	} else { 
+		if($onesys =~ /n/ ) {
+			print RULE_FILE ("COMNET_NAME=$comhostname\n");
+			print RULE_FILE ("TESTNET_NAME=$nets[$this_net]{net_name}\n");
+		} else {
+			if($nets[$this_net]{rule_name} =~ /nets/) {
+				print RULE_FILE ("COMNET_NAME=$comhostname\n");
+				print RULE_FILE ("TESTNET_NAME=$nets[$this_net]{net_name}\n");
+			} else {
+				print RULE_FILE ("COMNET_NAME=$comhostname\n");
+				print RULE_FILE ("TESTNET_NAME=$nets[$this_net]{net_name}\n");
+			}
+		}
+	}
+	$com_port = &get_com_port($nets[$this_net]{net_id});
+
+	print RULE_FILE ("COM_STREAM_PORT=$com_port\n");
+	$next_port = $com_port+1;
+	print RULE_FILE ("COM_DGRAM_PORT=$next_port\n");
+
+	print RULE_FILE ("BUFMIN=$bufmin\n");
+	print RULE_FILE ("BUFMAX=$bufmax\n");
+	print RULE_FILE ("BUFINC=$bufinc\n");
+	print RULE_FILE ("BUFSEED=$bufseed\n");
+	print RULE_FILE ("OPER=RW\n");
+	print RULE_FILE ("MASTER=Y\n");
+	if($TC =~ /$RDMA/) { 
+		print RULE_FILE ("LAYER=RDMA\n");
+	} else { 
+		print RULE_FILE ("LAYER=TCP\n");
+	}
+	print RULE_FILE ("IO_ALARM_TIME=$ioAlarm\n");
+	
+	if($crash) {
+		print RULE_FILE ("SHUTDOWN_FLAGS=0x1FFF\n");
+	} else {
+		print RULE_FILE ("SHUTDOWN_FLAGS=0x0FFF\n");
+	}
+	print RULE_FILE ("WRITE_SLEEP=0\n");
+	print RULE_FILE ("REPLICATES=$reps\n");
+	print RULE_FILE ("NUM_OPER=$numOper\n");
+	if($onesys =~ /y/) {
+		print RULE_FILE ("ONESYS=1\n");
+	} else {
+		print RULE_FILE ("ONESYS=0\n");
+	}
+	if($debug_pattern ne "") {
+		print RULE_FILE ("DEBUG_PATTERN=$debug_pattern\n");
+	}
+	if($no_compare) {
+		print RULE_FILE ("NO_COMPARE=$no_compare\n");
+	}
+
+	# end of stanza 1.
+    print RULE_FILE ("\n");
+
+    if($stresslevel !~ /dma/ && $stresslevel !~ /int/ && $stresslevel != 7) {
+        #add small byte count stanza
+		$val=int(rand(10))+1;
+        print RULE_FILE ("BUFMIN=$val\n");
+		$val=int(rand(4096))+11;
+        print RULE_FILE ("BUFMAX=$val\n");
+		$val=int(rand(100))+ 10;
+        print RULE_FILE ("BUFINC=$val\n");
+		$val=int(rand(400))+ 10;
+        print RULE_FILE ("NUM_OPER=$val\n");
+		if($debug_pattern ne "") {
+			print RULE_FILE ("DEBUG_PATTERN=$debug_pattern\n");
+		}
+    }
+
+	close(RULE_FILE);
+    #/* now do chmod on file to get the right permissions */
+    $res = `chmod 755 $rules_file`;
+    return;
+}
+
+
+sub get_com_port() {
+	local($net_id) = @_;
+	
+    $base200 = 5103;
+    $base100 = 5145;
+
+    if($net_id =~ /com/) {
+        return(5101);
+    }
+    if($net_id < 100 || $net_id > 223 ) {
+        print("get_com_port does not support net_id $net_id\n");
+        exit(0);
+    }
+    if($net_id < 223) {   #  /* use base100 */
+        $port = (2* ($net_id - 100)) + $base100;
+    } else {           # /* use base200 */
+        $port = (2* ($net_id - 223)) + $base200;
+    }
+
+    return($port);
+}
+
+sub make_mdt() {
+    local($this_net, $device_type, $TC) = @_;
+
+    unless (open (MDT_FILE,">>$mdtname")) {
+        die ("Can't open $mdtname file!\n");
+    }
+
+	&debug_log(__FUNC__,__LINE__,"add mdt entry for $dev_name, rule $nets[$this_net]{rule_name}, Testcase = $TC\n");
+   	print MDT_FILE ("$nets[$i]{net_iface}:\n");
+	if($TC =~ /$RDMA/) { 
+		print MDT_FILE ("        HE_name = \"hxedapl\"\n");
+	} else { 
+		print MDT_FILE ("        HE_name = \"hxecom\"\n");
+	}
+    print MDT_FILE ("        adapt_desc = \"$device_type\"\n");   
+    print MDT_FILE ("        device_desc = \"\"\n");  
+    print MDT_FILE ("        reg_rules = \"hxecom/$nets[$this_net]{rule_name}\"\n");
+    print MDT_FILE ("        emc_rules = \"hxecom/$nets[$this_net]{rule_name}\"\n");
+    print MDT_FILE ("        slot = \"$loc_code\"\n");       
+    print MDT_FILE ("\n");
+
+    close(MDT_FILE);
+	&debug_log(__FUNC__,__LINE__,"make_mdt done\n");
+    
+}
+
+
+sub pull_domain {
+    local($hostname) = @_;
+    local($dhostname);
+    #pull off domain info from hostname..
+    @tmp="";
+    @tmp=split(/\./,$hostname);
+    if($tmp[0] ne $hostname) {
+        $dhostname = $hostname;
+       $hostname = $tmp[0];
+    } else {
+        $dhostname = $hostname;
+    }
+    return($hostname,$dhostname);
+}
+sub merge_pattern {
+    local($patfile,$pat,@patlist,$item,$pfile);
+
+	@patlist = (HEX255,HEXFF,HEX55,HEXAA);
+
+
+	$pat = "BUILDNET";
+	$patfile = $ENV{"HTXPATTERNS"}."/$pat";
+	unless (open (OUT_FILE,">$patfile")) {
+		die ("Can't open $patfile file!\n");
+	}
+	foreach $item (@patlist) {
+		chomp($item);
+		$pfile = $ENV{"HTXPATTERNS"}."/$item";
+		unless (open (IN_FILE,"$pfile")) {
+			die ("Can't open $pfile file!\n");
+		}
+		$line = <IN_FILE>;
+		$len = length($line);
+		if($len > 1024) {
+			$line = substr($line,0,1024);
+		}
+		print OUT_FILE ("$line");
+		close(IN_FILE);
+	}
+	close(OUT_FILE);
+    return($pat);
+}
+sub get_value {
+    # give line with some tag=value it returns value.
+    local($line_to_get_from) = @_;
+    local($value);
+    $line_to_get_from =~ s/[^_0-9a-zA-Z\/\)]*$//;
+    $line_to_get_from =~ s/^[^_0-9a-zA-Z\/\(]*//;
+
+    @tppA = "";
+    @tppA = split(/=/,$line_to_get_from);
+    $value = $tppA[1];
+    $value =~ s/[^_0-9a-zA-Z\/\)]*$//;
+    $value =~ s/^[^_0-9a-zA-Z\/\(\.]*//;
+
+    if($value =~ /#/) {
+        @tm="";
+        @tm=split(/\s+/,$value);
+        $value = $tm[0];
+        $value =~ s/[^_0-9a-zA-Z\/\)]*$//;
+        $value =~ s/^[^_0-9a-zA-Z\/\(\.]*//;
+    }
+
+    return("$value");
+}
+sub split_devline {
+	local($line)=@_;
+	chomp($line);
+	$use_defaults = "yes" if(!$use_defaults);
+    if($line =~ /^$entname/i || $line =~ /^$netface/ || (($new_naming == 1) && ($line =~ /^$new_eniface/))) {
+   		($dev_name,$net_id,$device_type,$use_defaults,$mtu,$jumbo_frames,$testcase, $loc_code) = split(/\s+/,$line);
+    } elsif($line =~ /^$ibname/i ) {
+        ($dev_name,$net_id,$device_type, $mlx_dev, $port, $testcase, $loc_code) = split(/\s+/,$line);
+		&debug_log(__FUNC__,__LINE__,"split_devline_IPoIB : line=$line \n dev_name=$dev_name, net_id=$net_id, device_type=$device_type, ia=$mlx_dev, port=$port, testcase=$testcase, loc=$loc_code \n");
+    } elsif($line =~ /^$tmname/i ) {
+		#Network Team interface
+        ($dev_name,$net_id,$device_type,$use_defaults,$mtu,$jumbo_frames,$testcase, $loc_code) = split(/\s+/,$line);
+    } elsif($line =~ /^$bondname/i ) {
+        #Network Bond interface
+        ($dev_name,$net_id,$device_type,$use_defaults,$mtu,$jumbo_frames,$testcase, $loc_code) = split(/\s+/,$line);
+    } elsif($line =~ /^hfi/i) {
+       ($dev_name,$net_id,$device_type,$loc_code) = split(/\s+/,$line);
+        if($device_type =~ /TorrentCHIP/ && $net_id !~ /n/i) {
+        	print("$device_type cannot be used to form a network. Make net_id for device 'n' and rerun \n");
+            exit(0);
+        }
+    } elsif($line =~ /^$hcaname/) { 
+		($dev_name,$net_id,$device_type, $ia, $port, $testcase, $loc_code) = split(/\s+/,$line);
+		&debug_log(__FUNC__,__LINE__,"split_devline_IB : dev_name=$dev_name, net_id=$net_id, device_type=$device_type, ia=$ia, port=$port, testcase=$testcase, loc=$loc_code \n"); 
+	}
+	#set defauts for ent not set
+	if(!$dev_name) {
+		print("dev_name is not set in line->$line\n");
+		exit(0);
+	}
+	if(!$device_type) {
+		print("device_type is not set in line->$line\n");
+		exit(0);
+	}
+	if(!$testcase) { 
+		print("testcase is not set in line->$line\n");
+        exit(0);
+    }
+
+}
+sub set_this {
+	return(int(rand(2)));
+}
+
+
+sub get_defaults {
+	local($val);
+	if($force_defaults =~ /y/i) {
+		$val="yes";
+	} else {
+		$val="no";
+		$val="yes" if(&set_this());
+	}
+	return($val);
+}
+
+sub mk_temp_ibline { 
+	local($line, $loc)=@_;
+	$use_defaults = &get_defaults();
+    # Right now $line contains device_name, n, device_type
+    chomp($line);
+	&debug_log(__FUNC__,__LINE__,"building temporary IPoIB line \n"); 
+	($device, $nid, $device_type) = split(/\s+/,$line);
+	$testcase=$IPoIB;
+	chomp($device); 
+	$mlxdev=`ibdev2netdev | awk ' /$device/ { print \$1 }'`; 
+	$mlxdev=&trim($mlxdev); 
+	if(!$mlxdev) { 
+		$mlxdev="NA"; 
+	}
+	$mlxport=`ibdev2netdev | awk ' /$device/ { print \$3 }'` ; 
+	$mlxport=&trim($mlxport); 
+	if(!$mlxport) {
+		$mlxport="NA"; 
+	} 
+	$mtu=`ip addr show dev $device 2>/dev/null | awk '/mtu/ {print \$5}' `;
+    $mtu=&trim($mtu);
+	$line="$line " .  " $mlxdev $mlxport $testcase  $loc  ";
+	&debug_log(__FUNC__,__LINE__,"IB Line : $line \n"); 
+	return($line); 
+} 
+
+sub mk_temp_hcaline { 
+	local($line, $loc)=@_; 
+	$use_defaults = &get_defaults(); 
+	# Right now $line contains device_name, n, device_type
+    chomp($line);
+	&debug_log(__FUNC__,__LINE__,"building temporary hca line \n"); 
+	($device, $nid, $device_type) = split(/\s+/,$line); 
+	$testcase=$RDMA; 
+	$device=&trim($device); 
+	$num_ports=0; 
+	$path = "/sys/class/infiniband/$device/ports/"; 
+	if(-d $path) { 
+		$num_ports = `ls $path | wc -l `;  
+	}
+	$complete_line=""; 	
+	for($i=1; $i <= $num_ports; $i++) { 
+		$ia="$device-$i"; 
+		$temp_line = "$device n $device_type $ia $i RDMA $loc \n";   	
+		&debug_log(__FUNC__,__LINE__,"mk_temp_hcaline: line=$temp_line \n"); 
+		$complete_line = $complete_line. $temp_line; 
+	}	
+
+	return($complete_line); 
+}	
+
+
+
+sub mk_temp_entline {
+	local($line, $loc)=@_;
+	$use_defaults = &get_defaults();
+	# Right now $line contains device_name, n, device_type
+	chomp($line); 
+	($device, $nid, $device_type) = split(/\s+/,$line);	
+	&debug_log(__FUNC__,__LINE__,"building temporary ethernet line \n"); 
+	# Get the default values 
+	# Enable/Disable Jumbo Frames 
+	chomp($device); 
+	$mtu=`ip addr show dev $device 2>/dev/null | awk '/mtu/ {print \$5}' `;
+	$mtu=&trim($mtu); 
+	if($mtu =~/1500/i) { 
+		$jumbo_frames="no"; 
+	} elsif($mtu =~ /9000/i) { 
+		$jumbo_frames="yes"; 
+		$mtu=9000; 
+	} else { 
+		# Force 1500 MTU as default
+		$jumbo_frames="no";
+        $mtu=1500;
+	} 	
+	
+	# NIC's default to TCP, user need to specify RDMA specifically. 
+	$testcase=$TCP; 
+	if($use_defaults =~ /yes/i) {   
+	} else { 
+		# Randomize ...  
+		if(&set_this()) { 
+			$jumbo_frames="yes" ; 
+		} else { 
+			$jumbo_frames="no"; 
+		}
+		if($jumbo_frames=~ /y/i) { 
+			$jumbo_frames="yes";
+            $mtu=int(rand(7500)) + 1500;
+		} else { 
+			$jumbo_frames="no";
+            $mtu=1500;
+		} 
+	}
+	# $all_jumbo overrides above default settings. 
+	if($all_jumbo) {
+		$jumbo_frames = "yes";
+		$use_defaults="no";
+		$mtu="9000";
+	}
+	$line="$line " .  " $use_defaults $mtu $jumbo_frames $testcase $loc  ";
+	&debug_log(__FUNC__,__LINE__,"$line\n");
+
+	if($run_automate eq $net_iface_file) 
+	{
+		print TEST_IFACE ("$device \n"); 
+	}
+
+	return($line); 
+}
+
+#Network Team interface
+sub mk_temp_tmline {
+    local($line, $loc)=@_;
+    $use_defaults = &get_defaults();
+    # Right now $line contains device_name, n, device_type
+    chomp($line);
+    ($device, $nid, $device_type) = split(/\s+/,$line);
+
+	if($device =~ /tm/ || $device =~ /bond/) {
+	} else {
+		return("");
+	} 
+    &debug_log(__FUNC__,__LINE__,"building temporary ethernet line \n");
+    # Get the default values
+    # Enable/Disable Jumbo Frames
+    chomp($device);
+    $mtu=`ip addr show dev $device 2>/dev/null | awk '/mtu/ {print \$5}' `;
+    $mtu=&trim($mtu);
+    if($mtu =~/1500/i) {
+        $jumbo_frames="no";
+    } elsif($mtu =~ /9000/i) {
+        $jumbo_frames="yes";
+        $mtu=9000;
+    } else {
+        # Force 1500 MTU as default
+        $jumbo_frames="no";
+        $mtu=1500;
+    }
+
+    # NIC's default to TCP, user need to specify RDMA specifically.
+    $testcase=$TCP;
+    if($use_defaults =~ /yes/i) {
+    } else {
+        # Randomize ...
+        if(&set_this()) {
+            $jumbo_frames="yes" ;
+        } else {
+            $jumbo_frames="no";
+        }
+        if($jumbo_frames=~ /y/i) {
+            $jumbo_frames="yes";
+            $mtu=int(rand(7500)) + 1500;
+        } else {
+            $jumbo_frames="no";
+            $mtu=1500;
+        }
+    }
+    # $all_jumbo overrides above default settings.
+    if($all_jumbo) {
+        $jumbo_frames = "yes";
+        $use_defaults="no";
+        $mtu="9000";
+    }
+    $line="$line " .  " $use_defaults $mtu $jumbo_frames $testcase $loc  ";
+    &debug_log(__FUNC__,__LINE__,"$line\n");
+
+    if($run_automate eq $net_iface_file)
+    {
+		 print TEST_IFACE ("$device \n");
+    }
+
+    return($line);
+}
+
+sub is_devline {
+	local($devline)=@_; 
+	#works for Linux. 
+	if($devline =~ /^$entname/ ||$devline =~ /^ib/ || $devline =~ /^hfi/ || $devline =~ /^$netface/ || (($new_naming == 1) && ($devline =~ /^$new_eniface/)) 
+		|| $devline =~ /^$hcaname/ || $devline =~ /^$tmname/  || $devline =~ /^$bondname/) {
+	   	return("yes");	
+	} else {
+	   	return("");	
+	}
+}  
+
+sub ping_up_host {
+
+    local($host,$dev)=@_;
+    $retry = 0;
+
+    while($retry < 5)
+    {
+        $res = ping_up($host);
+        if($res eq "yes") {
+            return "yes";
+        }
+        else {
+            &debug_log(__FUNC__,__LINE__,"Pinging host $host failed. $retry Retrying...\n");
+            $retry++;
+        }
+    }
+    return("");
+}
+
+sub ping_up {
+    local($host)=@_;
+    #see if the server is up..
+    $res = `ping -c1 -w1 $host`;
+	if($res =~ /100%/ || !$res) {
+		return("");
+    }
+	return("yes");
+}
+
+sub arping_up {
+    local($ip , $dev)=@_;
+    #see if we get a arping response..
+    $cmd = "/usr/sbin/arping";
+    if(!(-e $cmd)) {
+        &debug_log(__FUNC__,__LINE__,"arping not present ignore result from arping \n");
+        return("");
+    }
+    $cmd = "/usr/sbin/arping -q -c 2 -w 3 -D -I $dev $ip";
+    $res = system($cmd);
+    $res = $res >> 8;
+    &debug_log(__FUNC__,__LINE__,"arping .. using cmd .. $cmd, response=$res. \n");
+    if($res == 1) {
+        return("yes");
+    } else {
+        return("");
+    }
+}
+
+sub mygetip() {
+	local($host) = @_;
+	local($i,$name,@addrlist,$altnames,$addrtype,$ip);
+
+	if(!(($name,$altnames,$addrtype,$len,@addrlist) = gethostbyname($host))) {
+		print("mygetip: IP for $host not found. Make sure your $host is a valid hostname (nameserver knows it).\n");
+		print("You may need to configure the comnet\n");
+        print("build_net no longer supports anything but use_site net. You really don't have to have this system on site net, but it does have to have the comnet (which can be private address) already configured. \nIn AIX use smit tcpip to configure you communications network.\n");
+		exit(1);
+	} else {
+		for ($i=0; $i<@addrlist; $i++) {
+			@addrbytes = unpack("C4", $addrlist[$i]);
+			$ip = join(".",@addrbytes);
+		}
+	}
+	return($ip);
+}
+sub mygethostname {
+	local($ip) = @_;
+	local($host,$dhost);
+
+	#given ip address get host name
+
+	$ip =~ s/[^_0-9a-zA-Z\/+]*$//;
+	$ip =~ s/^[^_0-9a-zA-Z\/+]*//;
+
+	@bytes = split(/\./,$ip);
+	$packaddr = pack("C4", @bytes);
+
+	if(!(($name,$altnames,$addrtype,$len,@addrlist) = gethostbyaddr($packaddr,2))) {
+		print("FAILED: Hostname for $ip not found. Its not in /etc/hosts or nameserver.\n");
+		exit(1);
+	} else {
+		$host = "$name";
+	}
+	($host,$dhost) = &pull_domain($host);
+	return($host,$dhost);
+}
+###########################################################################################
+# This function allocates IP address, Rules file depending on net_id specified in bpt file. 
+# If bpt file is incorrect has the capability to auto correct or flag an error. 
+############################################################################################
+sub get_nets_linux {
+	local($doingCom,$devline,$rc_check,$i);
+
+	foreach $devline (@profile) {
+		next if(!&is_devline($devline)); 
+		&split_devline($devline);
+
+		print("...............................Found $dev_name in location $loc_code\n");
+
+		&debug_log(__FUNC__,__LINE__,"net_id set to $net_id\n");
+		if($net_id =~ /n/i) { 
+			next; 
+		} elsif($net_id =~ /com/i ) {
+			print ("$dev_name.. Detected site network. Skipping it .... .\n");
+			$gotcom=1; 
+			next; 
+		}
+
+		if($net_id !~ /com/i) {
+			if($net_id !~ /b/i) {
+				$doingCom="";		 
+				$rc_check=&check_net_id($net_id);
+				if($rc_check<0) {
+					exit(0);
+				}
+			} 
+		} else {
+			if($gotcom) {
+				print("You assigned two com nets, in $prof\n");
+				exit(0);
+			} else {
+				&debug_log(__FUNC__,__LINE__,"Set doingCom and gotcom to 1\n"); 
+				$doingCom=1;
+				$gotcom=1;
+			}
+			&debug_log(__FUNC__,__LINE__,"Using site ring.\n");
+			#make sure com_dev = this device
+			if($dev_name ne $com_dev && !$no_comdev) {
+				print("You chose the wrong devices as comnet, |$com_dev| is the comnet, dev_name = $dev_name\n");
+				exit(0);
+			}
+		}
+        $nets[$net_count]{master} = "none";
+		# it is either com or a test net and its available 
+        #so save it and get other needed information 
+        $nets[$net_count]{net_id} = $net_id;
+        # save the slot*
+        $nets[$net_count]{slot} = $loc_code;
+        $nets[$net_count]{dev_name} = $dev_name;
+        # now get the parent 
+        $nets[$net_count]{parent} = "pci";
+        # now get the PdDvLn .. sample adapter/mca/atm4 
+        $nets[$net_count]{PdDvLn} = "dummy";
+		$nets[$net_count]{testcase} = $testcase; 
+
+        if($doingCom && !$config_com) {
+            $nets[$net_count]{net_name}=$comhostname;
+        } else {
+            #this is not com
+            $nets[$net_count]{net_iface}=&get_iface($dev_name);
+            $nets[$net_count]{device_type}=$device_type;
+        }
+		#Anything specific to device type goes here. 
+		if($dev_name =~ /$entname/ || (( $new_naming == 1) && ($dev_name =~ /$new_enname/))) {    
+			&get_ent_info();
+		} elsif($dev_name =~ /$ibname/) {    
+			&get_ib_info(); # just writes profile line out..
+		}  elsif($dev_name =~ /$tmname/ || $dev_name =~ /$bondname/) {
+			#Network Team interface
+            &get_ent_info(); # just writes profile line out..
+        } elsif($dev_name =~ /$hcaname/) { 
+			&get_hca_info(); 
+		}
+
+		if($doingCom) {
+			# check to see if this adapter can be com net 
+			# set the comnet ip address for this host 
+			$nets[$net_count]{net_addr}= "$com_ip";
+			# set the net name for com net on this host 
+			$nets[$net_count]{net_name}= "$comhostname";
+			# set rule name as none, there is no rule for com net 
+			$nets[$net_count]{rule_name}= "none";
+		} elsif ($net_id !~ /b/i) {
+            if($rc_check > 1) {
+                # onesys is set and this is second adapter in ip pair 
+                # set the testnet ip address for this network 
+				if($classB_net) {
+                	$nets[$net_count]{net_addr} = "$nets[$net_count]{net_id}" . ".2." . "$next_host_number";
+				}
+				else{
+                    $nets[$net_count]{net_addr} = "$nets[$net_count]{net_id}" . ".1.2." . "$next_host_number";
+				}
+                #Set the net name for this test net 
+                $nets[$net_count]{net_name} = "$nets[$net_count]{net_id}" . "nets" . "$next_host_number";
+                # /* set rule name for hxecom */
+                $nets[$net_count]{rule_name} = "$nets[$net_count]{net_id}" . "nets";
+            } else {
+                if($classB_net) {
+				   # /* set the testnet ip address for this network */
+					$nets[$net_count]{net_addr} = "$nets[$net_count]{net_id}" . ".1." . "$this_host_number";
+                } else {
+                    $nets[$net_count]{net_addr} = "$nets[$net_count]{net_id}" . ".1.1." . "$this_host_number";
+                }
+                $nets[$net_count]{net_name} = "$nets[$net_count]{net_id}" . "net"  . "$this_host_number";
+                $nets[$net_count]{rule_name} = "$nets[$net_count]{net_id}" . "net";
+			}
+		}
+		$nets[$net_count]{bcast}=&getbcast($nets[$net_count]{net_addr}, $testmask);  
+		&debug_log(__FUNC__,__LINE__,"Net addr is $nets[$net_count]{net_addr}, broadcast=$nets[$net_count]{bcast}  for net_count $net_count\n");
+		if(++$net_count>223) {  #  /* incremnet the net counter */
+			print("$net_count is to many networks\n");
+			exit(0);
+		}
+	}
+}
+
+sub do_linux_net_loop {
+
+	for($i=0; $i<$net_count; $i++) {
+	
+		# Let us decide which testcase to run on each pair. 	
+		&split_devline($nets[$i]{line});
+
+		if($net_id =~ /com/i) { 
+			&debug_log(__FUNC__,__LINE__,"Found com at $nets[$i]{net_iface} \n. Skipping it .... "); 
+			next; 
+		} 	
+		if($onesys =~ /y/ && ($device_type =~ /virtual_ent/ || $device_type =~ /vlan/i)) {
+			 print("Allowing Virtual ethernets in a one system test, make sure the ents are on the same pvid!\n");
+		}
+		
+		if($net_id !~ /b/i) {
+			# add dev_name to /tmp/comm_eehlist
+			if($nets[$i]{rule_name} !~ /nets/) {
+				$res = `echo $dev_name >> /tmp/comm_eehlist`;
+			}
+
+			if($onesys =~ /n/) { 
+				#/* add the other_ids testnet names to /etc/hosts */
+				foreach $other_id (@other_ids) {
+					if(!$other_id) {last;}
+					if($other_id =~ /\d{1,3}\.\d{1,3}\.(\d{1,3})\.(\d{1,3})/) {
+						if($classB_net) {
+							$string="$net_id" . ".1" . ".$1" . ".$2";
+							$tmpstring="$net_id" . "net" . "$1" . ".$2";
+						} else {
+							$string="$net_id" . ".1.1." . "$2";
+							$tmpstring="$net_id" . "net" . "$2";
+						}
+						&add_hosts_nets("$tmpstring","$string");
+						$res = `grep $tmpstring /.rhosts`;
+						if(!$res) {
+							&add_rhosts_nets("$tmpstring");
+						}
+					} else {
+						print("Invalid values in others_ids array val = |$other_id]|\n");
+						exit(1);
+					}
+				}
+			} else { 
+				&add_hosts_nets($nets[$i]{net_name}, $nets[$i]{net_addr}); 
+			}
+
+		}
+        &debug_log(__FUNC__,__LINE__,"########################## Configuring $device_type, dev=$dev_name, rule=$nets[$i]{rule_name}, hostname=$nets[$i]{net_name} ################################\n"); 
+		print("Configuring $device_type, dev=$dev_name, rule=$nets[$i]{rule_name}, hostname=$nets[$i]{net_name},ip address=$nets[$i]{net_addr} \n"); 
+		if($dev_name =~ /$bondname/ || $dev_name =~ /$tmname/ || $dev_name =~ /$entname/ || (( $new_naming == 1) && ($dev_name =~ /$new_enname/))) {
+
+			# BringUp the interface, configure IP address on it. 		
+			if($testcase =~ /$TCP/) { 
+				$res=&setup_TCP_testcase($device_type, $nets[$i]{net_name}, $nets[$i]{net_addr}, $nets[i]{bcast}, $testmask, $nets[$i]{net_iface}); 
+			} else {
+				# In future if entXX supports other then TCP testcase then add there setup function here. 
+			} 
+			
+        	# Lastly i need to set MTU	
+            if($jumbo_frames =~ /y/i || $all_jumbo =~ /y/i) {
+                &debug_log(__FUNC__,__LINE__,"ip link set mtu 9000 dev $nets[$i]{net_iface}");
+                $res = `ip link set mtu 9000 dev $nets[$i]{net_iface}`;
+            }
+ 
+		} elsif($dev_name =~ /hfi/) { 
+			# Configure TCP testcase for hfi's as default. 
+			$res=&setup_TCP_testcase($device_type, $nets[$i]{net_name}, $nets[$i]{net_addr}, $testmask, $nets[$i]{net_iface}); 
+		} elsif($dev_name =~ /ib/) {
+			# IB adapters can be configured to run IPoIB or RDMA testcase. 
+			&debug_log(__FUNC__,__LINE__,"Details =   $nets[$i]{net_iface}, $nets[$i]{net_name}, $nets[$i]{ia},  $nets[$i]{net_addr}, $testmask, $nets[$i]{port} \n"); 
+			if($nets[$i]{testcase} =~ /$IPoIB/ ) { 
+				&setup_IPoIB_testcase($nets[$i]{net_iface}, $nets[$i]{net_name}, $nets[$i]{net_addr}, $nets[$i]{bcast}, $testmask, $nets[$i]{ia}, $nets[$i]{port} );
+				# IPoIB still runs TCP testcase on ibXX
+			} elsif($nets[$i]{testcase} =~ /$RDMA/) { 
+				&setup_IPoIB_testcase($nets[$i]{net_iface}, $nets[$i]{net_name}, $nets[$i]{net_addr}, $nets[$i]{bcast}, $testmask, $nets[$i]{ia}, $nets[$i]{port} );
+				&setup_RDMA_testcase($nets[$i]{net_iface}, $nets[$i]{ia}, $nets[$i]{port}, $IPoIB, $nets[$i]{net_addr}); 			
+			} else { 
+				print("$dev_name: Illegal testcase=$testcase specified in bpt file, Valid inputs $TCP, $RDMA, $IPoIB !!!!\n");  
+				exit(0); 
+			}
+		} elsif($dev_name =~ /$hcaname/) { 
+			&debug_log(__FUNC__,__LINE__,"Details = $nets[$i]{dev_name}, ia=$nets[$i]{ia},  port=$nets[$i]{port}, tc=$nets[$i]{testcase} \n"); 
+			if($testcase =~ /$RDMA/) {
+                &setup_RDMA_testcase($nets[$i]{net_iface}, $nets[$i]{dev_name}, $nets[$i]{port}, $nets[$i]{testcase}, $nets[$i]{net_addr});
+            } else {
+                print("$dev_name: Illegal testcase=$testcase specified in bpt file, Valid inputs $TCP, $RDMA, $IPoIB !!!!\n");
+                exit(0);
+            }
+
+		} else {
+			print("$dev_name: UNKNOWN1  type of adapter. This program needs to be updated to handle the new adapter.\n");
+			exit(0);
+		}
+		if($onesys =~ /y/ && $net_id !~ /com/i &&($nets[$i]{testcase} !~ /$RDMA/i)) {
+            if($nets[$i]{rule_name} =~ /nets/) {
+                $pairs[$nets[$i]{net_id}]="$pairs[$nets[$i]{net_id}]" .  " $nets[$i]{dev_name} " . " $nets[$i]{net_addr} " . " $num_pairs " ;
+				&debug_log(__FUNC__,__LINE__,"pairs = $num_pairs \n"); 
+                &add_routes($nets[$i]{net_id});
+				$num_pairs++; 
+            } else {
+                $pairs[$nets[$i]{net_id}]=" $nets[$i]{dev_name} " . " $nets[$i]{net_addr} ";
+            }
+        }
+
+        #  for each network set up a rules file .
+        #  Set up mdt entry if its not com or com is to be tested 
+       
+        &debug_log(__FUNC__,__LINE__,"check on make_rule and make_mdt.. dev_name $nets[$i]{net_iface}, rule name $nets[$i]{rule_name}\n");
+
+        # create rules file and add to net.mdt file if not comnet
+        if($nets[$i]{rule_name} !~ /none/) {
+        	&make_rule($i, $nets[$i]{testcase});
+            &make_mdt($i, $device_type, $nets[$i]{testcase});
+        }
+        &debug_log(__FUNC__,__LINE__,"########################## Configuration Completed for dev=$dev_name, rule=$nets[$i]{rule_name}, hostname=$nets[$i]{net_name} ################################\n");
+	}   #END LOOP THRU NETWORKS>>> AIX
+}
+
+sub setup_IPoIB_testcase { 
+
+    $res="";
+	local($net_iface, $net_name, $net_addr, $broadcast, $testmask, $device_name, $device_port) = @_; 
+	&debug_log(__FUNC__,__LINE__,"setup_IPoIB_testcase:net_iface=$net_iface, net_name=$net_name, net_addr=$net_addr, broadcast=$broadcast, testmask=$testmask, device_name=$device_name, device_port=$device_port \n"); 
+	if(onesys =~ /y/i) { 
+		&setup_opensm($device_name, $device_port); 	
+	}
+	#Right now everything same as setup_TCP_testcase
+	$res = &setup_TCP_testcase($type, $net_name, $net_addr, $broadcast, $testmask, $net_iface); 
+	return($res);  
+}
+
+sub setup_TCP_testcase { 
+	
+	$res=""; 
+	local($dev_type, $net_name, $net_addr, $broadcast, $testmask, $iface) = @_; 
+    # Now configure IP address, netmask for the interface.
+	&debug_log(__FUNC__,__LINE__,"Configuring IP Address : $net_addr on $iface .... \n"); 	
+	# Re-Configure the device 
+	# &debug_log(__FUNC__,__LINE__,"ip link set $iface down \n");
+	# $res = `ip link set $iface down > /dev/null 2>&1`;
+	&debug_log(__FUNC__,__LINE__,"ip link set $iface up \n"); 
+	$res=`ip link set $iface up  > /dev/null 2>&1`; 
+	# Flush the previous IP Address if any 
+	&debug_log(__FUNC__,__LINE__,"ip addr flush $iface \n"); 
+	$res = `ip addr flush $iface > /dev/null 2>&1`; 
+
+	# Before Configuring IP address, check no other interface with same IP exists. 
+    if(&ping_up_host($nets[$i]{net_addr})) {
+		print("You can't use the net_id for this ip: $nets[$i]{net_addr}. \n");
+        print("A real system somewhere on the network is configured with this ip. Change the net_id to something else in the bpt file.\n");
+        exit(0);
+    }
+	# First try the old way, use mktcpip
+    &debug_log(__FUNC__,__LINE__,"/usr/sbin/mktcpip -h'$net_name' -a'$net_addr' -m'$testmask' -i'$iface' -t'tp'\n");
+	$cmd = "/usr/sbin/mktcpip -h'$net_name' -a'$net_addr' -m'$testmask' -i'$iface' -t'tp'"; 
+   	$res = system($cmd);
+	$rc=$res >> 8; 
+	&debug_log(__FUNC__,__LINE__,"return_code from setup_TCP_testcase = $rc \n"); 
+	if($rc) {
+		# /usr/sbin/mktcpip failed, lets try ip to configure static ip 
+		# Now configure new IP Address. 
+		&debug_log(__FUNC__,__LINE__,"/usr/sbin/mktcpip failed, falling back to IP command \n");
+		&debug_log(__FUNC__,__LINE__," ip addr add $net_addr dev $iface broadcast $broadcast \n");  
+		# If IP is configured this way, then we need this after each reboot !!	
+		print SET_ONESYS ("ip link set $iface up  > /dev/null 2>&1 \n");
+		if($iface =~ /tm/) {
+			#Network Team interface
+			`nmcli connection up $iface-p1`;
+			`nmcli connection up $iface-p2`;
+			`nmcli connection up $iface`;
+		}
+		print SET_ONESYS (" ip addr add $net_addr dev $iface broadcast $broadcast \n");  
+   	} else { 
+		#mktcpip successfull, sleep for some time and then reconfigure the device twice 
+		# mktcp does that but its not always successfull.  
+		sleep(1); 
+		print SET_ONESYS ("ifup $iface  > /dev/null 2>&1 \n"); 
+	}
+	return($rc); 
+}
+
+sub setup_RDMA_testcase { 
+
+	local($ia, $dev_name, $port, $testcase, $net_addr) = @_; 
+	&debug_log(__FUNC__,__LINE__,"setup_RDMA_testcase: ia=$ia, dev_name=$dev_name, port=$port, testcase=$testcase, net_addr=$net_addr \n"); 
+
+    &debug_log(__FUNC__,__LINE__,"Test RDMA = $RDMA_TC,  \n");
+    # File exists, lets modify it as our requirement.
+    unless (open (DAT_FILE,"$DAT_CONF_DEFAULT")) {
+    	die ("Can't open $DAT_CONF_DEFAULT file! exiting...")
+    }
+    unless(open(TEMP_FILE, ">/tmp/dat.conf")) {
+    	die ("Can't open /tmp/dat.conf file ! exiting .... ");
+    }
+    $found = 0;
+	####################################################################################################################
+	# Steps on how to form a dat line .. 
+	# Dat Line looks like : 
+	# 	<ia_name> <api_version> <threadsafety> <default> <lib_path> <provider_version> <ia_params> <platform_params> 
+	#  More info at @ http://linux.die.net/man/5/dat.conf
+	#  Where IP can be configured(IPoIB interface or RoCE) dat line looks like : 
+	#  	ofa-v2-ib0 u2.0 nonthreadsafe default libdaplofa.so.2 dapl.2.0 "ib0 0" "" 
+	# 	ofa-v2-cma-roe-eth3 u2.0 nonthreadsafe default libdaplofa.so.2 dapl.2.0 "eth3 0" "" 
+	# For Pure IB where IP cannot be configured (ex : mlx4_0 port 1 & 2 ) : 
+	# 	ofa-v2-mlx4_0-1 u2.0 nonthreadsafe default libdaploscm.so.2 dapl.2.0 "mlx4_0 1" ""
+	#	ofa-v2-mlx4_0-2 u2.0 nonthreadsafe default libdaploscm.so.2 dapl.2.0 "mlx4_0 2" "" 
+	######################################################################################################################
+
+    # my data_line
+	if($testcase =~ /$RDMA/) { 
+		$dat_line = "$ia u2.0 nonthreadsafe default libdaploscm.so.2 dapl.2.0 \"$dev_name $port\" \"\"" ;	
+	} else { 
+		$dat_line = "$ia u2.0 nonthreadsafe default libdaplofa.so.2 dapl.2.0 \"$dev_name 0\" \"\""  ;
+	}
+   	&debug_log(__FUNC__,__LINE__,"dat_line = $dat_line  \n");
+    
+    @datfile = <DAT_FILE>;
+    foreach $line (@datfile) {
+    	chomp($line);
+        if($line =~ /$ia/) {
+       	 	#Found Entry, replace it.
+            &debug_log(__FUNC__,__LINE__," Found $dev_name in Line $line \n");
+            $found = 1;
+            $line = $dat_line;
+        }
+        print TEMP_FILE "$line \n";
+   	}
+   	if(!$found) {
+   		$found = 0;
+       	print TEMP_FILE "$dat_line \n";
+        &debug_log(__FUNC__,__LINE__," Appending : $dat_line , to file /tmp/dat.conf \n");
+    }
+    close (TEMP_FILE);
+    close (DAT_FILE);
+    `mv $DAT_CONF_DEFAULT /tmp/dat.conf.bak`;
+    `cp /tmp/dat.conf /etc/`;
+    &debug_log(__FUNC__,__LINE__," $DAT_CONF_DEFAULT updated ...... \n");
+    # &add_hosts_nets($nets[$i]{net_name}, $nets[$i]{net_addr});
+    if($RDMA_TC =~ /yes/) {
+    	$TESTCASE="RDMA";
+    }
+	##################################################################################
+	#Attempt to bring the physical device port to active state if not already done . 
+	##################################################################################
+	if($onesys =~ /n/i) { 
+		# For MultiSystem test SM is present on IB Switch, so don't need below steps. 
+		return; 
+	} else { 
+		# For Single System OpenSM takes care of bringing the ports in ACTIVE state, 
+		# try running it on configured ports .. 
+		&setup_opensm($dev_name, $port); 
+		return; 
+	}
+
+}
+
+sub setup_opensm { 
+	
+	($dev_name, $port) = @_; 
+	#Preliminary checks for opensm and Mellanox OFED
+	$opensm_path="/usr/sbin/opensm";
+	$opensm_service_path="/etc/init.d/opensmd";
+	$opensm_pid="/var/run/opensm.pid";
+	$opensm = 0;
+	$is_switch_connected = 0;
+	
+	$dev_name= &trim($dev_name); 
+	$path="/sys/class/infiniband/".$dev_name; 
+	if(!(-e $path)) { 
+		print("Can't find device=$path, run opensm manually ..\n"); 
+		return; 
+	} 
+			
+	if ( -e $opensm_path) { # Check if open sm binary is present.
+    	$opensm = 1;
+	} else {  # Cannot do anything w/o opensm, exit ...
+    	$opensm = 0;
+    	print("OpenSM not installed \n");
+    	exit(1);
+	}
+	$state=&get_port_state($dev_name, $port);
+	#Get GID for
+    $guid=&get_node_guid($dev_name);
+	if($state =~/DOWN/i) {
+       	&debug_log(__FUNC__,__LINE__,"No port to port connection seems to be presnet. Device=$dev_name, port=$port, state=$state \n");
+       	exit(3);
+    } elsif($state =~/INIT/) {
+    	if($opensm == 1) { 
+			$is_switch_connected = `ibnodes | grep $guid | grep "^Switch" | wc -l`;
+			if($is_switch_connected == 0) {
+                &debug_log(__FUNC__,__LINE__,"Port with guid=$guid is not connected by switch and starting opensm\n");
+        	    #try running opensm binary to get port to active state.
+                $rc = &run_opensm_on_ports($opensm_path, $dev_name, $port, $guid);
+                if(rc != 0) {
+            	    &debug_log(__FUNC__,__LINE__," Check for incompatible cables. Device=$dev_name, port=$port, state=$state\n");
+                    exit(4);
+                }
+				$opensm_pingum_delay = 1;
+            } else {
+                &debug_log(__FUNC__,__LINE__,"Port with guid=$guid is connected by switch and skipping opensm starting\n");
+            } 
+       	} else {
+       		&debug_log(__FUNC__,__LINE__,"Port to port connection detected, but incompatible  cables used. Device=$dev_name, port=$port,  state=$state \n");
+        }
+   	} elsif($state =~ /ACTIVE/) {
+   		&debug_log(__FUNC__,__LINE__,"Ports ACTIVE, good to run DMA & MMIO's. Device=$dev_name, port=$port, state=$state \n");
+    } else {
+    	&debug_log(__FUNC__,__LINE__,"Unknown port state.  Device=$dev_name, port=$port, state=$state \n");
+    }
+}
+
+	
+sub get_port_state() {
+    local($dev, $port)=@_;
+    $dev=&trim($dev);
+    $port=&trim($port);
+
+    $path="/sys/class/infiniband/$dev/ports/$port/state";
+
+    $state=`cat $path | cut -d : -f 2 `;
+    $state=&trim($state);
+
+    print("device=$dev, port=$port, state=$state \n");
+    return($state);
+}
+
+sub get_node_guid() {
+
+    local($dev) = @_;
+    $dev=&trim($dev);
+
+    $path="/sys/class/infiniband/$dev/node_guid";
+    $guid=`cat $path`;
+    # remove delimiter to get complete qualified string
+    @array=split(/:/,$guid);
+    $guid_string="0x". join('', @array);
+
+    &debug_log(__FUNC__,__LINE__,"Device=$dev, GUID = $guid_string \n");
+    $guid_string=&trim($guid_string);
+
+    return($guid_string);
+}
+	
+sub run_opensm_on_ports() {
+    local($opensm_path, $ib_device, $port, $guid) = @_;
+    &debug_log(__FUNC__,__LINE__,"Running command : $opensm_path -g  $guid & \n");
+    `$opensm_path -g  $guid -o`;
+	print SET_ONESYS ("$opensm_path -g  $guid & \n"); 
+
+    $state=&get_port_state($ib_device, $port);
+    if($state =~ /ACTIVE/) {
+        &debug_log(__FUNC__,__LINE__,"Port ACTIVE, good to run DMA & MMIO's. Device=$ib_device, port=$port, state=$state \n");
+        return(0);
+    } else {
+        &debug_log(__FUNC__,__LINE__,"OpenSM could not bring ports to active state. Device=$ib_device, port=$port, state=$state\n");
+        return(5);
+    }
+}
+
+
+sub add_routes {
+	local($net_id)=@_; 
+	chomp($net_id); 
+    $pairs[$net_id]=&trim($pairs[$net_id]);
+    ($iface_a, $address_a, $iface_b, $address_b, $network) = split(/\s+/, $pairs[$net_id]);
+    &debug_log(__FUNC__,__LINE__,"add_routes : iface_a=$iface_a, iface_b=$iface_b, address_a=$address_a, address_b=$address_b, network=$network \n");
+
+	if($KERNEL_26) { 
+		&debug_log(__FUNC__,__LINE__,"We are using ip_crossover kernel module, for net=$net_id,  pairs=$pairs[$net_id]\n");	
+		$module_alias="ip_crossover$network"; 
+
+		$mac_a=`cat /sys/class/net/$iface_a/address`; 
+		$mac_a=&trim($mac_a);
+		@paramm = $address_a=~ /(\w+).(\w+).(\w+).(\w+)/;
+		$kaddress_a="$paramm[0].$paramm[1].$paramm[2].2"; 
+
+		$mac_b=`cat /sys/class/net/$iface_b/address`; 
+		$mac_b=&trim($mac_b); 
+		@paramm = $address_b=~ /(\w+).(\w+).(\w+).(\w+)/;
+		$kaddress_b="$paramm[0].$paramm[1].$paramm[2].2"; 
+		
+		&debug_log(__FUNC__,__LINE__,"Trying to load $module_alias b/w: $iface_a:$mac_a and $iface_b:$mac_b ...\n");
+		$cmd="/sbin/modprobe -o $module_alias ip_crossover dev1=$iface_a dev2=$iface_b";
+        &debug_log(__FUNC__,__LINE__,"$cmd\n");
+	 	print SET_ONESYS ("$cmd\n");
+	
+		&debug_log(__FUNC__,__LINE__,"Setting arp entries $kaddress_a, mac=$mac_b  \n"); 	
+		# $cmd = "arp -s $kaddress_a $mac_b";
+		$cmd = "ip neigh add $kaddress_a lladdr $mac_b dev $iface_a nud perm"; 
+        &debug_log(__FUNC__,__LINE__,"$cmd\n");
+        print SET_ONESYS ("$cmd\n");
+
+		&debug_log(__FUNC__,__LINE__,"Setting routes for iface_a=$iface_a:iface_ip=$address_a:kernel_ip=$kaddress_a \n"); 
+		$cmd = "ip route add $kaddress_a via $address_a"; 
+		&debug_log(__FUNC__,__LINE__,"$cmd\n");
+		print SET_ONESYS ("$cmd\n"); 
+
+		&debug_log(__FUNC__,__LINE__,"Setting arp entries $kaddress_b mac=$mac_a \n"); 
+        # $cmd = "arp -s $kaddress_b $mac_a";
+		$cmd = "ip neigh add $kaddress_b lladdr $mac_a dev $iface_b nud perm"; 
+        &debug_log(__FUNC__,__LINE__,"$cmd\n");
+        print SET_ONESYS ("$cmd\n");
+
+		&debug_log(__FUNC__,__LINE__,"Setting routes for iface_a=$iface_b:iface_ip=$address_b:kernel_ip=$kaddress_b \n"); 
+		$cmd = "ip route add $kaddress_b via $address_b";	
+		&debug_log(__FUNC__,__LINE__,"$cmd\n");
+        print SET_ONESYS ("$cmd\n");
+		
+
+	} else { 
+    	&debug_log(__FUNC__,__LINE__,"We are using Policy based routing technique net=$net_id,  pairs=$pairs[$net_id]\n");
+		$iface_a=&trim($iface_a); 
+		$iface_b=&trim($iface_b); 
+
+    	$base=(($network + 1) * 100);
+    	$table_a=($base+10);
+    	$table_b=($base+20);
+
+    	# Move local rule if no one else has
+    	$rc=`ip rule show | awk ' /local/ ' | cut -d : -f 1`;
+    	chomp($rc);
+    	if( $rc == 0 ) {
+        	print SET_ONESYS ("ip rule add pref 20000 lookup local \n");
+    		&debug_log(__FUNC__,__LINE__,"Running .. ip rule del pref 0 \n");
+    		print SET_ONESYS ("ip rule del pref 0 \n");
+    	}
+
+    	# RX
+    	&debug_log(__FUNC__,__LINE__,"Running ..echo 1 > /proc/sys/net/ipv4/conf/$iface_a/accept_local \n");
+    	print SET_ONESYS ("echo 1 > /proc/sys/net/ipv4/conf/$iface_a/accept_local \n");
+    	&debug_log(__FUNC__,__LINE__,"Running ..echo 1 > /proc/sys/net/ipv4/conf/$iface_b/accept_local \n");
+    	print SET_ONESYS ("echo 1 > /proc/sys/net/ipv4/conf/$iface_b/accept_local \n");
+
+    	&debug_log(__FUNC__,__LINE__,"Running ..ip rule add pref $base iif $iface_a lookup local \n");
+   		print SET_ONESYS ("ip rule add pref $base iif $iface_a lookup local \n");
+    	&debug_log(__FUNC__,__LINE__,"Running ..ip rule add pref $base iif $iface_b lookup local \n");
+    	print SET_ONESYS ("ip rule add pref $base iif $iface_b lookup local \n");
+
+    	# TX
+    	&debug_log(__FUNC__,__LINE__,"Running ..ip rule add pref $table_a to $address_a lookup $table_a \n");
+    	print SET_ONESYS ("ip rule add pref $table_a to $address_a lookup $table_a \n"); # iface_b to iface_a
+    	&debug_log(__FUNC__,__LINE__,"Running ..ip rule add pref $table_b to $address_b lookup $table_b \n");
+    	print SET_ONESYS ("ip rule add pref $table_b to $address_b lookup $table_b \n"); # iface_a to iface_b
+
+    	&debug_log(__FUNC__,__LINE__,"Running .. ip route add default dev $iface_b table $table_a \n");
+    	print SET_ONESYS ("ip route add default dev $iface_b table $table_a \n");
+    	&debug_log(__FUNC__,__LINE__,"Running .. ip route add default dev $iface_a table $table_b \n");
+    	print SET_ONESYS ("ip route add default dev $iface_a table $table_b \n");
+	}
+}
+sub get_comdev() {
+    local($line,@cfgdata);
+    #check to see if comhostname is ok.
+    local($name);
+    $dcomhostname=`hostname`;
+    chomp($dcomhostname);
+    if($dcomhostname =~ /\d{3,3}net\d{1,3}/ || !$dcomhostname || $dcomhostname =~ /localhost/) {
+        if(-e "/tmp/thishost" || $dcomhostname !~ /localhost/) {
+            $dcomhostname = `cat /tmp/thishost`;
+			chomp($dcomhostname);
+			if(!$dcomhostname) {
+				print("No hostname and not in /tmp/thishost file\n");
+                $no_comdev = "yes";
+                $testmask="255.255.255.0";
+                $classB_net="";
+                $this_host_number = 15;
+                $next_host_number = $this_host_number;
+                return;
+			}
+            `hostname $dcomhostname`;
+        } else {
+			if($onesys =~ /y/i) {
+				print("No hostname, but this is one system test!\n");
+                $no_comdev = "yes";
+                $testmask="255.255.255.0";
+                $classB_net="";
+                $this_host_number = 15;
+                $next_host_number = $this_host_number;
+				return;
+			} else {
+				print("FAILED: For multi systems test each system must have comnet configured!\n Commnet is a network connecting all the systems in the test. It can be a private network like 192.168.2.XX or a  site network connection.");
+				exit(0);
+			}
+        }
+    }
+	#see if the comnet pings
+	if(!&ping_up_host($dcomhostname)) {
+		if($onesys =~ /y/i) {
+			print("No hostname, but this is one system test!\n");
+			$no_comdev = "yes";
+			$testmask="255.255.255.0";
+			$classB_net="";
+			$this_host_number = 15;
+			$next_host_number = $this_host_number;
+			return;
+		} else {
+			print("FAILED: For multi systems test each system must have comnet configured!\n Commnet is a network connecting all the systems in the test. It can be a private network like 192.168.2.XX or a  site network connection.");
+			exit(0);
+		}
+	}
+    $com_ip = &mygetip($dcomhostname);
+
+    ($comhostname,$dcomhostname) = &pull_domain($dcomhostname);
+    
+	&debug_log(__FUNC__,__LINE__,"found com_ip =  $com_ip at interface "); 
+    $com_iface=`ip addr show to $com_ip | awk -F : ' /eth[0-9]/ || /net[0-9]/ || /en/ { print \$2}'`;   
+    $com_iface=trim($com_iface);  
+	&debug_log(__FUNC__,__LINE__,"com_iface=$com_iface \n"); 
+    if(!$com_iface) {
+        $no_comdev = "yes";
+        print("No comdev, set defualt host_number\n");
+        $no_comdev = "yes";
+        $testmask="255.255.255.0";
+        $classB_net="";
+        $this_host_number = 15;
+        $next_host_number = $this_host_number;
+        return;
+     }
+	
+	$com_dev = $com_iface;
+
+	chomp($dcomhostname);
+	if($dcomhostname !~ /\d{3,3}net\d{1,3}/ && $dcomhostname) {
+		`echo $dcomhostname > /tmp/thishost`;
+	}
+    
+	$res=`ip -o -f inet addr show dev $com_iface 2>/dev/null | awk -F 'inet' '{ print \$2}' | cut -d ' ' -f 2 | cut -d / -f 2`;
+	$res=&trim($res); 
+	if($res == 16) { # Class B 
+		$testmask="255.255.0.0" ; 
+		$classB_net="y";
+	} elsif($res == 24) {  #Class C
+		$testmask="255.255.255.0";
+        $classB_net="";
+    } else { # Default considering $res = 24 
+		$testmask="255.255.255.0";
+        $classB_net="";
+	}
+	print("Your host com_dev for comname $dcomhostname is set to $com_dev, netmask=$testmask\n");
+	#now set this_host_number and next_host_number
+
+	if($com_ip !~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/) {
+		print("Failed Can't get this_host_number from com_ip = |$com_ip|\n");
+		exit(0);
+	}
+	#strip off front and back whitespace
+    @it = split(/\./,$com_ip);
+	if($classB_net) {
+        if($it[2] == 0 && $it[3] == 0) {
+            print("Failed: Check the /etc/hosts file. There must be a bad entry for $dcomhostname in that file. Remove the bad entry and retry build_net.\n");
+            exit(0);
+        }
+    }
+    else {
+        if($it[3] == 0) {
+            print("Failed: Check the /etc/hosts file. There must be a bad entry for $dcomhostname in that file. Remove the bad entry and retry build_net.\n");
+            exit(0);
+        }
+    }
+    if($classB_net) {
+        $this_host_number = "$it[2]" . ".$it[3]";
+    } else {
+        $this_host_number = $it[3];
+    }
+	if($onesys =~ /y/) {
+		$next_host_number = $this_host_number;
+	}
+}
+
+#*********************************************************************
+# Below here stuff if done in build_net help only. 
+#*********************************************************************
+sub make_temp {
+    local($file_name) = @_; 
+	local($stress_level); 
+	unless (open (TPRO_FILE,">$file_name")) {
+        die ("Can't open $file_name file!\n");
+    }
+
+	if(!$onesys) {
+		$onesys=&get_onesys();
+	} 
+	&get_comdev();
+
+
+
+	#Linux Hardcode to 5  
+	$stress_level= 5;
+	&debug_log(__FUNC__,__LINE__,"stress_level = $stress_level\n");
+	print("Creating profile template... $file_name\n"); 
+	if($onesys =~ /n/) {
+		print TPRO_FILE ("onesys=no\n");
+	} else {
+		print TPRO_FILE ("onesys=yes\n");
+	}
+	
+	
+	print TPRO_FILE ("thishostid=$this_host_number\n");
+	if($onesys =~ /n/) {
+		print TPRO_FILE ("other_ids=$com_ip:\n");
+	}
+	else {
+        print TPRO_FILE ("nexthostid=$next_host_number\n");
+    }
+	print TPRO_FILE ("stresslevel=$stress_level\n");
+	print TPRO_FILE ("comhostname=$comhostname\n");
+
+	@devs="";
+	# List of devices that build_net recognize 
+	$devs[0]="$entname";
+	$devs[1]="$ibname";
+	$devs[2]="$netface"; 
+	$devs[3]="$hcaname";
+	$devs[5]="$tmname";
+	$devs[6]="$bondname";
+	if($new_naming == 1) { 
+		$devs[4] = "$new_eniface"; 
+	}		
+	foreach $dev (@devs) {
+		if($dev) {
+			# my search criteria for interfaces!! 
+			# default consider interfaces are named as <iface>[0-9] 
+			$targ = "$dev"."[0-9]";
+			if((($new_naming == 1) && ($dev =~ /$new_eniface/)) && !($dev =~ /$netface/)) { 
+				#Interface are names as en[a-z,A-Z,0-9]
+				$targ = "$dev"."[a-z,A-Z,0-9]"; 
+			}  
+			
+			 	
+			&debug_log(__FUNC__,__LINE__,"dev = $dev, searching for $targ \n");
+			@res="";
+			if($dev =~ /$hcaname/) { 
+				# For RDMA search using Infiniband utils 
+				@res = `ls /sys/class/infiniband/ 2>/dev/null`; 
+			} else {
+				@res = `ip link show 2>/dev/null |  awk ' /$targ/ { print \$2 } ' | cut -d : -f 1 `;
+			}
+			# Get the list of $dev ports. 	
+			$allcount = 0; 
+			$allcount = @res; 
+			# parse device name correctly here. 
+						
+			if($dev =~ /$entname/ || $dev =~ /$netface/ || (($new_naming == 1) && ($dev =~ /$new_eniface/))) {
+				print TPRO_FILE ("\n");
+				$line="#Transmission Control Protocl(TCP) Testcase .. ";
+                print TPRO_FILE ("$line\n");
+				$line="#dev   net_id   dev_type use_defaults mtu jumbo testcase location ";
+				print TPRO_FILE ("$line\n");
+				$line="#$entname" . "X XXX/n/com device_name no/yes   XXXX no/yes TCP/RDMA xx.xx.xx.x.x";
+				print TPRO_FILE ("$line\n");
+			} elsif($dev =~ /$ibname/ ) {
+				print TPRO_FILE ("\n");
+				$line="#Internet Protocol over Infiniband(IPoIB) Testcase .. ";
+                print TPRO_FILE ("$line\n");
+				$line="#DEV NET_ID   DEV_TYPE    DEV     PORT  TESTCASE   LOCATION    "; 
+				print TPRO_FILE ("$line\n");
+				$line="#ibXX" . "X XXX/n/com device_type mlx[4/5]_X X   IPoIB  xx.xx.xx.x.x ";   
+				print TPRO_FILE ("$line\n");
+			} elsif($dev =~ /$tmname/) {
+				#Network Team interface
+                print TPRO_FILE ("\n");
+                $line="#Link Aggregation Testcase .. ";
+                print TPRO_FILE ("$line\n");
+                $line="#dev   net_id   dev_type use_defaults mtu jumbo testcase location ";
+                print TPRO_FILE ("$line\n");
+                $line="#$tmname" . "X XXX/n/com device_name no/yes   XXXX no/yes TCP/RDMA xx.xx.xx.x.x";
+                print TPRO_FILE ("$line\n");
+            } elsif($dev =~ /$bondname/) {
+                #Network Team interface
+                print TPRO_FILE ("\n");
+                $line="#Link Aggregation Testcase .. ";
+                print TPRO_FILE ("$line\n");
+                $line="#dev   net_id   dev_type use_defaults mtu jumbo testcase location ";
+                print TPRO_FILE ("$line\n");
+                $line="#$bondname" . "X XXX/n/com device_name no/yes   XXXX no/yes TCP/RDMA xx.xx.xx.x.x";
+                print TPRO_FILE ("$line\n");
+            } elsif($dev =~ /$hcaname/) { 
+				print TPRO_FILE ("\n");
+				$line="#Remote Direct Memory Access(RDMA) Testcase .. "; 
+				print TPRO_FILE ("$line\n");
+                $line="#DEV NET_ID   DEV_TYPE    IA     PORT  TESTCASE   LOCATION    ";
+                print TPRO_FILE ("$line\n");
+                $line="#ibXX" . "X XXX/n/com device_name ibX X   ibX/- RDMA xx.xx.xx.x.x ";
+                print TPRO_FILE ("$line\n");
+			} else { 
+				print("Unknown device - $dev. Skipping it ..  \n"); 
+			}
+				
+
+			for($listcount=0; $listcount<$allcount; ++$listcount) {
+				chomp($res[$listcount]); 
+				&debug_log(__FUNC__,__LINE__,"Constructing devline for device = $res[$listcount] \n"); 
+				# All checks for $res[$listcount] goes here ...  
+				$device = &get_dev($res[$listcount]); 
+				if($device =~ /Unknown/i) {  
+					&debug_log(__FUNC__,__LINE__,"build_net doesnot recognize $res[$listcount]. Skipping it .... \n"); 
+					next; 
+				} 
+				($tloc, $dev_type)=&get_device_type_linux($res[$listcount]);
+				&debug_log(__FUNC__,__LINE__,"tloc = $tloc \n"); 
+				if($com_dev eq $res[$listcount]) {
+					$line = $res[$listcount]. " com ". $dev_type;  
+                } else { 
+					$line = $res[$listcount]. " n ". $dev_type;  
+				}
+			
+				if($dev =~ /$entname/ || $dev =~ /$netface/ || (($new_naming == 1) && ($dev =~ /$new_eniface/))) {
+					$line = &mk_temp_entline($line, $tloc);
+				} elsif($dev =~ /$ibname/) {
+					$line = &mk_temp_ibline($line, $tloc); 
+				} elsif($dev =~ /$tmname/  || $dev =~ /$bondname/){
+					#Network Team interface
+                    $line = &mk_temp_tmline($line, $tloc);
+                } elsif($dev =~ /$hcaname/) { 
+					$line = &mk_temp_hcaline($line, $tloc); 
+				} 
+                &debug_log(__FUNC__,__LINE__,"Line = $line \n");
+				if(($line)) {
+                	print TPRO_FILE ("$line\n");
+				}
+
+			}
+		}
+	}
+	close(TPRO_FILE);	
+	return(0);
+}
+
+sub trim { 
+
+	local($string) = @_; 
+	$string =~ s/^\s+//;
+	$string =~ s/\s+$//;
+	return $string;
+}
+
+sub automate_setup { 
+	local($file_name) = @_;
+	$auto_binary_cmd = " "; 
+	$auto_binary=$ENV{"HTXBIN"}."/auto"; 
+	#For now automation supported in onesys test. 
+	print("onesys=$onesys\n");	
+	if($onesys eq "n") { 
+		exit(0); 
+	}
+	#Check if automatation binary exists 
+	if ( -e $auto_binary) { 
+		if($use_automation !~ /y/i) {  
+			if(!$run_automate) {
+				print(" Do you want automation scripts to automatically detect network topology, enter yes(y) or no(n) \n"); 
+				$sys1=<STDIN>;
+			}else {
+				$sys1="n";
+			}
+		} else { 
+			$sys1="y"; 
+		} 
+		chomp($sys1);
+		if($sys1 =~ /y/i ) { 
+			# Automatically detect n/w configuration  
+			print("Automation script will now try to detect your network topology. \n"); 
+			print("In case of errors manually edit bpt file and run build_net bpt to setup hxecom networks \n");
+
+			#Remove the previous ARP entries in case it exists
+			@res=`arp -a 2>/dev/null |  awk ' { print \$1}'`;
+			foreach $arp_entry (@res) { 
+				chomp($arp_entry);
+				if($arp_entry =~ /\d{1,3}net/) { 
+					print("Removing $arp_entry from ARP cache \n");
+					$rc = `arp -d $arp_entry`;
+				}
+			}
+			# Read thru bpt file 
+    		unless (open(IN_FILE,"$file_name")) {
+        		die ("Can't open $file_name file!\n");
+    		}
+    		@bpt_file = <IN_FILE>;
+    		foreach $line (@bpt_file) {
+        		chomp($line);
+    		}
+    		close(IN_FILE);
+			$auto_binary_cmd = ""; 
+			# Find Out the network adapters from bpt file 
+			foreach $devline (@bpt_file) {
+				next if(!&is_devline($devline));	
+        		&split_devline($devline);
+				if($net_id =~ /com/) {
+					next; 
+				} 
+				#following devices are ignored by automation. 
+				if($dev_name =~ /$hcaname/) { 
+					print("$dev_name : IGNORED !! Manually edit bpt file for this device \n"); 
+					next; 
+				}
+				$iface=&get_iface($devline);
+				# turn arp filter off
+				$iface=&trim($iface); 
+				&debug_log(__FUNC__,__LINE__,"ip link set dev $iface up \n"); 
+				`ip link set dev $iface up`; 
+				&debug_log(__FUNC__,__LINE__,"echo 1 > /proc/sys/net/ipv4/conf/$iface/arp_filter \n"); 
+    			`echo 1 > /proc/sys/net/ipv4/conf/$iface/arp_filter`;
+
+				#Network Team interface
+
+				$tmdev = "";
+		
+				if($iface !~ /tm/ || $iface !~ /bond/) {
+					$tmdev = `ip link show dev $iface | grep master`;
+				}
+
+				if(!$tmdev){
+        			$auto_binary_cmd = $auto_binary_cmd . " " . $iface;
+	       		}
+
+	
+			}
+			if(!$auto_binary_cmd) { 
+				printf("No devices configured for automation. \n"); 
+				print("Manually edit bpt file and run build_net bpt to setup hxecom networks \n");
+				exit(0); 
+			}	
+			$cmd = $auto_binary . " " . $auto_binary_cmd; 
+			print("Running command .. \n $cmd \n"); 
+			$retry=0;
+			$sleep_interval=5;
+			# Give sometime for  device reset's done above. 
+			sleep($sleep_interval); 
+			while($retry < 10) {  
+				@res = `$cmd`; 			
+				if(!defined($res[0]) || $res[0] eq "") { 	
+					sleep($sleep_interval);	
+					print("cmd returned=@res, #$retry Retrying.... \n");
+					$retry++;	
+				} else { 
+					last;
+				}
+			}  
+			if(	(!defined($res[0]) || $res[0] eq "") && ($retry == 10)) {
+				print(" Automation couldnot detect your network setup. \nManually edit bpt file and run build_net bpt to setup hxecom networks.res=@res \n");
+                exit(0);
+            }
+			&write_bpt_file($file_name,@res); 
+		} else { 
+			print("Manually edit bpt file and run build_net bpt to setup hxecom networks \n");
+			exit(0); 
+		}            
+	 } else  { 
+		print("Automation binary not found on your system. \n Manually edit bpt file and run build_net bpt to setup hxecom networks \n");
+        exit(0);
+    }
+}
+
+#################################################################################
+### Function name:        write_bpt_file
+### Function arguments:   bpt file, loop back interfaces
+### Function description: Edits bpt file and update net id.
+#################################################################################
+
+sub write_bpt_file { 
+
+    local($file_name,@res) = @_; 
+
+    # Read thru bpt file
+    unless (open(IN_FILE,"$file_name")) {
+        die ("Can't open $file_name file!\n");
+    }
+
+    @profile = <IN_FILE>;
+    foreach $line (@profile) {
+        chomp($line);
+    }
+    close(IN_FILE);
+		
+    # Read thru bpt file
+    unless (open(IN_FILE,"$file_name")) {
+ 	   die ("Can't open $file_name file!\n");
+    }
+    
+    @bpt_file = <IN_FILE>;
+    foreach $line (@bpt_file) {
+	    chomp($line);
+    }
+    close(IN_FILE);
+
+    &get_comdev();
+    &set_this_host_number();
+    &set_next_host_number();
+
+    print("Your network setup looks like .... \n @res \n");
+    $my_net_id = 100;
+    foreach $loopback  (@res) {
+        chomp($loopback);  
+        ($src, $dest) = split(/->/,$loopback); 
+        if(!$dest) { 
+            print(" Automation couldnot detect your network setup. \nManually edit bpt file and run build_net bpt to setup hxecom networks.$dest \n"); 
+    	    exit(0); 
+        }    
+
+        &debug_log(__FUNC__,__LINE__,"$src <--------->$dest net_id=$my_net_id\n"); 
+        # This is blessing in disguise on Large Systems. :-)
+        while($my_net_id < 255) {
+
+    	    # Check if this net_id is usable, assign build_net pre-defined ip_address and ping on network.
+
+    	    if($classB_net) {
+	        	$first_ip="$my_net_id" . ".2." . "$next_host_number";
+	            $second_ip="$my_net_id" . ".1." . "$this_host_number";
+    	    } else {
+	        	$first_ip="$my_net_id" . ".1.2." . "$next_host_number";
+	            $second_ip="$my_net_id" . ".1.1." . "$this_host_number";
+    	    }	
+					
+	        if((&ping_up_host($first_ip) || &ping_up_host($second_ip)) ||
+            	((&arping_up($first_ip, $src) || &arping_up($second_ip, $src)) || &arping_up($first_ip, $dest) || &arping_up($second_ip, $dest))) {
+      	    	print("A real system somewhere on the network is configured with net_id=$my_net_id. Skipping $my_net_id net_id .... \n");
+	            $my_net_id++;
+    	    } else {
+                &debug_log(__FUNC__,__LINE__,"Found a valid net_id=$my_net_id, break of loop \n");
+	            last;
+    	    }
+        }
+
+        $src = &get_dev($src); 
+        $dest = &get_dev($dest);
+        $res = `cp $file_name $filename.backup`; 
+        $file_name="$file_name";
+        unless (open (IN_FILE,">$file_name")) {
+	    die ("Can't open $file_name file!\n");
+        }
+        foreach $devline (@bpt_file) {
+    	    chomp($devline);
+            if(&is_devline($devline)) { 
+    	    	#first parameter is always the device name. Second is net id, . 
+  	        	($dev_name, $netid, @rest)=split(/\s+/, $devline); 
+        		chomp($dev_name);
+        		$src=&trim($src); 
+		        $dest=&trim($dest);
+		        &debug_log(__FUNC__,__LINE__,"Comparing $dev_name with  $src and  $dest \n"); 
+                if(($src eq $dev_name) || ($dest eq $dev_name)) { 
+		            $netid = $my_net_id; 
+		            #Form the device line again with changes. 
+    	            $devline = $dev_name ." " .  $netid . " " . join(" ", @rest); 
+  		            &debug_log(__FUNC__,__LINE__,"device_line : $devline \n");
+	            }
+	        }
+    	    print IN_FILE ("$devline \n");
+        }
+        $my_net_id ++;
+        close(IN_FILE);
+    }	
+    $automation_successfully="yes"; 	
+}
+
+
+sub getbcast {
+    local($addr=shift);
+    local ($newaddr=$addr);
+    local($mask=shift);
+    local ($i=0);
+    @paramip="";
+    @paramm="";
+
+    @paramm = $mask=~ /(\w+).(\w+).(\w+).(\w+)/;
+
+    $i=0;
+    while ($paramm[$i] eq "255") {
+    	$i++;
+    }
+
+    &debug_log(__FUNC__,__LINE__,"[0] $paramm[0] [1] $paramm[1] [2] $paramm[2] [3] $paramm[3] i= $i\n");
+    @paramip = $addr=~ /(\w+).(\w+).(\w+).(\w+)/;
+    &debug_log(__FUNC__,__LINE__,"[0] $paramip[0] [1] $paramip[1] [2] $paramip[2] [3] $paramip[3] i= $i\n"); 
+    #@tmpit="";
+    #@tmpit=split(/\./,$addr);
+    #$last = $tmpit[3];
+    #$newaddr = $addr;
+    #$newaddr =~ s/$last$/255/;
+    if ($i == 3) { 
+        $addr= "$paramip[0]"."."."$paramip[1]"."."."$paramip[2]".".255";
+    } else {
+    	$addr= "$paramip[0]"."."."$paramip[1]".".255.255";
+    }
+    return("$addr");
+}
+
+
+sub setup_ip_crossover {
+	local($kernext_location); 
+	$kernext_location = $ENV{"HTXETC"}."/kernext/ip_crossover/ip_crossover.ko"; 
+	if( -e $kernext_location) { 
+		print("Setting up ip_crossover kernel module load \n");
+	} else { 
+		print ("fatal ip_crossover kernel module not found, this script would exit \n"); 
+		exit(-1); 
+	}
+	&debug_log(__FUNC__,__LINE__,"Running : cp $kernext_location /lib/modules/$KERNEL_REL/kernel/net/netfilter/ \n"); 
+	`cp $kernext_location /lib/modules/$KERNEL_REL/kernel/net/netfilter/ >/dev/null 2>&1`;
+	&debug_log(__FUNC__,__LINE__,"Running \"depmod -a\" command, so that modprobe finds ip_crossover  \n");
+	`depmod -a`;
+
+	#depmod should have populated the ip_crossover module entry, if not do it explicity.
+	unless (open (MODULES_DEP, "/lib/modules/$KERNEL_REL/modules.dep")) {
+		die ("\nCan't open modules.dep file!\nHxecom will not be able to load ip_crossover later. exiting...\n");
+	}
+	
+	@modules = <MODULES_DEP>;
+	close(MODULES_DEP); 
+	$entry_present  = 0; 
+	foreach $line (@modules) {
+    	chomp($line);
+		if($line =~ /ip_crossover/) { 
+			$entry_present = 1; 
+			last; 
+		}  
+	}
+	if($entry_present == 0) { 
+		print("depmod couldnot find ip_crossover, verify ip_crossover load(using \"insmod\") after running this script \n"); 
+		print("this script would explictly create an entry \n"); 
+		unless (open (MODULES_DEP, ">>/lib/modules/$KERNEL_REL/modules.dep")) {
+    	    die ("\nCan't open modules.dep file!\nbuild_net will not be able to load ip_crossover later. exiting...\n");
+	    }
+		print MODULES_DEP ("kernel/net/netfilter/ip_crossover.ko:\n");
+		close(MODULES_DEP); 
+	}
+	close(MODULES_DEP);
+}
+
+# This function would look for build_net defined hostnames and
+# remove them from /etc/hosts
+
+sub clean_hosts_nets() {
+    local($fileToChange,@host_lines);
+
+    $fileToChange = "/etc/hosts";
+    @host_lines="";
+    unless (open (HOST_FILE,"$fileToChange")) {
+        die ("Can't open $fileToChange file!\n");
+    }
+
+    @host_lines=<HOST_FILE>;
+    close(HOST_FILE);
+
+    unless (open (TMP_OUT,">tmp_out")) {
+        die ("Can't open tmp_out file doing tmp_out file!\n");
+    }
+    foreach $line (@host_lines) {
+        chomp($line);
+        if($line =~ /^#/) {
+            print TMP_OUT ("$line\n");
+        # Check get_comdev(), if you change this make sure it reflects everywhere.
+        } elsif($line =~ /\d{1,3}net\d{1,3}/ || $line =~ /\d{1,3}nets\d{1,3}/ ) {
+            &debug_log(__FUNC__,__LINE__,"Removing line \"$line\" from /etc/hosts \n");
+        } else {
+            print TMP_OUT ("$line\n");
+        }
+    }
+    close(TMP_OUT);
+    $result = `cp tmp_out $fileToChange`;
+    $result = `rm tmp_out`;
+}
