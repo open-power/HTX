@@ -69,7 +69,7 @@ static struct instruction_masks dep_instructions_array[] = {
 void decode_tc_instructions(int cno)
 {
 	int i, j, table_index = 0;
-	uint32 *instr; 
+	uint32 *instr = NULL; 
 	instruction_masks *ins_tuple;
 	client_data *cptr;
 	int prolog_ins, stream_ins; 
@@ -82,6 +82,15 @@ void decode_tc_instructions(int cno)
 	stream_ins = cptr->num_ins_built;
 	instr = (uint32 *)cptr->tc_ptr[INITIAL_BUF]->tc_ins + prolog_ins;
 
+	#ifdef DBG_INSTR
+	FILE * instr_fp = NULL;
+	char instr_fname[128];
+	sprintf(instr_fname, "%s/instr_list", hd.htx_exer_log_dir);
+	instr_fp = fopen(instr_fname, "w");
+	if (instr_fp == NULL) {
+		printf("fopen failed for %s: %s\n", instr_fname, strerror(errno));
+	}
+	#endif
 	bzero(cptr->dc_instr, sizeof(struct decoded_instruction) * MAX_INS_STREAM_DEPTH);
 
 	for (i = prolog_ins, j = 0; i < (prolog_ins + stream_ins); i++, j++) {
@@ -144,6 +153,9 @@ void decode_tc_instructions(int cno)
 
 					if ( ins_tuple->op1_dtype == GRU || ins_tuple->op1_dtype == GR ) {
 							sprintf(mnemonic, "%s,r%d", mnemonic, ptr->ra);
+					}
+					else if ((ins_tuple->op1_dtype == IMM_DATA_2BIT) || (ins_tuple->op1_dtype == IMM_DATA_3BIT)) {
+							sprintf(mnemonic, "%s,%d", mnemonic, ptr->ra);
 					}
 					else if ( ins_tuple->op1_dtype != DUMMY ) {
 							sprintf(mnemonic, "%s,f%d", mnemonic, ptr->ra);
@@ -332,7 +344,20 @@ void decode_tc_instructions(int cno)
 					break;
 			}
 
-			case FORM_XX1_RA_XS :
+			case VA_FORM_RS_RA_RB_RC_eop:
+			{
+				va_form_rs_ra_rb_rc_eop *ptr;
+				ptr = (va_form_rs_ra_rb_rc_eop *)instr;
+				cptr->dc_instr[j].tgt_val = ptr->ra;
+                cptr->dc_instr[j].op_val[0] = ptr->rs;
+                cptr->dc_instr[j].op_val[1] = ptr->rb;
+                cptr->dc_instr[j].op_val[2] = ptr->rc;
+
+				sprintf(mnemonic, "%s r%d, r%d,r%d,r%d", ins_tuple->ins_name, ptr->ra, ptr->rs, ptr->rb, ptr->rc);
+		        break;
+			}
+
+			case FORM_XX1_RA_XS:
 			{
 					int vsr_t;
 					Form_XX1_RA_XS *ptr;
@@ -739,6 +764,20 @@ void decode_tc_instructions(int cno)
                     cptr->dc_instr[j].op_val[1] = ptr->rb; 
 
 					sprintf(mnemonic, "%s r%d,r%d,r%d", ins_tuple->ins_name,  ptr->rt, ptr->ra, ptr->rb);
+					break;
+			}
+
+			case X_FORM_RT_RA_RB_CY_eop:
+			{
+					x_form_rt_ra_rb_cy_eop *ptr;
+					ptr = (x_form_rt_ra_rb_cy_eop *)instr;
+
+					cptr->dc_instr[j].tgt_val = ptr->rt;
+					cptr->dc_instr[j].op_val[0] = ptr->ra;
+                    cptr->dc_instr[j].op_val[1] = ptr->rb; 
+                    cptr->dc_instr[j].op_val[2] = ptr->cy; 
+
+					sprintf(mnemonic, "%s r%d,r%d,r%d, %d", ins_tuple->ins_name,  ptr->rt, ptr->ra, ptr->rb, ptr->cy);
 					break;
 			}
 
@@ -1323,7 +1362,11 @@ void decode_tc_instructions(int cno)
 					ptr = (x_form_rt_bfa *)instr;
 
 					cptr->dc_instr[j].tgt_val = ptr->rt;
-					cptr->dc_instr[j].op_val[0] = ptr->BFA;
+					if (ptr->eop == 257) { /* setbool */
+						cptr->dc_instr[j].op_val[0] =(ptr->BFA << 2) | ptr->nu0; /* BA is 5 bits */
+					} else { /* setb */
+						cptr->dc_instr[j].op_val[0] = ptr->BFA;
+					}
 
 					sprintf(mnemonic, "%s ", ins_tuple->ins_name);
 					sprintf(mnemonic, "%sr%d", mnemonic, ptr->rt);
@@ -1386,6 +1429,10 @@ void decode_tc_instructions(int cno)
 					DPRINT(hlog, "Case default: Offset: 0x%x, Machine code: 0x%x, does not match to any form type!!!\n", cptr->instr_index[i], *instr);
 					instr++;
 		}
+		#ifdef DBG_INSTR
+		fprintf(instr_fp, "table index: %d, addr: %p, mcode: 0x%x, mnemonic: %s\n", j, instr, *instr, mnemonic);
+		fflush(instr_fp);
+		#endif
 
 		/* target data type */
 		if ((ins_tuple->tgt_dtype == DUMMY) || (ins_tuple->tgt_dtype == CR_T) || ((ins_tuple->tgt_dtype >= IMM_DATA) && (ins_tuple->tgt_dtype <= IMM_DATA_14BIT))) {
@@ -1439,6 +1486,9 @@ void decode_tc_instructions(int cno)
 		strncpy(cptr->dc_instr[j].mnemonic, mnemonic, strlen(mnemonic));
 		instr++;
 	}
+	#ifdef DBG_INSTR
+	fclose(instr_fp);
+	#endif
 }
 
 

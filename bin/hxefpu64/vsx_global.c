@@ -908,7 +908,7 @@ void class_vsx_imm_gen(uint32 client_no, uint32 random_no, struct instruction_ma
 {
 	uint32 dc = 0, dm = 0;
 	uint32 vsr1, vsr2;
-	uint32 op1, op2, tgt, tgt_reg_no;
+	uint32 op1 = 0, op2 = 0, tgt = 0, tgt_reg_no = 0;
 	uint32 mcode, store_off, addi_mcode;
 	uint32 prolog_size, *tc_memory, num_ins_built;
 	struct vsr_list *vsrs;
@@ -994,7 +994,7 @@ void class_vsx_imm_gen(uint32 client_no, uint32 random_no, struct instruction_ma
 void class_vsx_load_gen2(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index)
 {
     uint32 gpr_num, vsr4;
-    uint32 op1, op2, tgt;
+    uint32 op1 = 0, op2 = 0, tgt = 0;
     uint32 mcode, store_off, load_off, addi_mcode;
     uint32 prolog_size, *tc_memory, num_ins_built;
     struct vsr_list *vsrs;

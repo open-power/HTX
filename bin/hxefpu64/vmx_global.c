@@ -457,6 +457,13 @@ struct instruction_masks vmx_p9_instructions_array[] = {
 /* last ins indicator */ {0xDEADBEEF, 0,DUMMY, 0, DUMMY, 0, DUMMY, DUMMY, DUMMY, 0, 0x0, "last_instruction", 0, 0, 0}
 };
 
+struct instruction_masks vmx_p9_dd2_instructions_array[]={
+    /***************************RFC02511 - FXU & Vector Extensions for Blockchain Support**************************************/
+    /* vmsumudm */ {0x10000023, 0, QGPR, 16, QGPR, 11, QGPR, 6, QGPR, 21, 0x33, "vmsumudm",  DUMMY, VMX_INT_ARITHMETIC_UNSIGNED_ONLY, FORM_VT_VA_VB_VC},
+    /* last ins indicator */ {0xDEADBEEF, 0,DUMMY    ,  0, DUMMY    ,  0, DUMMY, DUMMY, DUMMY    ,  0, 0x0, "last_instruction"}
+};
+
+
 
 void class_vmx_load_gen(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index)
 {
@@ -720,40 +727,40 @@ void class_vmx_normal_gen(uint32 client_no, uint32 random_no, struct instruction
 
 		mcode = temp->op_eop_mask | op1 | op2 | op3 | tgt;
 	}
-        /*
-         * Check if the target is dirty. If target is dirty build store instruction to save VSR
-         * to testcase memory buffer. Check alignment requirement for store instruction.
-         */
-
-        if( (0x1ULL << tgt_reg_no) & vsrs->dirty_mask) {
     /*
-         * Generate store. To generate store, tgt_reg_no's data type should be known.
-         */
-				store_off = init_mem_for_vsx_store(client_no, QGPR);
-                addi_mcode = GEN_ADDI_MCODE(STORE_RB, 0, store_off);
-                *tc_memory = addi_mcode;
-                cptr->instr_index[prolog_size + num_ins_built] = addi | 0x20000000;
-				cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)&simulate_addi;
-                tc_memory++;
-                num_ins_built++;
-                *tc_memory = STORE_VMX_128(vmx_vsr4);
-                /* save offset */
-                cptr->tc_ptr[INITIAL_BUF]->ea_off[prolog_size + num_ins_built] = store_off;
-                cptr->instr_index[prolog_size + num_ins_built] = vmx_stvx | 0x20000000;
-				cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)&simulate_stvx;
-                tc_memory++;
-                num_ins_built++;
-        }
+     * Check if the target is dirty. If target is dirty build store instruction to save VSR
+     * to testcase memory buffer. Check alignment requirement for store instruction.
+     */
 
-        *tc_memory = mcode;
-        cptr->instr_index[prolog_size + num_ins_built] = index | 0x10000000;
-		cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = temp->sim_func;
+    if ((0x1ULL << tgt_reg_no) & vsrs->dirty_mask) {
+    	/*
+     	 * Generate store. To generate store, tgt_reg_no's data type should be known.
+     	 */
+		store_off = init_mem_for_vsx_store(client_no, QGPR);
+        addi_mcode = GEN_ADDI_MCODE(STORE_RB, 0, store_off);
+        *tc_memory = addi_mcode;
+        cptr->instr_index[prolog_size + num_ins_built] = addi | 0x20000000;
+		cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)&simulate_addi;
         tc_memory++;
         num_ins_built++;
+        *tc_memory = STORE_VMX_128(vmx_vsr4);
+        /* save offset */
+        cptr->tc_ptr[INITIAL_BUF]->ea_off[prolog_size + num_ins_built] = store_off;
+        cptr->instr_index[prolog_size + num_ins_built] = vmx_stvx | 0x20000000;
+		cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)&simulate_stvx;
+        tc_memory++;
+        num_ins_built++;
+	}
 
-        /* Update masks for tgt vsr */
-        vsrs->dirty_mask |= (0x1ULL << vsr4);
-        /* Restore the number of instruction built */
-        cptr->num_ins_built = num_ins_built;
+    *tc_memory = mcode;
+    cptr->instr_index[prolog_size + num_ins_built] = index | 0x10000000;
+	cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = temp->sim_func;
+    tc_memory++;
+    num_ins_built++;
+
+    /* Update masks for tgt vsr */
+    vsrs->dirty_mask |= (0x1ULL << vsr4);
+    /* Restore the number of instruction built */
+    cptr->num_ins_built = num_ins_built;
 }
 
