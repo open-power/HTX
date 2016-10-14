@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)06	1.1  src/htx/usr/lpp/htx/inc/instr_form_LE.h, exer_fpu, htxubuntu 1/4/16 03:12:08 */
 
 #ifndef _htx_instruction_forms
 #define _htx_instruction_forms
@@ -55,7 +54,7 @@ typedef struct
 	uint32 eop:10;
 	uint32 rb:5;
 	uint32 ra:5;
-	uint32 dc:2; /*don't care*/
+	uint32 dc:2; /*dont care*/
 	uint32 bf:3;
 	uint32 opcode:6;
 }x_form_bf_ra_rb_eop_rc;
@@ -147,6 +146,16 @@ typedef struct
 	uint32 rt:5;
 	uint32 opcode:6;
 }a_form_rt_ra_rb_rc_eop_rc;
+
+typedef struct
+{
+    uint32 eop:6;
+    uint32 rc:5;
+    uint32 rb:5;
+    uint32 ra:5;
+    uint32 rs:5;
+    uint32 opcode:6;
+}va_form_rs_ra_rb_rc_eop;
 
 typedef struct
 {
@@ -710,11 +719,10 @@ typedef struct
 
 typedef struct
 {
-    uint32 nu2      :1;
-    uint32 fxd      :10;
+    uint32 eop      :11;
     uint32 nu1      :5;
-    uint32 BFA      :3;
     uint32 nu0      :2;
+    uint32 BFA      :3;
     uint32  rt      :5;
     uint32  opcode  :6;
 }x_form_rt_bfa;
@@ -775,5 +783,16 @@ typedef struct
     uint32 T:5;
     uint32 opcode:6;
 }Form_XX2_dx_dc_dm;
+
+typedef struct
+{
+    uint32 nu:1;
+    uint32 eop:8;
+    uint32 cy:2;
+    uint32 rb:5;
+    uint32 ra:5;
+    uint32 rt:5;
+    uint32 opcode:6;
+}x_form_rt_ra_rb_cy_eop;
 
 #endif

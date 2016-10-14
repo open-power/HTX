@@ -1,4 +1,4 @@
-# @(#)98	1.1  src/htx/usr/lpp/htx/bin/hxefpu64/linux_sync_func.s, exer_fpu, htxubuntu 12/8/08 06:41:38
+
 .machine "any"
 .file  	 "sync_func.s"		
 .globl  htx_sync
