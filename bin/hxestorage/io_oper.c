@@ -44,7 +44,7 @@ void __attn(unsigned int a,
 #endif
 
 #ifdef __CAPI_FLASH__
-    static chunk_id_t shared_lun_id = NULL_CHUNK_ID;
+    extern volatile chunk_id_t shared_lun_id;
 	extern int lun_type;
 	extern char capi_device[MAX_STR_SZ];
 	extern size_t chunk_size;
@@ -191,7 +191,7 @@ int close_disk (struct htx_data *htx_ds, struct thread_context * tctx)
  * Opens a CAPI attached Texan LUN, mode of open depends on
  * flag passed
  * lun_type - CBLK_OPN_VIRT_LUN/CBLK_OPN_PHY_LUN
- * open_flags - CBLK_OPN_VIRT_LUN/CBLK_OPN_PHY_LUN/CBLK_SHR_LUN/CBLK_CLOSE_LUN
+ * open_flags - CBLK_OPN_VIRT_LUN/CBLK_OPN_PHY_LUN/UNDEFINED
  ******************************************************************************/
 int open_lun(struct htx_data *htx_ds, const char * device, struct thread_context * tctx ) {
 
@@ -225,7 +225,7 @@ int open_lun(struct htx_data *htx_ds, const char * device, struct thread_context
                     return(-1);
                 }
                 if(size <=  chunk_size) {
-                    sprintf(msg, "Cannot allocated requested size= %#llx, reducing to %#llx \n", chunk_size, size);
+                    sprintf(msg, "Cannot allocate requested size= %#llx, reducing to %#llx \n", chunk_size, size);
                     user_msg(htx_ds, 0, tctx->io_err_flag, INFO, msg);
                     chunk_size = size;
                     return(0);
@@ -313,145 +313,79 @@ int close_lun(struct htx_data *htx_ds, struct thread_context * tctx) {
     volatile char backgrnd_thread = 'F';
 	unsigned int retry = DEFAULT_RETRY_COUNT;
 
-    /*
-     * Thread which has open flag as CBLK_CLOSE_LUN would be responsible for
-     * closing LUN. Rest threads which opened LUN or shared  will leave it open
-     */
-    if(tctx->open_flag == CBLK_CLOSE_LUN || tctx->force_op) {
+    if(tctx->force_op) {
+		exit_flag = 'Y';
+    }
 
-        /* If BWRC gets delayed and doesnot completes, this stanza would close the LUN
-         * resulting in EINVAL for IOPs issued by BWRC stanza
-         * Hold this thread from closing LUN until BWRC exit.
-         */
-		printf("%s : Closing, thread=%s chunk = %d, open_flag = %d, force_close=%#x \n", __FUNCTION__, tctx->id, tctx->fd, tctx->open_flag, tctx->force_op);
-		if(tctx->force_op) {
+    if(strcasecmp(tctx->oper, "BWRC") == 0 )  {
+		rc = pthread_mutex_lock(&segment_mutex);
+        if (rc) {
+           	sprintf(msg, "mutex lock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
+           	user_msg(htx_ds, rc, 0, HARD, msg);
+           	exit(rc);
+        }
 
-			exit_flag = 'Y';
-			retry = DEFAULT_RETRY_COUNT;
+        lba_fencepost[tctx->fencepost_index].status = 'F';
 
-			do {
-				sleep(5);
-				num_threads = (BWRC_threads_running - 1) + non_BWRC_threads_running;
-				retry --;
-			} while(num_threads && retry);
-			rc = cblk_close(tctx->fd, CBLK_SCRUB_DATA_FLG);
-			printf("%s:Closed !! thread=%s, VirtLUN with chunk_id = %d, force_close=%#x, num_threads = %x, retry = %x, Exiting .. \n",
-							 __FUNCTION__, tctx->id, tctx->fd, tctx->force_op, num_threads, retry);
-        	tctx->fd = NULL_CHUNK_ID;
-        	shared_lun_id = NULL_CHUNK_ID;
-			/*
-			 * Exiting ....
-			 */
-			exit(tctx->force_op);
-
-		} else {
-
-        	do {
-				backgrnd_thread = 'F';
-				rc = pthread_mutex_lock(&segment_mutex);
-                if (rc) {
-                	sprintf(msg, "mutex lock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
-                    user_msg(htx_ds, rc, 0, HARD, msg);
-                    exit(rc);
-                }
-
-            	for(i = 0; i < total_BWRC_threads; i++) {
-                	if(lba_fencepost[i].status == 'R') {
-                    	backgrnd_thread = 'R';
-						break;
-					}
-            	}
-				rc = pthread_mutex_unlock(&segment_mutex);
-                if (rc) {
-                	sprintf(msg, "mutex unlock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
-                    user_msg(htx_ds, rc, 0, HARD, msg);
-                    exit(rc);
-                }
-            	sleep(5);
-
-        	}  while(backgrnd_thread == 'R' && !tctx->force_op);
-
-	        rc = cblk_close(tctx->fd, CBLK_SCRUB_DATA_FLG);
-    	    if(rc ) {
-        	    sprintf(msg, " cblk_close failed with errno = %d \n", errno);
-            	user_msg(htx_ds,  errno, tctx->io_err_flag, HARD, msg);
-            	return(-1);
-        	}
-
-        	printf("%s:Closed !! thread=%s, VirtLUN with chunk_id = %d, force_close=%#x \n", __FUNCTION__, tctx->id, tctx->fd, tctx->force_op);
-        	tctx->fd = NULL_CHUNK_ID;
-			shared_lun_id = NULL_CHUNK_ID;
-		}
-
-		return(rc);
-
-    } else {
-       if(strcasecmp(tctx->oper, "BWRC") == 0 )  {
-			rc = pthread_mutex_lock(&segment_mutex);
-        	if (rc) {
-            	sprintf(msg, "mutex lock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
-            	user_msg(htx_ds, rc, HARD, msg);
-            	exit(rc);
-        	}
-
-        	lba_fencepost[tctx->fencepost_index].status = 'F';
-
-        	rc = pthread_mutex_unlock(&segment_mutex);
-        	if (rc) {
-            	sprintf(msg, "mutex unlock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
-            	user_msg(htx_ds, rc, 0, HARD, msg);
-            	exit(rc);
-        	}
-		}
-		/* Need to take thread_create_mutex lock and then update variables */
-    	rc = pthread_mutex_lock(&thread_create_mutex);
-    	if (rc) {
-        	sprintf(msg, "2nd mutex lock failed in function execute_thread_context, rc = %d\n", rc);
-        	user_msg(htx_ds, rc, 0, HARD, msg);
-        	exit(rc);
-    	}
-
-    	if (strcasecmp(tctx->oper, "BWRC") == 0) {
-        	BWRC_threads_running--;
-    	} else {
-        	non_BWRC_threads_running--;
-        	if (non_BWRC_threads_running == 0) {
-            	rc = pthread_cond_broadcast(&threads_finished_cond_var);
-            	if (rc) {
-                	sprintf(msg, "Cond broadcast failed threads_finished_cond_var for in function execute_thread_context, rc = %d\n", rc);
-                	user_msg(htx_ds, rc, 0, HARD, msg);
-                	exit(rc);
-            	}
-        	}
-    	}
-
-		rc = pthread_mutex_unlock(&thread_create_mutex);
-    	if (rc) {
-        	sprintf(msg, "2nd mutex unlock failed in function execute_thread_context, rc = %d\n", rc);
-        	user_msg(htx_ds, rc, 0, HARD, msg);
-        	exit(rc);
-    	}
-
-		printf("%s:non_BWRC_threads_running=%d, BWRC_threads_running=%d\n",__FUNCTION__, non_BWRC_threads_running, BWRC_threads_running);
-	    /*
-    	 * This thread opened LUN, it has to stay alive until, we are closing the LUN
-     	 */
-    	if(tctx->open_flag == CBLK_OPN_VIRT_LUN || tctx->open_flag == CBLK_OPN_PHY_LUN) {
-        	while(shared_lun_id != NULL_CHUNK_ID) {
-            	/*
-             	 * Wait for chunk to get closed, then this thread just exits
-             	 */
-            	if(exit_flag == 'Y') {
-                	break;
-            	}
-            	sleep(5);
-        	}
-			printf("%s: Not closing !! thread=%s chunk = %d, open_flag = %d, force_close=%#x \n", __FUNCTION__, tctx->id, tctx->fd, tctx->open_flag, tctx->force_op);
-    	}
-		pthread_exit(&rc);
+        rc = pthread_mutex_unlock(&segment_mutex);
+        if (rc) {
+           	sprintf(msg, "mutex unlock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
+           	user_msg(htx_ds, rc, 0, HARD, msg);
+           	exit(rc);
+        }
 	}
-}
+	/* Need to take thread_create_mutex lock and then update variables */
+    rc = pthread_mutex_lock(&thread_create_mutex);
+    if (rc) {
+       	sprintf(msg, "2nd mutex lock failed in function execute_thread_context, rc = %d\n", rc);
+       	user_msg(htx_ds, rc, 0, HARD, msg);
+       	exit(rc);
+    }
 
+    if (strcasecmp(tctx->oper, "BWRC") == 0) {
+       	BWRC_threads_running--;
+       	printf("%s:thread_id: %s - non_BWRC_threads_running=%d, BWRC_threads_running=%d, force_op=%#x\n", __FUNCTION__, tctx->id,   non_BWRC_threads_running,
+       			BWRC_threads_running, tctx->force_op);
+    } else {
+       	non_BWRC_threads_running--;
+       	printf("%s:thread_id: %s - non_BWRC_threads_running=%d, BWRC_threads_running=%d, force_op=%#x\n", __FUNCTION__, tctx->id,   non_BWRC_threads_running,
+       			BWRC_threads_running, tctx->force_op);
+       	if (non_BWRC_threads_running == 0) {
+           	rc = pthread_cond_broadcast(&threads_finished_cond_var);
+           	if (rc) {
+               	sprintf(msg, "Cond broadcast failed threads_finished_cond_var for in function execute_thread_context, rc = %d\n", rc);
+               	user_msg(htx_ds, rc, 0, HARD, msg);
+               	exit(rc);
+            	}
+        	}
+    	}
+
+	rc = pthread_mutex_unlock(&thread_create_mutex);
+    if (rc) {
+       	sprintf(msg, "2nd mutex unlock failed in function execute_thread_context, rc = %d\n", rc);
+       	user_msg(htx_ds, rc, 0, HARD, msg);
+       	exit(rc);
+    }
+	printf("%s:non_BWRC_threads_running=%d, BWRC_threads_running=%d\n",__FUNCTION__, non_BWRC_threads_running, BWRC_threads_running);
+  	/*
+	 * This thread opened LUN, it has to stay alive until, we are closing the LUN
+   	 */
+    if(tctx->open_flag == CBLK_OPN_VIRT_LUN || tctx->open_flag == CBLK_OPN_PHY_LUN) {
+        while ((exit_flag == 'N' && int_signal_flag == 'N' && signal_flag == 'N') ||
+       	       ((BWRC_threads_running + non_BWRC_threads_running) != 0)) {
+            sleep(2);
+        }
+        rc = cblk_close(shared_lun_id, CBLK_SCRUB_DATA_FLG);
+        if(rc ) {
+            sprintf(msg, " cblk_close failed with errno = %d \n", errno);
+            user_msg(htx_ds,  errno, 0, HARD, msg);
+            return(-1);
+        }
+        printf("%s:Closed !! VirtLUN with chunk_id = %d \n", __FUNCTION__,  shared_lun_id);
+        shared_lun_id = NULL_CHUNK_ID;
+    }
+	pthread_exit(&rc);
+}
 
 int
 cflsh_write_operation(struct htx_data * htx_ds, struct thread_context *tctx, int loop ) {
@@ -1183,21 +1117,18 @@ int compare_buffers(struct htx_data *htx_ds, struct thread_context *tctx, int lo
 
         /*** Save buffers if miscomapre count is less than MAX_MISCOMPARES ***/
         if (cnt < MAX_MISCOMPARES) {
-            tmp_ptr = getenv("HTX_LOG_DIR");
-            if (tmp_ptr != NULL) {
-                strcpy(log_dir, tmp_ptr);
-		    } else {
-                strcpy(log_dir, "/tmp/");
-		    }
-
             /*** Save the miscompare analysis ***/
+            strcpy(log_dir, htx_ds->htx_exer_log_dir);
             if (tctx->mis_log_buf != NULL) {
+                sprintf(path, "%s/htx%s_mis_%-d", log_dir, &(htx_ds->sdev_id[5]), cnt);
+            #if 0
                 strcpy(path, log_dir);
                 strcat(path, "htx");
                 strcat(path, &(htx_ds->sdev_id[5]));
                 strcat(path, "_mis_");
                 sprintf(msg1, "%-d", cnt);
                 strcat(path, msg1);
+            #endif
                 fp = fopen(path, "w");
                 if (fp == NULL) {
                     sprintf(msg1, "fopen failed for %s. errno: %d\n", path, errno);
@@ -1211,23 +1142,29 @@ int compare_buffers(struct htx_data *htx_ds, struct thread_context *tctx, int lo
             }
 
             /*** Save the wbuf ***/
+            sprintf(path_w, "%s/htx%s.wbuf%-d", log_dir, &(htx_ds->sdev_id[5]), cnt);
+        #if 0
             strcpy(path_w, log_dir);
-            strcat(path_w, "htx");
+            strcat(path_w, "/htx");
             strcat(path_w, &(htx_ds->sdev_id[5]));
             strcat(path_w, ".wbuf");
             sprintf(msg1, "%-d", cnt);
             strcat(path_w, msg1);
+        #endif
             hxfsbuf(wbuf, tctx->dlen, path_w, htx_ds);
             sprintf(msg1, "\nWrite buffer saved in %s\n", path_w);
             strcat(msg, msg1);
 
             /*** Save the rbuf ***/
+            sprintf(path_r, "%s/htx%s.rbuf%-d", log_dir, &(htx_ds->sdev_id[5]), cnt);
+        #if 0
             strcpy(path_r, log_dir);
-            strcat(path_r, "htx");
+            strcat(path_r, "/htx");
             strcat(path_r, &(htx_ds->sdev_id[5]));
             strcat(path_r, ".rbuf");
             sprintf(msg1, "%-d", cnt);
             strcat(path_r, msg1);
+        #endif
             hxfsbuf(rbuf, tctx->dlen, path_r, htx_ds);
             sprintf(msg1, "Read buffer saved in %s\n", path_r);
             strcat(msg, msg1);
@@ -1236,12 +1173,15 @@ int compare_buffers(struct htx_data *htx_ds, struct thread_context *tctx, int lo
             if (tctx->run_reread == 'Y') {
                 if (tctx->reread_buf != (char *) NULL) {
                     if (offs_reread != -1) {
+                        sprintf(path, "%s/htx%s.rerd%-d", log_dir, &(htx_ds->sdev_id[5]), cnt);
+                    #if 0
                         strcpy(path, log_dir);
-                        strcat(path, "htx");
+                        strcat(path, "/htx");
                         strcat(path, &(htx_ds->sdev_id[5]));
                         strcat(path, ".rerd");
                         sprintf(msg1, "%-d", cnt);
                         strcat(path, msg1);
+                    #endif
                         hxfsbuf(tctx->reread_buf, tctx->dlen, path, htx_ds);
                         strcat( msg, "Re-read fails compare at offset");
                         sprintf(msg1, "%lld; buffer saved in %s\n", offs_reread, path);
@@ -2033,34 +1973,38 @@ int compare_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop
         }
         misc_count++;
         if (misc_count < MAX_MISCOMPARES) {
-            tmp_ptr = getenv("HTX_LOG_DIR");
-            if (tmp_ptr != NULL) {
-                strcpy(log_dir, tmp_ptr);
-		    } else {
-                strcpy(log_dir, "/tmp/");
-            }
+            strcpy(log_dir, htx_ds->htx_exer_log_dir);
+            sprintf(path, "%s/htx%s.crbuf%-d", log_dir, &(htx_ds->sdev_id[5]), misc_count);
+        #if 0
             strcpy(path, log_dir);    /* set up path for the read buffer */
-            strcat(path, "htx");
+            strcat(path, "/htx");
             strcat(path, &(htx_ds->sdev_id[5]));
             strcat(path, ".crbuf");
             sprintf(cmp_str, "%-d", misc_count);
             strcat(path, cmp_str);
+        #endif
             hxfsbuf(rbuf, tctx->dlen, path, htx_ds);
+            sprintf(path, "%s/htx%s.cwbuf%-d", log_dir, &(htx_ds->sdev_id[5]), misc_count);
+        #if 0
             strcpy(path, log_dir);    /* set up path for the write buffer */
-            strcat(path, "htx");
+            strcat(path, "/htx");
             strcat(path, &(htx_ds->sdev_id[5]));
             strcat(path, ".cwbuf");
             sprintf(cmp_str, "%-d", misc_count);
             strcat(path, cmp_str);
+        #endif
             hxfsbuf(wbuf, tctx->dlen, path, htx_ds);
             if (tctx->reread_buf != (char *) 0) {
                 if (save_reread) {
+                    sprintf(path, "%s/htx%s.crerd%-d", log_dir, &(htx_ds->sdev_id[5]), misc_count);
+                #if 0
                     strcpy(path, log_dir);
-                    strcat(path, "htx");
+                    strcat(path, "/htx");
                     strcat(path, &(htx_ds->sdev_id[5]));
                     strcat(path, ".crerd");
                     sprintf(cmp_str, "%-d", misc_count);
                     strcat(path, cmp_str);
+                #endif
                     hxfsbuf(tctx->reread_buf, tctx->dlen, path, htx_ds);
                     strcat(msg, "Re-read fails to compare; ");
                     sprintf(cmp_str, "buffer saved in %s\n", path);
@@ -2376,12 +2320,7 @@ int run_cmd(struct htx_data *htx_ds, char *cmd_line)
     char *tmp_ptr = NULL;
     int filedes;
 
-    tmp_ptr = getenv("HTX_LOG_DIR");
-    if (tmp_ptr != NULL) {
-		strcpy(log_dir, tmp_ptr);
-    } else {
-        strcpy(log_dir, "/tmp/");
-    }
+    sprintf(log_dir, "%s/", htx_ds->htx_exer_log_dir);
 
     strcpy(filename, log_dir);
     strcat(filename, "cmdout.");

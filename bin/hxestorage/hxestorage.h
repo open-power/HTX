@@ -76,7 +76,7 @@
 
 #define DEFAULT_EEH_RETRIES         5
 #define DEFAULT_RETRY_COUNT         5
-#define DEFAULT_WAIT_COUNT          10
+#define DEFAULT_WAIT_COUNT          20
 
 #define MAX_BUFFERS                 256
 #define MAX_PATTERN_LENGTH          32
@@ -94,7 +94,7 @@
 	#define TESTCASE_TYPES              2
 	#define VLUN_BLKSIZE				4096
 	#define VLUN_TOTALBLOCKS			(1 * GB)
-
+    #define DEFAULT_CHUNK_SIZE          (64 * KB)
 #else
 	#define TESTCASE_TYPES			4
 #endif

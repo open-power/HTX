@@ -1,4 +1,3 @@
-
 /* IBM_PROLOG_BEGIN_TAG */
 /*
  * Copyright 2003,2016 IBM International Business Machines Corp.
@@ -76,7 +75,7 @@ void set_rule_defaults(struct ruleinfo *ruleptr, unsigned long long maxblk, unsi
     ruleptr->num_cache_threads = DEFAULT_CACHE_THREADS;
     ruleptr->num_async_io = DEFAULT_AIO_REQ_QUEUE_DEPTH;
 #ifdef __CAPI_FLASH__
-	ruleptr->open_flag = CBLK_SHR_LUN;
+	ruleptr->open_flag = UNDEFINED;
 #endif
     for (i=0; i < MAX_INPUT_PARAMS; i++) {
         strcpy(ruleptr->oper[i], "");
@@ -1054,7 +1053,7 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
         	rule->open_flag = CBLK_OPN_PHY_LUN;
 			if(lun_type != rule->open_flag) {
 				sprintf(msg, "line# %d keywd = %s (invalid). lun_type(=%d) shd be same as open flag(=%d) \n", *line, keywd, lun_type, rule->open_flag);
-				sprintf(msg + strlen(msg), "Check if file /tmp/test_phylun exists for enabling PLUN testing, Create file and relogin to HTX \n");
+				sprintf(msg + strlen(msg), "Check if file /tmp/test_lun_mode exists (with value 1) for enabling PLUN testing, Create file and relogin to HTX \n");
 				user_msg(ps, 0, 0, SOFT, msg);
 				return -1;
 			}
@@ -1062,12 +1061,14 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
         	rule->open_flag = CBLK_OPN_VIRT_LUN;
 			if(lun_type != rule->open_flag) {
 				sprintf(msg, "line# %d keywd = %s (invalid). lun_type(=%d) shd be same as open flag(=%d) \n", *line, keywd, lun_type, rule->open_flag);
-				sprintf(msg + strlen(msg), "Remove file /tmp/test_phylun for enabling VLUN testing, and relogin to HTX \n");
-				user_msg(ps, 0, 0, SOFT, msg);
+			#ifndef __HTX_LINUX__
+			    sprintf(msg + strlen(msg), "Check if file /tmp/test_lun_mode exists (with value >1) for enabling VLUN testing, and relogin to HTX \n");
+			#else
+			    sprintf(msg + strlen(msg), "Either remove file /tmp/test_lun_mode OR make aure it has value >1 for enabling VLUN testing, and relogin to HTX \n");
+			#endif
+			    user_msg(ps, 0, 0, SOFT, msg);
                 return -1;
             }
-        } else if (strcasecmp(varstr, "CLOSE_LUN") == 0) {
-        	rule->open_flag = CBLK_CLOSE_LUN;
         } else {
         	sprintf(msg, "line# %d %s = %s (must be PHYSICAL_LUN/VIRTUAL_LUN/CBLK_CLOSE_LUN ) \n", line, keywd, varstr);
             user_msg(ps, 0, 0, SOFT, msg);
