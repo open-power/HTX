@@ -311,7 +311,9 @@ typedef enum
 	FORM_XX1_IMM8,
 	FORM_X_BF_UIM_FB,
 	FORM_XX2_DX_DC_DM,
-	XFX_FORM_RT_FXM_EOP_RC
+	XFX_FORM_RT_FXM_EOP_RC,
+	X_FORM_RT_RA_RB_CY_eop,
+	VA_FORM_RS_RA_RB_RC_eop
 }instr_form;
 
 /*
@@ -439,6 +441,13 @@ void simulate_ori(uint32 *machine_code, struct testcase *test_case);
 void simulate_nop(uint32 *machine_code, struct testcase *test_case);
 void simulate_mfcr(uint32 *machine_code, struct testcase *test_case);
 
+/* mffs lightweight */
+void simulate_mffsce(uint32 *machine_code, struct testcase *test_case);
+void simulate_mffscdrn(uint32 *machine_code, struct testcase *test_case);
+void simulate_mffscdrni(uint32 *machine_code, struct testcase *test_case);
+void simulate_mffscrn(uint32 *machine_code, struct testcase *test_case);
+void simulate_mffscrni(uint32 *machine_code, struct testcase *test_case);
+void simulate_mffsl(uint32 *machine_code, struct testcase *test_case);
 
 /* VSX prototypes */
 
