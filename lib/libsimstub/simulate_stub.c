@@ -4543,3 +4543,12 @@ void simulate_fsel_dot(uint32 *machine_code, struct testcase *test_case)
 void Update_FPSCR(uint64 *fpscr)
 {
 }
+
+/* RFC02515: mffs lightweight: TBD */
+void simulate_mffsce(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_mffscdrn(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_mffscdrni(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_mffscrn(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_mffscrni(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_mffsl(uint32 *machine_code, struct testcase *test_case) {}
+

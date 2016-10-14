@@ -818,6 +818,7 @@ int DFPGENE(unsigned long long *Operand,int class,int Type , int cno)
 	GenDFPOP(&DecodedOp[0],cno);   /* generate a dfp operand */
 
 
+	/*
 	DPRINT(cptr->clog, "\n%s[%d]:Decoded Input:\n", __FUNCTION__, __LINE__);
 	if (DFPType[cno] == 0)
 		DPRINT(cptr->clog, "RANDOM Generated input %llx\n",DecodedOp[0]);
@@ -825,19 +826,23 @@ int DFPGENE(unsigned long long *Operand,int class,int Type , int cno)
 		for (k=0; k<DFPType[cno]; k++) {
 		    DPRINT(cptr->clog,"\n RANDOM Generated input %llx\n",DecodedOp[k]);
 		}
+	*/
 
 	/*Encode the operand */
 	ActionType[cno] = ENCODE;
 	retc = Decoder_Encoder(&DecodedOp[0],&EncodedOp[0],cno);
 
 
+	/* 
 	DPRINT(cptr->clog, "\n%s[%d]:Encoded Input:\n", __FUNCTION__, __LINE__);
-    if ( DFPType[cno] == 0)
+	if ( DFPType[cno] == 0)
 		DPRINT(cptr->clog, "ENCODED DFP FROM DFPGENE %llx \n",EncodedOp[0]);
 	else
 		for(k=0; k<DFPType[cno]; k++) {
 		    DPRINT(cptr->clog, "ENCODED DFP FROM DFPGENE %llx \n",EncodedOp[k]);
 		}
+
+	*/
 
 
 	*Operand = EncodedOp[0];

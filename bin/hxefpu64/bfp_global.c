@@ -285,6 +285,16 @@ struct instruction_masks bfp_p9_instructions_array[] = {
 
 };
 
+struct instruction_masks bfp_p9_dd2_instructions_array[] = {
+	/* mffsce */ 	{0xFC01048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffsce", &simulate_mffsce, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscdrn */ 	{0xFC14048E, 0, BFP_DP, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscdrn", &simulate_mffscdrn, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscdrni */ {0xFC15048E, 0, IMM_DATA_3BIT, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscdrni", &simulate_mffscdrni, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscrn */ 	{0xFC16048E, 0, BFP_DP, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscrn", &simulate_mffscrn, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscrni */ 	{0xFC17048E, 0, IMM_DATA_2BIT, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscrni", &simulate_mffscrni, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffsl */ 	{0xFC18048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffsl", &simulate_mffsl, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* last ins indicator */ {0xDEADBEEF, 0, DUMMY,  0, DUMMY, 0, DUMMY, DUMMY, DUMMY,  0, 0x0, "last_instruction", 0, 0, 0}
+};
+
 
 extern uint32 vsr_reg_wt[];
 uint32 bfp_reg_wt[3] = {0, 5, 5};
@@ -292,7 +302,7 @@ uint32 bfp_reg_wt[3] = {0, 5, 5};
 void class_bfp_normal_gen(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index)
 {
 	uint32 vsr1, vsr2, vsr3, vsr4;
-	uint32 op1, op2, op3, tgt;
+	uint32 op1 = 0, op2 = 0, op3 = 0, tgt = 0;
 	uint32 mcode, store_mcode, store_off, prolog_size, num_ins_built, *tc_memory;
 	uint64 dirty_reg_mask;
 	struct vsr_list *vsrs;
@@ -304,13 +314,22 @@ void class_bfp_normal_gen(uint32 client_no, uint32 random_no, struct instruction
 	num_ins_built = cptr->num_ins_built;
 	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
 
-	vsrs = &(cptr->vsrs[temp->op1_dtype]);
-	vsr1 = vsrs->head[BFP]->vsr_no;
-	MOVE_VSR_TO_END(client_no, temp->op1_dtype, BFP); /* Move this to the end of list */
-	op1 = (vsr1 & 0x1f) << (temp->op1_pos);
-#ifdef REUSE
-	vsrs->dirty_mask &= (~(0x1ULL << vsr1));
-#endif
+	if (temp->op1_dtype == IMM_DATA_3BIT) {
+		op1 = (0x00000007) & (random_no % 7);
+	}
+	else if (temp->op1_dtype == IMM_DATA_2BIT) {
+		op1 = (0x00000003) & (random_no % 3);
+	}
+	else {
+		vsrs = &(cptr->vsrs[temp->op1_dtype]);
+		vsr1 = vsrs->head[BFP]->vsr_no;
+		MOVE_VSR_TO_END(client_no, temp->op1_dtype, BFP); /* Move this to the end of list */
+		op1 = (vsr1 & 0x1f); 
+	#ifdef REUSE
+		vsrs->dirty_mask &= (~(0x1ULL << vsr1));
+	#endif
+	}
+	op1 = op1 << (temp->op1_pos);
 
 	vsrs = &cptr->vsrs[temp->op2_dtype];
 	vsr2 = vsrs->head[BFP]->vsr_no;

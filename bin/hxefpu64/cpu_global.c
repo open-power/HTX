@@ -62,11 +62,6 @@ struct instruction_masks cpu_macro_array[]={
 };
 
 struct instruction_masks cpu_p9_instructions_array[]={
-	/***************************RFC 2485.r3: Load Atomic Near Memory**************************************/
-  	/* lwat */ {0x7C00048C, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_LOAD_ATOMIC, "lwat",  DUMMY, P9_CPU_ATOMIC_LOAD, X_FORM_RS_RA_NB_eop},
-  	/* stwat*/ {0x7C00058C, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_STORE_ATOMIC, "stwat", DUMMY, P9_CPU_ATOMIC_STORE,  X_FORM_RS_RA_FC_eop},
-  	/* ldat */ {0x7C0004CC, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_LOAD_ATOMIC, "ldat",  DUMMY, P9_CPU_ATOMIC_LOAD, X_FORM_RS_RA_NB_eop},
-  	/* stdat*/ {0x7C0005CC, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_STORE_ATOMIC, "stdat", DUMMY, P9_CPU_ATOMIC_STORE, X_FORM_RS_RA_FC_eop},
 	/**************************RFC02461.r3: Hashing Support Operations************************************/
     /* modsw */	{0x7C000616, 0, GR , 16, GR, 11, DUMMY, DUMMY, GR, 21, 0x42, "modsw"  , DUMMY, P9_CPU_FIXED_ARTH, X_FORM_RT_RA_RB_OE_eop_rc},
     /* moduw */	{0x7C000216, 0, GR , 16, GR, 11, DUMMY, DUMMY, GR, 21, 0x42, "moduw"  , DUMMY, P9_CPU_FIXED_ARTH, X_FORM_RT_RA_RB_OE_eop_rc},
@@ -82,8 +77,6 @@ struct instruction_masks cpu_p9_instructions_array[]={
     /* setb */{0x7C000100, 0, IMM_DATA, 16, DUMMY, DUMMY, DUMMY, DUMMY, GR, 21, CLASS_CPU_STRING_OPS_FX, "setb", DUMMY, P9_CPU_FIXED_LOGIC, X_FORM_RT_BFA},
     /* cmprb */{0x7C000180, 0, IMM_DATA_1BIT, 22, GR, 16, GR, 11, CR_T, 23, CLASS_CPU_STRING_OPS_FX, "cmprb", DUMMY, P9_CPU_FIXED_LOGIC, X_FORM_BF_L_RA_RB},
     /* cmpeqb */{0x7C0001C0, 0, GR, 16, GR, 11, DUMMY, DUMMY, CR_T, 23, CLASS_CPU_STRING_OPS_FX, "cmpeqb", DUMMY, P9_CPU_FIXED_LOGIC, X_FORM_BF_L_RA_RB},
-	/**************************RFC02491 Load Doubleword Monitored Instruction************************************/
-	/* ldmx */{0x7C00026A, 0, GR, 16, GR, 11, DUMMY, DUMMY, GR, 21, 0x40, "ldmx", DUMMY, P9_CPU_FIXED_LOAD, X_FORM_RT_RA_RB_eop_EH},
 	/**************************RFC02494.r1: FXU Multiply-Add Instructions************************************/
 	/* maddhd */ {0x7C0001D2, 0, GR , 16, GR, 11, GR, 6, GR, 21, CLASS_CPU_MUL_ADD_DW, "maddhd" , DUMMY, P9_CPU_FIXED_ARTH, A_FORM_RT_RA_RB_RC_eop_rc},
 	/* maddhdu */{0x7C0001D2, 0, GR , 16, GR, 11, GR, 6, GR, 21, CLASS_CPU_MUL_ADD_DW, "maddhdu", DUMMY, P9_CPU_FIXED_ARTH, A_FORM_RT_RA_RB_RC_eop_rc},
@@ -93,6 +86,29 @@ struct instruction_masks cpu_p9_instructions_array[]={
 	/* extswsli. */ {0x7C0006F5, 0, GR, 21, IMM_DATA, 11, IMM_DATA_1BIT, 1, GR, 16, 0x57, "extswsli.", DUMMY, P9_CPU_FIXED_ARTH, MDFORM_RS_RA_SH_MB_rc},
 
   /* last ins indicator */ {0xDEADBEEF, 0,DUMMY    ,  0, DUMMY    ,  0, DUMMY, DUMMY, DUMMY    ,  0, 0x0, "last_instruction"}
+};
+
+struct instruction_masks cpu_p9_dd2_instructions_array[]={
+	/*********************RFC02466B Set Boolean Extension**********************************/
+	/* setbool */{0x7C000101, 0, IMM_DATA, 16, DUMMY, DUMMY, DUMMY, DUMMY, GR, 21, CLASS_CPU_STRING_OPS_FX, "setbool", DUMMY, P9_CPU_FIXED_LOGIC, X_FORM_RT_BFA},
+	/***************************RFC02511 - FXU & Vector Extensions for Blockchain Support**************************************/
+	/* addex */ {0x7C000154, 0, GR, 16, GR, 11, IMM_DATA_2BIT, 10, GR, 21, 0x42, "addex",  DUMMY, P9_CPU_FIXED_ARTH, X_FORM_RT_RA_RB_CY_eop},
+	/* brh */	{0x7C0001B6, 0, GR, 21, DUMMY, DUMMY, DUMMY, DUMMY, GR, 16, 0x45, "brh" , DUMMY, P9_CPU_FIXED_ARTH, X_FORM_RS_RA_eop},
+	/* brd */	{0x7C000176, 0, GR, 21, DUMMY, DUMMY, DUMMY, DUMMY, GR, 16, 0x45, "brd" , DUMMY, P9_CPU_FIXED_ARTH, X_FORM_RS_RA_eop},
+	/* brw */	{0x7C000136, 0, GR, 21, DUMMY, DUMMY, DUMMY, DUMMY, GR, 16, 0x45, "brw" , DUMMY, P9_CPU_FIXED_ARTH, X_FORM_RS_RA_eop},
+	/**************************RFC02517 SHA-3 Assist Instructions***********************************************************************/
+	/* xor3 */   {0x10000036, 0, GR , 21, GR, 11, GR, 6, GR, 16, 0x44, "xor3", DUMMY, P9_CPU_FIXED_LOGIC, VA_FORM_RS_RA_RB_RC_eop},
+	/* andcxor */{0x10000037, 0, GR , 21, GR, 11, GR, 6, GR, 16, 0x44, "andcxor", DUMMY, P9_CPU_FIXED_LOGIC, VA_FORM_RS_RA_RB_RC_eop},
+	/* rxor */   {0xC000017C, 0, GR , 21, GR, 11, DUMMY, DUMMY, GR, 16, 0x44, "rxor", DUMMY, P9_CPU_FIXED_LOGIC, X_FORM_RS_RA_RB_eop_rc},
+	/**************************RFC02491 Load Doubleword Monitored Instruction************************************/
+	/* ldmx */{0x7C00026A, 0, GR, 16, GR, 11, DUMMY, DUMMY, GR, 21, 0x40, "ldmx", DUMMY, P9_CPU_FIXED_LOAD, X_FORM_RT_RA_RB_eop_EH},
+	/***************************RFC 2485.r3: Load Atomic Near Memory**************************************/
+  	/* lwat */ {0x7C00048C, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_LOAD_ATOMIC, "lwat",  DUMMY, P9_CPU_ATOMIC_LOAD, X_FORM_RS_RA_NB_eop},
+  	/* stwat*/ {0x7C00058C, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_STORE_ATOMIC, "stwat", DUMMY, P9_CPU_ATOMIC_STORE,  X_FORM_RS_RA_FC_eop},
+  	/* ldat */ {0x7C0004CC, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_LOAD_ATOMIC, "ldat",  DUMMY, P9_CPU_ATOMIC_LOAD, X_FORM_RS_RA_NB_eop},
+  	/* stdat*/ {0x7C0005CC, 0, GR, 16, IMM_DATA_5BIT, 11, DUMMY, DUMMY, GR, 21, CLASS_CPU_STORE_ATOMIC, "stdat", DUMMY, P9_CPU_ATOMIC_STORE, X_FORM_RS_RA_FC_eop},
+
+  	/* last ins indicator */ {0xDEADBEEF, 0,DUMMY    ,  0, DUMMY    ,  0, DUMMY, DUMMY, DUMMY    ,  0, 0x0, "last_instruction"}
 };
 
 struct instruction_masks cpu_p8_instructions_array[]={
@@ -890,24 +906,33 @@ void class_cpu_cond_log_gen(uint32 client_no, uint32 random_no, struct instructi
 
 void class_cpu_fixed_arth_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int index)
 {
-	uint32 op1=0, op2=0, tgt=0,mcode=0,*tc_memory,num_ins_built,prolog_size, RT1=0,RT2=0,RT=0;
+	uint32 op1=0, op2=0, op3=0, tgt=0, mcode=0, *tc_memory, num_ins_built, prolog_size, RT1=0, RT2=0, RT=0;
 	struct server_data *sdata = &global_sdata[INITIAL_BUF];
 	struct client_data *cptr = sdata->cdata_ptr[client_no];        
 	prolog_size = cptr->prolog_size;
-	num_ins_built = cptr->num_ins_built;
-	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
+
 	/* pick registeres */
-	RT1= get_random_gpr(client_no,ins->op1_dtype,0);          /* get a register */
+	RT1= get_random_gpr(client_no, ins->op1_dtype, 0);          /* get source register */
 	op1 = ((RT1 & 0x1f) << (ins->op1_pos));                     
+
 	if (ins->op2_pos > 0) {
-	  	RT2= get_random_gpr(client_no,ins->op2_dtype,0);          /* get a register */
+	  	RT2= get_random_gpr(client_no, ins->op2_dtype, 0);      /* get source register */
 		op2 = ((RT2 & 0x1f) << (ins->op2_pos));                     
 	}
-	RT= get_random_gpr(client_no,ins->tgt_dtype,1);          /* get a register */
+
+	/* check for addex */
+	if ((ins->op3_pos > 0) && (ins->op3_dtype == IMM_DATA_2BIT)) {
+		op3 = ((get_random_no_32(client_no)) % 3);        			/* 2 bit CY - imm value(0, 1, 2) */
+    	op3  = op3 << (ins->op3_pos);
+	}
+
+	RT= get_random_gpr(client_no, ins->tgt_dtype, 1);           /* get target register */
+	tgt = ((RT & 0x1f) << (ins->tgt_pos));                     
+
 	num_ins_built = cptr->num_ins_built;
 	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
-	tgt = ((RT & 0x1f) << (ins->tgt_pos));                     
-	mcode = (ins->op_eop_mask | op1 | op2 | tgt);
+
+	mcode = (ins->op_eop_mask | op1 | op2 | op3 | tgt);
     *tc_memory = mcode;
 	cptr->instr_index[prolog_size + num_ins_built] = index | 0x10000000;
 	tc_memory++;
@@ -939,7 +964,7 @@ void class_cpu_fixed_logic_1_gen(uint32 client_no, uint32 random_no, struct inst
 	}
 
 	mcode = (ins->op_eop_mask | op1 | Imm_data | tgt);
-        *tc_memory = mcode;
+    *tc_memory = mcode;
 	cptr->instr_index[prolog_size + num_ins_built] = index | 0x10000000;
 	tc_memory++;
 	num_ins_built++;
@@ -950,22 +975,28 @@ void class_cpu_fixed_logic_1_gen(uint32 client_no, uint32 random_no, struct inst
 
 void class_cpu_fixed_logic_2_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int index)
 {
-	uint32 op1=0, op2=0, tgt=0,mcode=0,*tc_memory,num_ins_built,prolog_size,RT1=0,RT2=0,RT=0;
+	uint32 op1=0, op2=0, op3=0, tgt=0, mcode=0, *tc_memory, num_ins_built, prolog_size, reg_val = 0;
 	struct server_data *sdata = &global_sdata[INITIAL_BUF];
 	struct client_data *cptr = sdata->cdata_ptr[client_no];        
 	prolog_size = cptr->prolog_size;
 	num_ins_built = cptr->num_ins_built;
 	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
-	/* pick registeres */
-	RT1= get_random_gpr(client_no,ins->op1_dtype,0);          /* get a register */
-	op1 = ((RT1 & 0x1f) << (ins->op1_pos));                     
-	RT2= get_random_gpr(client_no,ins->op2_dtype,0);          /* get a register */
-	op2 = ((RT2 & 0x1f) << (ins->op2_pos));                     
-	RT= get_random_gpr(client_no,ins->tgt_dtype,1);          /* get a register */
-	num_ins_built = cptr->num_ins_built;
-	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
-	tgt = ((RT & 0x1f) << (ins->tgt_pos));                     
-	mcode = (ins->op_eop_mask | op1 | op2 | tgt);
+
+	reg_val = get_random_gpr(client_no, ins->op1_dtype, 0);         /* get a register */
+	op1 = ((reg_val & 0x1f) << (ins->op1_pos));                     
+
+	reg_val= get_random_gpr(client_no, ins->op2_dtype, 0);          /* get a register */
+	op2 = ((reg_val & 0x1f) << (ins->op2_pos));                     
+
+	if (ins->op3_dtype != DUMMY) {
+		reg_val= get_random_gpr(client_no, ins->op3_dtype, 0);          /* get a register */
+		op3 = ((reg_val & 0x1f) << (ins->op3_pos));                     
+	}
+
+	reg_val = get_random_gpr(client_no, ins->tgt_dtype, 1);         /* get a register */
+	tgt = ((reg_val & 0x1f) << (ins->tgt_pos));                     
+
+	mcode = (ins->op_eop_mask | op1 | op2 | op3 | tgt);
     *tc_memory = mcode;
 	cptr->instr_index[prolog_size + num_ins_built] = index | 0x10000000;
 	tc_memory++;
@@ -3501,6 +3532,17 @@ void class_cpu_string_operations_gen(uint32 client_no, uint32 random_no, struct 
 
 	switch (ext_op) {
 		case 256:       /* Setb */
+			op1 = (BFA << ins->op1_pos);
+			RT =  get_random_gpr(client_no,ins->tgt_dtype,1);       /* get the target register */
+			tgt = (RT & 0x1f) << (ins->tgt_pos);
+			mcode = (ins->op_eop_mask | op1 | tgt);
+    		*tc_memory = mcode;
+    		cptr->instr_index[prolog_size + num_ins_built] = index | 0x10000000;
+    		tc_memory++;
+    		num_ins_built++;
+			break;
+		case 257:       /* Setbool */
+			BFA = random_no & 0x1F; /* 5 bits */
 			op1 = (BFA << ins->op1_pos);
 			RT =  get_random_gpr(client_no,ins->tgt_dtype,1);       /* get the target register */
 			tgt = (RT & 0x1f) << (ins->tgt_pos);

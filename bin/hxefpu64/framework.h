@@ -43,7 +43,9 @@
 	#include <sched.h>
 	#include <sys/prctl.h>
 	#include <sys/resource.h>
-	#include <xscom.h>
+	#if !defined (__BML__)
+	#include <sys/auxv.h>
+	#endif
 #else
 	#include <sys/dr.h>
 #endif
@@ -60,10 +62,10 @@
 #endif
 
 #ifdef SCTU
-#define LOGFILE		"/tmp/sctu_log"
 #define SCTU_PP_COUNT	(256)
-#else
-#define LOGFILE		"/tmp/fpu_log"
+#define SCTU_MAX_GANG	8
+#define SCTU_PERF_GANG	2
+#define SCTU_GANG_P9	4
 #endif
 
 #define HSTRCMP strcasecmp
@@ -848,6 +850,7 @@ extern struct server_data global_sdata[];
 #define			BFP_COMPARE_ONLY		0x8000					|BFP_ONLY
 #define			BFP_SELECT_ONLY			0x10000					|BFP_ONLY
 #define			BFP_FPSCR_ONLY			0x20000					|BFP_ONLY
+#define			P9_BFP_FPSCR_ONLY		(0x20000				|BFP_ONLY 	|P9_ONLY)
 #define 		BFP_TEST_ONLY			0x40000					|BFP_ONLY
 #define 		P9_BFP_MOVE_ONLY		BFP_MOVE_ONLY			|BFP_ONLY	|P9_ONLY
 #define			P9_BFP_COMPARE_ONLY		BFP_COMPARE_ONLY		|BFP_ONLY   |P9_ONLY
@@ -1304,6 +1307,7 @@ int clear_sctu_th(void);
 int get_bind_core_and_cpus_list();
 int chip_testcase(void);
 int node_testcase(void);
+void set_sctu_gang_size(void);
 #else
 int get_bind_cpus_list(void);
 #endif
