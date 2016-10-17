@@ -42,7 +42,7 @@
 
 prog=htxd
 
-  [ "$HTX_HOME_DIR" ] || {
+if [[ -z ${HTX_HOME_DIR} ]] ; then
      install_path=`cat /var/log/htx_install_path`
      if [ -f ${install_path}/etc/scripts/htx_env.sh ]; then
          . ${install_path}/etc/scripts/htx_env.sh
@@ -51,6 +51,8 @@ prog=htxd
         echo "Either file is empty or does not contain correct install path. Hence exiting..."
         exit
      fi
+fi
+
 
 start() 
 {
