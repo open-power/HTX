@@ -320,14 +320,14 @@ int attach_to_syscfg(void)
     shm_id_htxsyscfg=shmget(SYSCFG_SHM_KEY,(sizeof(GLOBAL_SYSCFG)),(S_IRWXU| S_IRWXG | S_IRWXO));
     if (shm_id_htxsyscfg == -1)/* perror ("Creation ");*/{
             sprintf(msg,"inside attach_to_syscfg, shm_id creation failed= %d \n",errno);
-            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+            hxfmsg(misc_htx_data, 0, HTX_HE_SOFT_ERROR, msg);
 		return(107); 
     }
 
 	global_ptr=(GLOBAL_SYSCFG *)shmat(shm_id_htxsyscfg,0,0);
 	if(global_ptr == (void *)(-1)) {
 			sprintf(msg,"shmat failed inside attach_to_syscfg with errno=%d", errno);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, 0, HTX_HE_SOFT_ERROR, msg);
 		return(108);
 	}
 	return 0;
@@ -424,7 +424,7 @@ int get_cmd_op(char *dest,const char *cmd)
     	}
     	else {
                     sprintf(msg,"syscfg %d:Failed popen for command %s ,errno=%di,re-try count=%d\n",__LINE__,cmd,errno,count);
-                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                    hxfmsg(misc_htx_data, 0, HTX_HE_SOFT_ERROR, msg);
                 count++;
 
     	}
@@ -450,13 +450,13 @@ int sys_mount_check(void)
     if ( sys_mounted == 0 ) {
         if (mkdir("/sys", 0777)) {
 				sprintf(msg,"syscfg:/sys mkdir failed");
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+				hxfmsg(misc_htx_data, 0, HTX_HE_SOFT_ERROR, msg);
             return -1;
         }
 
         if (mount("sys", "/sys", "sysfs", MS_NOATIME, NULL)){
-				sprintf(msg,"syscfg:/sys mkdir failed");
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+				sprintf(msg,"syscfg:/sys mkdir failed in the second try");
+			hxfmsg(misc_htx_data, 0, HTX_HE_SOFT_ERROR, msg);
             return -1;
         }
     }
@@ -551,19 +551,22 @@ int phy_logical_virt_cpus(htxsyscfg_cpus_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside phy_logical_virt_cpus failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_lpar.rw));
 			if(rc1_1!=0){
 		            sprintf(msg,"global_ptr->global_lpar.rw_lock() failed in retry with rc=%d\n", rc1_1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"global_ptr->global_lpar.rw_lock() failed with rc=%d\n",rc1); 
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 
@@ -571,7 +574,8 @@ int phy_logical_virt_cpus(htxsyscfg_cpus_t *t)
 	rc2=pthread_rwlock_unlock(&(global_ptr->global_lpar.rw));
 	if (rc2 !=0  ) {
 			sprintf(msg,"unlock inside phy_logical_virt_cpus failed with errno=%d\n",rc2);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;
 }
@@ -613,26 +617,30 @@ int get_lpar_details(htxsyscfg_lpar_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_lpar_details failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_lpar.rw));
 			if(rc1_1!=0){
 		            sprintf(msg,"global_ptr->global_lpar.rw_lock() in get_lpar_details failed in retry with rc=%d\n", rc1_1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"global_ptr->global_lpar.rw_lock()in get_lpar_details  failed with rc=%d\n",rc1); 
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*t=(global_ptr->global_lpar);
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_lpar.rw));
 	if (rc2 !=0  ) {
 			sprintf(msg,"unlock inside get_lpar_details failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0; 
 }
@@ -675,26 +683,30 @@ int get_smt_details(htxsyscfg_smt_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_smt_details failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_core.rw));
 			if(rc1_1!=0){
 		            sprintf(msg,"lock inside get_smt_details failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_smt_details failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
     *t =(global_ptr->global_core.smtdetails);
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_core.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_smt_details failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_smt_details failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;
 }
@@ -736,6 +748,7 @@ int get_hw_smt(void)
     Pvr = global_ptr->global_pvr;
 	if (Pvr == PV_POWER6){
 		global_ptr->global_core.smtdetails.smt_threads = 2;
+		return 0;
 	}	
 	else if (Pvr == PV_POWER7 || Pvr == PV_POWER7PLUS){
 		global_ptr->global_core.smtdetails.smt_threads=  4;
@@ -757,7 +770,7 @@ int get_hw_smt(void)
             sprintf(msg,"syscfg:In get_hw_smt():Unknown Pvr %u\n",Pvr);
             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
 		global_ptr->global_core.smtdetails.smt_threads= -1;
-		return 0;
+		return -1;
 	}	
 	return 0;
 }
@@ -844,7 +857,7 @@ long long get_timebase(void)
     }
     else {
         pclose(fp);
-			sprintf(msg,"syscfg:popen failed for /proc/cpuinfo\n");
+		sprintf(msg,"syscfg:popen failed for /proc/cpuinfo\n");
 		hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
         return (-1);
     }
@@ -877,27 +890,31 @@ int get_core_details(htxsyscfg_core_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_core_details failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_core.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside get_core_details failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside get_core_details failed in retry with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_core_details failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*t = (global_ptr->global_core);
 
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_core.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_core_details failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_core_details failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;
 }
@@ -940,27 +957,31 @@ int get_memory_size(htxsyscfg_memsize_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_memory_size failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_memory.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside get_memory_size failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside get_memory_size failed in retry with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_memory_size failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*t=(global_ptr->global_memory.mem_size);
 
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_memory.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_memory_size failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_memory_size failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;
 }
@@ -1159,10 +1180,40 @@ int  get_page_details(void){
 	}
 	rc = fscanf(fp,"%d\n",&huge_page_size);
 	huge_page_size = (huge_page_size * 1024);
-	if(rc == EOF || rc == 0 || huge_page_size != 16777216)
-	{	
-		t[PAGE_INDEX_16M].supported = FALSE;
-		t[PAGE_INDEX_16M].free_pages= 0;
+
+	for(i=2; i<=3;i++){
+		t[i].free_pages= 0;
+		t[i].supported=FALSE;
+	}
+
+	if(rc == EOF || rc == 0){ 
+		sprintf(msg,"unlock inside get_memory_size failed with errno=%d\n",rc);
+		hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+	}
+	else if (huge_page_size == 2097152) {
+		t[PAGE_INDEX_2M].page_size = 2097152;
+		t[PAGE_INDEX_2M].supported = TRUE;
+		fp=popen("cat /proc/meminfo | grep HugePages_Total | awk '{print $2}' ","r");
+		if (fp == NULL || fp == (void *)-1 ) {
+			pclose(fp);
+			return -3;
+		}
+		rc = fscanf(fp,"%lu\n",&t[PAGE_INDEX_2M].total_pages);
+		if(rc == EOF || rc == 0) {
+			t[PAGE_INDEX_2M].total_pages= 0;
+		}	
+		pclose(fp);
+		fp=popen("cat /proc/meminfo | grep HugePages_Free | awk '{print $2}' ","r");
+		if (fp == NULL || fp == (void *)-1 ) {
+			pclose(fp);
+			return -3;
+		}
+		rc = fscanf(fp,"%lu\n",&t[PAGE_INDEX_2M].free_pages);
+		if(rc == EOF || rc == 0) {
+			t[PAGE_INDEX_2M].free_pages= 0;
+		}	
+		
+		pclose(fp);
 	}
 	else if (huge_page_size == 16777216) {
 		t[PAGE_INDEX_16M].page_size = 16777216;
@@ -1301,19 +1352,22 @@ int get_page_size(htxsyscfg_pages_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_page_size failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_memory.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside get_page_size failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside get_page_size failed in retry with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_page_size failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
     for ( i=0; i<MAX_PAGE_SIZES;i++){
@@ -1323,8 +1377,9 @@ int get_page_size(htxsyscfg_pages_t *t)
 
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_memory.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_page_size failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_page_size failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
 	return 0;
 }
@@ -1354,27 +1409,31 @@ int get_memory_details(htxsyscfg_memory_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_memory_details failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_memory.rw));
 			if(rc1_1!=0){
 		            sprintf(msg,"lock inside get_memory_details failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_memory_details failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*t = (global_ptr->global_memory);
 
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_memory.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_memory_details failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_memory_details failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;
 }
@@ -1508,27 +1567,31 @@ int L1cache(htxsyscfg_cache_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside L1cache failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_cache.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside L1cache failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside L1cache failed in retry with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside L1cache failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*t=(global_ptr->global_cache);
 
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_cache.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside L1cache failed with errno=%d\n",rc1);
+			sprintf(msg,"unlock inside L1cache failed with errno=%d\n",rc2);
 			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			return(rc2);
 	}
     return 0;   
 }
@@ -1638,27 +1701,31 @@ int L2L3cache(htxsyscfg_cache_t *t)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside L2L3cache failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_cache.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside L2L3cache failed with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside L2L3cache failed with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside L2L3cache failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 
 	*t=(global_ptr->global_cache);
 	rc2 = pthread_rwlock_unlock(&(global_ptr->global_cache.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"lock inside L2L3cache failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"lock inside L2L3cache failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;   
 }
@@ -1901,26 +1968,30 @@ void get_env_details(htxsyscfg_env_details_t* e)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_env_details failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->global_lpar.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside get_env_details failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside get_env_details failed in retry with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_env_details failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*e =(global_ptr->global_lpar.env_details);
 	rc2=pthread_rwlock_unlock(&(global_ptr->global_lpar.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_env_details failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_env_details failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
 	return;
 }
@@ -2306,27 +2377,31 @@ int get_hardware_config(SYS_CONF *sys_conf,unsigned int tot_cpus, unsigned int p
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_hardware_config failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->syscfg.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside get_hardware_config failed in retry with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside get_hardware_config failed in retry with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_hardware_config failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*sys_conf = (global_ptr->syscfg);
 
 	rc2 = pthread_rwlock_unlock(&(global_ptr->syscfg.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_hardware_config failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_hardware_config failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;
 }
@@ -2426,27 +2501,31 @@ int get_hardware_stat(SYS_STAT *sys_stat)
     if (rc1!=0  ) {
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_hardware_stat failed with errno=%d\n",rc1);
-                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
 			rc1_1 = pthread_rwlock_tryrdlock(&(global_ptr->system_cpu_map.stat.rw));
 			if(rc1_1!=0){
-		            sprintf(msg,"lock inside get_hardware_stat failed with errno=%d\n",rc1);
-		            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+		            sprintf(msg,"lock inside get_hardware_stat failed with errno=%d\n",rc1_1);
+		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_hardware_stat failed with errno=%d\n",rc1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+				return(rc1);
 		}
     }
 	*sys_stat = (global_ptr->system_cpu_map.stat);
 
 	rc2 = pthread_rwlock_unlock(&(global_ptr->system_cpu_map.stat.rw));
 	if (rc2 !=0  ) {
-			sprintf(msg,"unlock inside get_hardware_stat failed with errno=%d\n",rc1);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			sprintf(msg,"unlock inside get_hardware_stat failed with errno=%d\n",rc2);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(rc2);
 	}
     return 0;
 }
@@ -2958,14 +3037,9 @@ int update_syscfg(void)
 	lock1=pthread_rwlock_wrlock(&(global_ptr->global_lpar.rw));
 
 	if (lock1!=0  ) {
-		if ( lock1 == EDEADLK ) {
-				sprintf(msg,"global_ptr->global_lpar.rw_lock() failed with rc=%d\n", lock1);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
-		else{
-				sprintf(msg,"global_ptr->global_lpar.rw_lock() failed with rc=%d\n", lock1);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		}
+			sprintf(msg,"global_ptr->global_lpar.rw_lock() failed with rc=%d\n", lock1);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock1);
     }
 
 	r1=phy_logical_virt_cpus_update();
@@ -2988,7 +3062,8 @@ int update_syscfg(void)
 	lock2=pthread_rwlock_unlock(&(global_ptr->global_lpar.rw));
 	if (lock2 != 0  ) {
 			sprintf(msg,"global_ptr->global_lpar.rw_unlock() failed with rc= %d ", lock2);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock2);
 	}
 
 
@@ -2997,14 +3072,9 @@ int update_syscfg(void)
 	lock3=pthread_rwlock_wrlock(&(global_ptr->global_memory.rw));
 
 	if (lock3!=0  ) {
-		if ( lock3 == EDEADLK ) {
-				sprintf(msg,"global_ptr->global_memory.rw_lock3() failed with rc=%d\n", lock3);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
-		else{
-				sprintf(msg,"global_ptr->global_memory.rw_lock3() failed with rc=%d\n", lock3);;
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		}
+			sprintf(msg,"global_ptr->global_memory.rw_lock3() failed with rc=%d\n", lock3);;
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock3);
     }
 
 	r4=get_memory_size_update();
@@ -3039,7 +3109,8 @@ int update_syscfg(void)
 	lock4=pthread_rwlock_unlock(&(global_ptr->global_memory.rw));
 	if (lock4!=0  ) {
 			sprintf(msg,"global_ptr->global_memory.rw_unlock() failed with rc=%d\n", lock4);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock4);
     }
 
 
@@ -3047,14 +3118,9 @@ int update_syscfg(void)
 	lock5=pthread_rwlock_wrlock(&(global_ptr->global_cache.rw));
 
 	if (lock5!=0  ) {
-		if ( lock5 == EDEADLK ) {
-				sprintf(msg,"global_ptr->global_cache.rw_unlock() failed with rc=%d\n", lock5);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
-		else{
-				sprintf(msg,"global_ptr->global_cache.rw_unlock() failed with rc=%d\n", lock5);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		}
+			sprintf(msg,"global_ptr->global_cache.rw_unlock() failed with rc=%d\n", lock5);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock5);
     }
 	r8=L1cache_update();
 	if ( r8 ) {
@@ -3070,7 +3136,8 @@ int update_syscfg(void)
 	lock6 = pthread_rwlock_unlock(&(global_ptr->global_cache.rw));
 	if (lock6!=0  ) {
 			sprintf(msg,"global_ptr->global_cache.rw_unlock() failed with rc=%d\n", lock6);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock6);
 	}
 
 	/* *******************************hardware config update ******************************* */
@@ -3078,26 +3145,16 @@ int update_syscfg(void)
 	lock7 = pthread_rwlock_wrlock(&(global_ptr->syscfg.rw));
 
 	if (lock7!=0  ) {
-		if ( lock7 == EDEADLK ) {
-				sprintf(msg,"global_ptr->global_syscfg.rw_lock() failed with rc=%d\n", lock7);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
-		else{
-				sprintf(msg,"global_ptr->global_syscfg.rw_lock() failed with rc=%d\n", lock7);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		}
+			sprintf(msg,"global_ptr->global_syscfg.rw_lock() failed with rc=%d\n", lock7);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock7);
     }
 	lock18 = pthread_rwlock_wrlock(&(global_ptr->system_cpu_map.stat.rw));
 
 	if (lock18!=0  ) {
-		if ( lock1 == EDEADLK ) {
-				sprintf(msg,"global_ptr->system_cpu_map.rw_lock() inside get_hardware_config_update failed with rc=%d\n", lock18);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
-		else{
-				sprintf(msg,"global_ptr->system_cpu_map.rw_lock() inside get_hardware_config_update failed with rc=%d\n", lock18);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		}
+			sprintf(msg,"global_ptr->system_cpu_map.rw_lock() inside get_hardware_config_update failed with rc=%d\n", lock18);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock18);
     }
 
 	r11=get_hardware_config_update();
@@ -3109,28 +3166,24 @@ int update_syscfg(void)
 	lock19= pthread_rwlock_unlock(&(global_ptr->system_cpu_map.stat.rw));
     if (lock19!=0  ) {
 			sprintf(msg,"global_ptr->system_cpu_map.rw_unlock() failed with rc=%d\n", lock19);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock19);
     }
 
 	lock8 = pthread_rwlock_unlock(&(global_ptr->syscfg.rw));
 	if (lock8!=0  ) {
 			sprintf(msg,"global_ptr->syscfg.rw_unlock() failed with rc=%d\n", lock8);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock8);
 	}
-
 	/* *******************************hardware stat details update ************************* */
 
 	lock9 = pthread_rwlock_wrlock(&(global_ptr->system_cpu_map.stat.rw));
 
 	if (lock9!=0  ) {
-		if ( lock9 == EDEADLK ) {
-				sprintf(msg,"global_ptr->system_cpu_map.stat.rw_lock() failed with rc=%d\n", lock9);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
-		else{
-				sprintf(msg,"global_ptr->system_cpu_map.stat.rw_lock() failed with rc=%d\n", lock9);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		}
+			sprintf(msg,"global_ptr->system_cpu_map.stat.rw_lock() failed with rc=%d\n", lock9);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock9);
     }
 
 	r12=get_hardware_stat_update();
@@ -3141,7 +3194,8 @@ int update_syscfg(void)
 	lock12= pthread_rwlock_unlock(&(global_ptr->system_cpu_map.stat.rw));
 	if (lock12!=0  ) {
 			sprintf(msg,"global_ptr->system_cpu_map.stat.rw_unlock() failed with rc=%d\n", lock12);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock12);
 	}
 
 	/* *******************************core details update ********************************** */
@@ -3149,14 +3203,9 @@ int update_syscfg(void)
 	lock13 = pthread_rwlock_wrlock(&(global_ptr->global_core.rw));
 
 	if (lock13!=0  ) {
-		if ( lock13 == EDEADLK ) {
-				sprintf(msg,"global_ptr->global_core.rw_lock() failed with rc=%d\n", lock13);
-				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		}
-		else{
-				sprintf(msg,"global_ptr->global_core.rw_lock() failed with rc=%d\n", lock13);
-				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		}
+			sprintf(msg,"global_ptr->global_core.rw_lock() failed with rc=%d\n", lock13);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock13);
     }
 	r17 = get_hw_smt();
 	if ( r17) {
@@ -3191,7 +3240,8 @@ int update_syscfg(void)
 	lock14 = pthread_rwlock_unlock(&(global_ptr->global_core.rw));
 	if (lock14!=0  ) {
 			sprintf(msg,"global_ptr->global_core.rw_unlock() failed with rc=%d\n", lock14);
-			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+			return(lock14);
 	}
 
     return (r1|r2|r3|r5|r6|r7|r8|r9|r10|r11|r12|r13|r14|r15|r16|r17);

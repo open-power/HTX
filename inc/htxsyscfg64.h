@@ -99,12 +99,13 @@
 #define PVM_PROC_SHARED_GUEST	3
 
 /* page size indexez */
-#define PAGE_INDEX_4K 0
-#define PAGE_INDEX_64K 1
-#define PAGE_INDEX_16M 2
-#define PAGE_INDEX_16G 3
+#define PAGE_INDEX_4K    0
+#define PAGE_INDEX_64K   1
+#define PAGE_INDEX_2M    2
+#define PAGE_INDEX_16M   3
+#define PAGE_INDEX_16G   4
 
-#define MAX_PAGE_SIZES 4
+#define MAX_PAGE_SIZES 5
 #define MAX_POOLS 64
 
 /****************** Common include files  ******************/
