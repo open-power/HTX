@@ -112,8 +112,11 @@ sub __FUNC__ {
     }
 }
 
+`cp $ENV{"HTX_LOG_DIR"}."/build_net.log" $ENV{"HTX_LOG_DIR"}."/build_net.log.bk" 2>/dev/null`;
+`rm $ENV{"HTX_LOG_DIR"}."/build_net.log" 2>/dev/null`;
+
 # Build_net debug log file. format: build_net.log.<pid>
-$buildnet_logfile=$ENV{"HTX_LOG_DIR"}."/build_net.log." . $$;
+$buildnet_logfile=$ENV{"HTX_LOG_DIR"}."/build_net.log";
 
 #Opening Build_net debug log file
 unless (open (DEBUG_LOG,">$buildnet_logfile")) {
@@ -422,6 +425,10 @@ print SET_ONESYS ("systemctl disable SuSEfirewall2.service 2>/dev/null \n");
 # flush iptables settings
 print SET_ONESYS ("iptables -F 2>/dev/null \n"); 
 
+#Take backup and remove old mktcpip.log file
+`cp $ENV{"HTX_LOG_DIR"}."/mktcpip.log" $ENV{"HTX_LOG_DIR"}."/mktcpip.log.bk" 2>/dev/null `;
+`rm $ENV{"HTX_LOG_DIR"}."/mktcpip.log" 2>/dev/null `;
+ 
 #**************************** START LOOP TO CONFIG **********************
 #now fix up the rules files  and mdt file and configure the networks 
 #loop thru all the collected network structures. 
@@ -980,7 +987,8 @@ sub init_mdt {
     print MDT_FILE ("         cont_on_err = \"YES\"\n");
     print MDT_FILE ("         halt_level = \"1\"\n");
     print MDT_FILE ("         start_halted = \"n\"\n");
-    print MDT_FILE ("\n");
+    print MDT_FILE ("         priority = \"19\"\n");
+	print MDT_FILE ("\n");
 
     close(MDT_FILE);
 

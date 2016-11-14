@@ -3,7 +3,11 @@
 #########################################################################
 
 $mdtname = $ARGV[0];
-$mdtpath = $ENV{"HTXMDT"};
+open FILE, "/var/log/htx_install_path" or die "Couldn't open file: $!";
+$htx_home_dir = <FILE>;
+close FILE;
+chop($htx_home_dir);
+$mdtpath = $htx_home_dir . "/mdt/";
 if($mdtname eq "") {
 	chdir($mdtpath);
 	while(1) {
