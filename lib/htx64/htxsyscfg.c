@@ -930,10 +930,12 @@ int get_memory_size_update(void)
     int r1, r2;
 
     r1 = get_cmd_op(dest, "cat /proc/meminfo | grep MemTotal | awk '{ print $2 }'");
-    t->real_mem = atoi(dest);     /*Size of total real memory in bytes*/
+    t->real_mem = atoll(dest);     
+    t->real_mem = (t->real_mem * 1024);/*Size of total real memory in bytes*/
 
     r2 = get_cmd_op(dest, "cat /proc/meminfo | grep MemFree | awk '{ print $2 }'");
-    t->free_real_mem = atoi(dest);      /*Size of free real memory in bytes*/
+    t->free_real_mem = atoll(dest);     
+    t->free_real_mem = (t->free_real_mem * 1024);/*Size of free real memory in bytes*/
 	
     return ( r1 | r2 );
  #else
@@ -1178,6 +1180,7 @@ int  get_page_details(void){
 		pclose(fp);
 		return -3;
 	}
+
 	rc = fscanf(fp,"%d\n",&huge_page_size);
 	huge_page_size = (huge_page_size * 1024);
 
@@ -1186,11 +1189,7 @@ int  get_page_details(void){
 		t[i].supported=FALSE;
 	}
 
-	if(rc == EOF || rc == 0){ 
-		sprintf(msg,"unlock inside get_memory_size failed with errno=%d\n",rc);
-		hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-	}
-	else if (huge_page_size == 2097152) {
+	if (huge_page_size == 2097152) {
 		t[PAGE_INDEX_2M].page_size = 2097152;
 		t[PAGE_INDEX_2M].supported = TRUE;
 		fp=popen("cat /proc/meminfo | grep HugePages_Total | awk '{print $2}' ","r");
@@ -1969,7 +1968,6 @@ void get_env_details(htxsyscfg_env_details_t* e)
         if ( rc1 == EDEADLK ) {
                 sprintf(msg,"lock inside get_env_details failed with errno=%d\n",rc1);
                 hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
-				return(rc1);
         }
         else if ( rc1 == EAGAIN ) {
 			usleep(10);
@@ -1977,13 +1975,11 @@ void get_env_details(htxsyscfg_env_details_t* e)
 			if(rc1_1!=0){
 		            sprintf(msg,"lock inside get_env_details failed in retry with errno=%d\n",rc1_1);
 		            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
-					return(rc1_1);
 			}
         }
 		else{
                 sprintf(msg,"lock inside get_env_details failed with errno=%d\n",rc1);
 				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
-				return(rc1);
 		}
     }
 	*e =(global_ptr->global_lpar.env_details);
@@ -1991,7 +1987,6 @@ void get_env_details(htxsyscfg_env_details_t* e)
 	if (rc2 !=0  ) {
 			sprintf(msg,"unlock inside get_env_details failed with errno=%d\n",rc2);
 			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
-			return(rc2);
 	}
 	return;
 }
