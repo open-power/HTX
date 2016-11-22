@@ -13,10 +13,24 @@ $p6 = $ARGV[6];
 $p7 = $ARGV[7];
 $p8 = $ARGV[8];
 
-# now read in the profile if it exists.
-$prof = $ENV{"HTX_LOG_DIR"}."/mktcp_debug";
-unless (open (DEBUG_FILE,">>$prof")) {
-	die ("Can't open $prof file!\n");
+# To get function name
+sub __FUNC__ {
+    $func = "";
+    $func = (caller 1)[3] ;
+    if($func ne ""){
+        $func;
+    }
+    else{
+        "main";
+    }
+}
+
+# mktcpip debug log file.  
+$mktcpip_logfile=$ENV{"HTX_LOG_DIR"}."/mktcpip.log";
+
+#Opening mktcpip debug log file
+unless (open (DEBUG_LOG,">>$mktcpip_logfile")) {
+    die ("Can't open $mktcpip_logfile file!\n");
 }
 
 # Determine OS platform and unix distribution
@@ -46,17 +60,17 @@ if ($DISTRO  =~  /ubuntu/i) {
 } elsif ($DISTRO =~ /red/i || $DISTRO =~ /redhatenterpriseworkstation/i|| $DISTRO =~  /rhel/i || $DISTRO =~ /centos/i) { 
 	$redhat = 1; 
 } else { 
-	print DEBUG_FILE (" mktcpip Cannot detect your Distro version, distro=$DISTRO. This script would exit !! \n"); 	
+	&debug_log(__FUNC__,__LINE__," mktcpip Cannot detect your Distro version, distro=$DISTRO. This script would exit !! \n"); 	
 	&out(-1); 
 }
 
 $KERNEL_26 = "";
 $res = `uname -r | grep "2\.6\."`;
 if($res) {
-    print DEBUG_FILE (" Running on 2.6 Kernel with distro=$DISTRO\n");
+    &debug_log(__FUNC__,__LINE__," Running on 2.6 Kernel with distro=$DISTRO\n");
     $KERNEL_26 = "yes";
 } else {
-    print DEBUG_FILE (" Running on 3.0 Kernel, with distro= $DISTRO \n");
+    &debug_log(__FUNC__,__LINE__," Running on 3.0 Kernel, with distro= $DISTRO \n");
 }
 
 
@@ -81,13 +95,13 @@ foreach $val (@ARGV) {
 }
 
 if($iface eq "") { 
-	print DEBUG_FILE ("No interface provided as argument. This script would exit, iface=$iface !! \n"); 
+	&debug_log(__FUNC__,__LINE__,"No interface provided as argument. This script would exit, iface=$iface !! \n"); 
 	&out(-255); 
 } 
 # Before going to configure IP on interface bring the interface UP. 
 $state=`cat /sys/class/net/$iface/operstate`; 
 chomp($state); 
-print DEBUG_FILE ("$iface in file /sys/class/net/$iface/operstate is $state \n");
+&debug_log(__FUNC__,__LINE__,"$iface in file /sys/class/net/$iface/operstate is $state \n");
 if($state =~ /up/) { 
 	# Link is UP, we are good to move ahead 
 	# Flush the existing IP address 
@@ -101,8 +115,8 @@ if($state =~ /up/) {
 		# Flush the existing IP address
 		$res=`ip addr flush dev $iface`; 
 	} else { 
-		print DEBUG_FILE (" cannot bring the interface up iface=$iface or $iface state is unknown \n"); 
-		print DEBUG_FILE (" Probably : file /sys/class/net/$iface/operstate won't be present   !!! \n");  
+		&debug_log(__FUNC__,__LINE__," cannot bring the interface up iface=$iface or $iface state is unknown \n"); 
+		&debug_log(__FUNC__,__LINE__," Probably : file /sys/class/net/$iface/operstate won't be present   !!! \n");  
 		&out(-2); 
 	} 
 } 
@@ -119,7 +133,7 @@ if($ubuntu == 1) {
 } elsif($redhat == 1) { 
 	&configure_network_for_redhat(); 
 } else { 
-	print DEBUG_FILE (" I shouldn't be here, cannot detect distro \n"); 
+	&debug_log(__FUNC__,__LINE__," I shouldn't be here, cannot detect distro \n"); 
 	&out(-1); 
 }	
 #
@@ -127,6 +141,30 @@ if($ubuntu == 1) {
 &out(0); 
 
 
+#################################################################################
+### Function name:        debug_log
+### Function arguments:   Function name, Line Number, Data
+### Function description: Print/Save data in particular format. Enable
+###                       $print_on_screen for on screen logs. Default Behaviour:
+###                       Stores log in /tmp/build_net.log.<pid> file
+#################################################################################
+
+sub debug_log {
+        local($func_name,$line_num,$print_data) = @_;
+        $print_line = "";
+        $tag = "mktcpip";
+        $res=`date +"%d-%m-%Y %X"`;
+        chop($res);
+        if($print_on_screen)
+        {
+                print "$print_data";
+        }
+        else
+        {
+                $print_line = "[" . $res . "] [" . $tag . "] [" . $func_name . "] [" . $line_num . "]  " . $print_data;
+                print DEBUG_LOG ("$print_line");
+        }
+}
 
 
 sub out {
@@ -140,17 +178,14 @@ sub out {
 		$ipaddr = &trim($ipaddr);
         
         if($ip_value =~ /$ipaddr/){
-            print DEBUG_FILE ("IP address $ipaddr is configured successfully\n");
-			close(DEBUG_FILE);
+            &debug_log(__FUNC__,__LINE__,"IP address $ipaddr is configured successfully\n");
 			exit(0);
         } else{
-            print DEBUG_FILE ("IP address $ipaddr configuration failed\n");
-			close(DEBUG_FILE);
+            &debug_log(__FUNC__,__LINE__,"IP address $ipaddr configuration failed\n");
             exit(-7);
         }
 
     }
-	close(DEBUG_FILE);
 	exit($rc);
 }
 
@@ -167,24 +202,24 @@ sub configure_network_for_ubuntu {
 	# Debian Distros are different. 
 	$config_file="/etc/network/interfaces"; 
 	if(! -f $config_file) { 
-		print DEBUG_FILE ("$config_file doesn't exists. THis script would exit \n"); 
+		&debug_log(__FUNC__,__LINE__,"$config_file doesn't exists. THis script would exit \n"); 
 		&out(-3); 
 	}
 
 	$source_file="/etc/network/interfaces.d/htx-$iface.cfg"; 
 	# Form the ethernet Line 
 	$line = "auto $iface\n" . "iface $iface inet static\n" . "\taddress  $ipaddr \n" . "\tnetmask  $netmask\n" . "\tbroadcast  $broadcast\n"; 
-	print DEBUG_FILE ("$line writing to file $source_file \n"); 
+	&debug_log(__FUNC__,__LINE__,"$line writing to file $source_file \n"); 
 	`rm $source_file 2>/dev/null`; 
 	unless (open (OUT_FILE,">$source_file")) { 
-		print DEBUG_FILE ("$source_file cannot be opened \n"); 
+		&debug_log(__FUNC__,__LINE__,"$source_file cannot be opened \n"); 
 		&out(-4); 
 	} 
 	print OUT_FILE ("$line \n"); 
 	close(OUT_FILE); 
 
 	unless (open (OUT_FILE,"<$config_file")) {
-		print DEBUG_FILE ("$config_file doesn't exists. THis script would exit \n");
+		&debug_log(__FUNC__,__LINE__,"$config_file doesn't exists. THis script would exit \n");
 		&out(-3); 
 	}
 	@out_lines=<OUT_FILE>;
@@ -194,7 +229,7 @@ sub configure_network_for_ubuntu {
 	`rm $tmp_file 2>/dev/null`; 
 	$source_line="\nsource $source_file \n"; 
 	unless (open (TMP_FILE,">$tmp_file\n")) { 
-		print DEBUG_FILE ("$tmp_file cannot be opened \n"); 
+		&debug_log(__FUNC__,__LINE__,"$tmp_file cannot be opened \n"); 
 		&out(-5); 
 	}
 	$first_token = 0; 
@@ -203,12 +238,12 @@ sub configure_network_for_ubuntu {
 	foreach $line (@out_lines) { 
 		chomp($line); 
 		@values=split(/\s/, $line);
-		print DEBUG_FILE ("token : value[0]=$values[0], value[1]=$values[1] \n"); 
+		&debug_log(__FUNC__,__LINE__,"token : value[0]=$values[0], value[1]=$values[1] \n"); 
 		if($values[0] =~ /source/ && $values[1] eq /$iface/) { 
 			print TMP_FILE ("$source_line \n ");
 			$found = 1; 
 			$next_token = 1; 
-			print DEBUG_FILE ("source : value[0]=$values[0], value[1]=$values[1], first_token = $first_token, next_token=$next_token \n") ;
+			&debug_log(__FUNC__,__LINE__,"source : value[0]=$values[0], value[1]=$values[1], first_token = $first_token, next_token=$next_token \n") ;
 		} elsif($values[0] =~ /mapping/ || $values[0] =~ /auto/ || $values[0] =~ /allow/ || $values[0] =~ /#/ ) {
 			print TMP_FILE ("$line \n");
 			$next_token = 1; 
@@ -216,9 +251,9 @@ sub configure_network_for_ubuntu {
 			$first_token = 1; 
 			print TMP_FILE ("$source_line \n");	
 			$found = 1;
-			print DEBUG_FILE ("token : value[0]=$values[0], value[1]=$values[1], first_token = $first_token, next_token=$next_token \n") ;
+			&debug_log(__FUNC__,__LINE__,"token : value[0]=$values[0], value[1]=$values[1], first_token = $first_token, next_token=$next_token \n") ;
 		} else { 
-            print DEBUG_FILE ("else : value[0]=$values[0], value[1]=$values[1], first_token = $first_token, next_token=$next_token \n") ;
+            &debug_log(__FUNC__,__LINE__,"else : value[0]=$values[0], value[1]=$values[1], first_token = $first_token, next_token=$next_token \n") ;
             if($first_token == 0 && $next_token == 0) {
                 print TMP_FILE ("$line \n");
             } elsif($first_token == 1 && $next_token == 0) {
@@ -231,7 +266,7 @@ sub configure_network_for_ubuntu {
                 $next_token = 0;
                 print TMP_FILE ("$line \n");
             } else {
-                print DEBUG_FILE ("shouldn't reach here, first_token=$first_token, next_token=$next_token \n");
+                &debug_log(__FUNC__,__LINE__,"shouldn't reach here, first_token=$first_token, next_token=$next_token \n");
             }
 
 		} 
@@ -243,10 +278,10 @@ sub configure_network_for_ubuntu {
 	`cp $tmp_file $config_file`;  
 	`rm $tmp_file`; 
 
-	print DEBUG_FILE ("ifdown $iface 2>/dev/null \n");
+	&debug_log(__FUNC__,__LINE__,"ifdown $iface 2>/dev/null \n");
 	$res = `ifdown $iface 2>/dev/null`;
 
-	print DEBUG_FILE ("ifup $iface --force 2>/dev/null \n"); 
+	&debug_log(__FUNC__,__LINE__,"ifup $iface --force 2>/dev/null \n"); 
 	$res = `ifup $iface --force 2>/dev/null`;
 	&out(0); 
 }  
@@ -277,7 +312,7 @@ sub build_ifcfg {
 	
 	if( -d $dir_to_grep) { 
 	} else { 
-		print DEBUG_FILE (" Directory $dir_to_grep doesnot exists. This script needs to be updated for  this Distro \n"); 
+		&debug_log(__FUNC__,__LINE__," Directory $dir_to_grep doesnot exists. This script needs to be updated for  this Distro \n"); 
 		&out(-3); 
 	}
 	$mac = `ip link show dev $ifname 2>/dev/null | awk ' /link/ { print \$2 } '`; 	
@@ -292,34 +327,34 @@ sub build_ifcfg {
 		$file1="/etc/sysconfig/network/ifcfg-$ifname";
 	}else {
 		$file1=`grep -ir '$mac' $dir_to_grep | cut -d : -f 1`;
-		print DEBUG_FILE (" Searching $mac in $dir_to_grep and found=$file1\n"); 
+		&debug_log(__FUNC__,__LINE__," Searching $mac in $dir_to_grep and found=$file1\n"); 
 	}
 	chomp($file1);
 	if($file != $file1) { 
-		print DEBUG_FILE (" config_file $file, actually found $file1. Check mktcpip script \n"); 
+		&debug_log(__FUNC__,__LINE__," config_file $file, actually found $file1. Check mktcpip script \n"); 
 	}
-	print DEBUG_FILE ("mac = $mac, file1=$file1 \n"); 
+	&debug_log(__FUNC__,__LINE__,"mac = $mac, file1=$file1 \n"); 
 	unless (open (OUT_FILE,"<$file1")) {
-        print DEBUG_FILE (" Configuration file for $ifname doesnot exists. \nthis script would create one !! \n");
-        print DEBUG_FILE (" Creating file = $file \n");
+        &debug_log(__FUNC__,__LINE__," Configuration file for $ifname doesnot exists. \nthis script would create one !! \n");
+        &debug_log(__FUNC__,__LINE__," Creating file = $file \n");
         unless (open (OUT_FILE,">$file")) {
-            print DEBUG_FILE ("Can't create configuration file for $iface, file=$file !\n");
+        &debug_log(__FUNC__,__LINE__,"Can't create configuration file for $iface, file=$file !\n");
         }
 		if($ifname =~ /ib/) { 
 			print OUT_FILE ("TYPE=InfiniBand\n"); 
-			print DEBUG_FILE ("TYPE=InfiniBand\n");
+			&debug_log(__FUNC__,__LINE__,"TYPE=InfiniBand\n");
 			print OUT_FILE ("CONNECTED_MODE=yes\n");
-			print DEBUG_FILE ("CONNECTED_MODE=yes\n");
+			&debug_log(__FUNC__,__LINE__,"CONNECTED_MODE=yes\n");
 		} elsif($ifname =~ /tm/) {
 			#Network Team interface
 			print OUT_FILE ("DEVICETYPE=Team\n");
-            print DEBUG_FILE ("DEVICETYPE=Team\n");
+            		&debug_log(__FUNC__,__LINE__,"DEVICETYPE=Team\n");
 			print OUT_FILE ("IPV6INIT=no\n");
-	        print DEBUG_FILE ("IPV6INIT=no\n");
+	        	&debug_log(__FUNC__,__LINE__,"IPV6INIT=no\n");
 
 		}else { 
         	print OUT_FILE ("TYPE=Ethernet\n");
-        	print DEBUG_FILE ("TYPE=Ethernet\n");
+        	&debug_log(__FUNC__,__LINE__,"TYPE=Ethernet\n");
 		}
 
 		if($ifname !~ /tm/){
@@ -329,32 +364,32 @@ sub build_ifcfg {
 				#used to try and find the correct hardware address for an IPoIB
 				#device.Hence build_net won't populate HWADDR for IPoIB.
 	       		print OUT_FILE ("HWADDR=$mac\n");
-    	    	print DEBUG_FILE ("HWADDR=$mac\n");
+    	    		&debug_log(__FUNC__,__LINE__,"HWADDR=$mac\n");
 			}
 		}
 		if($ifname =~ /tm/){
 			#Network Team interface
 			print OUT_FILE ("IPV6INIT=no\n");
-	        print DEBUG_FILE ("IPV6INIT=no\n");
+	        	&debug_log(__FUNC__,__LINE__,"IPV6INIT=no\n");
 		}
         print OUT_FILE ("DEVICE=$ifname\n");
-        print DEBUG_FILE ("DEVICE=$ifname\n");
+        &debug_log(__FUNC__,__LINE__,"DEVICE=$ifname\n");
         print OUT_FILE ("NAME=$ifname\n");
-        print DEBUG_FILE ("NAME=$ifname\n");
+        &debug_log(__FUNC__,__LINE__,"NAME=$ifname\n");
         print OUT_FILE ("IPADDR=$ipaddr\n");
-        print DEBUG_FILE ("IPADDR=$ipaddr\n");
+        &debug_log(__FUNC__,__LINE__,"IPADDR=$ipaddr\n");
         print OUT_FILE ("NETMASK=$netmask\n");
-        print DEBUG_FILE ("NETMASK=$netmask\n");
+        &debug_log(__FUNC__,__LINE__,"NETMASK=$netmask\n");
         print OUT_FILE ("BROADCAST=$broadcast\n");
-        print DEBUG_FILE ("BROADCAST=$broadcast\n");
+        &debug_log(__FUNC__,__LINE__,"BROADCAST=$broadcast\n");
 		if($suse == 1) { # Suse uses BOOTPROTO differently 
 			print OUT_FILE ("BOOTPROTO=static\n"); 
-			print DEBUG_FILE ("BOOTPROTO=static\n"); 
+			&debug_log(__FUNC__,__LINE__,"BOOTPROTO=static\n"); 
 			print OUT_FILE ("STARTMODE=onboot\n");
-            print DEBUG_FILE ("STARTMODE=onboot\n");
+            		&debug_log(__FUNC__,__LINE__,"STARTMODE=onboot\n");
 		} elsif($redhat == 1 || $fedora == 1) {  
             print OUT_FILE ("ONBOOT=yes\n");
-            print DEBUG_FILE ("ONBOOT=yes\n");
+            &debug_log(__FUNC__,__LINE__,"ONBOOT=yes\n");
 			#
 			#Recently NM is considered to bring interface UP, so reverting back to let NM control this iface .. 
 			#
@@ -362,12 +397,12 @@ sub build_ifcfg {
 			if($ifname !~ /tm/) { 
 				#Network Team interface
 	            print OUT_FILE ("NM_CONTROLLED=no \n");
-    	        print DEBUG_FILE ("NM_CONTROLLED=no \n");
+    	        &debug_log(__FUNC__,__LINE__,"NM_CONTROLLED=no \n");
 			}
         	print OUT_FILE ("BOOTPROTO=none\n");
-        	print DEBUG_FILE ("BOOTPROTO=none\n");
+        	&debug_log(__FUNC__,__LINE__,"BOOTPROTO=none\n");
 		} else { 
-			print DEBUG_FILE (" Unknown distribution .. Exiting \n"); 
+			&debug_log(__FUNC__,__LINE__," Unknown distribution .. Exiting \n"); 
 			&out(-2); 
 		}
         close(OUT_FILE);
@@ -378,11 +413,11 @@ sub build_ifcfg {
    	close(OUT_FILE);
 	$num_out_lines=$#out_lines; 
 	if($num_out_lines == 0) { 
-		print DEBUG_FILE (" File $file1 Corrupted !! \n");
+		&debug_log(__FUNC__,__LINE__," File $file1 Corrupted !! \n");
 		&out(-4); 
 	}
    	unless (open (TMP_OUT,">/tmp/tmp_out")) {
-       	print DEBUG_FILE ("Can't open tmp_out file doing tmp_out file!\n");
+       	&debug_log(__FUNC__,__LINE__,"Can't open tmp_out file doing tmp_out file!\n");
 		&out(-5); 
    	}
 	$num_lines=0; 
@@ -477,17 +512,17 @@ sub build_ifcfg {
 	# To ensure TMP_OUT is not blank ! 
 	if($num_lines > 0) { 
    		$result = `cp /tmp/tmp_out $file1 2>/dev/null`;
-		print DEBUG_FILE (" Update to $file1 Successful !!! \n"); 
+		&debug_log(__FUNC__,__LINE__," Update to $file1 Successful !!! \n"); 
 	} else { 
-		print DEBUG_FILE (" Update to $file1 Failed, num_lines edited = $num_lines !!! \n"); 
+		&debug_log(__FUNC__,__LINE__," Update to $file1 Failed, num_lines edited = $num_lines !!! \n"); 
 		&out(-6); 
 	}
    	$result = `rm /tmp/tmp_out 2>/dev/null`;
 
-	print DEBUG_FILE ("ifdown $ifname 2>/dev/null \n");
+	&debug_log(__FUNC__,__LINE__,"ifdown $ifname 2>/dev/null \n");
 	$res = `ifdown $ifname 2>/dev/null`;
 
-	print DEBUG_FILE ("ifup $ifname 2>/dev/null \n"); 
+	&debug_log(__FUNC__,__LINE__,"ifup $ifname 2>/dev/null \n"); 
 
 	if($ifname =~ /tm/) {
 		#Network Team interface
@@ -510,104 +545,104 @@ sub setvar {
 		$HOSTNAME=$input;
 		$HOSTNAME=~s/^-h//;
 		if(!$HOSTNAME) {
-			print DEBUG_FILE ("Bad value passed for HOSTNAME to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for HOSTNAME to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("HOSTNAME=$HOSTNAME\n");
+			&debug_log(__FUNC__,__LINE__,"HOSTNAME=$HOSTNAME\n");
 		}
 	} elsif($input =~ /-a/) {
 		$ipaddr=$input;
 		$ipaddr=~s/^-a//;
 		if(!$ipaddr) {
-			print DEBUG_FILE ("Bad value passed for ipaddr to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for ipaddr to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("ipaddr=$ipaddr\n");
+			&debug_log(__FUNC__,__LINE__,"ipaddr=$ipaddr\n");
 		}
 	} elsif($input =~ /-m/) {
 		$netmask=$input;
 		$netmask=~s/^-m//;
 		if(!$netmask) {
-			print DEBUG_FILE ("Bad value passed for netmask to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for netmask to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("netmask=$netmask\n");
+			&debug_log(__FUNC__,__LINE__,"netmask=$netmask\n");
 		}
 	} elsif($input =~ /-i/) {
 		$iface=$input;
 		$iface=~s/^-i//;
 		if($iface !~ /tm/ && $iface !~ /eth/ && $iface !~ /ib/ && $iface !~ /atm/ && $iface !~ /tok/ && $iface !~ /fddi/ && $iface !~ /bond/ && $iface !~ /en/) {
-			print DEBUG_FILE ("Bad value passed for iface to mktcpip......input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for iface to mktcpip......input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("iface=$iface\n");
+			&debug_log(__FUNC__,__LINE__,"iface=$iface\n");
 		}
 	} elsif($input =~ /-c/) {
 		$master=$input;
 		$master=~s/^-c//;
 		if(!$master) {
-			print DEBUG_FILE ("Bad value passed for nameserver to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for nameserver to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("master=$master\n");
+			&debug_log(__FUNC__,__LINE__,"master=$master\n");
 		}
 	} elsif($input =~ /-n/) {
 		$nameserver=$input;
 		$nameserver=~s/^-n//;
 		if(!$nameserver) {
-			print DEBUG_FILE ("Bad value passed for nameserver to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for nameserver to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("nameserver=$nameserver\n");
+			&debug_log(__FUNC__,__LINE__,"nameserver=$nameserver\n");
 		}
 	} elsif($input =~ /-d/) {
 		$domain=$input;
 		$domain=~s/^-d//;
 		if(!$domain) {
-			print DEBUG_FILE ("Bad value passed for domain to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for domain to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("domain=$domain\n");
+			&debug_log(__FUNC__,__LINE__,"domain=$domain\n");
 		}
 	} elsif($input =~ /-g/) {
 		$gateway=$input;
 		$gateway=~s/^-g//;
 		if(!$gateway) {
-			print DEBUG_FILE ("Bad value passed for gateway to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for gateway to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("gateway=$gateway\n");
+			&debug_log(__FUNC__,__LINE__,"gateway=$gateway\n");
 		}
 	} elsif($input =~ /-r/) {
 		$media=$input;
 		$media=~s/^-r//;
 		if(!$media) {
-			print DEBUG_FILE ("Bad value passed for media to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for media to mktcpip..input=$input\n");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("media=$media\n");
+			&debug_log(__FUNC__,__LINE__,"media=$media\n");
 		}
 	} elsif($input =~ /-t/) {
 		$type=$input;
 		$type=~s/^-t//;
 		if(!$type) {
-			print DEBUG_FILE ("Bad value passed for type to mktcpip..input=$input\ntype=$type");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed for type to mktcpip..input=$input\ntype=$type");
 			return(1);
 		}
 		if($debug) {
-			print DEBUG_FILE ("type=$type\n");
+			&debug_log(__FUNC__,__LINE__,"type=$type\n");
 		}
 	} else {
-			print DEBUG_FILE ("Bad value passed to mktcpip..input=$input\n");
+			&debug_log(__FUNC__,__LINE__,"Bad value passed to mktcpip..input=$input\n");
 			return(1);
 	}
 	return(0);
@@ -628,9 +663,9 @@ sub getbcast {
     $i++;
     }
 
-	if ($debug) { print  DEBUG_FILE ("[0] $paramm[0] [1] $paramm[1] [2] $paramm[2] [3] $paramm[3] i= $i\n"); }
+	&debug_log(__FUNC__,__LINE__,"[0] $paramm[0] [1] $paramm[1] [2] $paramm[2] [3] $paramm[3] i= $i\n"); 
 	@paramip = $addr=~ /(\w+).(\w+).(\w+).(\w+)/;
-	if ($debug) { print DEBUG_FILE ("[0] $paramip[0] [1] $paramip[1] [2] $paramip[2] [3] $paramip[3] i= $i\n"); }
+	&debug_log(__FUNC__,__LINE__,"[0] $paramip[0] [1] $paramip[1] [2] $paramip[2] [3] $paramip[3] i= $i\n"); 
 	#@tmpit="";
     #@tmpit=split(/\./,$addr);
     #$last = $tmpit[3];
