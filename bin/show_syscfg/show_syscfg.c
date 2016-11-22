@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -199,8 +199,8 @@ get_env_details(&e);
 		exit(1);
 	}
 
-    printf("Real memory size                        : %llu MB\n", v.mem_size.real_mem/1024);
-    printf("Free real memory                        : %llu MB\n",v.mem_size.free_real_mem/1024);
+    printf("Real memory size                        : %llu MB\n", v.mem_size.real_mem/(1024*1024));
+    printf("Free real memory                        : %llu MB\n",v.mem_size.free_real_mem/(1024*1024));
 	for(i=0; i<MAX_PAGE_SIZES; i++) {	
 		if(v.page_details[i].supported) {
 			printf("Total pages(%8d)                   : %lu\n",v.page_details[i].page_size,v.page_details[i].total_pages);
