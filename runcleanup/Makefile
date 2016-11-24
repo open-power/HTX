@@ -1,6 +1,6 @@
 include ../htx.mk
 
-TARGET= hxecom.runcleanup
+TARGET= hxecom.runcleanup hxediag.runcleanup
 
 .PHONY: all clean
 

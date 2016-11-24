@@ -55,7 +55,7 @@ move_scripts:
 	mkdir -p ${SHIPDIR}/usr/sbin/
 	mkdir -p ${MDT}
 	mkdir -p ${SCRIPTS}
-	${CP} build_net htx_build_net pingum fixrules ${SHIPDIR}/usr/bin/
+	${CP} build_net build_net_config htx_build_net pingum pingum_config fixrules ${SHIPDIR}/usr/bin/
 	${CP} pscheck ${SCRIPTS}/
 	${CP} mdt_net net.default ${MDT}/
 	${CP} mktcpip ${SHIPDIR}/usr/sbin/

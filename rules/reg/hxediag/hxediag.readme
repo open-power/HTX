@@ -1,0 +1,141 @@
+Goal:
+To create a test environment under HTX umbrella which performs diagnostic tests to verify health of a Ethernet adapter. Exerciser uses Linux Kernel Ethtool infrastructure 
+
+to query device driver for supported diagnostic test types, execute supported diagnostic tests and report failures appropriate.
+
+Salient Features:
+
+Exerciser supports following mode of testing :
+
+1. Online test mode
+
+2. Offline test mode
+
+3. External loop-back mode.
+
+
+Hardware supported & HW test scope:
+
+Currently exerciser is enabled for  following ethernet adapter:
+
+1. Mellanox RoCE(Travis-EN) which uses mlx4_en device driver.
+
+2. Broadcom NICs(Shiner and Austin) which uses tg3 and bnx2 device drivers.
+
+
+Exerciser assumes each physical ports of the device are wrapped using appropriate compatible wrap plugs.
+
+Supported OS:
+
+AIX : n
+Linux : y
+
+
+Prerequisites:
+
+Each Ethernet port of device should be wrapped using appropriate compatible wrap plug.
+
+Brief Description:
+
+Exerciser uses Ethtool infrastructure provided in Linux kernel to invoke diagnostic tests enabled by respective device driver(not through user space ethtool utility, which internally does the same). To do so  exerciser issues SIOCETHTOOL ioctl on the opened devices with various commands to query device driver  for self test support, types of test supported and execute tests. ETHTOOL self test infrastructure allows users to run these diagnostic tests under three modes :
+
+1. Online mode : Only a subset of supported test is run, during the test duration device is still available and working.
+
+2. Offline mode : All the supported test would run, some of the diagnostic tests are destructive in nature, hence adapter is taken offline for these tests.
+
+3. External LB : External loop-back test would be run along with tests available with other modes.
+
+Type of diagnostics test supported depends on device driver, which are generally provided by adapter vendors. 
+
+A list of self test supported for Mellanox and Broadcom adapter is provided below :
+
+     nvram_test                  
+     link_test
+     register_test
+     memory_test
+     mac_loopback
+     phy_loopback
+     int_loopback
+     ext_loopback
+     interrupt_test
+     speed_test
+     loopback_test
+
+Since different device drivers support different kinds of tests and some of them are expected to fail with the setup MFG would use(wraps on). For example link test, speed test, external loop back test would fail if we don't have external links connected to ports.
+
+Currently exerciser would report FAIL, if any these tests fails( considering device drivers supports them) :
+
+    NVRAM test
+    MEMORY test
+    REGISTER test
+    MAC LOOPBACK test(if device driver supports it)
+    PHY LOOPBACK Test(if device driver supports it).
+    INTERRUPT test
+    Internal Loop back test
+
+Exerciser would ignore failures reported for these test :  
+
+1. Link Test
+2. External Loop-back/loop_back test
+3. Speed Test
+
+Binary Name : hxediag (comes with default HTX Linux package and  installed in  /usr/lpp/htx/bin/ on test machine ).
+
+Mdt File :  Exerciser entry is present in following mdt's :
+
+    mdt.all
+    mdt.bu
+    mdt.bu.characterization
+    mdt.bu_combo_char
+    mdt.bu_hot
+    mdt.bu_hot_combo_char
+    mdt.bu_hot_p17
+    mdt.bu_tpsm
+    mdt.io
+    mdt.p8_bu_hot
+    mdt.p8_bu_hot_p17
+
+
+Rules file : 
+
+Rules file for the exerciser is present /usr/lpp/htx/rules/reg/hxediag/, these files gets installed as part of regular HTX package installation. Two rules file are provided as part of the default package : 
+
+1. default rules file : runs all the tests, consists of three stanzas, Stanza 1 runs Self tests in Online mode, Stanza 2 runs Self tests in Offline mode and Stanza 3 runs Self test in External Loop-back mode.
+
+2. default.mfg : Same as default except Stanza 3 is not present, assumes ports are wrap connected.
+
+Rules file parameters :
+
+A sample rules stanza  looks like : 
+
+**** Offline test mode
+rule_id = DiagTest_Offline   
+test = offline
+num_oper = 100
+sleep = 5
+
+1. rule_id - String to uniquely identify each stanza.
+
+2. Test : Controls which mode to run the testcase. Accepted inputs : Online, Offline or External_lb execute the testcase. If nothing specified then default is online.
+
+3. num_oper  : Controls how many times to run the same test. This parameter accepts positive decimal number.
+
+4. Sleep :  (in seconds) : Controls how many seconds to sleep before executing the same test  again.
+
+5. Threshold : Some of the self test may fail intermittently while they pass on most iterations. Threshold controls percentage of failure testcase when exerciser would report failure and exit. If failure percentage is less than threshold then exerciser would dump fail information in  /tmp/htxmsg and continue.  Default threshold is 50(in percent)
+
+Exerciser statistics : 
+
+Exerciser uses following fields in /tmp/htxstats to update exerciser specific statistics :
+
+1. bad_others :  Number of test failed
+
+2. good_writes : Number of test passed.
+
+3. bad_writes :  Number of test failed
+
+4. good_others  : Number of test passed.
+
+Last Updated :
+
+December 8,  2014 by Piyush Sharma(piyusharma@in.ibm.com)

@@ -1,0 +1,7 @@
+rule_id = IB_SelfDiagTest
+test = selftest
+num_oper = 10
+sleep = 10
+device_type = infiniband
+device_name = glacierpark_1port 
+num_ports = 1

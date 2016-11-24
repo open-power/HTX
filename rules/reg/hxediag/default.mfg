@@ -1,0 +1,13 @@
+
+*** Online test mode. 
+rule_id = DiagTest_Online 
+test = online 
+num_oper = 2 
+sleep = 5 
+
+*** Offline test mode. 
+rule_id = DiagTest_Offline 
+test = offline
+num_oper = 2
+sleep = 5
+

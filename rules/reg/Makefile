@@ -1,7 +1,7 @@
 include ../../htx.mk
 
 SUBDIRS= hxecd hxetape hxeasy hxetlbie hxecorsa \
-        hxemem64 bootme hxecom  hxerng hxecpu hxefpu64 hxesctu \
+        hxemem64 bootme hxecom hxediag hxerng hxecpu hxefpu64 hxesctu \
         hxecache hxefabricbus hxesamp hxestorage 
 SUBDIRS_CLEAN = $(patsubst %,%.clean,$(SUBDIRS))
 
