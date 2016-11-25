@@ -519,8 +519,81 @@ BEGIN {
     }
 
 
-    ibm_internal = snarf("ls -l ${HTX_HOME_DIR}/.internal 2> /dev/null | wc -l");
-    if (ibm_internal) {
+    cmd = "";
+
+    #Hxediag stanza enabled only on HTX ubuntu Release
+	ip=snarf("hostname -i");
+	split(ip, ip_array, " ");
+	for (cnt in ip_array) {
+		dev=sprintf("ip -o -4 addr show | awk ' /%s/ { print $2 }' ", ip_array[cnt]);
+		primary_iface[cnt]=snarf(dev);
+	}
+
+	cmd="ip link show | cut -d : -f 2 | awk '/eth[0-9]/ || /en[aA-zA]/' |tr -d ' '";
+	while( cmd | getline intface ) {
+		found = 0;
+		for(cnt in primary_iface) {
+			if(intface ~ primary_iface[cnt]) {
+				found = 1;
+                break;
+			}
+		}
+		if(found == 0) {
+			cmd1=sprintf("ethtool -i %s | awk -F : ' {print $2}' \n", intface);
+			driver=snarf(cmd1);
+			if(driver ~ /tg3/ || driver ~ /bnx2x/) {
+				mkstanza("hxediag", "Broadcom Ethernet","NIC",intface,"hxediag", "default", "default" );
+			}
+			if(driver ~ /mlx4_en/) {
+				mkstanza("hxediag", "Mellanox RoCE", "NIC",intface,"hxediag", "default", "default" );
+			}
+		}
+	}
+	close(cmd);
+
+
+	#Enable hydepark diag test for ubuntu only right now ..
+	cmd="ls /sys/class/infiniband/ 2>/dev/null | awk ' /mlx[0-9]_[0-9]/'";
+	rules="default.ib";
+	adaptdesc="IB";
+	devicedesc="";
+	gp_dev = 0;
+	gp1p_dev = 0;
+	while( cmd | getline ib_dev ) {
+		# Gather some info about this device.
+		cmd1=sprintf("cat /sys/class/infiniband/%s/board_id \n", ib_dev);
+		dev_name=snarf(cmd1);
+		close(cmd1);
+		cmd1=sprintf("ls /sys/class/infiniband/%s/device/net/ | awk '/eth[0-9]/' \n", ib_dev);
+		roce=snarf(cmd1);
+		close(cmd1);
+		cmd1=sprintf("ls /sys/class/infiniband/%s/device/net/ | awk '/ib[0-9]/' \n", ib_dev);
+		ipoib=snarf(cmd1);
+		close(cmd1);
+		if(dev_name ~/IBM2190110032/) { # Glacier Park
+			rules="default.ib_gp";
+			devicedesc="Glacier Park";
+			gp_dev += 1;
+		} else if(dev_name ~/IBM1210111019/) { # Hyde Park
+			rules="default.ib";
+			devicedesc="Hyde Park";
+		} else if(dev_name ~/IBM2180110032/) { # GP 1 Port
+			rules="ib_gp1p";
+			devicedesc="GP 1Port";
+			gp1p_dev += 1;
+		} else {
+			continue;
+		}
+		# printf("ib_dev=%s, devicedesc=%s, roce=%s, ipoib=%s, dev_name=%s, rules = %s\n",ib_dev, devicedesc, roce, ipoib, dev_name, rules);
+		if(roce) continue;
+		if(devicedesc ~ /Glacier Park$/ && ((gp_dev % 2 ) == 0)) continue;
+		if((devicedesc ~ /GP 1Port$/) && (rules ~ /ib_gp1p$/) && (gp1p_dev != 1)) continue;
+		mkstanza("hxediag", adaptdesc, devicedesc, ib_dev, "hxediag", rules, rules);
+	}
+	close(cmd);
+
+   	ibm_internal = snarf("ls -l ${HTX_HOME_DIR}/.internal 2> /dev/null | wc -l");
+	if (ibm_internal) {
         system("${HTXSCRIPTS}/htxconf_internal.awk");
     }
 }

@@ -1,0 +1,14 @@
+rule_id = IB_BERDiagTest
+device_type = infiniband 
+device_name = hydepark
+num_ports = 2
+test = ber
+num_oper = 10
+sleep = 10
+
+rule_id = IB_DMADiagTest
+device_type = infiniband
+test = dma
+num_oper = 50
+sleep = 10
+
