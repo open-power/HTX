@@ -6,6 +6,9 @@ case "$1" in
 	remove)
 		[[ -h /bin/ver ]] && rm -rf /bin/ver 2>/dev/null
 		[[ -h /bin/htxcmdline ]] && rm -rf /bin/htxcmdline 2>/dev/null
+		[[ -h /bin/hcl ]] && rm -rf /bin/hcl 2>/dev/null
+		[[ -h /bin/htxscreen ]] && rm -rf /bin/htxscreen 2>/dev/null
+		[[ -h /bin/htxmenu ]] && rm -rf /bin/htxmenu 2>/dev/null
 		[[ -d /usr/lpp/htx ]] &&  rm -rf /usr/lpp/htx 2>/dev/null
 		[[ -s /bin/set_linux_nets ]] && rm -rf /bin/set_linux_nets 2>/dev/null
 		[[ -s /etc/cpdir ]] && rm -rf /etc/cpdir 2>/dev/null

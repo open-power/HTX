@@ -23,6 +23,7 @@
 #include "htxd_instance.h"
 #include "htxd_ipc.h"
 #include "htxd_ecg.h"
+#include "htxd_trace.h"
 
 
 #ifndef __HTX_LINUX__
@@ -56,6 +57,7 @@ int htxd_start_DR_child(void)
 	if(dr_shm_id== -1)  {
 		strcpy(msg_text,"Unable to get the DR semaphore...No point forking DR child\n");
 		htxd_send_message(msg_text, 0, HTX_SYS_INFO, HTX_SYS_MSG);
+		HTXD_TRACE(LOG_ON, msg_text);
 		return -1;
 	}
 
@@ -76,13 +78,15 @@ int htxd_start_DR_child(void)
 		exit(0);
 
 	case -1:
-		printf("DEBUG: htxd_start_DR_child() failed while creating child process with errno = <%d>", errno); fflush(stdout);
+		sprintf(msg_text, "DEBUG: htxd_start_DR_child() failed while creating child process with errno = <%d>", errno); 
+		HTXD_TRACE(LOG_ON, msg_text);
 
 		return -1;
 
 	default:
 		sprintf(msg_text,"DR child started..pid(%d)\n", dr_child_pid);
 		htxd_send_message(msg_text, 0, HTX_SYS_INFO, HTX_SYS_MSG);
+		HTXD_TRACE(LOG_ON, msg_text);
 
 		htxd_set_dr_child_pid(dr_child_pid);
 

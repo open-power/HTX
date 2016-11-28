@@ -57,6 +57,7 @@ typedef struct htxd_ecg_info_struct
 	struct htxd_ecg_info_struct *	ecg_info_previous;
 	char							ecg_name[MAX_ECG_NAME_LENGTH];
 	char 				ecg_start_time[26];
+	int				ecg_run_start_time;
 	int								ecg_status;
 	char							ecg_description[20];
 	int								ecg_shm_key;
@@ -141,6 +142,7 @@ extern int			htxd_set_shm_with_exercisers_values_for_dr_restart(char *);
 extern int			htxd_get_running_ecg_list(char *);
 extern char *			htxd_get_ecg_start_time(void);
 extern int			htxd_get_total_device_count(void);
+extern int			htxd_get_loaded_device_count(void);
 
 #endif
 

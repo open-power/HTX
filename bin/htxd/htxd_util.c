@@ -39,7 +39,11 @@
 #include <hxiipc.h>
 
 
-
+extern int htx_unbind_thread(void);
+extern int bind_process(pid_t, int, int);
+extern int bind_thread(pthread_t, int, int);
+extern int get_logical_cpu_num(int, int, int, int);
+extern struct tm * htx_localtime_r (const time_t *, struct tm *);
 
 
 
@@ -214,9 +218,15 @@ void htxd_set_value_FD_close_on_exec_flag(int value)
 pid_t htxd_create_child_process(void)
 {
 	pid_t new_pid;
+	char trace_string[256];
+
 
 	htxd_set_FD_close_on_exec_flag();
 	new_pid = fork();
+	if(new_pid == -1) {
+		sprintf(trace_string, "fork failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
 
 	return new_pid;
 }
@@ -380,6 +390,7 @@ short htxd_send_message(char *msg_text, int errno_val, int  severity, mtyp_t msg
 			(void) sprintf(error_msg,"\n%s -- Error in the time() system call of the send_message() function.\nerrno: %d (%s).\n",program_name, errno_save, strerror(errno_save));
 			fprintf(stderr, "%s", error_msg);
 			fflush(stderr);
+			HTXD_TRACE(LOG_ON, error_msg);
 			exit_code |= BAD_GETTIMER;
 			strcpy(char_time, "time() error");
 		} else {
@@ -431,11 +442,13 @@ short htxd_send_message(char *msg_text, int errno_val, int  severity, mtyp_t msg
 
 			fprintf(stderr, "%s", error_msg);
 			fflush(stderr);
+			HTXD_TRACE(LOG_ON, error_msg);
 			exit_code |= BAD_MSGSND;
 		}
 	} else {
 		fprintf(stderr, "%s", msg_text);
 		fflush(stderr);
+		HTXD_TRACE(LOG_ON, error_msg);
 		exit_code |= NO_MSG_QUEUE;
 	}
 
@@ -524,3 +537,14 @@ int do_the_bind_thread(pthread_t tid)
 }
 #endif
 
+
+
+void htxd_ipc_cleanup_on_process_exit(int exit_pid)
+{
+	char command_string[128];
+
+	
+	sprintf(command_string, "%s/etc/scripts/htx_exer_ipc_cleanup %d", global_htx_home_dir, exit_pid); 
+	system(command_string);
+
+}

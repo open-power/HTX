@@ -62,7 +62,7 @@ int htxd_process_command(char **result_string, int *p_command_type)
 			alloc_size = running_ecg_count * MAX_ECG_NAME_LENGTH;
 			running_ecg_list = malloc(alloc_size); 
 			if(running_ecg_list == NULL) {
-				sprintf(trace_str, "Error: malloc failed while allocating running_ecg_list, alloc_size is <%d>\n", alloc_size);
+				sprintf(trace_str, "Error: malloc failed while allocating running_ecg_list, alloc_size is <%d>, malloc failed with errno <%d>", alloc_size, errno);
 				HTXD_TRACE(LOG_ON, trace_str);
 				exit(-1);
 			}
@@ -72,7 +72,7 @@ int htxd_process_command(char **result_string, int *p_command_type)
 			alloc_size = (strlen(temp_result) + strlen(running_ecg_list) + 256);
 			updated_result = malloc(alloc_size);
 			if(updated_result == NULL) {
-				sprintf(trace_str, "Error: malloc failed while allocating updated_result, alloc_size is <%d>\n", alloc_size);
+				sprintf(trace_str, "Error: malloc failed while allocating updated_result, alloc_size is <%d>, malloc failed with errno <%d>", alloc_size, errno);
 				HTXD_TRACE(LOG_ON, trace_str);
 				exit(-1);
 			}
@@ -83,7 +83,7 @@ int htxd_process_command(char **result_string, int *p_command_type)
 			alloc_size = (strlen(temp_result) + 256);
 			updated_result = malloc(alloc_size);
 			if(updated_result == NULL) {
-				sprintf(trace_str, "Error: malloc failed while allocating updated_result (else), alloc_size is <%d>\n", alloc_size);
+				sprintf(trace_str, "Error: malloc failed while allocating updated_result (else), alloc_size is <%d>, malloc failed with errno <%d>", alloc_size, errno);
 				HTXD_TRACE(LOG_ON, trace_str);
 				exit(-1);
 			}

@@ -32,7 +32,7 @@
 
 #include "htxd_option.h"
 
-/* one option entry : option name, option method, parameter list flag, running ecg list display flag */
+/* one option entry : option name, option method, parameter list flag, running ecg list display flag, command type */
 option option_list[] =
 	{
 		{"-createmdt", 0, FALSE, 0, HTXCMDLINE_COMMAND},
@@ -75,7 +75,11 @@ option option_list[] =
 		{"-append_net_mdt", 0, TRUE, 0, HTXSCREEN_COMMAND},
 		{"-test_net", 0, FALSE, 0, HTXSCREEN_COMMAND},
 		{"-set_htx_env", 0, TRUE, 0, HTXCMDLINE_COMMAND},
-		{"-get_htx_env", 0, TRUE, 0, HTXCMDLINE_COMMAND}
+		{"-get_htx_env", 0, TRUE, 0, HTXCMDLINE_COMMAND},
+		{"-get_run_time", 0, TRUE, 1, HTXCMDLINE_COMMAND},
+		{"-get_last_update_time", 0, TRUE, 1, HTXCMDLINE_COMMAND},
+		{"-get_fail_status", 0, TRUE, 1, HTXCMDLINE_COMMAND},
+		{"-get_dev_cycles", 0, TRUE, 1, HTXCMDLINE_COMMAND}
 	};
 
 #endif

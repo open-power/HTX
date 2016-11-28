@@ -1,0 +1,23 @@
+--------------------------------------------------------------------------------
+|                                                                              |
+|                                                                              |
+|           1 Activate/Halt System: XXXXXXX                                    |
+|           2 Activate/Halt Device(s)                                          |
+|           3 Select mdt                                                       |
+|           4 Show/Set/Clear "Continue on Error" Flag(s) for Device(s)         |
+|                                                                              |
+|           5 Display Device Status Table                                      |
+|           6 Display Device Statistics                                        |
+|                                                                              |
+|           7 View HTX Error Log                                               |
+|           8 View HTX Message Log                                             |
+|           9 View Master Device Table (mdt)                                   |
+|          10 Add Device/Restart or Terminate Exercisers                       |
+|                                                                              |
+|          11 Go to shell command line                                         |
+|          12 Configure test network (build_net)                               |
+|                                                                              |
+|    Please enter the number of the desired option:                            |
+--------------------------------------------------------------------------------
+|  d = refresh screen         s = shutdown test      x = exit screen           |
+--------------------------------------------------------------------------------

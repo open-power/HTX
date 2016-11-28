@@ -92,5 +92,11 @@ extern int			htxd_is_init_syscfg(void);
 extern int			htxd_get_test_running_state(void);
 extern void			htxd_set_test_running_state(int);
 extern int			htxd_get_ecg_sem_id(void);
+extern int			htxd_get_equaliser_offline_cpu_flag(void);
+extern void			htxd_set_equaliser_offline_cpu_flag(int value);
+extern int			htxd_stop_stop_watch_monitor(htxd_thread *p_stop_watch_monitor_thread);
+extern int			htxd_start_stop_watch_monitor(htxd_thread *p_stop_watch_monitor_thread);
+extern void			htxd_remove_stop_watch_monitor(void);
+extern int			htxd_is_stop_watch_monitor_initialized(void);
 
 #endif

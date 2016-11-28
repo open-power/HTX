@@ -23,7 +23,7 @@
 #ifndef HTXCMD__HEADER
 #define HTXCMD__HEADER
 
-#include "../htxd/htxd_common_define.h"
+#include "htxd_common_define.h"
 
 #define COMMAND_LENGTH 1024
 

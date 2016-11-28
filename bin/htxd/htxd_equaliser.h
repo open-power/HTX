@@ -45,11 +45,11 @@ typedef struct run_time_data run_time_data;
 struct thread_config_parameters {
     char        dev_name[16];
     int         lcpu;
-    int         pcpu;
-    uint32      util_pattern;
-    uint32      utilization_pattern;
-    uint16      pattern_length;
-    uint16      sequence_length;
+    int         pcpu;                /* Only used in Linux to bind to the cpu thread */
+    uint32      util_pattern;        /* UTIL_LEFT/UTIL_RIGHT/UTIL_RANDOM/UTIL_PATTERN */
+    uint32      utilization_pattern; /* Bit pattern */
+    uint16      pattern_length;      /* length of bit pattern */
+    uint16      sequence_length;     /* Num of %age util defined */
     uint16      utilization_sequence[MAX_UTIL_SEQUENCE_LENGTH];
 };
 typedef struct thread_config_parameters thread_config_params;
@@ -62,11 +62,11 @@ typedef struct run_time_thread_config_structure run_time_thread_config;
 
 struct test_config_structure {
     uint32                      time_quantum;
-    uint16                      num_tests_configured;
+    uint16                      num_tests_configured;  /* Number of test configured under equaliser */
     uint32                      offline_cpu;           /* Flag to make cpu offline. only supported for Linux */
-    uint32                      startup_time_delay;
-    uint32                      log_duration;
-    run_time_thread_config      *thread;
+    uint32                      startup_time_delay;    /* Time delay for equaliser to be effective */
+    uint32                      log_duration;          /* Time duration foe which logs are collected. */
+    run_time_thread_config      *thread;               /* info for each exerciser running under equaliser control */
 };
 typedef struct test_config_structure test_config_struct;
 
