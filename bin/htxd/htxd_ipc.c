@@ -36,6 +36,7 @@
 #include "htxd_instance.h"
 #include "htxd_ecg.h"
 #include "htxd_util.h"
+#include "htxd_trace.h"
 
 #include "hxiipc.h" 
 /* #include <hxiipc.h> */
@@ -56,10 +57,13 @@ htxd_device_entry   *htxd_create_device_table(int number_of_devices)
 {
 	htxd_device_entry *device_table = NULL;
 	int shm_id = -1;
+	char trace_string[256];
 
 
 	shm_id = shmget (SHMKEY, number_of_devices * sizeof (htxd_device_entry), IPC_CREAT | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(shm_id == -1) {
+		sprintf(trace_string, "htxd_create_device_table: shmget failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 
@@ -67,6 +71,8 @@ htxd_device_entry   *htxd_create_device_table(int number_of_devices)
 
 	device_table = (htxd_device_entry *) shmat (shm_id, (char *) 0, 0);
 	if(device_table == (htxd_device_entry *)-1) {
+		sprintf(trace_string, "htxd_create_device_table: shmat failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 	
@@ -78,9 +84,13 @@ void * htxd_create_system_header_info(void)
 {
 	void *attch_address;
 	int shm_id = -1;
+	char trace_string[256];
+
 
 	shm_id = shmget (REMSHMKEY, 4096, IPC_CREAT | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH |S_IWOTH);
 	if(shm_id == -1) {
+		sprintf(trace_string, "htxd_create_system_header_info: shmget failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 
@@ -88,6 +98,8 @@ void * htxd_create_system_header_info(void)
 	
 	attch_address = (void *) shmat (shm_id, (char *) 0, 0);
 	if(attch_address == (void *) -1) {
+		sprintf(trace_string, "htxd_create_system_header_info: shmat failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 
@@ -101,9 +113,12 @@ void * htxd_create_exer_table(int number_of_exer)
 {
 	void *attch_address;
 	int shm_id = -1;
+	char trace_string[256];
 
 	shm_id = shmget (SHMKEY, number_of_exer * sizeof (texer_list), IPC_CREAT | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if(shm_id == -1) {
+		sprintf(trace_string, "htxd_create_exer_table: shmget failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 
@@ -111,6 +126,8 @@ void * htxd_create_exer_table(int number_of_exer)
 
 	attch_address = (void *) shmat (shm_id, (char *) 0, 0);
 	if(attch_address == (void *) -1) {
+		sprintf(trace_string, "htxd_create_exer_table: shmat failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 	bzero (attch_address,  number_of_exer * sizeof (texer_list));
@@ -121,9 +138,13 @@ void * htxd_create_exer_table(int number_of_exer)
 int htxd_create_message_queue(int message_key)
 {
 	int message_queue_id;
+	char trace_string[256];
+
 
 	g_msgqid = message_queue_id = msgget (message_key, IPC_CREAT | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH); 
 	if(message_queue_id == -1) {
+		sprintf(trace_string, "htxd_create_message_queue: msgget failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(14);
 	}
 
@@ -313,11 +334,11 @@ int htxd_get_device_error_sem_status(int device_sem_id, int device_position)
 } 
 
 
+
 int htxd_get_global_activate_halt_sem_status(int sem_id)
 {
-	struct semid_ds device_sembuffer;
 	int sem_status = -1;
-	
+	struct semid_ds device_sembuffer;
 	
 	sem_status = semctl(sem_id, 0, GETVAL, &device_sembuffer);
 
@@ -329,7 +350,6 @@ int htxd_get_global_activate_halt_sem_status(int sem_id)
 
 int htxd_set_global_activate_halt_sem_status(int sem_id, int value)
 {
-	struct semid_ds device_sembuffer;
 	int return_code;
 	
 	return_code = SEMCTL(sem_id, 0, SETVAL, value);	

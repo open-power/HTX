@@ -43,9 +43,12 @@
 #define COMMAND_TAILER_LENGTH 16
 #define COMMAND_STRING_LENGTH 10
 
+
+
+/* creating a socket */
 int htxd_create_socket(void)
 {
-	int socket_fd;
+	int	socket_fd;
 	char	trace_string[256];
 
 
@@ -73,8 +76,8 @@ int htxd_create_socket(void)
 /* setting socket option */
 int htxd_set_socket_option(int socket_fd)
 {
-	int result;
-	int option_value = 1;
+	int	result;
+	int	option_value = 1;
 	char	trace_string[256];
 
 
@@ -92,10 +95,10 @@ int htxd_set_socket_option(int socket_fd)
 
 
 
-
+/* bind socket */
 int htxd_bind_socket(int socket_fd, struct sockaddr_in *local_address, int port_number)
 {
-	int result;
+	int	result;
 	char	trace_string[256];
 
 
@@ -113,11 +116,12 @@ int htxd_bind_socket(int socket_fd, struct sockaddr_in *local_address, int port_
 
 
 
-
+/* listening connection */
 int htxd_listen_socket(int socket_fd)
 {
-	int result;
+	int	result;
 	char	trace_string[256];
+
 
 	result = listen (socket_fd, BACKLOG);
 	if(result == -1)
@@ -132,10 +136,12 @@ int htxd_listen_socket(int socket_fd)
 }
 
 
+
+/* select for reading */
 int htxd_select(int socket_fd)
 {
-	int				result;
-	fd_set			read_fd_set;
+	int		result;
+	fd_set		read_fd_set;
 	struct timeval	timeout;
 	char		trace_string[256];
 
@@ -191,7 +197,7 @@ int htxd_select_timeout(int socket_fd, int timeout_seconds)
 /* accept a connection */
 int htxd_accept_connection(int socket_fd, struct sockaddr_in *p_client_address, socklen_t *p_address_length)
 {
-	int new_fd;
+	int	new_fd;
 	char	trace_string[256];
 
 
@@ -210,10 +216,12 @@ int htxd_accept_connection(int socket_fd, struct sockaddr_in *p_client_address, 
 
 
 
+/* length received ack */
 int htxd_send_ack_command_length(int new_fd)
 {
 	int result;
 	char ack_string[] = ":length received:";
+
 	
 	result = send (new_fd, ack_string, strlen (ack_string), 0);
 	if(result == -1)
@@ -224,10 +232,14 @@ int htxd_send_ack_command_length(int new_fd)
 	return result;
 }
 
+
+
+/* receive bytes */
 int htxd_receive_bytes(int new_fd, char * receive_buffer, int receive_length)
 {
-	int received_bytes;
-	int remaining_bytes;
+	int	received_bytes;
+	int	remaining_bytes;
+
 
 	remaining_bytes = receive_length;
 	while(remaining_bytes > 0) {
@@ -248,18 +260,18 @@ int htxd_receive_bytes(int new_fd, char * receive_buffer, int receive_length)
 
 
 
-/* incoming command string receives here */
+/* incomming command string receives here */
 char * htxd_receive_command(int new_fd)  /* note: have to change for error handling */
 {
-	int result;
-	char * command_details_buffer = NULL;
-	char temp_buffer[20];
-	int command_length;
+	int	result;
+	char	*command_details_buffer = NULL;
+	char	temp_buffer[20];
+	int	command_length;
 	char	trace_string[256];
 
 
 	memset(temp_buffer, 0, sizeof(temp_buffer) );
-	/* receiving command  length from incoming commend */
+	/* receiving command  length from incomming commend */
 	result = htxd_receive_bytes(new_fd, temp_buffer, 10);
 	if(result == -1)
 	{

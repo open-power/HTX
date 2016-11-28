@@ -152,6 +152,8 @@ int htxd_get_device_run_status(struct htxshm_HE *p_HE, htxd_ecg_info *p_ecg_info
 	} else if(p_HE->PID == 0) {
 		if(p_HE->DR_term == 1) {
 			strcpy(status_result, "DT");
+		} else if(p_HE->test_run_period_expired == 1) {
+			strcpy(status_result, "RT");
 		} else if(p_HE->user_term == 0) {
 			strcpy(status_result, "DD");
 		} else {
@@ -168,6 +170,8 @@ int htxd_get_device_run_status(struct htxshm_HE *p_HE, htxd_ecg_info *p_ecg_info
 		}	
 	} else if( (p_HE->equaliser_halt == 1) || ( (device_sem_status = htxd_get_device_run_sem_status(device_sem_id, device_position) ) != 0) || (htxd_get_global_activate_halt_sem_status(device_sem_id) == 1) ) {
 		strcpy(status_result, "ST");
+	} else if(p_HE->started_delay_flag == 1 ) {
+		strcpy(status_result, "SD");
 	} else if( (p_HE->max_cycles != 0) && (p_HE->cycles >= p_HE->max_cycles) ) {
 		strcpy(status_result, "CP");
 	} else if( (epoch_time_now - p_HE->tm_last_upd) > ( (long)(p_HE->max_run_tm + p_HE->idle_time) ) ) {  ////?????
@@ -594,12 +598,9 @@ int htxd_activate_device(htxd_ecg_info *p_ecg_info_to_activate, char *p_command_
 
 int htxd_activate_all_device(htxd_ecg_info * p_ecg_info_to_activate, char *command_result)
 {
-	struct htxshm_HE *p_HE;
 	int return_code = 0;
 	int i;
 
-
-	p_HE = (struct htxshm_HE *)(p_ecg_info_to_activate->ecg_shm_addr.hdr_addr + 1);
 
 	for(i = 0; i < p_ecg_info_to_activate->ecg_shm_exerciser_entries ; i++) {
 		htxd_set_device_run_sem_status(p_ecg_info_to_activate->ecg_sem_id, i, 0);
@@ -691,8 +692,8 @@ int htxd_suspend_device(htxd_ecg_info *p_ecg_info_to_suspend, char *p_command_op
 	}	
 
 	p_device_name = strtok(p_command_option_list, " ");
-	while(p_device_name != NULL) {
 
+	while(p_device_name != NULL) {
 		p_HE = (struct htxshm_HE *)(p_ecg_info_to_suspend->ecg_shm_addr.hdr_addr + 1);
 		for(i = 0; i < p_ecg_info_to_suspend->ecg_shm_exerciser_entries ; i++) {
 			if(strcmp(p_HE->sdev_id, p_device_name) == 0) {
@@ -709,12 +710,9 @@ int htxd_suspend_device(htxd_ecg_info *p_ecg_info_to_suspend, char *p_command_op
 
 int htxd_suspend_all_device(htxd_ecg_info * p_ecg_info_to_suspend, char *command_result)
 {
-	struct htxshm_HE *p_HE;
 	int return_code = 0;
 	int i;
 
-
-	p_HE = (struct htxshm_HE *)(p_ecg_info_to_suspend->ecg_shm_addr.hdr_addr + 1);
 
 	for(i = 0; i < p_ecg_info_to_suspend->ecg_shm_exerciser_entries ; i++) {
 		htxd_set_device_run_sem_status(p_ecg_info_to_suspend->ecg_sem_id, i, 1);
@@ -1661,6 +1659,7 @@ int htxd_option_method_clrerrlog(char **command_result)
 	int return_code;
 	char temp_string[300];
 
+
 	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_ERR_LOG_FILE);
 	*command_result = malloc(512);
 	if(*command_result == NULL) {
@@ -1866,6 +1865,8 @@ int htxd_option_method_set_kdblevel(char **command_result)
 int htxd_option_method_set_hxecom(char **command_result)
 {
 	char temp_string[300];
+
+
 
 	*command_result = malloc(512);
 	if(*command_result == NULL) {
@@ -2447,8 +2448,6 @@ int htxd_option_method_screen_5(char **command_result)
 
 void htxd_get_screen_2_4_row_entry(struct htxshm_HE *p_HE, htxd_ecg_info * p_ecg_info, int device_position, activate_halt_entry *p_activate_halt_row, int screen_mode)
 {
-	char device_run_status[5];
-	char device_active_suspend_status[15];
 	int sem_status;
 
 
@@ -2552,8 +2551,6 @@ int htxd_option_method_screen_4(char **command_result)
 
 void htxd_get_screen_2_row_entry(struct htxshm_HE *p_HE, htxd_ecg_info * p_ecg_info, int device_position, activate_halt_entry *p_activate_halt_row)
 {
-	char device_run_status[5];
-	char device_active_suspend_status[15];
 	int sem_status;
 
 
@@ -3100,3 +3097,288 @@ int htxd_option_method_test_net(char **command_result)
 	}
 	return 0;
 }
+
+
+
+int htxd_option_method_get_run_time(char **command_result)
+{
+
+	htxd_ecg_info * p_ecg_info_list = NULL;
+	htxd_option_method_object get_run_time_method;
+	char trace_string[256];
+	int current_time;
+	int mdt_run_time;
+
+
+	htxd_init_option_method(&get_run_time_method);
+	*command_result = malloc(EXTRA_BUFFER_LENGTH);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	get_run_time_method.return_code = htxd_validate_command_requirements(get_run_time_method.htxd_instance, get_run_time_method.error_string);
+	if(get_run_time_method.return_code != 0) {
+		strcpy(*command_result, get_run_time_method.error_string);
+		return get_run_time_method.return_code;
+	}
+
+	if(get_run_time_method.command_ecg_name[0] != '\0') {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_run_time_method.htxd_instance->p_ecg_manager, get_run_time_method.command_ecg_name);	
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Incorrect ECG Name(%s) provided", get_run_time_method.command_ecg_name);
+			return -1;
+		}
+	} else {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_run_time_method.htxd_instance->p_ecg_manager, get_run_time_method.htxd_instance->p_ecg_manager->running_ecg_name);
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Internal Error: Failed to get a running ecg<%s>", get_run_time_method.command_ecg_name);
+			return -1;
+		}
+	}
+
+	current_time = (int) time((time_t *) 0);
+	mdt_run_time = current_time - p_ecg_info_list->ecg_run_start_time; 
+	sprintf(*command_result, "Run_time = %d minutes %d seconds", mdt_run_time/60, mdt_run_time%60);
+
+
+	return 0;
+}
+
+
+
+
+int htxd_option_method_get_last_update_time(char **command_result)
+{
+
+	htxd_ecg_info * p_ecg_info_list = NULL;
+	htxd_option_method_object get_last_update_time_method;
+	struct htxshm_HE *p_HE;
+	char trace_string[256];
+	long long last_update_time = 0;
+	char date_formatted[80] ={'\0'};
+	char time_formatted[80] ={'\0'};
+	int i;
+
+
+	htxd_init_option_method(&get_last_update_time_method);
+	*command_result = malloc(EXTRA_BUFFER_LENGTH);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	get_last_update_time_method.return_code = htxd_validate_command_requirements(get_last_update_time_method.htxd_instance, get_last_update_time_method.error_string);
+	if(get_last_update_time_method.return_code != 0) {
+		strcpy(*command_result, get_last_update_time_method.error_string);
+		return get_last_update_time_method.return_code;
+	}
+
+	if(get_last_update_time_method.command_ecg_name[0] != '\0') {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_last_update_time_method.htxd_instance->p_ecg_manager, get_last_update_time_method.command_ecg_name);	
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Incorrect ECG Name(%s) provided", get_last_update_time_method.command_ecg_name);
+			return -1;
+		}
+	} else {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_last_update_time_method.htxd_instance->p_ecg_manager, get_last_update_time_method.htxd_instance->p_ecg_manager->running_ecg_name);
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Internal Error: Failed to get a running ecg<%s>", get_last_update_time_method.command_ecg_name);
+			return -1;
+		}
+	}
+
+
+	p_HE = (struct htxshm_HE *)(p_ecg_info_list->ecg_shm_addr.hdr_addr + 1);
+	for(i = 0; i < p_ecg_info_list->ecg_shm_exerciser_entries ; i++) {
+		if(p_HE->tm_last_upd > last_update_time) {
+			last_update_time = p_HE->tm_last_upd;
+		}
+		p_HE++;
+	}
+
+	if(last_update_time == 0) {
+		sprintf(*command_result, "Last_update_time = 00:00:00 00/00/00");
+	} else {
+		htxd_get_time_details(last_update_time, date_formatted, NULL, time_formatted);
+		sprintf(*command_result, "Last_update_time = %s %s", date_formatted, time_formatted);
+	}
+
+	return 0;
+}
+
+
+int htxd_option_method_get_fail_status(char **command_result)
+{
+	htxd_ecg_info			*p_ecg_info_list = NULL;
+	htxd_option_method_object	get_last_update_time_method;
+	struct htxshm_HE		*p_HE;
+	char				trace_string[256];
+	time_t				run_status_clock;
+	int				i;
+	int				dev_dd = 0;
+	int				dev_tm = 0;
+	int				dev_st = 0;
+	int				dev_er = 0;
+	int				dev_cp = 0;
+	int				dev_ld = 0;
+	int				dev_hg = 0;
+	int				dev_pr = 0;
+	int				dev_rn = 0;
+
+
+
+	htxd_init_option_method(&get_last_update_time_method);
+	*command_result = malloc(EXTRA_BUFFER_LENGTH);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	get_last_update_time_method.return_code = htxd_validate_command_requirements(get_last_update_time_method.htxd_instance, get_last_update_time_method.error_string);
+	if(get_last_update_time_method.return_code != 0) {
+		strcpy(*command_result, get_last_update_time_method.error_string);
+		return get_last_update_time_method.return_code;
+	}
+
+	if(get_last_update_time_method.command_ecg_name[0] != '\0') {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_last_update_time_method.htxd_instance->p_ecg_manager, get_last_update_time_method.command_ecg_name);	
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Incorrect ECG Name(%s) provided", get_last_update_time_method.command_ecg_name);
+			return -1;
+		}
+	} else {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_last_update_time_method.htxd_instance->p_ecg_manager, get_last_update_time_method.htxd_instance->p_ecg_manager->running_ecg_name);
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Internal Error: Failed to get a running ecg<%s>", get_last_update_time_method.command_ecg_name);
+			return -1;
+		}
+	}
+
+	p_HE = (struct htxshm_HE *)(p_ecg_info_list->ecg_shm_addr.hdr_addr + 1);
+	run_status_clock = time ((long *) 0);
+	for(i = 0; i < p_ecg_info_list->ecg_shm_exerciser_entries ; i++) {
+		if(p_ecg_info_list->ecg_shm_addr.hdr_addr->started != 1) {
+			break;
+		}
+
+		if (p_HE->PID == 0) {
+			if (p_HE->user_term == 0) {
+				dev_dd++;
+			} else {
+				dev_tm++;
+			}
+		}else if( (htxd_get_global_activate_halt_sem_status(p_ecg_info_list->ecg_sem_id) == 1) ||
+			  (p_HE->equaliser_halt == 1) ||
+			  (htxd_get_device_run_sem_status(p_ecg_info_list->ecg_sem_id, i) ) != 0) {
+			dev_st++;
+		}else if( htxd_get_device_error_sem_status(p_ecg_info_list->ecg_sem_id, i) != 0) {
+			dev_er++;
+		}else if( (p_HE->max_cycles != 0) &&
+			   (p_HE->cycles >= p_HE->max_cycles)) {
+			dev_cp++;	
+		}else if(p_HE->tm_last_upd == -1) {
+			dev_ld++;
+		}else if((run_status_clock - p_HE->tm_last_upd) > ((long)(p_HE->max_run_tm + p_HE->idle_time))) {
+			dev_hg++;
+		}else if(p_HE->no_of_errs > 0) {
+			dev_pr++;
+		}else {
+			dev_rn++;
+		}	
+		
+		p_HE++;
+	}
+
+	if( (dev_er != 0) || (dev_dd != 0) || (dev_tm != 0) || (dev_cp != 0) || (dev_pr != 0) || (dev_hg != 0) ) {
+		sprintf(*command_result, "Fail_status = 1");
+	} else {
+		sprintf(*command_result, "Fail_status = 0");
+	}
+	
+	return 0;
+}
+
+
+
+/* to calulate cumulative device cycles */
+int htxd_option_method_get_dev_cycles(char **command_result)
+{
+
+	htxd_ecg_info * p_ecg_info_list = NULL;
+	htxd_option_method_object get_dev_cycles_method;
+	struct htxshm_HE *p_HE;
+	char trace_string[256];
+	long int cumulative_cycle_count = 0;
+	int is_device_name_found = FALSE;
+	int i;
+	char device_name_prefix[256];
+	int device_name_search_length;
+
+
+	htxd_init_option_method(&get_dev_cycles_method);
+	*command_result = malloc(EXTRA_BUFFER_LENGTH);
+	if(*command_result == NULL) {
+		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	get_dev_cycles_method.return_code = htxd_validate_command_requirements(get_dev_cycles_method.htxd_instance, get_dev_cycles_method.error_string);
+	if(get_dev_cycles_method.return_code != 0) {
+		strcpy(*command_result, get_dev_cycles_method.error_string);
+		return get_dev_cycles_method.return_code;
+	}
+
+	if(get_dev_cycles_method.command_ecg_name[0] != '\0') {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_dev_cycles_method.htxd_instance->p_ecg_manager, get_dev_cycles_method.command_ecg_name);	
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Incorrect ECG Name(%s) provided", get_dev_cycles_method.command_ecg_name);
+			return -1;
+		}
+	} else {
+		p_ecg_info_list = htxd_get_ecg_info_node(get_dev_cycles_method.htxd_instance->p_ecg_manager, get_dev_cycles_method.htxd_instance->p_ecg_manager->running_ecg_name);
+		if(p_ecg_info_list == NULL) {
+			sprintf(*command_result, "Internal Error: Failed to get a running ecg<%s>", get_dev_cycles_method.command_ecg_name);
+			return -1;
+		}
+	}
+
+	if(strlen(get_dev_cycles_method.command_option_list) == 0) {
+		 sprintf(*command_result, "No device name prefix is provided");
+		return -1;
+	}
+
+	sscanf(get_dev_cycles_method.command_option_list, "%s", device_name_prefix);
+	device_name_search_length = strlen(device_name_prefix);
+
+	p_HE = (struct htxshm_HE *)(p_ecg_info_list->ecg_shm_addr.hdr_addr + 1);
+
+	for(i = 0; i < p_ecg_info_list->ecg_shm_exerciser_entries ; i++) {
+		if (strncmp(p_HE->sdev_id, device_name_prefix, device_name_search_length) == 0) {
+			is_device_name_found = TRUE;
+			if(p_ecg_info_list->ecg_shm_addr.hdr_addr->started != 1) {
+				break;
+			}
+			cumulative_cycle_count += p_HE->cycles;
+			if(p_HE->test_id != 0) {
+				cumulative_cycle_count++;
+			}
+		}
+		p_HE++;
+	}
+
+	if(is_device_name_found == FALSE) {
+		sprintf(*command_result,"Device name prefix(%s) is NOT found", device_name_prefix);
+		return -1;
+	}
+
+	sprintf(*command_result, "%s = %ld", device_name_prefix, cumulative_cycle_count);
+
+	return 0;
+}
+
+

@@ -37,7 +37,8 @@
 
 
 extern volatile int htxd_ecg_shutdown_flag;
-extern int init_syscfg();
+extern int init_syscfg(void);
+extern int htxd_start_stop_watch_monitor(htxd_thread *);
 
 
 /* start equaliser process */
@@ -53,6 +54,8 @@ int htxd_start_equaliser(void)
 	{
 	case 0:
 		htxd_equaliser();
+		sprintf(temp_str, "htxd_start_equaliser: returned from htxd_equaliser, exiting...");
+		HTXD_TRACE(LOG_ON, temp_str);
 		exit(0);
 		break;
 
@@ -111,7 +114,7 @@ void htxd_execute_run_setup_script(char *ecg_name)
 int htxd_load_hxsmsg(htxd_profile *p_profile)
 {
 	int hxsmsg_pid, rc = 0;
-	char hxsmsg_path[512], temp_str[128];
+	char hxsmsg_path[512], temp_str[256];
 	char auto_start_flag_string[8];
 
 
@@ -122,7 +125,8 @@ int htxd_load_hxsmsg(htxd_profile *p_profile)
 		strcpy(hxsmsg_path, global_htx_home_dir);
 		strcat(hxsmsg_path, "/bin/hxsmsg");
 
-		if(p_profile->auto_start == 0) {
+		sprintf(temp_str, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
+		if(htxd_is_file_exist(temp_str) == FALSE) {
 			strcpy(auto_start_flag_string, "no");
 		} else {
 			strcpy(auto_start_flag_string, "yes");
@@ -141,7 +145,8 @@ int htxd_load_hxsmsg(htxd_profile *p_profile)
 				p_profile->stress_device,
 				p_profile->stress_cycle,
 				(char *) 0);
-		printf("DEBUG: hxsmsg load failed <errno : %d> !!!\n", errno); fflush(stdout);
+		sprintf(temp_str, "htxd_load_hxsmsg: hxsmsg load failedi, execl returned with errno  <errno : %d> !!!", errno); 
+		HTXD_TRACE(LOG_ON, temp_str);
 		exit(errno);
 
 	case -1:
@@ -154,8 +159,9 @@ int htxd_load_hxsmsg(htxd_profile *p_profile)
 		if ((htxd_get_equaliser_offline_cpu_flag()) == 1) {
 			rc = do_the_bind_proc(hxsmsg_pid);
 			if (rc < 0) {
-				sprintf(temp_str, "binding hxsmsg process to core 0 failed.\n");
+				sprintf(temp_str, "binding hxsmsg process to core 0 failed.");
 				htxd_send_message(temp_str, 0, HTX_SYS_INFO, HTX_SYS_MSG);
+				HTXD_TRACE(LOG_ON, temp_str);
 			}
 
 		}
@@ -187,10 +193,13 @@ int htxd_load_hxstats(void)
 		sprintf(temp_str, "%s/htxstats", global_htx_log_dir);
 		execl(hxsstats_path, "hxstats", temp_str, "30", (char *) 0 );
 
-		printf("DEBUG: hxstats load failed <errno : %d> !!!\n", errno); fflush(stdout);
+		sprintf(temp_str, "htxd_load_hxstats: hxstats load failed, execl failed with errno <%d>", errno); 
+		HTXD_TRACE(LOG_ON, temp_str);
 		exit(errno);
 
 	case -1:
+		sprintf(temp_str, "htxd_load_hxstats: htxd_create_child_process returned -1 with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, temp_str);
 		exit(-1);
 
 	default:
@@ -202,7 +211,7 @@ int htxd_load_hxstats(void)
 	if ((htxd_get_equaliser_offline_cpu_flag()) == 1) {
 		rc = do_the_bind_proc(hxstats_pid);
 		if (rc < 0) {
-			sprintf(temp_str, "binding hxstats process to core 0 failed.\n");
+			sprintf(temp_str, "binding hxstats process to core 0 failed.");
 			htxd_send_message(temp_str, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 		}
 
@@ -281,8 +290,9 @@ int htxd_load_exerciser(struct htxshm_HE *p_HE)
 			}
 		}
 
-/* system("export EXTSHM=OFF"); */
-unsetenv("EXTSHM");
+		/* system("export EXTSHM=OFF"); */
+		unsetenv("EXTSHM");
+
 		if ( (execl(exerciser_path, exerciser_name, device_name, run_mode, rule_path, (char *) 0) ) == -1) {
 			sprintf(trace_str, "execl() failed  exerciser_path <%s> exerciser_name <%s> errno = <%d>\n", exerciser_path, exerciser_name, errno);
 			htxd_send_message (trace_str, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
@@ -392,7 +402,10 @@ int htxd_option_method_run_mdt(char **result)
 
 	/* start hxsmsg process if it is not already started */
 	if(htxd_get_htx_msg_pid() == 0) {
-		htxd_truncate_error_file();
+		sprintf(temp_str, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
+		if(htxd_is_file_exist(temp_str) == FALSE) { /* incase of bootme do not truncate error file */
+			htxd_truncate_error_file();
+		}
 		htxd_truncate_message_file();
 		htxd_load_hxsmsg(htxd_instance->p_profile);
 		HTXD_TRACE(LOG_ON, "run started htxsmsg process");
@@ -413,9 +426,11 @@ int htxd_option_method_run_mdt(char **result)
 		htxd_send_message (trace_str, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 		HTXD_TRACE(LOG_ON, trace_str);
 
+		/* copy run mdt to current mdt */
 		sprintf(temp_str, "cp %s %s/mdt/mdt ; sync", command_ecg_name, global_htx_home_dir);
 		system(temp_str);
 
+		/* update for camss mdt */
 		if( strstr(command_ecg_name, "camss") != NULL) {
 			sprintf(trace_str, "updating camss mdt <%s>", command_ecg_name);
 			HTXD_TRACE(LOG_OFF, trace_str);
@@ -436,6 +451,8 @@ int htxd_option_method_run_mdt(char **result)
 		}
 		ecg_manager->selected_ecg_name[0] = '\0';
 	}
+
+	ecg_manager->current_loading_ecg_info->ecg_run_start_time = (int) time((time_t *) 0);
 
 	/* initializing syscfg */
 	if(htxd_is_init_syscfg() != TRUE) {
@@ -486,9 +503,16 @@ int htxd_option_method_run_mdt(char **result)
 		HTXD_TRACE(LOG_ON, "run started hang monitor thread");
 	}
 
+	/* start stop_watch monitor thread */
+	if(htxd_is_stop_watch_monitor_initialized() != TRUE) {
+		htxd_start_stop_watch_monitor(&(htxd_instance->stop_watch_monitor_thread));
+		HTXD_TRACE(LOG_ON, "run started stop watch monitor thread");
+	}
+
 	htxd_instance->run_state = HTXD_DAEMON_RUNNING;
 	htxd_set_test_running_state(HTXD_TEST_ACTIVATED);
 	strcpy(ecg_manager->running_ecg_name, command_ecg_name);
+
 
 	/* to DEBUG */
 /*	htxd_display_ecg_info_list();
@@ -613,7 +637,10 @@ int htxd_option_method_select_mdt(char **result)
 
 	/* start hxsmsg process if it is not already started */
 	if(htxd_get_htx_msg_pid() == 0) {
-		htxd_truncate_error_file();
+		sprintf(temp_str, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
+		if(htxd_is_file_exist(temp_str) == FALSE) { /* incase of bootme do not truncate error file */
+			htxd_truncate_error_file();
+		}
 		htxd_truncate_message_file();
 		htxd_load_hxsmsg(htxd_instance->p_profile);
 		HTXD_TRACE(LOG_ON, "run started htxsmsg process");

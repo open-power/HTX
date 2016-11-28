@@ -27,11 +27,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include <errno.h>
 
 #include "htxd.h"
 #include "htxd_ecg.h"
 #include "htxd_thread.h"
 #include "htxd_profile.h"
+#include "htxd_trace.h"
+#include "htxd_util.h"
+#include "htxd_instance.h"
+
+
 
 extern htxd *htxd_global_instance;
 extern volatile int htxd_shutdown_flag;
@@ -86,7 +92,7 @@ int htxd_hang_monitor_ecg(htxd_ecg_info *p_ecg_info_to_hang_monitor, char *comma
 						"Current elasped time = %d seconds.",
 						p_HE->HE_name, p_HE->sdev_id,
 						p_HE->max_run_tm,
-						(int)(clock - p_HE->tm_last_upd));
+						elasped_time);
 				}
 			} else {
 				p_HE->hung_flag = 0;
@@ -131,6 +137,8 @@ int htxd_start_hang_monitor(htxd_thread **hang_monitor_thread)
 	if(*hang_monitor_thread == NULL) {
 		*hang_monitor_thread = malloc(sizeof(htxd_thread));
 		if(*hang_monitor_thread == NULL) {
+			sprintf(temp_str, "htxd_start_hang_monitor: filed malloc with errno <%d>.\n", errno);
+			htxd_send_message(temp_str, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 			exit(1);
 		}
 		memset(*hang_monitor_thread, 0, sizeof(htxd_thread));
@@ -159,12 +167,24 @@ int htxd_start_hang_monitor(htxd_thread **hang_monitor_thread)
 int htxd_stop_hang_monitor(htxd_thread **hang_monitor_thread)
 {
 	int return_code = -1;
+	char trace_string[256];
 
 
 	return_code = htxd_thread_cancel(*hang_monitor_thread);
+	if(return_code != 0) {
+		sprintf(trace_string, "htxd_stop_hang_monitor: htxd_thread_cancel returned with <%d>", return_code);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
+
+	return_code = htxd_thread_join(*hang_monitor_thread);
+	if(return_code != 0) {
+		sprintf(trace_string, "htxd_stop_hang_monitor: htxd_thread_join returned with <%d>", return_code);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
 
 	if(*hang_monitor_thread != NULL) {
 		free(*hang_monitor_thread);
+		*hang_monitor_thread = NULL;
 	}
 
 	return return_code;

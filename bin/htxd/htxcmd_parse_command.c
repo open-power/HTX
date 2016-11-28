@@ -25,8 +25,8 @@
 #include <string.h>
 
 
-#include "../htxd/htxd_common.h"
-#include "../htxd/htxd_common_define.h"
+#include "htxd_common.h"
+#include "htxd_common_define.h"
 #include "htxcmd.h"
 
 
@@ -205,7 +205,7 @@ char * htxcmd_get_ecg_name(int argument_count, char *argument_vector[], char *ec
 	ecg_name[0] = '\0';
 
 	for (i = 1; i < argument_count; i++) {
-		if( ( (strncmp(ECG_NAME_OPTION, argument_vector[i], strlen(ECG_NAME_OPTION) ) ) == 0) || ( (strncmp(MDT_NAME_OPTION, argument_vector[i], strlen(MDT_NAME_OPTION) ) ) == 0) ){ 
+		if( ( (strncmp(ECG_NAME_OPTION, argument_vector[i], strlen(ECG_NAME_OPTION) ) ) == 0) || ( (strncmp(MDT_NAME_OPTION, argument_vector[i], strlen(MDT_NAME_OPTION) ) ) == 0)){ 
 			i++;
 			if( i >= argument_count) {
 				htxcmd_display_usage("Error : ECG name is not provided with <-ecg> option");

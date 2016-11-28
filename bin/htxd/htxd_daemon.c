@@ -51,7 +51,7 @@ extern volatile int htxd_shutdown_flag;
 extern int htxd_shutdown_all_mdt(void);
 extern int htxd_stop_hotplug_monitor(htxd_thread **);
 extern int htxd_autostart(htxd *);
-extern int detach_syscfg();
+extern int detach_syscfg(void);
 
 /* daemon live here, receives command, process it, send back result */
 int htxd_start_daemon(htxd *htxd_instance)
@@ -215,6 +215,8 @@ int htxd_idle_daemon(void)
 	int return_code;
 	char trace_string[256];
 	pid_t htx_stats_pid;
+	pid_t htx_msg_pid;
+	pid_t htx_equaliser_pid;
 	htxd *htxd_instance;
 #ifdef __HTXD_DR__
 	pid_t htx_dr_child_pid;
@@ -225,12 +227,26 @@ int htxd_idle_daemon(void)
 		htxd_instance = htxd_get_instance();
 		htxd_stop_hang_monitor(&(htxd_instance->p_hang_monitor_thread));
 		htxd_remove_hang_monitor();
+
+		sprintf(trace_string, "stopping hang monitor thread");
+		HTXD_TRACE(LOG_OFF, trace_string);
 	}
 
+	if(htxd_is_stop_watch_monitor_initialized() == TRUE) {
+		htxd_instance = htxd_get_instance();
+		htxd_stop_stop_watch_monitor(&(htxd_instance->stop_watch_monitor_thread));
+		htxd_remove_stop_watch_monitor();
+
+		sprintf(trace_string, "stopping stop watch monitor thread");
+		HTXD_TRACE(LOG_OFF, trace_string);
+	}
 	
 	htx_stats_pid = htxd_get_htx_stats_pid();
 	if (htx_stats_pid != 0) {
 		htxd_send_SIGTERM(htx_stats_pid);
+
+		sprintf(trace_string, "sent SIGTERM to hxstats process, pid <%d>", htx_stats_pid);
+		HTXD_TRACE(LOG_OFF, trace_string);
 	}
 
 #ifdef __HTX_LINUX__
@@ -238,6 +254,9 @@ int htxd_idle_daemon(void)
 		htxd_instance = htxd_get_instance();
 		htxd_stop_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
 		htxd_remove_hotplug_monitor();
+
+		sprintf(trace_string, "stopping hotplug  monitor thread");
+		HTXD_TRACE(LOG_OFF, trace_string);
 	}
 #endif
 
@@ -246,10 +265,23 @@ int htxd_idle_daemon(void)
 	htx_dr_child_pid = htxd_get_dr_child_pid();
 	if (htx_dr_child_pid != 0) {
 		htxd_send_SIGTERM(htx_dr_child_pid);
+
+		sprintf(trace_string, "sent SIGTERM to DR child process, pid <%d>", htx_dr_child_pid);
+		HTXD_TRACE(LOG_OFF, trace_string);
 	}
 #endif
+	htx_equaliser_pid = htxd_get_equaliser_pid();
+	if(htx_equaliser_pid != 0) {
+		htxd_send_SIGTERM(htx_equaliser_pid);
+
+		sprintf(trace_string, "sent SIGTERM to equaliser process, pid <%d>", htx_equaliser_pid);
+		HTXD_TRACE(LOG_OFF, trace_string);
+	}
 	
-	htxd_send_message ("System into idle state", 0, HTX_SYS_INFO, HTX_SYS_FINAL_MSG);
+	htxd_send_message ("Final message from test: System into idle state", 0, HTX_SYS_INFO, HTX_SYS_FINAL_MSG);
+
+	sprintf(trace_string, "sent test final message to hxsmsg process");
+	HTXD_TRACE(LOG_OFF, trace_string);
 
 	while(1) {
 #ifdef __HTXD_DR__
@@ -270,6 +302,30 @@ int htxd_idle_daemon(void)
 
 	}
 
+	while(1) {
+		htx_msg_pid = htxd_get_htx_msg_pid();
+		if(htx_msg_pid == 0) {
+			sprintf(trace_string, "hxsmsg is stopped");
+			HTXD_TRACE(LOG_OFF, trace_string);
+			break;
+		}
+		sleep(1);
+		sprintf(trace_string, "wating for exiting hxsmsg process, pid <%d>", htx_msg_pid);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
+
+	while(1) {
+		htx_equaliser_pid = htxd_get_equaliser_pid();
+		if(htx_equaliser_pid == 0) {
+			sprintf(trace_string, "equaliser is stopped");
+			HTXD_TRACE(LOG_OFF, trace_string);
+			break;
+		}
+		sleep(1);
+		sprintf(trace_string, "wating for exiting equaliser process, pid <%d>", htx_equaliser_pid);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
+
 	if (htxd_is_init_syscfg() == TRUE) {
 		return_code = detach_syscfg();
 		if(return_code != 0) {
@@ -282,6 +338,9 @@ int htxd_idle_daemon(void)
 	htxd_cleanup_system_shm();
 	htxd_set_daemon_state(HTXD_DAEMON_IDLE);
 	htxd_set_test_running_state(HTXD_TEST_HALTED);
+
+	sprintf(trace_string, "daemon is in idle state now");
+	HTXD_TRACE(LOG_OFF, trace_string);
 
 	return 0;
 }

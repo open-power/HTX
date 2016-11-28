@@ -179,9 +179,8 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
     script_list_file = strcat(script_list_file, "/");
     script_list_file = strcat(script_list_file, HE_SCRIPT_FILE);
     if (0 != (rc = access(script_list_file, R_OK))) {
-	sprintf(msg_text,
-		"Cannot access %s. Errno = %d", script_list_file, errno);
-	printf(msg_text);
+	sprintf(msg_text, "Cannot access %s. Errno = %d", script_list_file, errno);
+	HTXD_TRACE(LOG_ON, msg_text);
 //	print_log(LOGERR,"Cannot access %s. Errno = %d", script_list_file, errno);
 //	(void) send_message(msg_text, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
 	//if (!editor_PID && !shell_PID) print_log(LOGERR,"Cannot access %s for %s.  See message log.\n",
@@ -196,10 +195,8 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
  */
     p_temp_filename = tempnam(NULL, "hxs");
     if (p_temp_filename == NULL) {
-	(void) sprintf(msg_text,
-		       "Problem getting the temporary file name for awk output.  errno = %d",
-		       errno);
-	printf(msg_text);
+	(void) sprintf(msg_text, "Problem getting the temporary file name for awk output.  errno = %d", errno);
+	HTXD_TRACE(LOG_ON, msg_text);
 	//(void) send_message(msg_text, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
 //	if (!editor_PID && !shell_PID) print_log(LOGMSG,"%s\n", msg_text);
 	rc = -1;
@@ -241,7 +238,7 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
 	(void) sprintf(msg_text,
 		       "Problem getting the script name from %s.\nPattern =\"%s\"\nrun_cmd() returns %d.  errno=%d   See %s for output.",
 		       script_list_file, pattern, rc, errno, p_temp_filename);
-	printf(msg_text);
+	HTXD_TRACE(LOG_ON, msg_text);
 //	(void) send_message(msg_text, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
 //	if (!editor_PID && !shell_PID) print_log(LOGERR,"Failed to get script name for %s.  See message log.\n", device_name);
 	rc = -1;

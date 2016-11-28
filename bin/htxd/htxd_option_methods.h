@@ -89,5 +89,9 @@ extern int htxd_option_method_append_net_mdt OPTION_METHOD_ARGS;
 extern int htxd_option_method_test_net OPTION_METHOD_ARGS;
 extern int htxd_option_method_set_htx_env OPTION_METHOD_ARGS;
 extern int htxd_option_method_get_htx_env OPTION_METHOD_ARGS;
+extern int htxd_option_method_get_run_time OPTION_METHOD_ARGS;
+extern int htxd_option_method_get_last_update_time OPTION_METHOD_ARGS;
+extern int htxd_option_method_get_fail_status OPTION_METHOD_ARGS;
+extern int htxd_option_method_get_dev_cycles OPTION_METHOD_ARGS;
 
 #endif

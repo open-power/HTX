@@ -37,8 +37,8 @@
 #include "htxd_trace.h"
 
 
-
-int htxd_set_device_restart_status(htxd_ecg_info *, int);
+extern int get_smt_status(int);
+extern int htxd_set_device_restart_status(htxd_ecg_info *, int);
 
 /* a generic function to process a command for all active ecg */
 int htxd_process_all_active_ecg_device(ecg_device_process_function process_action, char *device_list, char *command_result)
@@ -201,9 +201,12 @@ htxd_ecg_manager * create_ecg_manager(void)
 {
 	htxd_ecg_manager *p_ecg_manager = NULL;
 	int exer_table_length_limit;
+	char trace_string[256];
 
 	p_ecg_manager = malloc(sizeof(htxd_ecg_manager) );
 	if(p_ecg_manager == NULL) {
+		sprintf(trace_string, "create_ecg_manager: failed to malloc for htxd_ecg_manager object, errno is <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 	memset(p_ecg_manager, 0, sizeof(htxd_ecg_manager) );
@@ -525,6 +528,50 @@ int htxd_extract_ecg_to_shm_HE(htxd_ecg_manager *this_ecg_manager, char *stanza,
     cfgcskwd ("priority", stanza, workstr);
     shm_point.HE_addr->priority = (unsigned short) atoi (htxd_unquote (workstr));
 
+   /* set Start Delay Duration */
+    memset(workstr, 0, sizeof(workstr));
+    cfgcskwd ("start_delay", stanza, workstr);
+    if(strlen(workstr) == 0) {
+        shm_point.HE_addr->test_start_delay = 0;
+    } else {
+        shm_point.HE_addr->test_start_delay =  atoi (htxd_unquote (workstr));
+    }
+
+   /* set Test Run Time  */
+    memset(workstr, 0, sizeof(workstr));
+    cfgcskwd ("run_time", stanza, workstr);
+    if(strlen(workstr) == 0) {
+        shm_point.HE_addr->test_run_period = 0;
+    } else {
+        shm_point.HE_addr->test_run_period =  atoi (htxd_unquote (workstr));
+    }
+
+   /* set Equaliser Flag  */
+    memset(workstr, 0, sizeof(workstr));
+    cfgcskwd ("equaliser_flag", stanza, workstr);
+    if(strlen(workstr) == 0) {
+        shm_point.HE_addr->equaliser_flag = 0;
+    } else {
+        shm_point.HE_addr->equaliser_flag = atoi (htxd_unquote (workstr));
+    }
+
+   /* set Offline CPU  */
+    memset(workstr, 0, sizeof(workstr));
+    cfgcskwd ("offline_cpu", stanza, workstr);
+    if(strlen(workstr) == 0) {
+        shm_point.HE_addr->offline_cpu = 0;
+    } else {
+        shm_point.HE_addr->offline_cpu = atoi (htxd_unquote (workstr));
+    }
+
+   /* set CPU Utilization  */
+    memset(workstr, 0, sizeof(workstr));
+    memset(shm_point.HE_addr->cpu_utilization, 0, sizeof(shm_point.HE_addr->cpu_utilization));
+    cfgcskwd ("cpu_utilization", stanza, workstr);
+    if(strlen(workstr) > 0) {
+        strcpy(shm_point.HE_addr->cpu_utilization, htxd_unquote (workstr));
+    }
+
    /* set Slot Number */
     cfgcskwd ("slot", stanza, workstr);
     shm_point.HE_addr->slot = (unsigned short) atoi (htxd_unquote (workstr));
@@ -607,6 +654,12 @@ int htxd_extract_ecg_to_shm_HE(htxd_ecg_manager *this_ecg_manager, char *stanza,
 
    /* set Time of Last call to HTX_update() */
     shm_point.HE_addr->tm_last_upd = -1;
+
+   /* set test started time stamp */
+    shm_point.HE_addr->test_started_time = 0;
+
+   /* set test delayed start flag */
+    shm_point.HE_addr->started_delay_flag = 0;
 
    /* set Number of Other Bad Operations */
     shm_point.HE_addr->bad_others = 0;
@@ -940,7 +993,7 @@ int htxd_init_equaliser_info( htxd_ecg_info *p_ecg_info)
 				p_ecg_info->ecg_equaliser_info.offline_cpu = atoi(htxd_unquote(temp_str));
 				htxd_set_equaliser_offline_cpu_flag(p_ecg_info->ecg_equaliser_info.offline_cpu);
 			#ifdef __HTX_LINUX__
-				/* Also, get the SMT for core 0, if WOF test is enabled as this will be
+				/* Also, get the SMT for core 0, if offlining cpu is enabled as this will be
 				 * while binding the threads/processes to core 0.
 				 */
 				if (p_ecg_info->ecg_equaliser_info.offline_cpu == 1) {
@@ -1000,6 +1053,7 @@ int htxd_init_ecg_info(htxd_ecg_manager *this_ecg_manager, char *new_ecg_name)
 	strcpy( p_current_ecg_info->ecg_name, new_ecg_name);
 	p_current_ecg_info->ecg_status = ECG_UNLOADED;
 	sprintf(p_current_ecg_info->ecg_start_time, "%lu", time((long *) 0) );
+	p_current_ecg_info->ecg_run_start_time = 0;
 
 	next_key_offset = htxd_get_next_key_offset(this_ecg_manager);
 

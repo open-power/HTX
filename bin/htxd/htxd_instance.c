@@ -23,10 +23,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "htxd.h"
 #include "htxd_common_define.h"
 #include "htxd_util.h"
+#include "htxd_trace.h"
 
 
 extern volatile int htxd_shutdown_flag;
@@ -364,6 +366,32 @@ void htxd_remove_hang_monitor(void)
 }
 
 
+
+int htxd_is_stop_watch_monitor_initialized(void)
+{
+	htxd *p_temp_instance;
+
+	p_temp_instance = htxd_get_instance();
+
+	if(p_temp_instance->is_stop_watch_monitor_initailized == 0) {
+		return FALSE;
+	} else {
+		return TRUE;
+	}
+}
+
+
+void htxd_remove_stop_watch_monitor(void)
+{
+	htxd *p_temp_instance;
+
+	p_temp_instance = htxd_get_instance();
+
+	p_temp_instance->is_stop_watch_monitor_initailized = 0;
+}
+
+
+
 int htxd_is_profile_initialized(htxd *htxd_instance)
 {
     if(htxd_instance->p_profile == NULL) {
@@ -377,6 +405,8 @@ int htxd_is_profile_initialized(htxd *htxd_instance)
 htxd * htxd_create_instance(void)
 {
 	htxd *htxd_new_instance;
+	char trace_string[256];
+
 
 	if( htxd_global_instance != NULL) {
 		return htxd_global_instance;
@@ -384,6 +414,8 @@ htxd * htxd_create_instance(void)
 
 	htxd_new_instance = malloc(sizeof(htxd));
 	if(htxd_new_instance == NULL) {
+		sprintf(trace_string, "htxd_create_instance: failed malloc with errno <%d>, exiting...", errno);	
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(0);
 	}
 	memset(htxd_new_instance, 0, sizeof(htxd) );
@@ -403,7 +435,15 @@ void initialize_command(htxd_command *p_htxd_command)
 htxd_command * htxd_create_command(void)
 {
 	htxd_command *p_htxd_command;
+	char trace_string[256];
+
+
 	p_htxd_command = malloc(sizeof(htxd_command));
+	if(p_htxd_command == NULL) {
+		sprintf(trace_string, "htxd_create_command: failed malloc with errno <%d>, exiting...", errno);	
+		HTXD_TRACE(LOG_ON, trace_string);
+		exit(0);
+	}
 	initialize_command(p_htxd_command);
 
 	return p_htxd_command;
@@ -437,6 +477,7 @@ void init_htxd_instance(htxd *p_htxd_instance)
 	p_htxd_instance->init_syscfg_flag		= FALSE;
 	p_htxd_instance->master_client_mode		= 0;
 	p_htxd_instance->is_test_active			= 0;
+	p_htxd_instance->is_stop_watch_monitor_initailized	= 0;
 }
 
 
@@ -446,7 +487,8 @@ int htxd_reset_exer_pid(pid_t child_pid, char *exit_reason)
 
 	texer_list *p_exer_table;
 	int exer_position_in_exer_table;
-	char exit_detail_string[256];
+	char exit_detail_string[512];
+	char temp_str[100];
 
 	p_exer_table = htxd_get_exer_table();
 	if(p_exer_table == NULL) {
@@ -460,9 +502,19 @@ int htxd_reset_exer_pid(pid_t child_pid, char *exit_reason)
 			(p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->sdev_id,
 			exit_reason);
 
+		if( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->user_term) {
+			strcat(exit_detail_string, " because of user request");
+		} else if ( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->DR_term ) {
+			strcat(exit_detail_string, " because of DR operation");
+		} else if ( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period_expired ) {
+			sprintf(temp_str, " because of run time (%d seconds) is completed", (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period);
+			strcat(exit_detail_string, temp_str);
+		}
+
 		if( (htxd_ecg_shutdown_flag == FALSE) && (htxd_shutdown_flag == FALSE) ) {
 			if ( ( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->user_term) ||
-				( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->DR_term ) ) {
+				( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->DR_term ) ||
+				( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period_expired )   ) {
 				htxd_send_message(exit_detail_string, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 			} else {
 				htxd_send_message(exit_detail_string, 0, HTX_HE_HARD_ERROR, HTX_SYS_MSG);

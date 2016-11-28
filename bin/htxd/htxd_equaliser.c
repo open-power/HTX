@@ -99,7 +99,7 @@ int get_line(char line[], int lim, FILE *fp)
 
 void update_thread_config(char *affinity, thread_config_params cur_config)
 {
-    char *chr_ptr[4], *ptr, msg[128], dev_name_str[32];
+    char *chr_ptr[4], *ptr, msg[256], dev_name_str[32];
     char tmp_str[10], tmp[4];
     int i, j, k, l, m, exer_found;
     int node_num, chip_num, core_num, thread_num;
@@ -116,7 +116,8 @@ void update_thread_config(char *affinity, thread_config_params cur_config)
     if ((chr_ptr[i++] = strtok(affinity, "NPCT")) != NULL) {
         for (; i < 4; i++) {
             if ((chr_ptr[i] = strtok(NULL, "NPCT")) == NULL) {
-                printf("Improper data is provided in line\n");
+                sprintf(msg, "Improper data is provided in line, exiting...\n");
+    		htxd_send_message (msg, 0, HTX_SYS_INFO, HTX_SYS_MSG); 
                 exit(1);
             }
         }
@@ -273,6 +274,8 @@ int read_config(void)
 
 	rc = init_syscfg_with_malloc();
 	if (rc) {
+		sprintf(msg, "read_config: failed with init_syscfg_with_malloc, exiting...");
+		htxd_send_message(msg, 0, HTX_SYS_HARD_ERROR, HTX_SYS_MSG);
 	    exit(1);
 	}
 	test_config.offline_cpu = 0;
@@ -577,7 +580,6 @@ void htxd_equaliser(void)
 #endif
 
 	pclose(fp);
-	printf("DEBUG: point 1\n");
 	test_config.thread = (run_time_thread_config *) malloc(sizeof(run_time_thread_config) * (shm_addr.hdr_addr)->max_entries);
 	if( test_config.thread == NULL) {
 		sprintf(msg, "Error (errno = %d) in allocating memory for equaliser process.\nProcess will exit now.", errno);
@@ -586,18 +588,17 @@ void htxd_equaliser(void)
 		exit(1);
 	}
 
-	printf("DEBUG: point 2\n");
 	test_config.startup_time_delay = 0;
 	test_config.log_duration = 0;
 	rc = read_config();
 	if(rc == -1) {
-	printf("DEBUG: point 3\n");
+		sprintf(msg, "htxd_equaliser: read_config returned with -1, exiting...");
+		htxd_send_message(msg, 0, HTX_SYS_HARD_ERROR, HTX_SYS_MSG);
 		free(test_config.thread);
 		/* PRTMSG(MSGLINE, 0, ("ERROR:Equaliser process exiting. See /tmp/htxerr for more details.")); */
 		exit(1);
 	}
 	else {
-	printf("DEBUG: point 4\n");
 		htxd_send_message("Done reading config file", 0, HTX_SYS_INFO, HTX_SYS_MSG);
 	}
 /*	if(equaliser_debug_flag == 1) {*/
@@ -692,7 +693,7 @@ void htxd_equaliser(void)
                                 }
                             }
                         #endif
-							sprintf(msg, "Sending SIGCONT to %s at %s", thread->th_config.dev_name, p_tm);
+						    sprintf(msg, "Sending SIGCONT to %s at %s", thread->th_config.dev_name, p_tm);
 							fprintf (log_fp, "%s", msg);
 							if(htxd_get_equaliser_debug_flag() == 1) {
 								sprintf(msg, "htx_equaliser: Sending SIGCONT to %s at %s", thread->th_config.dev_name, p_tm);

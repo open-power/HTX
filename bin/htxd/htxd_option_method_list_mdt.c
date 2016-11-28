@@ -58,13 +58,13 @@ int htxd_list_files(char *path_name, char **file_list)
 
 	memset(*file_list, 0, (dir_entry_count * DIR_ENTRY_LENGTH) + BUFFER_LENGTH);
 
-    p_dir = opendir(path_name);
-    if(p_dir == NULL) {
-        perror("dir open failed");
-        return -1;
-    }
+	p_dir = opendir(path_name);
+		if(p_dir == NULL) {
+		perror("dir open failed");
+		return -1;
+	}
 
-    while ( (p_dir_entry = readdir(p_dir) ) != NULL) {
+	while ( (p_dir_entry = readdir(p_dir) ) != NULL) {
 		if( p_dir_entry->d_name[0] == '.') { 	/* skip hidden filies			*/
 			continue;
 		}

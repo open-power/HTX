@@ -89,6 +89,7 @@ print_exiting_script()
   export HTXPROCESSORS=1
   export HTXSCRIPTS=${HTXLPP}/etc/scripts/
   export HTXSCRIPTS_STX=${HTXLPP}/etc/scripts_stx/
+  export HTX_BOOTME_LOG_DIR=${HTX_LOG_DIR}/htx_bootme_log_dir
   export HTXNoise=$HTX_LOG_DIR/HTXScreenOutput # Its a file. Last / should not be there
 
   #export PATH variable
