@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define PARMS(x) x
 
@@ -31,6 +32,7 @@
 #include "htxd.h"
 #include "htxd_instance.h"
 #include "htxd_util.h"
+#include "htxd_trace.h"
 
 
 #define HTX_PROFILE ".htx_profile"
@@ -115,9 +117,12 @@ void htxd_display_profile(htxd_profile *p_profile)
 htxd_profile * htxd_create_profile(void)
 {
 	htxd_profile *new_profile = NULL;
+	char trace_string[256];
 
 	new_profile = malloc(sizeof(htxd_profile) );
 	if(new_profile == NULL) {
+		sprintf(trace_string, "htxd_create_profile: malloc failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
 		exit(1);
 	}
 	memset(new_profile, 0, sizeof(htxd_profile) );
@@ -300,11 +305,14 @@ int htxd_init_profile(htxd_profile **p_profile)
 
 		/* close htx profile file */
 		if (cfgcclsf(profile_fd) != CFG_SUCC) {
+			sprintf(temp_string, "htxd_init_profile: cfgcclsf not returned CFG_SUCC");
+			HTXD_TRACE(LOG_ON, temp_string);
 			exit(1);
 		}
 
 	} else {
-		printf("[DEBUG] : Error : failed to open HTX profile file\n");	
+		sprintf(temp_string, "Error : failed to open HTX profile file");
+		HTXD_TRACE(LOG_ON, temp_string);
 	}
 	
 

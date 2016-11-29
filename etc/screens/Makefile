@@ -23,6 +23,12 @@ TARGET= AD_scn     \
         dst_scn.a  \
         mmenu_scn  \
         mmhelp_scn.a \
+        config_net  \
+        config_net.a \
+        htxscreen_mmenu_scn  \
+        htxscreen_mmenu_scn.a \
+        mdt_list  \
+        mdt_list.a \
         ddsrch_scn \
         ddsrch_scn.a 
  

@@ -70,4 +70,8 @@ void init_option_list(void)
 	option_list[index++].option_method = htxd_option_method_test_net;
 	option_list[index++].option_method = htxd_option_method_set_htx_env;
 	option_list[index++].option_method = htxd_option_method_get_htx_env;
+	option_list[index++].option_method = htxd_option_method_get_run_time;
+	option_list[index++].option_method = htxd_option_method_get_last_update_time;
+	option_list[index++].option_method = htxd_option_method_get_fail_status;
+	option_list[index++].option_method = htxd_option_method_get_dev_cycles;
 }

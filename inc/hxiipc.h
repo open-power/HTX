@@ -45,6 +45,7 @@
 #endif
 
 #define RULE_NAME_LENGTH_LIMIT 100
+#define CPU_UTLIZATION_LENGTH 128
 
 #define SEM_PER_EXER 3
 #define SEM_GLOBAL 6
@@ -189,6 +190,7 @@ struct htxshm_HE {
         char           emc_rules[RULE_NAME_LENGTH_LIMIT];    /* EMC Rules File Name             */
         char           reg_rules[RULE_NAME_LENGTH_LIMIT];    /* REG Rules File Name             */
         char           sdev_id[DEV_ID_MAX_LENGTH];       /* /dev/???? Description           */
+	char           cpu_utilization[CPU_UTLIZATION_LENGTH];
         unsigned short dma_chan;          /* DMA Channel                     */
         unsigned short test_id;           /* Current rules file stanza       */
         unsigned short intrpt_lev;        /* Interrupt Level                 */
@@ -223,16 +225,19 @@ struct htxshm_HE {
         unsigned       hotplug_mem : 1;   /* flag to register mem hotplug    */
         unsigned       hotplug_io  : 1;   /* flag to register ip hotplug     */
         unsigned       upd_test_id  : 1;  /* updated test_id to 1            */
-        unsigned       sp7  : 1;          /* Spare Flag 7                    */
-        unsigned       sp6  : 1;          /* Spare Flag 6                    */
-        unsigned       sp5  : 1;          /* Spare Flag 5                    */
-        unsigned       sp4  : 1;          /* Spare Flag 4                    */
+        unsigned       started_delay_flag : 1;  /*  started delay flag       */
+        unsigned       test_run_period_expired  : 1; /* test run period expired flag */
+        unsigned       equaliser_flag  : 1; /* Equaliser Flag                */
+        unsigned       offline_cpu  : 1;  /* Offline CPU                     */
         unsigned       sp3  : 1;          /* Spare Flag 3                    */
         unsigned       sp2  : 1;          /* Spare Flag 2                    */
         unsigned       sp1  : 1;          /* Spare Flag 1                    */
         long long      tm_last_err;       /* Time of Last Error              */
         long long      tm_last_upd;       /* Time of Last Call to htx_update */
         long long      run_time;          /* exerciser total run time        */
+	long long	test_started_time; /* test started timestamp         */
+	long long	test_start_delay; /* test start delay duration in seconds */
+	long long	test_run_period;  /* test run duration in seconds    */
         float          data_trf_rate1;/* write data transfer rate        */
 	    float 	       data_trf_rate2;/* read data transfer rate	     */
 	    long double    throughput;        /* Read instruction throughput     */

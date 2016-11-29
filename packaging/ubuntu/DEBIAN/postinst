@@ -10,6 +10,9 @@ case "$1" in
 		ln -sf /usr/bin/perl /bin/perl
 		ln -sf /usr/bin/awk /bin/awk
 		ln -sf /usr/lpp/htx/bin/htxcmdline /bin/htxcmdline
+		ln -sf /usr/lpp/htx/bin/htxcmdline /bin/hcl
+		ln -sf /usr/lpp/htx/bin/htxscreen /bin/htxscreen
+		ln -sf /usr/lpp/htx/bin/htxscreen /bin/htxmenu
 		ln -sf /usr/lpp/htx/etc/scripts/ver /bin/ver
 
 		update-rc.d htx.d defaults >/dev/null 2>&1

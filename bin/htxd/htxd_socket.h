@@ -36,7 +36,7 @@ extern char * htxd_receive_command(int);
 extern int htxd_send_ack_command_length(int);
 extern int htxd_send_response_length(int, int);
 extern int htxd_send_response(int, char *, int, int);
-extern  int htxd_receive_bytes(int, char *, int);
+extern int htxd_receive_bytes(int, char *, int);
 extern int htxd_send_heart_beat_response(int , char *);
 
 

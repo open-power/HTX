@@ -1,23 +1,13 @@
 #!/bin/ksh
-# IBM_PROLOG_BEGIN_TAG
+# @(#)56        1.15  src/htx/usr/lpp/htx/etc/scripts/bootmeStuff.sh, htx_bootme, htx52B, htx52B_466 3/25/03 13:52:20
 #
-# Copyright 2003,2016 IBM International Business Machines Corp.
+# COMPONENT_NAME: htx_bootme
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# ORIGINS: 27
 #
-#                http://www.apache.org/licenses/LICENSE-2.0
+# OWNER: Jack E. Moore
+#        jem@us.ibm.com
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-# implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# IBM_PROLOG_END_TAG
-
 ###############################################################################
 ###############################################################################
 
@@ -27,20 +17,26 @@
 
 
 ###############################################################################
+# file locations
 htx_install_path=`cat /var/log/htx_install_path`
 if [ -f $htx_install_path/etc/scripts/htx_env.sh ]; then
     . $htx_install_path/etc/scripts/htx_env.sh
 else
     echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
-    echo "Either file is empty or does not contain correct install path. Hence exiting..."
+    echo "Either file is empty or does not contain correct install path. Hence exiting..."  
     exit 1
 fi
-
-# file locations
+    
   PROG_DIR=${HTXSCRIPTS}
   SC_ERR=${HTX_LOG_DIR}/sctcheckstop.err
   rules=${HTXREGRULES}/bootme/default
-  blog=${HTX_LOG_DIR}/bootme.log
+
+  if [ -e ${HTX_HOME_DIR}/.htxd_autostart ] ; then
+  	blog=${HTX_BOOTME_LOG_DIR}/bootme.log
+  else
+	blog=${HTX_LOG_DIR}/bootme.log
+  fi
+
   Work=${HTX_LOG_DIR}/bootme.work
   typeset -i count=0 scount=0 bcount=0
 
@@ -241,12 +237,12 @@ function logError
 
 #############################################################################
 # escape for testing - touch .noreboot (keeps from having to edit script)
-  [ -f $HTXLPP/.noreboot ] && exit
+  [ -f $HTX_HOME_DIR/.noreboot ] && exit
 
 
 #############################################################################
 # remove some other potentially large files
-  rm -f ${HTX_LOG_DIR}/aixerr_* ${HTX_LOG_DIR}/htx*.0* ${HTX_LOG_DIR}/list*
+  rm -f /tmp/aixerr_* /tmp/htx*.0* /tmp/list*
 
 
 #############################################################################
@@ -330,9 +326,17 @@ function timeCalc
 
 #############################################################################
 # Copy htxerr to backup locations
-  [ -e ${HTX_LOG_DIR}/htxerr.bootme1 ] && cp ${HTX_LOG_DIR}/htxerr.bootme1 ${HTX_LOG_DIR}/htxerr.bootme2
-  [ -e ${HTX_LOG_DIR}/htxerr ]         && cp ${HTX_LOG_DIR}/htxerr         ${HTX_LOG_DIR}/htxerr.bootme1
-
+  if [ -e ${HTX_HOME_DIR}/.htxd_autostart ] ; then
+	diff_count=`diff ${HTX_LOG_DIR}/htxerr ${HTX_BOOTME_LOG_DIR}/htxerr.bootme | wc -l`
+	if [ ${diff_count} -ne 0 ] ; then
+		TIME_STAMP=`date "+%Y.%m.%d-%H.%M.%S"`
+		cp ${HTX_LOG_DIR}/htxmsg ${HTX_BOOTME_LOG_DIR}/htxmsg_${TIME_STAMP}
+		cp ${HTX_LOG_DIR}/htxerr ${HTX_BOOTME_LOG_DIR}/htxerr.bootme
+	fi
+  else
+	[ -e ${HTX_LOG_DIR}/htxerr.bootme1 ] && cp ${HTX_LOG_DIR}/htxerr.bootme1 ${HTX_LOG_DIR}/htxerr.bootme2
+	[ -e ${HTX_LOG_DIR}/htxerr ]         && cp ${HTX_LOG_DIR}/htxerr         ${HTX_LOG_DIR}/htxerr.bootme1
+  fi
 
 #############################################################################
 # Log message
@@ -360,7 +364,7 @@ function timeCalc
           sync
 
           if [[ -n $(echo $BOOT_CMD | grep "shutdown") ]]
-             then $BOOT_CMD $NEW_BOOT_WAIT <${HTX_LOG_DIR}/.bootme
+             then $BOOT_CMD $NEW_BOOT_WAIT </tmp/.bootme
              else $BOOT_CMD $NEW_BOOT_WAIT
           fi
   fi

@@ -678,6 +678,10 @@ int htx_start(struct htx_data *data, int *p_sem_id, int *p_save_time)
 
 
   time_t  temp_time;
+  time_t  current_time;
+  time_t  started_time;
+  struct  tm      *asc_time, asc_time1;
+  char    disp_time[26], disp_time1[30];
 
     int lockinit1,lockinit1_1;
 	lockinit1_1 = lockinit1 = 0;
@@ -1028,6 +1032,72 @@ Unable to find %s in HTX shared memory structure.\n",
 
   p_shm_HE->tm_last_upd = time((time_t *) 0);
   *p_save_time = p_shm_HE->tm_last_upd;     /* for cycle time calc.     */
+
+	/* to support started delay time */
+	if(p_shm_HE->test_start_delay != 0) {
+		started_time = current_time = time((time_t *) 0);
+		data->error_code = 0;
+		data->severity_code = (enum sev_code )7;
+		temp_time = started_time;
+		asc_time = htx_localtime_r(&temp_time, &asc_time1);
+		strcpy(disp_time, asctime_r(asc_time, disp_time1));
+		disp_time[24] = '\0';
+
+		(void) sprintf(data->msg_text,
+			"\n---------------------------------------------------------------------\
+			\nDevice id:%-18s\nTimestamp:%-20s\
+			\nerr=%-8.8x\nsev=%-1.1d\nExerciser Name:%-14s\
+			\nDevice:%s\
+			\nMessage Text:test start delay is set as %d seconds, going to sleep...\
+			\n---------------------------------------------------------------------\n",
+			data->sdev_id,
+			&disp_time[4],
+			data->error_code,
+			data->severity_code,
+			data->HE_name,
+			data->dev_desc,
+			p_shm_HE->test_start_delay);
+
+		if (sendp(data, HTX_HE_MSG) != 0) {
+			perror(data->msg_text);
+			fflush(stderr);
+		} /* endif */
+
+		p_shm_HE->started_delay_flag = 1;
+		while( (current_time < (started_time + p_shm_HE->test_start_delay) ) && ((p_shm_hdr)->shutdown == 0 ) ) {
+			sleep(1);
+			current_time = time((time_t *) 0);
+		}
+		p_shm_HE->started_delay_flag = 0;
+
+		temp_time = current_time;
+		asc_time = htx_localtime_r(&temp_time, &asc_time1);
+		strcpy(disp_time, asctime_r(asc_time, disp_time1));
+		disp_time[24] = '\0';
+
+		(void) sprintf(data->msg_text,
+			"\n---------------------------------------------------------------------\
+			\nDevice id:%-18s\nTimestamp:%-20s\
+			\nerr=%-8.8x\nsev=%-1.1d\nExerciser Name:%-14s\
+			\nDevice:%s\
+			\nMessage Text:test start delay (%d seconds) is completed, start running...\
+			\n---------------------------------------------------------------------\n",
+			data->sdev_id,
+			&disp_time[4],
+			data->error_code,
+			data->severity_code,
+			data->HE_name,
+			data->dev_desc,
+			p_shm_HE->test_start_delay);
+
+		if (sendp(data, HTX_HE_MSG) != 0) {
+			perror(data->msg_text);
+			fflush(stderr);
+		} /* endif */
+
+	}
+	p_shm_HE->test_started_time = time((time_t *) 0);
+
 
     lockinit1 = pthread_rwlockattr_init(&rwlattr_update);
     if (lockinit1!=0  ) {

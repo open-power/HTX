@@ -35,6 +35,7 @@
 #include "htxd_trace.h"
 #include "htxd_thread.h"
 #include "htxd_socket.h"
+#include "htxd_util.h"
 
 
 htxd *htxd_global_instance = NULL;
@@ -58,7 +59,7 @@ int htxd_validate_arguments(int argc, char *argv[], htxd *p_htxd_instance)
 	int ret = 0;;
 
 
-	while ((arg_option = getopt(argc, argv, "ast:")) != -1)
+	while ((arg_option = getopt(argc, argv, "ast:")) != -1) 
 	{
     	switch(arg_option)
 		{
@@ -222,7 +223,7 @@ int main(int argc, char *argv[])
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "main");
 
 	htxd_global_instance = htxd_create_instance();
-	init_htxd_instance(htxd_global_instance);
+	init_htxd_instance(htxd_global_instance); 
 
 	HTXD_TRACE(LOG_ON, "validate arguments to daemon launcher");
 	ret = htxd_validate_arguments(argc, argv, htxd_global_instance);
@@ -235,6 +236,7 @@ int main(int argc, char *argv[])
 	if(htxd_global_instance->run_level == HTXD_SHUTDOWN)
 	{
 /* shutdown all currently running ECGc */
+		HTXD_TRACE(LOG_ON, "htxd_global_instance->run_level = HTXD_SHUTDOWN, exiting...");
 		exit(0);
 	}
 
@@ -242,7 +244,7 @@ int main(int argc, char *argv[])
 	system("errlogger --- HTXD Started ---");
 #endif
 
-	HTXD_TRACE(LOG_ON, "forking daemon process");
+	HTXD_TRACE(LOG_ON, "forking daemon process");	
 	htxd_global_instance->daemon_pid = fork();
 	switch (htxd_global_instance->daemon_pid)
 	{

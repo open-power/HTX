@@ -78,3 +78,23 @@ int htxd_thread_cancel(htxd_thread *p_thread_info)
 
 	return return_code;
 }
+
+
+
+int htxd_thread_join(htxd_thread *p_thread_info)
+{
+	int return_code;
+	void *error_code;
+	char trace_string[256];
+
+	return_code = pthread_join(p_thread_info->thread_id, &error_code);
+	if(return_code != 0) {
+		sprintf(trace_string, "htxd_thread_join: pthread_join returned with return code <%d>, error code <%d>", return_code, (int) error_code);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
+
+	return return_code;
+}
+
+
+

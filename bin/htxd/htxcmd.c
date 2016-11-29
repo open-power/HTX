@@ -64,6 +64,10 @@ void htxcmd_display_usage(char *error_text)
 	printf("\t-geterrlog\n");
 	printf("\t-clrerrlog\n");
 	printf("\t-getvpd\n");
+	printf("\t-get_fail_status [-ecg <ecg_name>]\n");
+	printf("\t-get_run_time [-ecg <ecg_name>]\n");
+	printf("\t-get_dev_cycles <device_name_prefix> [-ecg <ecg_name>]\n");
+	printf("\t-get_last_update_time [-ecg <ecg_name>]\n");
 	printf("\t-cmd <command to execute>\n");
 	printf("\nPlease Note: -ecg option is provided for backward compatibility, -mdt option is preferred\n\n");
 

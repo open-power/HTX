@@ -35,6 +35,7 @@
 
 
 extern int htxd_idle_daemon(void);
+extern int htx_unbind_process(void);
 
 extern int sem_length;
 extern volatile int htxd_ecg_shutdown_flag;
@@ -52,12 +53,13 @@ int htxd_cleanup_ecg_ipc(htxd_ecg_info *p_ecg_info)
 }
 
 /* Cleanup equaliser realted setting */
-int htxd_cleanup_equaliser_setting()
+int htxd_cleanup_equaliser_setting(void)
 {
 	htxd_set_equaliser_offline_cpu_flag(0);
 	#ifdef __HTX_LINUX__
 	    htx_unbind_process();
 	#endif
+	return 0;
 }
 
 /* count running exercisers */
@@ -212,9 +214,6 @@ int htxd_option_method_shutdown_mdt(char **result)
 	HTXD_TRACE(LOG_OFF, "shutdown unload exercisers");
 	htxd_unload_exercisers(p_ecg_info_node_to_remove);
 
-	HTXD_TRACE(LOG_OFF, "shutdown cleanup ipc");
-	htxd_cleanup_ecg_ipc(p_ecg_info_node_to_remove);
-
 	if (htxd_get_equaliser_offline_cpu_flag() == 1) {
 		HTXD_TRACE(LOG_OFF, "Unload equaliser setting");
 		htxd_cleanup_equaliser_setting();
@@ -226,12 +225,15 @@ int htxd_option_method_shutdown_mdt(char **result)
 	sprintf(temp_str, "MDT <%s> is shutdhown", p_ecg_info_node_to_remove->ecg_name);
 	htxd_send_message (temp_str, 0, HTX_SYS_INFO, HTXD_MDT_SHUTDOWN_MSG);
 
-	free(p_ecg_info_node_to_remove);
-
 	if(htxd_get_running_ecg_count() == 0) {
 		HTXD_TRACE(LOG_OFF, "no mdt is currently running, daemon goes to idle state");
 		htxd_idle_daemon();
 	}
+
+	HTXD_TRACE(LOG_OFF, "shutdown cleanup ipc");
+	htxd_cleanup_ecg_ipc(p_ecg_info_node_to_remove);
+
+	free(p_ecg_info_node_to_remove);
 
 	/* delete bootme entries */
 	sprintf(temp_str, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);

@@ -63,13 +63,17 @@ void child_death(int sig, int code, struct sigcontext *scp)
 	pid_t child_pid;
 	int child_process_exit_status;	
 	char exit_reason[120];
+	int is_ipc_cleanup_required = 0;
 
 
 	while( (child_pid = wait3(&child_process_exit_status, WNOHANG, (struct rusage *) NULL) ) > 0  ) {
+		is_ipc_cleanup_required = 0;
 		if ( WIFEXITED(child_process_exit_status) ) {
-			sprintf(exit_reason, "exit(%d) call.", WEXITSTATUS(child_process_exit_status) );
+			sprintf(exit_reason, "exit(%d) call", WEXITSTATUS(child_process_exit_status) );
+			is_ipc_cleanup_required = 1;
 		} else if ( WIFSIGNALED(child_process_exit_status) )  {
 			sprintf(exit_reason, "signal %d", WTERMSIG(child_process_exit_status) );
+			is_ipc_cleanup_required = 1;
 		}	
 
 		if(child_pid == htxd_get_htx_stats_pid() ) {
@@ -84,8 +88,16 @@ void child_death(int sig, int code, struct sigcontext *scp)
 			htxd_set_dr_child_pid(0);
 		}
 #endif
+		else if(child_pid == htxd_get_equaliser_pid() ) {
+			htxd_set_equaliser_pid(0);
+		}
+
 		else {
 			htxd_reset_exer_pid(child_pid, exit_reason);
+		}
+
+		if(is_ipc_cleanup_required == 1) {
+			htxd_ipc_cleanup_on_process_exit(child_pid);
 		}
 	} 
 
@@ -295,15 +307,15 @@ void register_signal_handlers(void)
 	 /*else
 	    sigvector.sa_handler = (void (*)(int)) sig_end;*/
 		break;
-	    case SIGINT:             /* interrupt (rubout)  */
+	 /*   case SIGINT:             / * interrupt (rubout)  * /
 		sigvector.sa_handler = (void (*)(int)) sig_end;
-		break;
+		break; */
 	    case SIGQUIT:            /* quit (ASCII FS)     */
 		sigvector.sa_handler = SIG_IGN;
 		break;
-	    case SIGILL:             /* illegal instruction */
+	 /*   case SIGILL:             / * illegal instruction * /
 		sigvector.sa_handler = (void (*)(int)) sig_end;
-		break;
+		break; */
 	    case SIGTRAP:            /* trace trap          */
 		sigvector.sa_handler = SIG_DFL;
 		break;
@@ -315,23 +327,23 @@ void register_signal_handlers(void)
 		sigvector.sa_handler = SIG_DFL;
 		break;
 #endif
-	    case SIGFPE:             /* floating point exception    */
+	 /*   case SIGFPE:             / * floating point exception    * /
 		sigvector.sa_handler = (void (*)(int)) sig_end;
-		break;
+		break; */
 	    case SIGKILL:            /* kill (cannot be caught)     */
 		sigvector.sa_handler = SIG_DFL;
 		break;
 	    case SIGBUS:             /* bus error                   */
-		sigvector.sa_handler = (void (*)(int)) sig_end;
+		sigvector.sa_handler = SIG_DFL;
 		break;
 		//case SIGSEGV:         /* segmentation violation      */
 		    //  sigvector.sa_handler = (void (*)(int)) sig_end;
 		    //  break;
 		case SIGSYS:             /* bad argument to system call */
-		    sigvector.sa_handler = (void (*)(int)) sig_end;
+		    sigvector.sa_handler = SIG_DFL;
 		    break;
 		case SIGPIPE:            /* write on a pipe with no one t */
-		    sigvector.sa_handler = (void (*)(int)) sig_end;
+		    sigvector.sa_handler = SIG_DFL;
 		    break;
 		case SIGALRM:            /* alarm clock                 */
 		    sigvector.sa_handler = (void (*)(int)) alarm_signal;
@@ -385,7 +397,7 @@ void register_signal_handlers(void)
 		    break;
 #ifndef __OS400__               /* 400 */
 		case SIGPWR:             /* power-fail restart          */
-		    sigvector.sa_handler = (void (*)(int)) sig_end;
+		    sigvector.sa_handler = SIG_DFL;
 		    break;
 #endif
 #ifdef __HTXD_DR__
@@ -394,7 +406,7 @@ void register_signal_handlers(void)
 		    break;
 #else
 		case SIGUSR1:            /* user defined signal 1       */
-		    sigvector.sa_handler = (void (*)(int)) sig_end;
+		    sigvector.sa_handler = SIG_DFL;
 		    break;
 #endif
 		case SIGUSR2:            /* user defined signal 2       */
@@ -406,7 +418,7 @@ void register_signal_handlers(void)
 		    break;
 #if !defined(__HTX_LINUX__) && !defined(__OS400__)	/* 400 */
 		case SIGDANGER:          /* system crash imminent (maybe) */
-		    sigvector.sa_handler = (void (*)(int)) sig_end;
+		    sigvector.sa_handler = SIG_DFL;
 		    break;
 #endif
 		case SIGVTALRM:          /* virtual time alarm (see setitimer) */

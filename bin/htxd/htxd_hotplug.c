@@ -35,6 +35,7 @@
 #include "htxsyscfg64.h"
 #include "cfgclibdef.h"
 #include "scr_info.h"
+#include "htxd_trace.h"
 
 #ifdef __HTX_LINUX__
 
@@ -201,7 +202,6 @@ int hotplug_monitor_send_signal(hotplug_mode* p_mode_state)
 /* populates mdt.hotplug */
 int hotplug_monitor_create_mdt(void)
 {
-	char mdt_path[250];
 	char hotplug_str[1024];
 
 
@@ -396,11 +396,14 @@ void* htxd_hotplug_monitor(void* vptr)
 int htxd_start_hotplug_monitor(htxd_thread **hotplug_monitor_thread)
 {
 	int return_code = 0;
+	char trace_string[256];
 
 
 	if(*hotplug_monitor_thread == NULL) {
 		*hotplug_monitor_thread = malloc(sizeof(htxd_thread));
 		if(*hotplug_monitor_thread == NULL) {
+			sprintf(trace_string, "htxd_start_hotplug_monitor: malloc faile with errno <%d>", errno);
+			HTXD_TRACE(LOG_ON, trace_string);
 			exit(1);
 		}
 	}	

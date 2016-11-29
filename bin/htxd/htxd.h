@@ -57,6 +57,7 @@ typedef struct
 	htxd_ecg_manager *	p_ecg_manager;
 	htxd_thread *		p_hang_monitor_thread;
 	htxd_thread *		p_hotplug_monitor_thread;
+	htxd_thread 		stop_watch_monitor_thread;
 	char			program_name[80];
 	char			htx_path[80];
 	int			shutdown_flag;
@@ -85,6 +86,7 @@ typedef struct
 	int			init_syscfg_flag;
 	int			master_client_mode;
 	int			is_test_active;
+	int			is_stop_watch_monitor_initailized;
 } htxd;
 
 extern htxd *htxd_global_instance;
