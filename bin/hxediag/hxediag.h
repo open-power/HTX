@@ -58,6 +58,18 @@
 
 #define MAX_RETRY	0x10
 
+#define NVRAM_MASK 	0x01
+#define LINK_MASK 	0x02
+#define REGISTER_MASK 	0x04 
+#define MEMORY_MASK 	0x08
+#define MAC_MASK 	0x10 
+#define PHY_MASK 	0x20
+#define INT_LOOP_MASK 	0x40
+#define EXT_MASK 	0x80
+#define INTERRUPT_MASK 	0x100
+#define SPEED_MASK 	0x200
+#define LOOPBACK_MASK 	0x400
+
 #ifdef DEBUGON
 	#define DEBUG TRUE 
 #else
@@ -106,7 +118,7 @@ struct rule_info {
 	int num_oper; 
 	int sleep; 
 	int threshold; 
-
+	int mask;
 }; 
 
 /****************************************************
@@ -118,7 +130,7 @@ int issue_ioctl(int fd, void  * command , struct htx_data * htx_d);
 
 char * strupr(char * str); 
 
-int update_result(struct ethtool_test *test, int num_tests,  char supported_test[][MSG_TEXT_SIZE], struct self_test * self_test, struct htx_data * htx_d);
+int update_result(struct ethtool_test *test, int num_tests,  char supported_test[][MSG_TEXT_SIZE], int error_mask, struct self_test * self_test, struct htx_data * htx_d);
 
 int dump_test(struct ethtool_test *test, struct ethtool_gstrings *strings);
 

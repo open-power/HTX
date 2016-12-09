@@ -520,6 +520,7 @@ BEGIN {
 
 
     cmd = "";
+	DIR = snarf("echo $HTX_HOME_DIR");
 
     #Hxediag stanza enabled only on HTX ubuntu Release
 	ip=snarf("hostname -i");
@@ -539,13 +540,20 @@ BEGIN {
 			}
 		}
 		if(found == 0) {
-			cmd1=sprintf("ethtool -i %s | awk -F : ' {print $2}' \n", intface);
-			driver=snarf(cmd1);
-			if(driver ~ /tg3/ || driver ~ /bnx2x/) {
-				mkstanza("hxediag", "Broadcom Ethernet","NIC",intface,"hxediag", "default", "default" );
-			}
-			if(driver ~ /mlx4_en/) {
-				mkstanza("hxediag", "Mellanox RoCE", "NIC",intface,"hxediag", "default", "default" );
+			num_lines = "";
+			cmd1 = sprintf("cat %s/htx_diag.config | wc | awk 'NR==1 {print $1}'", DIR);
+			num_lines = snarf(cmd1);
+			for(count=0; count < num_lines; count++) {
+				command = sprintf("cat %s/htx_diag.config 2> /dev/null | awk -F':' 'NR==%d {print $1}'", DIR, (count+1));
+				driver_name = snarf(command);
+				command = sprintf("cat %s/htx_diag.config 2> /dev/null | awk -F':' 'NR==%d {print $2}'", DIR, (count+1));
+				driver_desc=snarf(command);
+				cmd1=sprintf("ethtool -i %s | awk -F : ' {print $2}' \n", "enP3p3s0f1");
+				driver=snarf(cmd1);
+
+				if(driver ~ driver_name) {
+					mkstanza("hxediag", driver_desc,"NIC",intface,"hxediag", "default", "default" );
+				}
 			}
 		}
 	}

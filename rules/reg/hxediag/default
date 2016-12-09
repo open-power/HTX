@@ -4,16 +4,18 @@ rule_id = DiagTest_Online
 test = online 
 num_oper = 100 
 sleep = 5 
+mask = 0x07FD
 
 ***** Offline test mode 
 rule_id = DiagTest_Offline 
 test = offline
 num_oper = 100
 sleep = 5
+mask = 0x07FD
 
 ***** External loopback test mode 
 rule_id = DiagTest_ExtLb
 test = external_lb 
 num_oper = 100
 sleep = 5
-
+mask = 0x07FD

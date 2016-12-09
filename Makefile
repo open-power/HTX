@@ -9,6 +9,7 @@ TARGET= .htx_profile \
         .bash_profile \
         .bashrc \
         htx_eq.cfg \
+        htx_diag.config \
 	run_htx_cmdline.sh \
         hxsscripts
 

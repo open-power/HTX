@@ -521,8 +521,9 @@ main(int argc, char ** argv) {
         				free (test);
         				free(strings);
         				return(rc);
-    				}		
-	                rc = update_result(test, strings->len, supported_test, &result, &htx_d);
+    				}	
+	
+	                rc = update_result(test, strings->len, supported_test, current_stanza->mask, &result, &htx_d);
     	            if(rc == -EOPNOTSUPP) {
         	            sprintf(htx_d.msg_text, "Unrecongnized test, exiting test... \n");
             	        hxfmsg(&htx_d, ENOSYS, HTX_HE_HARD_ERROR, htx_d.msg_text);
@@ -920,7 +921,7 @@ char * strupr(char * str) {
 
 }	
 
-int update_result(struct ethtool_test *test, int num_tests,  char supported_test[][MSG_TEXT_SIZE], struct self_test * self_test, struct htx_data * htx_d) { 
+int update_result(struct ethtool_test *test, int num_tests,  char supported_test[][MSG_TEXT_SIZE], int error_mask, struct self_test * self_test, struct htx_data * htx_d) { 
 
 
 	int i = 0, rc = 0; 
@@ -935,7 +936,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 				 * NVRAM Test failing on Shiner-T adapter, Broadcom debugging 
 				 * Hence ignore failures for NVRAM Test 
 				 */ 
-				/* rc ++; */ 
+				if(error_mask & NVRAM_MASK){
+					rc++;
+				}  
 			} else { 
 				self_test->nvram_test.pass++; 
 			}
@@ -956,7 +959,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "REGISTER")) { 
 			if(test->data[i]) { 
 				self_test->register_test.fail ++; 
-				rc++; 
+				if(error_mask & REGISTER_MASK){
+					rc++;
+				} 
 			} else { 
 				self_test->register_test.pass ++; 
 			}
@@ -964,7 +969,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "MEMORY")) { 
 			if(test->data[i]) {
                 self_test->memory_test.fail ++; 
-				rc++; 
+				if(error_mask & MEMORY_MASK){
+					rc++;
+				} 
 			} else { 
 				self_test->memory_test.pass ++; 
 			} 
@@ -972,7 +979,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "MAC")) { 
 			if(test->data[i]) {
 				self_test->mac_loopback.fail ++; 
-				rc++;
+				if(error_mask & MAC_MASK){
+					rc++;
+				}
 			} else { 
 				self_test->mac_loopback.pass++; 
 			} 
@@ -980,7 +989,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "PHY")) { 
 			if(test->data[i]) {
 				self_test->phy_loopback.fail ++; 
-				rc++; 
+				if(error_mask & PHY_MASK){
+					rc++; 
+				}
 			} else { 
 				self_test->phy_loopback.pass ++; 
 			} 
@@ -992,7 +1003,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  			 * ***************************************************/
 			if(test->data[i]) {
 				self_test->int_loopback.fail ++; 
-				rc++; 
+				if(error_mask & INT_LOOP_MASK){
+					rc++; 
+				}
 			} else { 
 				self_test->int_loopback.pass ++; 
 			}
@@ -1005,11 +1018,19 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  				 **************************************************************/
 				if(test->data[i]) {
 					self_test->ext_loopback.fail ++; 
+					if(error_mask & EXT_MASK){
+						rc++;
+					}  
 				} else { 
 					self_test->ext_loopback.pass ++; 
 				}
 			} else { 
-				self_test->ext_loopback.fail ++;
+				if(test->data[i]) {
+					self_test->ext_loopback.fail ++;
+					if(error_mask & EXT_MASK){
+						rc++;
+                    }
+				}
 			}
 			self_test->ext_loopback.total++; 
 		} else if(strstr(supported_test[i], "INTERRUPT")) { 
@@ -1020,7 +1041,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 				 * due to device driver - BJKing needs to come back when this is fixed in driver
 				 * Uncomment below line if we want to flag hard error for Interrupt test. 
 				 ******************************************************************************/
-				/*  rc++;  */  
+				if(error_mask & INTERRUPT_MASK){
+					rc++;  
+				}
 			} else { 
 				self_test->interrupt_test.pass ++; 
 			}
@@ -1031,6 +1054,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  			 * ******************************************/
 			if(test->data[i]) {
                 self_test->speed_test.fail ++; 
+				if(error_mask & SPEED_MASK){
+					rc++;  
+				}
 			} else { 
 				self_test->speed_test.pass ++; 	
 			} 
@@ -1041,6 +1067,9 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  			* ********************************************/
 			if(test->data[i]) {
 				self_test->loopback_test.fail ++; 
+				if(error_mask & LOOPBACK_MASK){
+					rc++;  
+				}
 			} else { 
 				self_test->loopback_test.pass ++; 
 			} 
@@ -1050,7 +1079,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
         	hxfmsg(htx_d, rc, HTX_HE_HARD_ERROR, htx_d->msg_text);
 			return(-EOPNOTSUPP); 
 		} 
-		if(rc && test->data[i]) { 	
+		if(rc && test->data[i]) { 
 			sprintf(message, "\n%s ",supported_test[i]); 
 			strcat(message1, message); 
 		}
@@ -1085,7 +1114,8 @@ set_defaults(struct rule_info h_r[]) {
 		h_r[i].num_oper = 8; 
 		h_r[i].test = 0; 
 		h_r[i].sleep = 5; 
-		h_r[i].threshold = 0; 
+		h_r[i].threshold = 0;
+		h_r[i].mask = 0x7C; 
 	}
 }
 
@@ -1210,7 +1240,17 @@ rf_read_rules(const char rf_name[], struct rule_info rf_info[], unsigned int * n
             } else {
                 if(DEBUG) printf("\n num_oper - %d ", current_ruleptr->num_oper);
             }
-		} else if ((strcmp(keywd, "test")) == 0) { 
+		} else if ((strcmp(keywd, "mask")) == 0 ) {
+            sscanf(line, "%*s %x", &current_ruleptr->mask);
+            if(DEBUG) printf("\n mask - %x ", current_ruleptr->mask);
+            if (current_ruleptr->mask < 0x0000) {
+                sprintf(msg, "\n Invalid mask");
+                hxfmsg(htx_d, 0, HTX_HE_HARD_ERROR, msg);
+                return(-1);
+            } else {
+                if(DEBUG) printf("\n mask - %x ", current_ruleptr->mask);
+            }
+        }else if ((strcmp(keywd, "test")) == 0) { 
 			sscanf(line, "%*s %s", tmp); 			 
 			if((strcmp(tmp, "online")) == 0) { 
 				current_ruleptr->test = 0; 
