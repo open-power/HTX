@@ -113,6 +113,7 @@ rule_id = DiagTest_Offline
 test = offline
 num_oper = 100
 sleep = 5
+mask = 0x07FD
 
 1. rule_id - String to uniquely identify each stanza.
 
@@ -123,6 +124,10 @@ sleep = 5
 4. Sleep :  (in seconds) : Controls how many seconds to sleep before executing the same test  again.
 
 5. Threshold : Some of the self test may fail intermittently while they pass on most iterations. Threshold controls percentage of failure testcase when exerciser would report failure and exit. If failure percentage is less than threshold then exerciser would dump fail information in  /tmp/htxmsg and continue.  Default threshold is 50(in percent)
+i
+
+6. Mask : User can modify this field to set the test error status they are interested in. If an error has occured user can either ignore it or get notified by modifying the mask field.
+default value is 0x07FD whilch is 11111111101; each bit field corresponds to particular ethtool supported test in the order (NVRAM, LINK, REGISTER, MEMORY, MAC, PHY, INT_LOOP, Ext, INTERRUPT, SPEED, LOOPBACK). In the default mask value(0x07FD) we are ignoring Link Test error report. 
 
 Exerciser statistics : 
 
@@ -136,6 +141,11 @@ Exerciser uses following fields in /tmp/htxstats to update exerciser specific st
 
 4. good_others  : Number of test passed.
 
+Note: If user would like to test new adapters, they are now allowed to append new drivers which support ethtool infrastructure in file /usr/lpp/htx_diag.config in the format driver_name:desvice_description.
+For example: bnx2x:Broadcom Ethernet
+
+
 Last Updated :
 
 December 8,  2014 by Piyush Sharma(piyusharma@in.ibm.com)
+December 9,  2016 by Shilpa Chandrappa(shchand9@in.ibm.com)
