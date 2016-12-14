@@ -522,7 +522,6 @@ BEGIN {
     cmd = "";
 	DIR = snarf("echo $HTX_HOME_DIR");
 
-    #Hxediag stanza enabled only on HTX ubuntu Release
 	ip=snarf("hostname -i");
 	split(ip, ip_array, " ");
 	for (cnt in ip_array) {
@@ -548,7 +547,7 @@ BEGIN {
 				driver_name = snarf(command);
 				command = sprintf("cat %s/htx_diag.config 2> /dev/null | awk -F':' 'NR==%d {print $2}'", DIR, (count+1));
 				driver_desc=snarf(command);
-				cmd1=sprintf("ethtool -i %s | awk -F : ' {print $2}' \n", "enP3p3s0f1");
+				cmd1=sprintf("ethtool -i %s | awk -F : ' {print $2}' \n", intface);
 				driver=snarf(cmd1);
 
 				if(driver ~ driver_name) {
