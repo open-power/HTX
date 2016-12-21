@@ -421,10 +421,13 @@ BEGIN {
 		no_pages_reserved_per_instance = 64;
 		rule_file_name=sprintf("default.p7");
 	}
-	else if(proc_ver == "4b" || proc_ver == "4c" || proc_ver == "4d" ) {
+	else if(proc_ver == "4b" || proc_ver == "4d" || proc_ver == "4c" ) {
 		no_pages_reserved_per_instance = 32;
 		rule_file_name=sprintf("default.p8");
 	}
+    else if(proc_ver == "4e" || proc_ver == "4f" ) {
+        rule_file_name=sprintf("default.p9");
+    }
 	if ( proc_os == "POWER6" ) {
 		rule_file_name=sprintf("default.p6");
 	}
@@ -754,15 +757,15 @@ function create_memory_stanzas() {
 	if (CMVC_RELEASE != "htxltsbml") {
 		ams=snarf("cat /proc/ppc64/lparcfg 2> /dev/null | grep cmo_enabled | awk -F= '{print $2}'")
 		if (ams == "1") {
-			system("awk '/.*/ { if ($0 ~ /^max_mem/ )printf(\"max_mem = yes\\nmem_percent = 40\\n\"); else print $0; }' ${HTXREGRULES}/hxemem64/maxmem > ${HTXREGRULES}/hxemem64/maxmem.ams");
-			mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem.ams","maxmem.ams");
+			system("awk '/.*/ { if ($0 ~ /^global_alloc_mem_percent/ )printf(\"global_alloc_mem_percent = 40\\n\"); else print $0; }' ${HTXREGRULES}/hxemem64/default > ${HTXREGRULES}/hxemem64/default.ams");
+			mkstanza("hxemem64","64bit","memory","mem","hxemem64","default.ams","default.ams");
         }
 		else {
-			mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem","maxmem");
+			mkstanza("hxemem64","64bit","memory","mem","hxemem64","default","default");
 		}
 	}
 	else {
-		mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem","maxmem");
+		mkstanza("hxemem64","64bit","memory","mem","hxemem64","default","default");
 	}
 	load_seq(65535);
 	loop_cnt=((log_proc-(log_proc%2))/2);

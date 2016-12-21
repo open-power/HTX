@@ -30,7 +30,7 @@ P6Compatmode=`${HTXBIN}/show_syscfg pvr | grep -i Power6Compatmode | awk -F: '{p
 echo "Creating mdt.ab_mem ..."
 if [[ $proc_ver_dec -ge 63 && $P6Compatmode = "False" ]] # Shifts for P7 & above
 then
-    create_my_mdt mem:memmfg 							> ${HTXMDT}/mdt.ab_mem
+    create_my_mdt mem:default.mfg 							> ${HTXMDT}/mdt.ab_mem
 else
     cat ${HTXMDT}/mdt.mem  							> ${HTXMDT}/mdt.ab_mem
 fi

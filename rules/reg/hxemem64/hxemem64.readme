@@ -1,344 +1,310 @@
-
-README for hxemem64 
-=====================
-
+* IBM_PROLOG_BEGIN_TAG 
+* This is an automatically generated prolog. 
+*  
+* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxemem64/hxemem64.readme 1.4.5.3 
+*  
+* Licensed Materials - Property of IBM 
+*  
+* COPYRIGHT International Business Machines Corp. 2010 
+* All Rights Reserved 
+*  
+* US Government Users Restricted Rights - Use, duplication or 
+* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
+*  
+* IBM_PROLOG_END_TAG 
+README for hxemem64
 (1) Goal:
 ---------
-The goal of hxemem64 exerciser is to stress test the memory subsystem in a multitasking 
-environment.
+The goal of hxemem64 exerciser is to stress test the nest portion of POWER systems (L3,X-bus,A-bus,Centaur,memory subsystem) in a multitasking environment.
 
 (2) Salient Features:
----------------------
-
-1.Supports testing of various page sizes, segments (including MPSS).
+----------------------------
+1.Supports exercising of various page sizes and segments.
 2.Supports concurrent test case to stress all memory controllers of the system in parallel.
-3.Supports various patterns, read/write ratios.
+3.Provides controlling option of memory workload for every supported page pool at each chip level.
+4.Provides controlling option of cpu workload at Node->Chip->Core->Threads level.
+3.Supports various patterns, read/write/read_compare ratios.
 4.Supports specifying a stride for memory access pattern.
 
 (3) Hardware supported & HW test scope:
 ---------------------------------------
-Hxemem64 exerciser is supported on all POWER platforms.
-MPSS test case is supported only on Power6 and later HW running AIX610 or later version.
-eMPSS test case is supported only on power7 and later HW running AIX61L or later version.
+Hxemem64 exerciser is supported on all POWER platforms. 
 
-(4) Supported OS:
+(4) OS support:
 -----------------
 AIX: y
 Linux: y
 BML: y
 
 (5) General info:
------------------
-hxemem64 test program runs as user application on top of OS (AIX, BML & Linux).
-mdt.mem is a special mdt to drive high memory bandwidth.
-Rule file parameters decide how many cpu threads are used to drive memory controllers.
-For testing large pages, prior configuration of large pages should be done before 
-running HTX.
-In case of Dynamic reconfiguration, if any CPU’s are removed exerciser will check
-whether any thread is bound to that particular CPU if yes then it will be unbond.
-And in next stanza it will bound with the available CPU’s.
-
-To configure large pages on Linux, use following command:
+-----------------------
+hxemem64 test program runs as a user application on top of OS (AIX, BML & Linux).  It supports memory exercising/stress testing at both levels/modes i.e 
+"system memory view" and "chip memory view" , which can be controlled through rule file parameter "global_disable_fliters". 
+For high performance test  i.e to drive high memory bandwidth and to have control on cpus and memory usage (by using cpu and mem filters facility in rule),
+it is necessary to run hxemem64 in "chip memory view mode" by making global rule "global_disable_filter = no" for a given rule file. 
+For exercising huge/large pages, prior configuration of pages should be done before running HTX (This is currently done during HTX initial setup time). 
+To configure large pages, use following commands:
+Linux:
 echo <no_of_large_pages>  > /proc/sys/vm/nr_hugepages
-
+AIX:
 vmo command can be used to configure large pages on AIX.
 16G pages need to be configured through HMC.
 
+In case of Dynamic reconfiguration, if any CPU is removed exerciser will check whether any thread is bound to that CPU, if yes then it will be unbound.
+And from next stanza, it will be a free floating cpu workload (runs without binding to any cpu).
+
 (6) Prerequisites:
 ---------------------
-System should have enough paging/swap space as per the AIX/Linux Performance tuning guidelines 
-for normal operation.  As a general rule the paging/swap space available should be approximately
-1.5 times of total memory available.
+System must be in well balanced configuration with respect to cpus and memory, i.e every available chip must have both cpus and memory in it. 
+System should have enough paging/swap space as per the AIX/Linux Performance tuning guidelines for normal operation. 
 
 (7) Description:
--------------------
-Objective of hxemem64 is to stress test the memory subsystem by performing various data 
-integrity tests. Exerciser has capability to test fixed amount of memory or % of free memory.
-Exerciser probes the available free memory configuration for every page pool 
-(4K, 64K, 16M and 16G page pools) and grabs % of memory from every page pool by allocating 
-shared memory segments. 
+-----------------
+Objective of hxemem64 is to stress test the memory subsystem by performing various data integrity tests.
+Exerciser has capability to test absolute amount or percentage of free memory or number of pages for all supported page sizes(4K, 64K, 2M, 16M and 16G page pools).
+Exerciser, during its initial setup stage probes the available free memory for every page pool and
+grabs percentage of memory from every page pool by allocating in shared memory segments. Later, based on the operation and filters at every stanza
+it decides what amount of memory per page pool is exercised. 
 
-Exerciser supports two types of testing modes: 
-1) normal
-2) concurrent
+Exerciser supports two types of testing modes:
+1)  system memory view.
+2)  chip memory view.
 
-Normal mode is a single threaded operation where in single thread performs write/read/compare
-operation on every memory segment with specified pattern(s). 
+System memory view, is enabled based on system/partition configuration. i.e. in following scenarios.
+	- when system is booted with shared processor mode.
+	- When there is imbalanced cpu and mem configuration, i.e If any of the chips in partition contains only cpus  and no memory  or only mem and no cpus in it.
+ 
+Chip memory view, is enabled in the following scenarios.
+	-When system is booted in dedicated processor mode.
+	-And when there is good balanced cpu and mem config detected on the partition, i.e  every  available chip  has both cpu and memory configured in it.
+	-One can force exercising memory at chip level (even if system having imbalanced config) by setting "global_disable_filters = yes". 
 
-Concurrent mode is a multi threaded operation where in available shared memory segments are 
-divided equally among the threads and all the threads perform write/read/compare (WRC) 
-operation on allotted segments with specified pattern(s).Threads performing WRC operation bind
-themselves to specific cpu. Exerciser attempts to grab local memory (node affinity) for each 
-thread due to performance reasons.Concurrent mode allows to drive high memory bandwidth across
-the system. 
-Mode can be specified through rule file parameter "mode".
+
+Default mode of action by exerciser based on system config: 
+==============================================================================================
+Chip no.        has cpu?         has memory? 	    Hxemem64 runs in mode           comments
+==============================================================================================
+      1       	   Y	      	 N   		     System memory view 	Filters disabled 
+      2            N             Y		     System memory view		Filters disabled
+      3            Y             Y                   Chip memory view		Filters enabled
+      4            N             N                   Ignore			N.A.
 
 There are three types of WRC operations supported
 1)MEM
-When oper = MEM, entire shared memory segment is written using specified pattern. 
-Later, read/compare operation is performed from beginning of the shared memory segment.
+When oper = MEM, entire shared memory segment is written using specified pattern.
+Later, read/read_compare operation is performed from beginning of the shared memory segment.
+
 2)DMA
-When oper = DMA, shared memory segment is filled through a DMA from disk in the chunks 
-of specified pattern size. The pattern file should exist on the disk. Later, read/compare 
-operation happens like MEM.
+When oper = DMA, shared memory segment is filled through a DMA from disk in chunks
+of specified pattern size. The pattern file should exist on the disk. Later, read/read_compare
+operation will be performed like MEM.
+
 3)RIM
-When oper = WRFR, i.e. Write/Read/Flush/Read and then compare.shared memory segment is 
-written in 1/2/4/8 bytes at a time and read/compare operations follow immediately.
+When oper = RIM, i.e. Write/Read/Flush/Read and then compare.
+
+4)STRIDE
+When oper =STRIDE, it will introduce a stride in the memory access pattern. 
+The stride size for accessing the memory is defined through a rulefile parameter "stride_sz". 
+By default, its value is 128 byte(1 cacheline).
+The main intention of this test case is to have more cache misses i.e. L1/L2/L3 misses. 
 
 Patterns:
-Pattern is the data that is written to memory by the exerciser for performing the memory 
-ops.Rule paramemter “PATTERN_ID” specifies the pattern being used. One can specify pattern 
-in following ways:
--	Through pattern file
--	Special patterns like RANDOM and ADDRESS
--	Through upto 32 byte hexadecimal immediate pattern
+Pattern is the data which is written to memory by the exerciser for performing the memory ops. 
+Rule parameter PATTERN_ID specifies the pattern being used. One can specify pattern in following ways:
+	-   Through pattern file
+	-   Special patterns like RANDOM and ADDRESS
+	-   Through upto 32 byte hexadecimal immediate pattern
 Exercise supports upto 9 different patterns for a given stanza.
 
-Memory exerciser performs memory ops and while performing data integrity check if it 
-encounters a miscompare the exerciser drops to kernel debugger to facilitate debugging 
-with certain interesting pointers in GPRs R3 through R9. 
--------------------------------------------------------------------------------------------
-TLBIE Test Case:
--------------------------------------------------------------------------------------------
-Purpose: This test case was designed to generate excessive tlbie's in the system. 
-tlbie stands for Translation LookAside Buffer Invalidate Entry.
-Feature: 541203 created a tlbie test case using hxemem64 exerciser. 
-To run tlbie test case alone use the mdt file "mdt.tlbie".
-
-The rules file used for tlbie test case is "tlbie", which look like following:
-    tblie test case...
-    rule_id = mem_tlb
-    num_oper = 100
-    oper = tlb
-    seg_size_4k = 1048576
-
-Only above mentioned keywords are supported for oper = tlb.
-Note: all messages in the /tmp/htxmsg will have keyword TLBIE to make tlbie test case 
-messages easily identifiable.
---------------------------------------------------------------------------------------------
-MPSS Test Case - AIX 610 and above
---------------------------------------------------------------------------------------------
-Purpose: MPSS [Mixed Page Size Segment] is supported on AIX 610 onwards that allows a 
-segment to contain a mix of both 4K and 64K pages. AIX supports PSPA (page size promotion 
-aggresion) to promote a page from 4K to 64K in a block of 16*4K pages. Conversion of 16*4K 
-pages to one 64K page depends on PSPA value. In MPSS test case a mixed page segment is 
-created from Uni page size segment by playing with PSPA. Once the segment is converted to 
-MPSS, WRC operation is performed with specified pattern such that the segment still remains 
-MPSS for a life of test case.There is a special rule file, maxmem.mpss, that runs MPSS 
-testcases. This test only uses MPSS segments as data segments and not text segments.
-
-Feature # 613978 was created to add MPSS support in hxemem64 exerciser.
-
-The valid rule file parameters for eMPSS test case are:
-
-      rule_id = mpss_0xf
-      num_oper = 2000
-      seg_size_4k = 268435456 [256MB]
-      crash_on_misc = no
-      debug_level = 0
-      width = 8
-      compare = yes
-      pattern_id = HEXFF(8)
-      max_mem = no
-
-      All the above keywords are supported for oper = mpss
-
---------------------------------------------------------------------------------------------
-eMPSS test case:
---------------------------------------------------------------------------------------------
-Purpose: eMPSS [ Enhanced 16MB mixed page segment support] is supported for AIX61J and above,
-that allows a segment to contain  mix of 4K, 64K and 16M pages.
-eMPSS rule stanzas are enabled in maxmem.empss and mem.empss.only rule files.
-To run the empss testcase, one has to select mdt.bu.empss or mdt.mem.empss Or could create a
-custom mdt file using one of these rule files. 
-
-eMPSS test case is supported on P7 DD1 (and later) HW running AIX61J and later.
-
-Valid rule file parameters for eMPSS test case are:
-rule_id = empss_1
-num_oper = 20
-remap_p = 10
-oper = empss
-sao_enable = 0
-d_side_test = 1
-i_side_test = 1 
-addnl_i_side_test = 1
-base_page_size = 4K
-
-Please refer rule file parameters section to know more details about these parameters.
-
--------------------------------------------------------------------------------------------
-nstride test case:
--------------------------------------------------------------------------------------------
-Purpose: To introduce a stride in the memory access pattern. The stride size for accessing the
-memory is defined through a rulefile parameter "stride_sz". By default, its value is 128 byte(cacheline). 
-The main intention of this testcase have more L1 misses.
-
-nstride stanza is enabled in rules.max_cache_miss rulefile. One need to select mdt.max_cache_miss to run
-nstride testcase.
-
-Below are the valid rule file paramteters for nstride testcase:
-rule_id = l2l3miss
-max_mem = yes
-mem_percent = 70
-compare = yes
-mode = concurrent
-oper = nstride
-stride_sz = 128
+Memory exerciser performs memory ops and while performing data integrity check if it
+encounters a miscompare the exerciser drops to kernel debugger to facilitate debugging
+with certain interesting pointers in GPRs, R3 through R9.
 
 
------------------------------------------------------------------------------------------------
- (8) rule file parameters:
----------------------------------------------------------------------------------------------
-This section describes various rule parameters and relevant details supported by hxemem64 
-exerciser.
+(8) Rule file parameters:
+-------------------------------
+Hxemem64 rule parameters can be classified in 2 sections: Global rules and Stanza specific rules. 
+Global rule parameters are generally placed at the top of the rule file i.e before first stanza and
+their naming convention is with prefix "global_". These rules are visible/accessible across and beyond all stanzas. 
 
-Sample Rule File:
----------------------------------------------------------------------------------------------
-* write out all zeros to memory...
-rule_id = mem_0xdb
-pattern_id = HXZEROS (8)
-mem_percent = 75
-max_mem = yes
-mode = concurrent
-num_threads = 2
-compare = yes
-crash_on_misc = yes
-num_oper = 1
-oper = mem
-seg_size_4k = 268435456
-seg_size_64k = 268435456
-seg_size_16m = 268435456
-seg_size_16g = 17179869184
-num_seg_4k = 1
-num_seg_64k = 1
-num_seg_16m = 1
-num_seg_16g = 1
-debug_level = 2
-width = 8
----------------------------------------------------------------------------------------------
+Description of Global rule parameters:
+==============================================================================================
+Name : global_alloc_mem_percent
+Description: Specifies the percentage of free memory to be allocated for exercising. Value can be specified in the range 1-99.  
+This value is applied only on base page pool i.e 4K and/or 64K. 
+In case of "chip memory view"  mode, the value is the percentage of free memory from every chip in the system. 
+Otherwise, the percentage is applied at system/partition level.
+
+Default: 70
+Syntax: Example, 
+global_alloc_mem_percent = 70
+
+Notes: Please use this parameter cautiously if you are using above 80% value. "global_alloc_mem_percent" rule 
+will be overwritten if "global_alloc_mem_size" global rule parameter is present.
+==============================================================================================
+Name: global_alloc_mem_size
+Description: Specifies the amount of memory in bytes to be allocated for exercising. 
+Value can be specified in the range from minimum segment size to max possible size of available free memory. 
+In case of "chip memory view" mode, the value is part of free memory from every chip in the system.
+Otherwise the mentioned memory size is considered at system level.
+Minimum segment size is dependent on rule parameter "global_alloc_segment_size".
+Default:  -1
+Syntax: Example, 
+global_alloc_mem_size  =  1073741824
+
+Notes: Please use this parameter cautiously if you are using above 80%  of total memory.
+"global_alloc_mem_size" rule will take priority on "global_alloc_mem_percent".
+==============================================================================================
+Name: global_alloc_segment_size
+Description: Specifies the standard size of each memory segment to be allocated in bytes for base page size pool (4K and/or 64K).
+The default segment size which is 256MB will be overwritten with it.
+Memory specified in rule "global_alloc_mem_size" or "global_alloc_mem_spercent" is divided in number of segments for exercising.
+Specified value must at least be equal to supported base page size(e.g: 64K)
+Default:  -1
+Syntax: Example, 
+global_alloc_segment_size = 536870912
+
+Notes: On Linux platform, the "global_alloc_segment_size" may get modified in exerciser code
+if specified value results in overshoot of Linux shm  parameters (shmmax/shmni). 
+============================================================================================
+Name: global_num_threads
+Description: Specifies the num of threads to create to allocate 
+memory specified by global_alloc_mem_percent" or "global_alloc_mem_size".
+This parameter is valid only in "system memory view" mode.
+
+Note: If "global_num_threads" is specified, then it is advised to specify "global_disable_cpu_bind = yes"
+as well for a stanza, so that cpu load is distributed as per OS scheduling policy, 
+Otherwise exerciser binds only to first  global_num_threads of available logical cpus. 
+
+Default:
+  global_num_threads = -1
+
+Name: global_debug_level
+Description: Debug level is at both global and stanza level, global level rule will handle print msgs 
+used in modules before first stanza test case commence,it decides on what level of messages to display. For example, if global_debug_level = 3
+it displays all messages i.e., important messages, info messages,debug messages and must print messages. 
+And if debug level = 1 has mentioned then the debug prints with level 1 and 0 will only be printed (i.e., only MUST and IMP messages).
+        Debug_level has 4 values:
+        0   (DBG_MUST_PRINT)
+        1   (DBG_IMP_PRINT)
+        2   (DBG_INFO_PRINT)
+        3   (DBG_DEBUG_PRINT)
+
+Notes: This is over written by stanza specific rule "debug_level", Only messages with debug level less than or
+equal to the stanza specified debug level are printed.
+Higher the debug level more the messages. Don't disturb debug level this is an aid for developer to debug the code issues.
+Default: 0
+Syntax: Example,
+         g_debug_level = 2
+==================================================================================================================
+Name: global_disable_cpu_bind
+Description: This parameter would disable the thread to bind to a particualr cpu for allocating memory. On enabling this parameter, 
+threads will be scheduled to run on cpus as per OS scheduling policies and 
+thus may not guarantee local memory affinity and performance of exerciser may get affected.
+
+Values Accepted:   YES or NO (YES to disable the binding, NO to enable the binding)
+Default: global_disable_cpu_bind  = no
+===================================================================================================================
+Name: global_startup_delay
+Description: This parameter specifies time laps after which the memory exerciser should start allocating memory segments during HTX run.
+Since the memory exerciser considers only the free memory on the system for testing, 
+it will wait till other HTX exercisers allocate their resources.
+The delay can be varied in between 0 to 120 seconds.
+Default: 90 seconds.
+Syntax: Example,
+global_startup_delay = 30
+====================================================================================================================
+Name: global_disable_filters
+Description: This parameter specifies whether to enable cpu and mem filters or not, 
+i.e exerciser should view/exercise memory at system level or at chip level. 
+
+Default : global_disable_filters = yes
+
+Notes: global_disable_filter is overwritten to no, if it finds partition is booted in dedicated processor mode and 
+Has good balance with cpu and mem configuration as explained in below table.
+-----------------------------------------------------------------------------------------------------------
+Chip no.       has cpu?     has mem? 		Hxemem64 runs in mode           comments
+-----------------------------------------------------------------------------------------------------------
+      1       	Y	      N   	  	System memory view	 	Filters disabled 
+      2         N             Y			System memory view		Filters disabled
+      3         Y             Y                 Chip memory view		Filters enabled ("global_disable_filters" overwritten to "no")
+      4         N             N                 Ignore				N.A.
+======================================================================================================================
+
+Description of Stanza specific rule parameters.
+------------------------------------------------------------
+
 Name: rule_id
-
-Purpose: Identification string of the rule
-Notes: It can contain only ascii characters, must be specified, and can be 1 to 8 characters 
-long.
+Description: Identification string of the rule.
+Notes: It can contain only ascii characters, must be specified, and can be 1 to 8 characters long.
 Default: No default value
-
 Syntax: For example,
          Rule_id = rule1
 ----------------------------------------------------------------------------------------------
 Name: pattern_id
 
-Purpose: Specifies the bit pattern to be used for performing memory ops.
- 
-Pattern_id could be specified in following ways: 
-1) Through a pattern file – Pattern data is read from a file with specified length.
+Description: Specifies the bit pattern to be used for performing memory ops.
+Pattern_id could be specified in following ways:
+1) Through a pattern file, Pattern data is read from a file with specified length.
 2) Through special keywords - RANDOM or ADDRESS
 ADDRESS pattern uses 8 byte effective address of a memory location as a pattern.
-For RANDOM pattern, exerciser generates 8 bytes pseudo random data with help of seed. During 
+For RANDOM pattern, exerciser generates 8/4/1 bytes pseudo random data with help of seed. During
 compare, same seed is used to regenerate the expected data.
-3) Through immediate hexadecimal no – One can specify up to 32 bytes of hexadecimal data to be 
-used as a pattern. 
+3) Through immediate hexadecimal number, One can specify up to 32 bytes of hexadecimal data to be
+used as a pattern.
 
 One can specify upto 9 different patterns using any of the above (1), (2) and (3).
 
-Note: When multiple patterns are specified in the same rule stanza, please refer 
+Note: When multiple patterns are specified in the same rule stanza, please refer
 SWITCH_PAT_PER_SEG rule parameter for details about how patterns are applied to segments.
 
-Usage: 
-	Through a pattern file:
-	Syntax:
-	PATTERN_ID = <name_of_the_pattern_file>(<pattern_size>)
-	e.g. PATTERN_ID = HEX55(4096)
-	where HEX55 is the pattern file name and pattern size is 4096. Pattern size amount of 
-	data is read from the file and replicated in the memory region.
-	Range: Pattern size must be a power of 2 and is ranging from 8 bytes to 4096 bytes. 
-	Possible values are 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096.
+Usage:
+    Through a pattern file:
+    Syntax:
+    PATTERN_ID = <name_of_the_pattern_file>(<pattern_size>)
+    e.g. PATTERN_ID = HEX55(4096)
+    where HEX55 is the pattern file name and pattern size is 4096. Pattern size amount of
+    data is read from the file and replicated in the memory region.
+    Range: Pattern size must be a power of 2 and is ranging from 8 bytes to 4096 bytes.
+    Possible values are 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096.
 
-	RANDOM or ADDRESS are special keywords. To use one of these, one can specify pattern_id 
-	as follows:
-	Eg: PATTERN_ID = RANDOM ADDRESS
-	These special patterns always use 8 byte as a pattern size.
-
-	Immediate hexadecimal pattern can be specified as:
-	Eg:
-	PATTERN_ID = 0x1010101010101010 
-	Pattern length must power of 2 and in the range of 8 to 32 bytes.
-
-	Multiple patterns can be specified using any of the above.
-	Eg:
-	PATTERN_ID = HEX55(4096) RANDOM HEXAA(32) ADDRESS 
-                              0xA1A2A3A4A5A6A7A8B1B2B3B4B5B6B7B8
+    RANDOM or ADDRESS are special keywords. To use one of these, one can specify pattern_id
+    as follows:
+    Eg: PATTERN_ID = RANDOM 
+    These special patterns always use 8 byte as a pattern size.
+     Immediate hexadecimal pattern can be specified as:
+    Eg:
+    PATTERN_ID = 0x1010101010101010
+    Pattern length must power of 2 and in the range of 8 to 32 bytes.
+    Multiple patterns can be specified using any of the above.
+    Eg:
+    PATTERN_ID = HEX55(4096) RANDOM HEXAA(32) ADDRESS
+                 0xA1A2A3A4A5A6A7A8B1B2B3B4B5B6B7B8
 ---------------------------------------------------------------------------------------------
- Name: max_mem
-Purpose: This parameter specifies whether to test % (as mentioned by MEM_PERCENT) of free mem
-OR test absolute amount of memory as mentioned in the rule file.
-
-Values Taken:
-If MAX_MEM is set to yes, exerciser tests MEM_PERCENT of available free memory from each page 
-pool.
-If MAX_MEM is set to no, exerciser tests the memory according to the values specified in rule 
-parameters NUM_SEG_XX and SEG_SIZE_XX. The amount of memory used for testing would be 
-(NUM_SEG_XX) * (SEG_SIZE_XX).
-When MAX_MEM is set to no, tt’s the responsibility of the user to set these rule parameters 
-such that exerciser does not fail due to insufficient memory.
-Note: Rule parameter SEG_SIZE_XX is considered for both max_mem = yes while NUM_SEG_XX is 
-considered only for max_mem = no case.
-
-Note: The value must be a YES or a NO.
-Default:YES
-
- Syntax: Example,
-         max_mem = yes
----------------------------------------------------------------------------------------------
-Name: compare
-Purpose: This parameter specifies whether to compare the contents of the shared memory buffers
-8 bytes at a time with the specified bit pattern.
-
- Notes: The value must be a YES or NO.
-
- Default: YES
-
- Syntax: Example,
-         compare = yes
-
- --------------------------------------------------------------------------------------------
 Name: crash_on_mis
 
-Purpose: This parameter specifies whether to trap to KDB or not in case of miscompares.
- 
-  Notes: The value must be "yes" or "no"
-
-  Default: "yes"
-
-  Syntax: Example,
+Description: This parameter specifies whether to trap to KDB or not in case of miscompares.
+Notes: The value must be "yes" or "no"
+Default: "yes"
+Syntax: Example,
           crash_on_mis = yes
-
 --------------------------------------------------------------------------------------------
- Name: num_oper
-
- Purpose: Specifies how many times to repeat the RWC operation. One operation is normally 1 
- Write , 1 read and 1 Compare. we can specify in one operation how many writes , read onlys 
+Name: num_oper
+ Description: Specifies how many times to repeat the RWR-C operation. One operation is normally 1
+ Write , 1 read and 1 Read-Compare. we can specify in one operation how many writes , read onlys
  and read_compares using the corresponding keywords num_writes, num_read_only, num_read_comp.
  For eg 1 operation can be 3 writes, 5 read_onlys and 3 read_compares.
-
  Notes: The value must be > 0.
-
  Default: 1
-
  Syntax: Example,
          num_oper = 1
-
 ---------------------------------------------------------------------------------------------
- Name: num_writes
+Name: num_writes
 
- Purpose:
- 	  Specifies the number of times to write in one operation.
- 	  One operation is normally 1 Write , 1 read and 1 Compare.
- 	  For more details refer num_oper parameter.
- 	  
-
- Notes: The value must be > 0.
+ Description:
+      Specifies the number of times to write in one operation.
+      One operation is normally 1 Write , 1 read and 1 Compare.
+      For more details refer num_oper parameter.
 
  Default: 1
 
@@ -348,200 +314,75 @@ Purpose: This parameter specifies whether to trap to KDB or not in case of misco
 ----------------------------------------------------------------------------------------------
  Name: num_read_only
 
- Purpose: Specifies number of times to perform a read in one operation. One operation is
+ Description: Specifies number of times to perform a read in one operation. One operation is
  normally 1 Write , 1 read and 1 Compare.
-
- Notes: The value must be > 0.
-
- Default: 1
-
+Default: 1
  Syntax: Example,
          num_read_only = 1
-
 --------------------------------------------------------------------------------------------
 Name: num_read_comp
-
- Purpose: Specifies how many times to do a read and compare (after writing) in one operation.
- Note: To use this we shouldn't make num_writes  = 0 it should be atleast 1 which is the 
+ Description: Specifies how many times to do a read and compare (after writing) in one operation.
+ Note: To use this we shouldn't make num_writes  = 0, it should be atleast 1 which is the
  default value of  num_writes.
  One operation is normally 1 Write ,1 read and 1 Compare.
-
- Notes: The value must be > 0.
-
  Default: 1
-
  Syntax: Example,
          num_read_comp = 1
-
----------------------------------------------------------------------------------------------
-Name: mode
-Purpose: Specifies the mode in which hxemem64 should run.
-
-There are two possible values for this parameter.
-mode = NORMAL
-Normal mode is a single threaded operation where in single thread performs write/read/compare 
-operation on every segment with specified patterns.
-
-mode = CONCURRENT	
-Concurrent mode is a multi threaded operation where in available shared memory segments are 
-divided equally among the threads and all the threads perform write/read/compare (WRC) 
-operation on allotted segments with specified patterns. Threads performing WRC operation bind 
-themselves to specific cpu depeding up on bind_proc and bind_method parameters.
-Exerciser attempts to grab local memory (node affinity) for each thread for better performance.
-Concurrent mode allows to drive high memory bandwidth across the system.
-When CONCURRENT mode is specified by default it spawns N number of threads where N 
-is number of logical processor or can be explicitly specified by  num_threads parameter.
-
- Notes: The value must be equal to NORMAL or CONCURRENT.
-
- Default: normal
-
- Syntax: Example,
-         mode = concurrent
 ---------------------------------------------------------------------------------------------
 Name: num_threads
 
-Purpose: Specifies the number of threads to spawn when mode is CONCURRENT. When MODE is NORMAL
-then it is always 1.
+Description:  This parameter is valid only in "system memory view" mode, which specifies the number of threads to spawn.
+The value must be >= 1 and <= Number of logical processors, If num_threads is specified more than the number of
+logical processors on the partition it is rounded off to number of logical processors.
 
-We can choose number of threads to be spawned when exerciser starts by specifying num_threads
-keyword. Mode should be CONCURRENT for enablement of this parameter.
-In case of mode is CONCURRENT and num_threads is not specified, then number number of logical
-cpu considered as number of threads by default.
-
-Notes: The value must be >= 1 and <= Number of logical processors If num_threads is specified 
-more than the number of logical processors on the partition it is rounded off to number of 
-logical processors.
-
+Note: If "num_threads" is specified, then it is advised to specify "disable_cpu_bind = yes" as well 
+for that stanza so that cpu load is distributed as per OS scheduling policy, 
+Otherwise exerciser binds only to first num_threads of available logical cpus. 
 Default:
-  If mode = concurrent, then it is equal to number of logical processor
-  If mode = normal , it will be made 1.
-
-Syntax: Example,
-	num_threads = 2
----------------------------------------------------------------------------------------------
-
-Name: bind_proc
-
-  Purpose: This parameter would enable the thread to bind to a particualr cpu for carrying out 
-  various operation.On disabling this parameter the threads will be scheduled to run on cpus as 
-  per OS scheduling policies.
-  
-  Values Accepted:    YES or NO (YES to make the binding , NO for no binding)
-
-  Default: bind_proc = yes
-----------------------------------------------------------------------------------------------
-
-Name:bind_method
-
-  Purpose: This parameter would allow the thread to bind to any cpu randomly for each write,
-  read and read-compare in one operation.This keyword is valid only for DMA and MEM operations.
-  If bind_proc is enabled this feature will be disabled.
- 
-Two values can be specified for this attribute. 
-Bind_method = YES
-If bind_method is enabled, for each write operation it binds with a random CPU then again it 
-binds with a random CPU for read-only  or read-compare operation.
-
-Bind_method = NO
-No random bind to cpu will happen during  each WRC.         
- Default: bind_method = NO
-	  
-----------------------------------------------------------------------------------------------
+  num_threads = -1
+-----------------------------------------------------------------------------------------
+Name: disable_cpu_bind
+Description: This parameter would enable the thread to bind to a particualr cpu for carrying out various operation.
+On enabling this parameter, the threads will be scheduled to run on cpus as per OS scheduling policies.  
+  Values Accepted:    YES or NO (YES to avoid binding, NO for enable binding)
+  Default: disable_cpu_bind = no
+-----------------------------------------------------------------------------------------
 Name: oper
-
- Purpose: Specifies the mode of operation for the threads to execute. 
- The various operations supported are DMA, MEM, TLB, RIM, MPSS and EMPSS
-
-For, Oper = MEM
-In this operation,  shared memory segment is filled from the host memory. 
-Entire segment is written prior to reading and compared based on the compare flag.
-
-For, Oper = DMA
-In this operation,  shared memory segment is filled from the by reading from the disk.
-Entire segment is written prior to reading and compared based on the compare flag.
-
-Oper =  RIM 
-In RIM operation, after every memory write, data is read back and compared based on compare flag.
-
-Oper = TLB
-TLB test case was designed to generate excessive tlbie's in the system. tlbie stands for 
-Translation LookAside Buffer Invalidate Entry.
-For more details on TLB see the TLB test case  section.
-
-Oper = MPSS
-Please see MPSS test case section.
-
-Oper = EMPSS
-Please see EMPSS test case section.
-
-Oper = NSTRIDE
-Please see NSTRIDE test case section.
-
-Notes: The value must be DMA or MEM or TLB or RIM or MPSS or EMPSS or NSTRIDE.
-
+Description: Specifies the mode of operation for the threads to execute. The various operations supported are DMA, MEM, RIM, STRIDE etc.
+Please see (7)DESCRIPTION section of  this document  for detailed explanation on individual operation.
+Notes: The value must be DMA or MEM or RIM or STRIDE.
  Default: MEM
-
  Syntax: Example,
         oper = mem
+-----------------------------------------------------------------------------------------
+Name: Name: seg_size_4k, seg_size_64k, seg_size_2m, seg_size_16m, seg_size_16g
+Description: Specify the size of the memory segment region in bytes which will be filled using
+the given page size. For eg: SEG_SIZE_64K = 2097152 , this will ask to exercise 2MB  memory from created shared memory segment (256MB by default)
+of 64K page size.
 
---------------------------------------------------------------------------------------------
- Name: seg_size_4k, seg_size_64k, seg_size_16m, seg_size_16g
-
- Purpose: Specify the size of the shared memory segments in bytes which will be filled using
- the given page size. For eg: SEG_SIZE_64K = 268435456 will create 256MB segment filled with 
- pages of  64K page size.
-
- Notes: The value must be >= 8 or <= 268435456 (for upto AIX 4.3.0) .
-        Please ensure that the segment size should be multiple of the page size.
-
- Default:
-      For 4K,64K and 16M page sizes default segment size = 256MB
-      For 16G page size default segment size is 16GB
+Notes:  1. The value must be >= page_size  or  <= 268435456 ( or less than if global_alloc_mem_size  is mentioned) .
+      	2. Please ensure that the segment size should be multiple of the page size.
+Default:
+      For 4K,64K page sizes, the default segment size  is  equal to 256MB
+      For huge/large pages, the page size itself is the default segment size(for eg: segment size = 2MB for 2MB page size)
 
  Syntax: Example,
          Seg_size_4k = 8192
+-----------------------------------------------------------------------------------------
+Name: width
+Description: Specify whether 1 byte, 4 byte or 8 byte load/store instructions will be used to fill
+the shared memory buffers on memory operations.
+Notes: The value must be 1, 4, or 8.
+This parameter is ignored for DMA write operations. Because  when written into the segment using
+the file operation (read) system call test case specifies the size of the pattern mentioned in rule.
 
----------------------------------------------------------------------------------------------
- Name: num_seg_4k, num_seg_64k, num_seg_16m, num_seg_16g
-
- Purpose: Specify the number of the shared memory segments to be creted for the given page size.
-
- Note:  In case of max_mem = no case, if the product of the number of segments and the segment
- size specified in the rules exceeds the real memory on the machine, the system may either 
- thrash (response to keyboard will be very slow) or run out of paging space
- (htx will terminate with signal 33).
-
- Default: 0
-
- Syntax: Example,
-         Num_seg_4k = 2
-
----------------------------------------------------------------------------------------------
- Name: width
-
- Purpose: Specify whether 1 byte, 4 byte or 8 byte store instructions will be used to fill 
- the shared memory  buffers on MEM operations.
-
- Notes: The value must be 1, 4, or 8.
-
-  This parameter is ignored for DMA write operations. Because as we write into the segment using 
-  the file operation (read) system call which doesn't specify the size of the read into the 
-  segment buffer.
-
- Default: 8
-
+Default: 8
  Syntax: Example,
          width = 8
-
-----------------------------------------------------------------------------------------------
- Name: debug_level
-
- Purpose: Debug level decides on what level of messages to display. For example if 
- debug_level = 3 it display all messages i.e., important messages, info messages, debug 
- messages and must print messages.And if you give debug level = 1 then the debug prints 
- of level 1 and 0 are only printed i.e., only MUST and IMP messages are printed.
-          Debug_level has 4 values:
+-----------------------------------------------------------------------------------------
+Name: debug_level
+ Description: Debug level decides on what level of messages to display. 
+        Debug_level has 4 values:
         0   (DBG_MUST_PRINT)
         1   (DBG_IMP_PRINT)
         2   (DBG_INFO_PRINT)
@@ -549,431 +390,231 @@ Notes: The value must be DMA or MEM or TLB or RIM or MPSS or EMPSS or NSTRIDE.
 
  Notes:    Only messages with debug level less than or equal to the stanza specified debug level
  are printed. Higher the debug level more the messages.
-
  Default: 0
-
  Syntax: Example,
          debug_level = 2
 
- Note: Don’t disturb debug level this is an aid for developer to debug the code issues.
-
+ Note: Do not disturb debug level, as this is an aid for developer to debug the code issues.
 ----------------------------------------------------------------------------------------------
- Name: mem_percent
+Name: mem_percent
 
- Purpose: Specifies the percent of free memory to be used for testing. We can specify a range 
- from 20-99.
-
- Notes: Please use this parameter cautiously if you are using above 80% value. This key word is
- only considered in MAX_MEM = YES case.
-
- Default: 70
-
+Description: This parameter is valid only in "system memory view" mode, Specifies the 
+percentage of memory to be used for exercising from allocated memory using
+global_alloc_mem_percent or global_alloc_mem_size. We can specify a range from 1-100.
+Default: 100
  Syntax: Example,
-         Mem_percent = 80
-
----------------------------------------------------------------------------------------------
-Other parameters behavior for max_mem = YES case :
-
-This case lets the exerciser use mem_percent of free memory for testing.
-For example if mem_percent = 75. The exerciser creates that many number
-of segments (of specified size) such as to fill 75% of free memory.
-So in max_mem = yes case num_seg_x is inactive (num_seg_x value is
-not considered).
-
-----------------------------------------
-PARAMETER   		STATE
-
----------------- -----------------------
-compare     		Active
-num_oper   		Active
-seg_size_4k    		Active
-seg_size_64k    	Active
-seg_size_16m   		Active
-seg_size_16g    	Active
-
-num_seg_4k  		InActive
-num_seg_64k 		InActive
-num_seg_16m 		InActive
-num_seg_16g 		InActive
-
-debug_level 		Active
-mem_percent 		Active
-width       		Active
-
----------------------------------------------------------------------------------------------
-Parameter behavior for max_mem = no case :
-
-In this case exerciser creates the specified number of segments
-of the specified size as mentioned in the rules.
-
-So please use this max_mem=no with proper num_seg_x and seg_size_x parameters
-This case assumes that user knows the present memory configuration of the system.
-------------------------------------
-PARAMETER   		STATE
----------------- -------------------
-compare     		Active
-num_oper    		Active
-seg_size_4k     	Active
-seg_size_64k    	Active
-seg_size_16m   		Active
-seg_size_16g  	  	Active
-num_seg_4k  		Active
-num_seg_64k 		Active
-num_seg_16m 		Active
-num_seg_16g 		Active
-debug_level 		Active
-mem_percent 		Active
-width       		Active
-
-As you can see num_seg_x are Active in max_mem = no case.
-
-
-EMPSS TEST CASE PAREMETERS:
+         mem_percent = 80
 ----------------------------------------------------------------------------------------------
-Name : remap_p
+Name: cpu_percent
+Description: This parameter is valid only in "system memory view mode", 
+Specifies the percent of logical cpus present in system(or % of  global_num_threads value). 
 
-Purpose: To specify the number of operations in percentage after which the segments are 
-remapped during execution of empss testcase. 
-
-Notes:   This parameter is valid only for empss test case for which the rule file used is 
-maxmem.empss or mem.empss.only.
-
- Default: None
-
- Syntax: Example,
-         remap_p = 10
-
----------------------------------------------------------------------------------------------
-Name: sao_enabled
-
-Purpose: To specify whether to make memory use sao (strong access ordering).This is enabled 
-only for  empss test case.
-Notes: This parameter is only valid for empss test case. It can have value either "0" or "1".
-Default: 0
-
-Syntax: Example,
-	Sao_enabled = 0
-
+Note: If "cpu_percent" is specified, then it is advised to specify "disable_cpu_bind = yes" as well 
+for same stanza, so that cpu load is distributed as per OS scheduling policy, 
+Otherwise exerciser binds only to first  % of available logical cpus. 
 ----------------------------------------------------------------------------------------------
-
-Name: i_side_test
-
-Purpose: To specify whether to enable i-side testing for empss test case.
-
-Notes: This parameter is only valid for empss test case. It can have value wither “0” or “1”.
-
-Default: 0
-
-Syntax: Example,
-	i_side_test = 1
-
-----------------------------------------------------------------------------------------------
-Name: d_side_test
-Purpose: To specify whether to enable d-side testing for empss test case.
-
-Notes: This parameter is only valid for empss test case. It can have value either “0” or “1”.
-
-Default: 0
-
-Syntax: Example,
-	d_side_test = 0
-
-----------------------------------------------------------------------------------------------
-
-Name: addnl_i_side_test
-
-Purpose: To specify whether to make enable addnl_i_side testing for empss test case.
-
-Notes: This parameter is only valid for empss test case. It can have value either “0” or “1”.
-
-Default: 0
-
-Syntax: Example,
-	addnl_i_side_test = 1
-
-----------------------------------------------------------------------------------------------
-
-Name: base_pg_sz
-
-Purpose: To specify the minimum page size for all the segments in empss testcase.
-
-Notes: This parameter is only used for empss test case. Only 4K and 64K are the valid values 
-for this.
-
-Default: 4K
-
-Syntax: Example,
-	base_pg_sz = 4K
-
-----------------------------------------------------------------------------------------------
-Name: base_sg_sz
-
-Purpose: To specify the minimum segment size to use for empss testing.
-
-Notes: This parameter is only valid for empss test case. Only 256MB and 1TB are the valid 
-values for it.
-
-Default: 256MB
-
-Syntax: Example,
-	base_sg_sz = 1TB
-
-----------------------------------------------------------------------------------------------
-Name :startup_delay
-
-Purpose: This parameter specifies time laps after which the memory exerciser should  start 
-allocating memory segments during HTX run .Since the memory exerciser considers only  the free
-memory on the system for testing, it will wait till the other HTX exercisers allocate thier
-resources.The delay can be varied in between 0 to 120 seconds.
-
-Default: 90 seconds.
-
-Syntax: Example,
-startup_delay = 30
-----------------------------------------------------------------------------------------------
-Name: messages
-
-Purpose:This parameter specifies whether to print debug messages during the memory exerciser
-run.
-possible values YES or NO.
-
-Default:YES
-
-Syntax: Example,
-messages = yes
-----------------------------------------------------------------------------------------------
-
 Name: switch_pat_per_seg
-This parameter specifies whether to use all the patterns on each memory segment or to use 
+This parameter specifies whether to use all the patterns on each memory segment or to use
 specified pattern on each memory segment.
-This is valid for OPER = MEM and OPER = RIM
+This is valid for OPER = MEM and OPER = RIM or OPER = STRIDE
 
 There are three possible values for this parameter as below.
 SWITCH_PAT_PER_SEG = ALL
-If ALL is selected all the patterns are tested on each memory segment. 
+If ALL is selected all the patterns are tested on each memory segment.
 
 SWITCH_PAT_PER_SEG = YES
- If yes is selected, it makes sure to use a particular pattern for each memory segment.Here
- pattern would be switched for each segment.
+ If yes is selected, it makes sure to use a particular pattern for each memory segment. Here
+ pattern will be switched for each segment.
 
 SWITCH_PAT_PER_SEG = NO
 Fixed pattern would be used for all segments.
 Refer pattern_id section for more details.
 ----------------------------------------------------------------------------------------------
-
 Name: stride_sz
-Purpose: This parameter specifies the stride size. This is valid only for nstride testcase.
+Description: This parameter specifies the stride size. This is valid only for stride testcase.
 
 Default: 128
 
 Syntax: Example
 stride_sz=128
 ----------------------------------------------------------------------------------------------
+NAME: affinity
+Description: This parameter is valid only in "chip memory view" mode(global_disable_fiters=no),
+specifies relationship between cpu and memory based on cpu_filter and mem_filter. Supported values are 
+LOCAL,REMOTE_CHIP,REMOTE_NODE, FLOATING, RANDOM.
 
-(9) Miscompare Analysis:
-------------------------
+LOCAL: Memory from  a chip is exercised by binding to cpus from same chip. 
+REMOTE_CHIP: Memory from a chip is exercised by binding to cpus from next chip's cpus in a round robin fashion.
+REMOTE_NODE: Memory from a chip is exercised by binding to cpus from  chip belongs to next node.
+FLOATING: Memory from a chip is exercised without binding to any specific cpus. 
+RANDOM: Memory from a chip is exercised by binding to random selected cpus  from whole system.
+
+NOTE:  REMOTE_NODE and RANDOM are not supported currently. 
+Default: LOCAL
+Syntax: Example
+affinity = LOCAL
+----------------------------------------------------------------------------------------------
+NAME:cpu_filter
+Description: This parameter is valid only in "chip memory view mode"(global_disable_fiters=no),
+Specifies usage of cpus in system hierarchy manner i.e  node->chip->core->cpu. And decides number of threads to be created for
+an operation.
+
+Format: N<tok>P<tok>C<tok>T<tok>
+<tok> can be one of    *, single absolute numbers, range (format: [num1-num2]), multiple absolute numbers (format:[num1,num2,num5]), mix of
+range and absolute numbers (format:[num1-num3,num6]), percentage (format: %num or [%num]).
+Multiple filters (upto to 8) can be specified with space as a separation delimiter.  
+A single effective filter mask will be derived by exerciser from all specified cpu filters.
+
+Default: cpu_filter =  N*P*C*T*
+
+Valid cpu filter Examples with description :
+1.	N*P*C*T*	 : Enable use of all available cpus in the system.
+2.	N*P*C*T0 	 : Enable use of only thread 0 from every core in the system.
+3.	N0P0C0T0	 : Single thread operation, uses  cpu 0  to bind and run, cpu 0 is 0th cpu of Node0, chip0,core0.
+4.	N*P*C[0,5-7]T*  or N*P*C0T*  N*P*C[5-7]T*	or	N*P*C[0,5,6,7]T*       
+			   Use all cpus  only  from cores 0,5,6,7 of all chips in the system to bind and run.
+5.	N*P%50C*T*	 : Use  cpus of  first 50%  chips from every node. 
+
+Below are some examples of invalid format of cpu_filter, Exerciser behavior is unexpected in such cases.  
+1.	NPCT*		 :  entry at every node.chip,core,thread level must have a valid <tok> as explained above. 
+2.	N*P*C%50 	 :  specified filter must have all four entries N,P,C and T.
+3.	N*P*C*T50%       :  correct usage is  N*P*C*T%50
+4.	N*P*C*T0-3 	 :  When range is specified, it must be in "[ ]",correct usage is N*P*C*T[0-3].
+5.	N*P*C0,3T*	 :  correct usage is N*P*C[0,3]T* or  "N*P*C0T*  N*P*C3T*" or "N*P*C[0]*T* N*P*C[3]*T*"
+6.	N*P*C*T[]        :  [ ] cannot be empty.
+
+Note: 	1. Numbers that represent NPCT are always logically contiguous. 
+	2. When absolute numbers are specified in cpu_filter, User must make sure that numbers are within 
+	   boundaries of node, chip, core and, thread on that system.
+----------------------------------------------------------------------------------------------
+Name : mem_filter
+Description: This parameter is valid only in chip memory view mode(global_disable_fiters=no),
+Specifies usage of memory per page_size pool, in system hierarchy manner node->chip.
+
+Format: N<tok1>P<tok1>[<page_size1>_<tok2>, <page_size2>_<tok2>]
+tok1 	   :It can be any of  *, single absolute numbers. 
+page_size  :4K,64K,2M and/or 16M  (both case 'k' or 'K','m' or 'M'  supported in mem_filter).  
+	    Page sizes, which do not support for a given system are ignored by exerciser and 
+	    continues exercising mem by considering only supported and filter mentioned page size pools. 
+
+tok2	   :can be any of  %, absolute value with suffix MB or GB, number of pages with suffix #. For base page size (i.e 4k and/or 64K) 
+       	    this filter value is applied on allocated memory for that chip as per global rules global_alloc_mem_percent or global_alloc_mem_size.
+       	    And for huge page size (i.e 2M or 16M) the filter value is applied on free memory backed with huge page size.
+
+Multiple filters (upto to 8) can be specified with space as a separation delimiter.  
+A single effective filter mask will be derived by exerciser from all specified mem filters.
+
+Default: mem_filter = N*P*[4K_100%,64K_100%,2M_100%,16M_100%]
+
+Valid mem_filter examples 
+1.N*P*[4K_50%,64K_50%,2M_#20,16M_#20]		        :  50% memory from 4K and/or 64K page pool  and 20 huge pages from 2M or 16M page pool  is exercised. 
+2.N0P0[2M_100%,16M_100%]  N0P1[2M_100%,16M_100%]   :  All supported  huge pages(2M or 16M) are exercised from first 2 chips of node 0. 
+3.N0P0[4K_512MB,64K_512MB]  N1P1[4K_1GB,64K_1GB]  
+
+
+Invalid or not supported mem_filter format examples, Exerciser behavior is unexpected in such cases.  
+1.N*P*[4K_50%,4K_1GB]	: same page size for a chip cannot be repeated in a filter or by using multiple filters. 
+2.N*p*[64K_1024KB]	: KB  or TB or Bytes is not supported.
+3.N0P[0-2][16M_100%]	: range or % supported at chip level is not supported, usage of multiple filters is the alternative. 
+4.NP*[4K_100%,64K_100%] : N<tok> is missing.
+
+
+Note: 	1. Numbers that represent NP are always logically contiguous. 
+	2. When absolute numbers are specified with NP in mem_filter , 
+	   User must make sure that numbers are within  boundaries of node, chip on that system.
+	3. When absolute sizes are specified with page_sizes (i.e MB, GB or #), User must make sure that the size should be less than the available free memory and
+	   also, less than the allocated memory using global_alloc_mem_percent.
+
+==================================================================================================================
+
+(9) filters and affinity relation.
+-------------------------------------------
+User must specify filters accordingly, such that it should full fill the affinity requirement.  For default values of cpu_filter and mem_filter,
+exerciser internally takes care of affinity by overwriting current affinity or by ignoring imbalanced chip.
+
+Some invalid combination examples:
+      1.affinity = local
+	cpu_filter = N0P0C*T*
+	mem_filter = N0P1[64K_100%,16M_100%]
+
+      2.affinity = remote_chip
+	cpu_filter = N0P0C*T*	  
+	mem_filter = N0P0[64K_100%,16M_100%]
+
+(10) Miscompare Analysis,
+--------------------------------------------------------
 For AIX miscompare registers are interpreted as:
  gpr3 = 0xFFFFFFFFBEAFDEAD.
  gpr4 = Miscompare offset in number of dwords/words/bytes offset from starting address of
- the segment
- gpr5 = Address of Starting Address of the Segment Buffer
- gpr6 = Address of the Pattern buffer 
- gpr7 = Address of the miscomparing location in the segment buffer
+ the segment.
+ gpr5 = Starting Address of the Segment Buffer.
+ gpr6 = Address of the Pattern buffer. 
+ gpr7 = Address of the miscomparing location in the segment buffer.
  gpr8 = Structure which has dwords consecutively of
-    a) seg_number,b) page_size_index(0=4k,1=64k,2=16M,3=16G page size),
-    c) width(read/write) and d) the segment size, but only in case OPER = MPSS , 
-       it contains starting address of 4K page where miscompare has occurred .
- gpr9 = Current executing stanza pointer.
+    a) oper  b)seg_number,   
+    c) page_size_index(0=4k,1=64k,2=2M,3=16M,4=16G page size),
+    d) width(8/4/1)     e) the segment size     f) owning_thread
+    g) cpu_owning_chip    h) mem_owning_chip   
+    i) affinity_index (1=LOCAL,2=REMOTE_CHIP,3=FLOATING,4=INTRA_NODE,5=INTER_NODE,6=ABOSOLUTE)
+    j) Address of owning thread structure. 	
+    k) Address of  global structure "g_data".
+    l) sub segment number in case of 16G and RIM test case.
+    m)  sub segment size in case of 16G and RIM test case.
+    n) Total load/store access for this segment. 
+gpr9 = Current rule stanza pointer. 
+----------------------------------------------------------------------------------------
 
- Example of aix htx hxemem64 trap:
- -------------------------------------------
- # Static breakpoint:
- 000000010000BFBC       tweq    stkp,stkp           stkp=00000001100493F0
- 000000010000BFC0        xor    r3,r3,r3            r3=FFFFFFFFBEAFDEAD
- KDB(1)> dr
- r0  : 0000000010000000  r1  : 00000001100493F0  r2  : 0000000110005650
- r3  : FFFFFFFFBEAFDEAD  r4  : 0000000000000002  r5  : 0700000030000000
- r6  : 000000011000A278  r7  : 0700000030000004  r8  : 0000000110049490
- r9  : 0000000110008120  r10 : 0000000110005400  r11 : 0000000000000000
- r12 : 00000001000076A8  r13 : 0000000110051800  r14 : 0000000000000003
- r15 : 0000000002000000  r16 : 0000000110008120  r17 : 0000000000000000
- r18 : 0000000110015650  r19 : 0000000000000001  r20 : 0000000110008120
- r21 : 0000000110005A28  r22 : 0000000110015650  r23 : 0000000110015570
- r24 : 0000000000000000  r25 : 000000011000A270  r26 :  0000000000000000
- r27 : 0000000110005B40  r28 : 0000000000000000  r29 : 00000001100008C8
- r30 : 0000000000000001  r31 : 000000011000A278
- KDB(1)> dw @r6
- 000000011000A278: 00000000 00000000 20202020 20202020  ........
- KDB(1)> dw @r5
- 0700000030000000: 00000000 00000003 00000000 00000000  ................
- KDB(1)> dw @r7
- 0700000030000004: 00000003 00000000 00000000 00000000  ................
- KDB(1)> dw @r8 30
- 0000000110049490: 00000000 00000000 00000000 00000000  ................
- 00000001100494A0: 00000000 00000004 00000000 10000000  ................
- 00000001100494B0: 00000000 00000000 00000000 00000000  ................
- 00000001100494C0: 0FFFFFFF D0152F28 00000001 10015570  ....../(......Up
- 00000001100494D0: 00000000 00000000 00000000 00000000  ................
- 00000001100494E0: 00000001 10005128 00000000 00000000  ......Q(........
- 00000001100494F0: 00000001 10015570 00000001 10015650  ......Up......VP
- 0000000110049500: 00000001 10005C38 00000001 1000A278  ......\8.......x
- 0000000110049510: 00000001 10005B40 00000000 00000000  ......[@........
- 0000000110049520: 00000001 100008C8 00000001 1000A270  ...............p
- 0000000110049530: 00000001 100496D0 24000224 00000000  ........$..$....
- 0000000110049540: 00000001 00003C90 00000000 00000000  ......<.........
- KDB(1)> dw @r9 20
- 0000000110008120: 4D454D5F 30583030 00484558 5A45524F  MEM_0X00.HEXZERO
- 0000000110008130: 53000000 00000001 4D454D00 4E4F0000  S.......MEM.NO..
- 0000000110008140: 434F4E43 55525245 4E540000 00000000  CONCURRENT......
- 0000000110008150: 00000001 59455300 59455300 00000000  ....YES.YES.....
- 0000000110008160: 00000000 10000000 00000000 10000000  ................
- 0000000110008170: 00000000 10000000 00000004 00000000  ................
- 0000000110008180: 00000000 00000000 00000000 00000000  ................
- 0000000110008190: 00000004 00000000 00000046 59455300  ...........FYES.
-
-----------------------------------------------------------------------------------------------
- For Linux miscompare the registers are interpreted as:
- gpr3 = 0xBEEFDEADFFFFFFFF
- gpr4 = Starting Address of the Shared Memory Segment.
- gpr5 = Address of Miscomparing Location in the Shared memory segment.
- gpr6 = Bit pattern that was used in the 8 byte compare
- gpr7 = Size in bytes of Shared Memory Segment.
- gpr8 = Address of the Miscompare Error Message string.(This dumps in text all info)
-
- Process name which caused the trap to the kernel debugger would be
- hxemem64
-
- Example of htx linux hxemem64 miscompare trap:
-----------------------------------------------------------------------------------------------
- 2:mon> e
- cpu 0x2: Vector: ffffffffffffffd8  at [c00000003310b990]
-     pc: 0000000000000004
-     lr: c00000003310bb30
-     sp: c000000035977780
-    msr: 0
-   current = 0xc0000000340724c0
-   paca    = 0xc0000000004a3700
-     pid   = 4676, comm = hxemem64
- 2:mon> r
- R00 = c00000003310ba60   R16 = c00000003310bcd0
- R01 = c000000035977780   R17 = ffffffffffffffe9
- R02 = c0000000004e0498   R18 = c00000003310bcd0
- R03 = beefdeadffffffff   R19 = c00000003310bcd0
- R04 = 0000040000028000   R20 = c00000003310bae0
- R05 = 0000040000028000   R21 = c00000003412ca80
- R06 = 0000000000000000   R22 = c00000003310bcd0
- R07 = 0000000010000000   R23 = 0000000000000006
- R08 = 0000040021fb138c   R24 = c0000000004f68a0
- R09 = c00000000f6e1a60   R25 = c00000000f6e1a60
- R10 = c00000003310ba60   R26 = d0000000004ac480
- R11 = 8000000000009032   R27 = c000000000642340
- R12 = c00000003310ba70   R28 = c00000003310bb00
- R13 = 0000000000000000   R29 = 0000040021faf150
- R14 = c000000035c81000   R30 = c00000003310bb00
- R15 = ffffffffffffff9c   R31 = c000000000642340
- pc  = 0000000000000004
- lr  = c00000003310bb30
- msr = 0000000000000000   cr  = 00000001
- ctr = c000000035977780   xer = ffffffffffffff9c   trap = ffffffffffffffd8
- 2:mon> d 0000040021fb138c
- 0000040021fb138c 4d454d4f5259204d 4953434f4d504152  |MEMORY MISCOMPAR|
- 0000040021fb139c 45286878656d656d 36342920696e2072  |E(hxemem64) in r|
- 0000040021fb13ac 756c65204d454d5f 305830302c706173  |ule MEM_0X00,pas|
- 0000040021fb13bc 733d20312c52756c 65732066696c653d  |s= 1,Rules file=|
- 2:mon>
- 0000040021fb13cc 2f7573722f6c7070 2f6874782f72756c  |/usr/lpp/htx/rul|
- 0000040021fb13dc 65732f7265672f68 78656d656d36342f  |es/reg/hxemem64/|
- 0000040021fb13ec 6d61786d656d0a53 6861726564206d65  |maxmem.Shared me|
- 0000040021fb13fc 6d6f727920696428 73686d69645b305d  |mory id(shmid[0]|
- 2:mon>
- 0000040021fb140c 293d323638363938 352c536861726564  |)=2686985,Shared|
- 0000040021fb141c 206d656d6f727920 5365676d656e7420  | memory Segment |
- 0000040021fb142c 5374617274696e67 204541287368725f  |Starting EA(shr_|
- 0000040021fb143c 6d656d705b305d29 3d30783078343030  |memp[0])=0x0x400|
-2:mon>
- 0000040021fb144c 3030303238303030 2c0a4d6973636f6d  |00028000,.Miscom|
- 0000040021fb145c 70617265204f6666 73657420696e2074  |pare Offset in t|
- 0000040021fb146c 6865205368617265 64206d656d6f7279  |he Shared memory|
- 0000040021fb147c 207365676d656e74 2069732028302078  | segment is (0 x|
- 2:mon>
- 0000040021fb148c 2034292030206279 7465732066726f6d  | 4) 0 bytes from|
- 0000040021fb149c 2074686520737461 7274696e67206c6f  | the starting lo|
- 0000040021fb14ac 636174696f6e2c0a 4461746120657870  |cation,.Data exp|
- 0000040021fb14bc 6563746564203d20 3078300a44617461  |ected = 0x0.Data|
- 2:mon>
- 0000040021fb14cc 2072657472696576 6564203d20307833  | retrieved = 0x3|
- 0000040021fb14dc 3030303030303030 0a4d656d6f727920  |00000000.Memory |
- 0000040021fb14ec 4d6973636f6d7061 7265206c6f636174  |Miscompare locat|
- 0000040021fb14fc 696f6e204541203d 2030783078343030  |ion EA = 0x0x400|
- 2:mon>
- 0000040021fb150c 3030303238303030 200a536861726564  |00028000 .Shared|
- 0000040021fb151c 206d656d6f727920 7365676d656e7420  | memory segment |
- 0000040021fb152c 73697a65203d2032 3638343335343536  |size = 268435456|
- 0000040021fb153c 200a536861726564 206d656d6f727920  | .Shared memory |
- 2:mon>
- 0000040021fb154c 7365676d656e7420 636f6e7369737473  |segment consists|
- 0000040021fb155c 206f662070616765 73206f662073697a  | of pages of siz|
- 0000040021fb156c 65203d344b0a7265 61642f7772697465  |e =4K.read/write|
- 0000040021fb157c 207769647468203d 20342c2054726170  | width = 4, Trap|
- 2:mon>
- 0000040021fb158c 5f466c6167203d20 31205375622d5365  |_Flag = 1 Sub-Se|
- 0000040021fb159c 676d656e74204e75 6d6265723d302c20  |gment Number=0, |
- 0000040021fb15ac 5468726561643d30 2c6e756d5f6f665f  |Thread=0,num_of_|
- 0000040021fb15bc 746872656164733d 320a000000000000  |threads=2.......|
- 2:mon>
- 0000040021fb15cc 0000000000000000 0000000000000000  |................|
- 0000040021fb15dc 0000000000000000 0000000000000000  |................|
- 0000040021fb15ec 0000000000000000 0000000000000000  |................|
- 0000040021fb15fc 0000000000000000 0000000000000000  |................|
- 2:mon>
-
-----------------------------------------------------------------------------------------------
-
-(10) Exerciser specific log file:
+(11) Exerciser specific log file:
 -------------------------------------
-There is no exerciser specific log file created for hxemem64.
+echo $HTX_LOG_DIR
+/tmp/
 
- (11) Understanding htxstats:
+hxemem64 creates log file "$HTX_LOG_DIR/htx/hxemem64/mem/mem_segment_details" on test machine.
+
+#cat mem_segment_details | head
+
+******************************************************************************************************************************************************
+ In_use_seg_num  page_size      Owning_thread   cpu_num         mem_chip_num     segment_id              segment_size            segment_EA
+================================================================================================================================================
+        0        64K             0               1               0               1065686736              239140864               0x3fff55bf0000
+        1        64K             0               1               0               1065785043              239140864               0x3fff393d0000
+        2        64K             0               1               0               1065752274              239140864               0x3fff2afc0000
+        3        64K             0               1               0               1065719505              239140864               0x3fff477e0000
+        4        64K             1               9               0               1065817812              239140864               0x3fff6dbf0000
+
+ (12) Understanding htxstats:
 ----------------------------------
+Stats for hxemem64 mainly tells about the Bandwidth at the system/partition level 
+i.e number of bytes written/read per second to/from memory.
+
 hxemem64 stats appear as follows:
 
 mem:
-  cycles                              	=                  0
-  # good reads                        	=                  0
-  # bytes read                        	=        21118205952
-  # good writes                       	=                  0
-  # total instructions                	=                  0
-  # bytes written                     	=        21118205952
-  # good others                       	=                  0
-  # bad others                        	=                  0
-  # bad reads                         	=                  0
-  # bad writes                        	=                  0
-  # data transfer rate(bytes_wrtn/s)  	=        30298718.00
-  # data transfer rate(bytes_read/s)  	=        30298718.00
-  # instruction throughput(MIPS)     =           0.000000
+  cycles                              =                  1
+  # good reads                        =                  0
+  # bytes read                        =   3394396137521152
+  # good writes                       =                  0
+  # total instructions                =                  0
+  # bytes written                     =   1697242173014016
+  # good others                       =                  0
+  # bad others                        =                  0
+  # bad reads                         =                  0
+  # bad writes                        =                  0
+  # data transfer rate(bytes_wrtn/s)  =        10682474496.00
+  # data transfer rate(bytes_read/s)  =        21364391936.00
+  # instruction throughput(MIPS)      =           0.000000
 
-Stats for hxemem64 mainly tells about the number of bytes written/read per second to/from
-memory .
 
-(12) Limitations:
+(13) Limitations:
 ---------------------
-When a memory test fails i.e. when the exercise determines that the final result of a test rule 
-is not as  expected, it is up to the hardware engineers to determine the exact cause and 
-location of error with ESP or some other means. In other words, while the exerciser will be 
-helpful is stress testing the memory subsystem in a  multitasking environment, it will not be
-able to provide low level  details/diagnostics about the  failure. It can only tell which tests 
-have failed.
+When a memory test fails i.e. when the exerciser determines that the result of a test rule 
+is not as expected, it is up to the hardware engineers to determine the exact cause and 
+location of error with FSP or some other means. In other words, while the exerciser will be 
+helpful is stress testing the memory subsystem in a multitasking environment, it will not be
+able to provide low level details/diagnostics about the failure. It can only tell which tests 
+have failed and some high level cpu information.
 
 Software Notes:
 We obtain and exercise shared memory instead of the memory from the heap. This is due to the 
-fact that in case of shared  memory atlest upto 2 GB (except AIX 4.3.0) of memory can be 
-obtained where as in the latter case,malloc() gets memory from the private data area of the 
-process which will be much lesser.
-
-(13).DEPENDENCIES:
---------------------------
-System should have enough paging space as per the AIX Performance tuning guidelines for normal 
-operation.
-
-
-
+fact that in case of shared memory at least up to 2 GB of memory can be obtained where as in the
+latter case, malloc() gets memory from the private data area of the process which will be much lesser.

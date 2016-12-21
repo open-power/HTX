@@ -1,42 +1,54 @@
-* @(#)11        1.1  src/htx/usr/lpp/htx/rules/reg/hxemem64/rules.dl1_reloads_from_caches, exer_cache, htxubuntu 2/22/11 06:18:03
+* IBM_PROLOG_BEGIN_TAG 
+* This is an automatically generated prolog. 
+*  
+* htx72F src/htx/usr/lpp/htx/rules/reg/hxemem64/rules.dl1_reloads_from_caches 1.1 
+*  
+* Licensed Materials - Property of IBM 
+*  
+* COPYRIGHT International Business Machines Corp. 2011 
+* All Rights Reserved 
+*  
+* US Government Users Restricted Rights - Use, duplication or 
+* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
+*  
+* IBM_PROLOG_END_TAG 
+* %Z%%M%        %I%  %W% %G% %U%
 * This rule files is primarily used by manufacturing
 * This combinations of patterns and associated iterations is able to stress
 * the memory for a minimum length of time, as required by manufacturing.
-* Hxemem waits for 90 seconds before allocating any memory for the test.
-* Memory that remains after the OS and other apps have allocated their's,
-* is used for the test.
-* In this case, 90 percent of remaining memory will be used up.
+*************************************************************************
+*******Global Rules**********
+global_alloc_mem_percent  = 40
+global_alloc_huge_page = no
+global_startup_delay = 0
+global_disable_filters = no
+*********************************
 rule_id = 1 
 pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
-max_mem = no
-compare = yes
 num_oper = 10
 num_writes = 1
 num_read_only = 0
 num_read_comp = 1000
 switch_pat_per_seg = all
-mode = concurrent
-bind_proc = yes
 oper = mem
 width = 8
-num_seg_4k = 1
-seg_size_4k = 16384
-startup_delay = 0
+affinity = local
+disable_cpu_bind = NO
+cpu_filter = N*P*C*T*
+mem_filter = N*P*[64K_#128]
+seg_size_64k = 65536
 
 rule_id = 2 
 pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
-max_mem = no
-compare = yes
 num_oper = 10
 num_writes = 1
 num_read_only = 0
 num_read_comp = 1000
 switch_pat_per_seg = all
-mode = concurrent
-bind_proc = yes
 oper = mem
 width = 8
-num_seg_4k = 1
-seg_size_4k = 262144
-startup_delay = 0
+affinity = local
+cpu_filter = N*P*C*T*
+mem_filter = N*P*[64K_#256]
+seg_size_64k = 65536
 

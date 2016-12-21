@@ -21,8 +21,14 @@ TARGET= \
              rules.app_server \
              rules.hpc_comp_node \
              rules.MBA \
- 		mem.eq.50 \
-		mem.eq.90
+      		 mem.eq.50 \
+	    	 mem.eq.90 \
+             default \
+             default.char \
+             default.less \
+             default.eq \
+             default.mfg \
+             default.mfg.nodelay
 
 
 .PHONY: all clean

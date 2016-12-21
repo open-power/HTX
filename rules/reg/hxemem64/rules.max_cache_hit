@@ -1,41 +1,39 @@
-* @(#)12        1.1  src/htx/usr/lpp/htx/rules/reg/hxemem64/rules.max_cache_hit, exer_cache, htxubuntu 2/22/11 06:18:05
-* This rule files is primarily used by manufacturing
-* This combinations of patterns and associated iterations is able to stress
-* the memory for a minimum length of time, as required by manufacturing.
-* Hxemem waits for 90 seconds before allocating any memory for the test.
-* Memory that remains after the OS and other apps have allocated their's,
-* is used for the test.
-* In this case, 90 percent of remaining memory will be used up.
-rule_id = l2_hit 
+* IBM_PROLOG_BEGIN_TAG 
+* It considers less memory as low as one 4k and 64K page per thread, accesses same
+* memory on next read opeartions to maximize cache hits
+****************************************************************
+*******Global Rules**********
+global_startup_delay = 0
+global_alloc_mem_percent = 30
+global_alloc_huge_page = no
+global_disable_filters = no
+*********************************
+rule_id = l2_hit
 pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
-max_mem = no
-compare = yes
 num_oper = 10
 num_writes = 1
 num_read_only = 0
 num_read_comp = 1000
 switch_pat_per_seg = all
-mode = concurrent
-bind_proc = yes
 oper = mem
 width = 8
-num_seg_4k = 1
+affinity = local
+disable_cpu_bind = NO
+cpu_filter = N*P*C*T%50
+mem_filter = N*P*[4K_#64,64K_#64]
 seg_size_4k = 4096
-startup_delay = 0
+seg_size_64k = 65536
 
-rule_id = l3_hit 
+rule_id = l3_hit
 pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
-max_mem = no
-compare = yes
 num_oper = 10
 num_writes = 1
 num_read_only = 0
 num_read_comp = 1000
 switch_pat_per_seg = all
-mode = concurrent
-bind_proc = yes
 oper = mem
 width = 8
-num_seg_4k = 1
-seg_size_4k = 262144
-startup_delay = 0
+cpu_filter = N*P*C*T*
+mem_filter = N*P*[4K_#128,64K_#128]
+seg_size_4k = 4096
+seg_size_64k = 65536

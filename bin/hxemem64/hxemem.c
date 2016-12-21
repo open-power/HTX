@@ -15,8 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* IBM_PROLOG_END_TAG */
-/* @(#)87       1.74.1.19  src/htx/usr/lpp/htx/bin/hxemem64/hxemem.c, exer_mem64, htx61J, htx61J_639 4/23/10 03:41:33 */
 #include "hxemem64.h"
 #ifndef __HTX_LINUX__
 #include <sys/vminfo.h>

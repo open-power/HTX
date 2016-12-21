@@ -3247,7 +3247,11 @@ int setup_cache_thread_context(void) {
 			th_array[index].thread_type 					= CACHE;
 			th_array[index].current_rule					= current_rule;
 			th_array[index].start_class	 					= 0;
-			th_array[index].end_class	   					= (2*cache_asc) - 1;
+            if((system_information.pvr == POWER9_NIMBUS) || (system_information.pvr == POWER9_CUMULUS)) {
+                th_array[index].end_class                   = (cache_asc - 1);
+            }else{
+			    th_array[index].end_class	   				= (2*cache_asc) - 1;
+            }
 			th_array[index].walk_class_jump 				= 1;
 			th_array[index].cache_instance_under_test 		= j;
 			th_array[index].memory_starting_address_offset 	= /*th_array[index].cache_instance_under_test * 2*cache_size*/ 0 ;
@@ -3575,7 +3579,7 @@ int create_cache_threads(void) {
 	int	index			= 0;
 	int	core 			= 0;
 	int num_cores		= system_information.num_cores;
-    int num_cache_threads = current_rule->num_cache_threads_created;
+    int num_cache_threads = current_rule->num_cache_threads_to_create;
     int thd;
 	switch(testcase_type) {
 		case CACHE_BOUNCE_ONLY :
