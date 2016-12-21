@@ -1257,7 +1257,7 @@ rf_read_rules(const char rf_name[], struct rule_info rf_info[], unsigned int * n
 			} else if((strcmp(tmp, "offline")) == 0) { 
 				current_ruleptr->test = ETH_TEST_FL_OFFLINE; 
 			} else if((strcmp(tmp, "external_lb")) == 0) { 
-				current_ruleptr->test = ETH_TEST_FL_EXTERNAL_LB; 
+				current_ruleptr->test = (ETH_TEST_FL_OFFLINE | ETH_TEST_FL_EXTERNAL_LB); 
 			} else if((strcmp(tmp, "ber")) == 0) { 
 				current_ruleptr->test = IB_BER_TEST; 
 			} else if((strcmp(tmp, "dma")) == 0) { 
