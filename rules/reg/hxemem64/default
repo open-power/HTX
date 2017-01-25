@@ -1,0 +1,74 @@
+* IBM_PROLOG_BEGIN_TAG 
+* This is an automatically generated prolog. 
+*  
+* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxemem64/default 1.2 
+*  
+* Licensed Materials - Property of IBM 
+*  
+* COPYRIGHT International Business Machines Corp. 2016 
+* All Rights Reserved 
+*  
+* US Government Users Restricted Rights - Use, duplication or 
+* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
+*  
+* IBM_PROLOG_END_TAG 
+**The default rule file allocates 70% of free memory available in the partition, 
+**Each stanza has differant stress test case in terms of oper/memory access width/pattern,  
+**that exercises allocated memory dependng mem_filetr and cpu_filter parameter.
+**Please read the documnetation htxmem64.readme for explaination of rule parameters.
+****************************************************************************************
+***Global Rules****
+global_alloc_mem_percent = 70
+global_disable_cpu_bind  = NO
+**************************
+rule_id = mem_1
+oper = mem
+num_oper = 1
+pattern_id = ADDRESS 0x5555555555555555
+switch_pat_per_seg = all
+width = 8
+affinity = local
+
+rule_id = mem_remote_2
+oper = mem
+num_oper = 1
+pattern_id = RANDOM HEXFF(8)
+width = 4
+affinity = remote_chip
+
+rule_id = mem_3
+oper = mem
+num_oper = 1
+pattern_id = 0xAAAAAAAAAAAAAAAA
+width = 1
+affinity = local
+
+rule_id = stride_4
+oper = stride
+num_oper = 1
+pattern_id = HEXFF(8) ADDRESS HEXZEROS(8)
+width = 8
+affinity = local
+mem_filter = N*P*[4K_50%,64K_50%,2M_100%,16M_100%]
+
+rule_id = rim_5
+oper = rim
+num_oper = 1
+pattern_id = 0x3333333333333333
+width = 8
+cpu_filter = N*P*C*T50%
+mem_filter = N*P*[4k_10%,64K_10%,2M_100%,16M_100%]
+seg_size_16M = 2097152
+seg_size_4K  = 2097152
+seg_size_64K = 2097152
+
+rule_id = dma_6
+oper = dma
+num_oper = 1
+pattern_id = HEXZEROS(4096)
+width = 8
+cpu_filter = N*P*C*T0
+mem_filter = N*P*[4k_100MB,64K_100MB]
+seg_size_4K  = 2097152
+seg_size_64K = 2097152
+seg_size_16M = 2097152

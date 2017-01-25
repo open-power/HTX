@@ -1,39 +1,37 @@
 * IBM_PROLOG_BEGIN_TAG 
 * This is an automatically generated prolog. 
 *  
-* htx72F src/htx/usr/lpp/htx/rules/reg/hxemem64/mem_16m_hwpf 1.3 
+* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxemem64/default.mfg.nodelay 1.1 
 *  
 * Licensed Materials - Property of IBM 
 *  
-* COPYRIGHT International Business Machines Corp. 2010 
+* COPYRIGHT International Business Machines Corp. 2016 
 * All Rights Reserved 
 *  
 * US Government Users Restricted Rights - Use, duplication or 
 * disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
 *  
 * IBM_PROLOG_END_TAG 
-* Targeted at concurrent operations with 16M pages and hardware prefetch
-* This rule stanza creates Cache to memory traffic by working with 16M page
-* creating hardware prefetch operations in the process
-* 8 byte width of operations:
-*Note: Please make sure 16M pages are enabled on test system.
-***********************************************************************************
+**This rule is for mfg testing, consumes 90% of memory using all cpu resources,
+**Each segment is filled with 9 different patterns.
+**Please read the documnetation htxmem64.readme for explaination of rule parameters.
+****************************************************************************************
 *******Global Rules**********
 global_startup_delay = 0
-global_alloc_mem_percent = 5
+global_alloc_mem_percent = 90
+global_disable_cpu_bind  = NO
 global_disable_filters = no
 *********************************
-rule_id = MEM_HPF
+rule_id = mem_stride_test
+oper = stride
 pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
-num_oper = 9999
+switch_pat_per_seg = all
+num_oper = 500
 num_writes = 1
-num_read_only = 0
+num_read_only = 1
 num_read_comp = 1
-switch_pat_per_seg = YES
-disable_cpu_bind = no
-oper = mem
 width = 8
 affinity = local
+disable_cpu_bind = NO
 cpu_filter = N*P*C*T*
-mem_filter = N*P*[16M_100%]
-
+mem_filter = N*P*[4K_100%,64K_100%,2M_100%,16M_100%]

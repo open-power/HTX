@@ -751,18 +751,35 @@ function mkstanza(hxe,a,d,dev,rfdir,reg,emc) {
 function create_memory_stanzas() { 
 
 	ams=0
-	if (CMVC_RELEASE != "htxltsbml") {
-		ams=snarf("cat /proc/ppc64/lparcfg 2> /dev/null | grep cmo_enabled | awk -F= '{print $2}'")
-		if (ams == "1") {
-			system("awk '/.*/ { if ($0 ~ /^max_mem/ )printf(\"max_mem = yes\\nmem_percent = 40\\n\"); else print $0; }' ${HTXREGRULES}/hxemem64/maxmem > ${HTXREGRULES}/hxemem64/maxmem.ams");
-			mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem.ams","maxmem.ams");
-        }
+	if ( proc_ver == "4e" || proc_ver == "4f" ) {
+		if (CMVC_RELEASE != "htxltsbml") {
+			ams=snarf("cat /proc/ppc64/lparcfg | grep cmo_enabled | awk -F= '{print $2}'")
+			if (ams == "1") {
+				system("awk '/.*/ { if ($0 ~ /^global_alloc_mem_percent/ )printf(\"global_alloc_mem_percent = 40\\n\"); else print $0; }' ${HTXREGRULES}/hxemem64/default > ${HTXREGRULES}/hxemem64/default.ams");
+				mkstanza("hxemem64","64bit","memory","mem","hxemem64","default.ams","default.ams");
+			}
+			else {
+				mkstanza("hxemem64","64bit","memory","mem","hxemem64","default","default");
+			}
+		}
 		else {
-			mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem","maxmem");
+			mkstanza("hxemem64","64bit","memory","mem","hxemem64","default","default");
 		}
 	}
 	else {
-		mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem","maxmem");
+		if (CMVC_RELEASE != "htxltsbml") {
+			ams=snarf("cat /proc/ppc64/lparcfg | grep cmo_enabled | awk -F= '{print $2}'")
+			if (ams == "1") {
+				system("awk '/.*/ { if ($0 ~ /^max_mem/ )printf(\"max_mem = yes\\nmem_percent = 40\\n\"); else print $0; }' ${HTXREGRULES}/hxemem64/maxmem > ${HTXREGRULES}/hxemem64/maxmem.ams");
+				mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem.ams","maxmem.ams");
+			}
+			else {
+				mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem","maxmem");
+			}
+		}
+		else {
+			mkstanza("hxemem64","64bit","memory","mem","hxemem64","maxmem","maxmem");
+		}
 	}
 	load_seq(65535);
 	loop_cnt=((log_proc-(log_proc%2))/2);
