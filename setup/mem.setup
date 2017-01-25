@@ -1,6 +1,60 @@
+#!/bin/bash
 ###### This script is used to collect the required memory statistics for hxemem64 exerciser.
 ###### Collect the large and huge page memory required memory statistics 
 ###### into the file ${HTX_LOG_DIR}/freepages
+echo "Entering mem.setup.." >> $HTXNoise
+proc_ver=`grep 'Processor Version' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $4 }'`
+echo "proc_ver=$proc_ver" >> $HTXNoise
+
+if [[ "$proc_ver" != "0x4e" && "$proc_ver" != "0x4f" ]]
+then
+    #P8 or less
+    if [ -r ${HTXREGRULES}/hxemem64/mem_16m_hwpf_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/mem_16m_hwpf_old ${HTXREGRULES}/hxemem64/mem_16m_hwpf
+    fi
+
+    if [ -r ${HTXREGRULES}/hxemem64/rules.app_server_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/rules.app_server_old ${HTXREGRULES}/hxemem64/rules.app_server
+    fi
+
+    if [ -r ${HTXREGRULES}/hxemem64/rules.comm_db_pk_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/rules.comm_db_pk_old ${HTXREGRULES}/hxemem64/rules.comm_db_pk
+    fi
+
+    if [ -r ${HTXREGRULES}/hxemem64/rules.dl1_reloads_from_caches_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/rules.dl1_reloads_from_caches_old ${HTXREGRULES}/hxemem64/rules.dl1_reloads_from_caches
+    fi
+
+    if [ -r ${HTXREGRULES}/hxemem64/rules.hpc_comp_node_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/rules.hpc_comp_node_old ${HTXREGRULES}/hxemem64/rules.hpc_comp_node
+    fi
+
+    if [ -r ${HTXREGRULES}/hxemem64/rules.max_cache_hit_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/rules.max_cache_hit_old ${HTXREGRULES}/hxemem64/rules.max_cache_hit
+    fi
+
+    if [ -r ${HTXREGRULES}/hxemem64/rules.max_cache_miss_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/rules.max_cache_miss_old ${HTXREGRULES}/hxemem64/rules.max_cache_miss
+    fi
+
+    if [ -r ${HTXREGRULES}/hxemem64/rules.web_server_old ]
+    then
+        mv ${HTXREGRULES}/hxemem64/rules.web_server_old ${HTXREGRULES}/hxemem64/rules.web_server
+    fi
+
+    if [ ! -x ${HTXBIN}/hxemem64_new ]
+    then
+        cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxemem64_new
+        cp ${HTXBIN}/hxetlbie ${HTXBIN}/hxemem64
+    fi
+fi
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
 if [[ $Hugepagesize -lt 2048 ]]
 then
@@ -41,7 +95,6 @@ num_cores=`cat ${HTX_LOG_DIR}/htx_syscfg 2> /dev/null | awk ' /Number of Cores/ 
 percent_cores=`grep 'percent_hw_threads' ${HTXREGRULES}/hxetlbie/tlbie | awk '{ print $3 }' | head -1`
 # Processor Version i.e will be 003e for p6 & 003f for p7
 ###proc_ver=`cat /proc/cpuinfo |grep -m 1 revision |awk {'print $5'}`
-proc_ver=`grep 'Processor Version' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $4 }'`
 shared_processor_mode=`grep shared_processor_mode ${HTX_LOG_DIR}/htx_syscfg | awk '{print $3}'`
 
 if [ "$shared_processor_mode" =  "no" ]
@@ -108,12 +161,12 @@ then
 	    elif [[ "$proc_ver" = "0x4b" || "$proc_ver" = "0x4d" || "$proc_ver" = "0x4c" ]]
 	    then
 		#P8
-		pages_reserved_cache_per_instance=$((max_cpus_in_instance/maxSMT))
+			pages_reserved_cache_per_instance=$((max_cpus_in_instance/maxSMT))
 		
 		elif [[ "$proc_ver" = "0x4e" || "$proc_ver" = "0x4f" ]]
 		then
 		#P9
-			pages_reserved_cache_per_instance=$((max_cpus_in_instance/maxSMT)*2*mult_factor) #P9 cache size =10MB,1 cache thread for every (smt/2) threads. 
+			pages_reserved_cache_per_instance=$(($((max_cpus_in_instance/maxSMT))*2*mult_factor)) #P9 cache size =10MB,1 cache thread for every (smt/2) threads. 
 		
 		fi
 
@@ -153,13 +206,13 @@ then
 	then
 		tlbie_16M=1
 	fi	
+    cache_buffer_pages=`expr $num_instances \* $mult_factor`
 fi
 leave_16M=`expr $cache_16M + $mem_16M + $tlbie_16M`
 leave_16G=0
 
 # Add extra 16M as buffer so that if any other process takes additional 16M pages. We don't fall short of it and hit any error.
 extra_16M_buffer=5
-cache_buffer_pages=`expr $num_instances \* $mult_factor`
 if [[ $extra_16M_buffer -lt $cache_buffer_pages ]]
 then
     extra_16M_buffer=$cache_buffer_pages
@@ -285,4 +338,4 @@ shmall_4K=`expr $shmall_new / 4`  # in terms of 4K
 
 echo "Writing $shmall_4K to /proc/sys/kernel/shmall"
 echo $shmall_4K > /proc/sys/kernel/shmall
-
+echo "Exiting mem.setup.." >> $HTXNoise

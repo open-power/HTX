@@ -1,0 +1,23 @@
+* Targeted at concurrent operations with 16M pages and hardware prefetch
+* This rule stanza creates Cache to memory traffic by working with 16M page
+* creating hardware prefetch operations in the process
+* 8 byte width of operations:
+rule_id = MEM_HPF
+pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
+max_mem = NO
+compare = yes
+num_oper = 9999
+num_writes = 1
+num_read_only = 0
+num_read_comp = 1
+switch_pat_per_seg = YES
+mode = concurrent
+bind_proc = yes
+oper = mem
+width = 8
+num_seg_4k = 0
+num_seg_64k = 0
+num_seg_16g = 0
+num_seg_16m = 1
+seg_size_16m = 16777216
+

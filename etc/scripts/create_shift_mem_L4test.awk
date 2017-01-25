@@ -35,7 +35,7 @@ system("cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk");
 
 for (i=0; i < no_of_chips; i++) {
     mem_inst = sprintf("mem%d", i);
-    mkstanza("hxemem64","64bit","memory",mem_inst,"hxemem64",rule_file,rule_file);
+    mkstanza("hxecentaur","64bit","memory",mem_inst,"hxemem64",rule_file,rule_file);
     cont_on_err("NO");
     printf("\n");
 }

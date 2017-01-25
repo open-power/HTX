@@ -23,14 +23,19 @@
 # Print the memory configure
 ${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.ab query_memconf >/dev/null 2>&1
 
-proc_ver=`${HTXBIN}/show_syscfg pvr | grep Version | awk -F: '{print $2}'`
+proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
 proc_ver_dec=`printf %d $proc_ver`
-P6Compatmode=`${HTXBIN}/show_syscfg pvr | grep -i Power6Compatmode | awk -F: '{print $2}'|sed -e 's/^ *//' `
+P6Compatmode=`${HTX_LOG_DIR}/htx_syscfg | grep -i Power6Compatmode | awk -F: '{print $2}'|sed -e 's/^ *//' `
 
 echo "Creating mdt.ab_mem ..."
 if [[ $proc_ver_dec -ge 63 && $P6Compatmode = "False" ]] # Shifts for P7 & above
 then
-    create_my_mdt mem:memmfg 							> ${HTXMDT}/mdt.ab_mem
+	if [[ $proc_ver_dec -ge 78 ]]
+	then
+    	create_my_mdt mem:default.mfg 							> ${HTXMDT}/mdt.ab_mem
+	else
+		create_my_mdt mem:memmfg 								> ${HTXMDT}/mdt.ab_mem
+	fi
 else
     cat ${HTXMDT}/mdt.mem  							> ${HTXMDT}/mdt.ab_mem
 fi

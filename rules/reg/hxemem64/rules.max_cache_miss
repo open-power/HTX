@@ -1,25 +1,19 @@
-* @(#)13        1.2  src/htx/usr/lpp/htx/rules/reg/hxemem64/rules.max_cache_miss, exer_cache, htxubuntu 4/9/12 02:16:32
-* This rule files is primarily used by manufacturing
-* This combinations of patterns and associated iterations is able to stress
-* the memory for a minimum length of time, as required by manufacturing.
-* Hxemem waits for 90 seconds before allocating any memory for the test.
-* Memory that remains after the OS and other apps have allocated their's,
-* is used for the test.
-* In this case, 90 percent of remaining memory will be used up.
+* IBM_PROLOG_BEGIN_TAG 
+*******Global Rules**********
+global_alloc_mem_percent = 70
+global_startup_delay = 0
+*********************************
 rule_id = l2l3miss
 pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
-max_mem = yes
-mem_percent = 70
-compare = yes
 num_oper = 1
 num_writes = 1
 num_read_only = 1
 num_read_comp = 1
 switch_pat_per_seg = yes
-mode = concurrent
-bind_proc = yes
-oper = nstride
+oper = stride
 stride_sz = 128
 width = 8
-startup_delay = 0
-
+affinity = local
+disable_cpu_bind = NO
+cpu_filter = N*P*C*T*
+mem_filter = N*P*[4K_100%,64K_100%,2M_100%,16M_100%]

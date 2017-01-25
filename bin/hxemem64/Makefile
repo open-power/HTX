@@ -5,12 +5,16 @@ TARGET= hxemem64
 LDFLAGS +=
 
 OBJ_SUFF=.o
-OBJECTS = hxemem${OBJ_SUFF} \
-        mem_operation${OBJ_SUFF} \
-        rand_operation${OBJ_SUFF} \
-        pat_operation${OBJ_SUFF} \
-        test_L4${OBJ_SUFF} \
-        gen_tlbie${OBJ_SUFF}
+OBJECTS =  \
+    nest_framework${OBJ_SUFF} \
+    nest_read_rules${OBJ_SUFF} \
+    parse_filters${OBJ_SUFF} \
+    mem${OBJ_SUFF} \
+    memory_operations${OBJ_SUFF} \
+    mem_pattern_file_operations${OBJ_SUFF} \
+    mem_random_pat_operations${OBJ_SUFF} \
+    stride_operation${OBJ_SUFF}
+
  
 SRCS = $(patsubst %.o, %.c, $(OBJECTS))
 
