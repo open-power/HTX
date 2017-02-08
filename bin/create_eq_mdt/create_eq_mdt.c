@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)37	1.3  src/htx/usr/lpp/htx/bin/create_eq_mdt/create_eq_mdt.c, htxconf, htxubuntu 1/21/16 02:10:07 */
-
 /*************************************************************/
 /* create_eq_mdt binary takes equaliser CFG file as a input  */
 /* and generates corresponding mdt whose name is also given  */
@@ -28,11 +26,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <libgen.h>
 #include "htxsyscfg64.h"
 
 
-#define MAX_PARAMS_IN_ROW	7
-#define MAX_LINE_SIZE		256
+#define MAX_DEV_IN_ROW      10
+#define MAX_DEV_INPUT       4
+#define MAX_LINE_SIZE       1024
+#define DEFAULT_PATTERN_LENGTH  20
+
 struct dev_exer_map {
     char dev[16];
     char exer[64];
@@ -40,31 +42,48 @@ struct dev_exer_map {
     char dev_desc[24];
 };
 
+struct dev_info {
+    char dev_name[32];
+    char rule_file_name[64];
+    int start_delay;
+    int runtime;
+    char cpu_utilization[128];
+};
+
 struct dev_exer_map map_array[] = {{"mem", "hxemem64", "64bit", "memory"},
                                {"fpu", "hxefpu64", "core", "floating_point"},
                                {"cpu", "hxecpu", "processor", "processor"},
                                {"sctu", "hxesctu", "cache", "coherence_test"},
-                               {"cache", "hxecache", "", "Processor_Cache"},
+                               {"cache", "hxecache", "", "Processor_cache"},
                                {"tdp", "hxeewm", "", "energy workload"},
                                {"rdp", "hxeewm", "", "energy workload"},
+                               {"adds", "hxeewm", "", "energy workload"},
+                               {"divds", "hxeewm", "", "energy workload"},
                                {"fdaxpy", "hxeewm", "", "energy workload"},
                                {"mdaxpy", "hxeewm", "", "energy workload"},
                                {"ddot", "hxeewm", "", "energy workload"},
                                {"pv", "hxeewm", "", "energy workload"}
                               };
-int line_num = 0, wof_test = 0;
-int create_dev_stanza (FILE *fp, char *affinity_str, char *dev_name, char *rule_file);
+int line_num = 0, offline_cpu = 0, startup_time_delay;
+int log_duration, time_quantum, pattern_length;
+int pvr, num_devs = 0;
+char scripts_dir[128];
+static int num_mem_instances = 0;
 
-void create_string_entry(FILE *fp, char *param_name, char *param_value, char *desc);
 void create_default_stanza(FILE *fp, char *eq_file);
+int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input);
+int get_line(char line[], int lim, FILE *fp);
+void create_string_entry(FILE *fp, char *param_name, char *param_value, char *desc);
+void create_numeric_entry(FILE *fp, char *param_name, char *param_value, char *desc);
 
 int main(int argc, char **argv)
 {
-    int rc, i, err_no;
-    char eq_file_name[128], mdt_file_name[128];
-    char line[MAX_LINE_SIZE], affinity_str[64];
-    char rule_file_name[128], dev_name[64];
-    char *chr_ptr[MAX_PARAMS_IN_ROW], keywd[32];
+    int rc, i, j, err_no;
+    char eq_file_name[256], mdt_file_name[256];
+    char line[MAX_LINE_SIZE], tmp_str[128], resource_str[64];
+    struct dev_info dev_input[MAX_DEV_IN_ROW];
+    char *dev_info_ptr[MAX_DEV_IN_ROW], *dev_ptr[MAX_DEV_INPUT], keywd[32];
+    char *ptr, *resource_ptr;
 
     FILE *eq_fp, *mdt_fp;
 
@@ -74,6 +93,8 @@ int main(int argc, char **argv)
         printf ("NOTE: You need to give absolute path for cfg and mdt file\n");
         exit(1);
     }
+
+    pvr = get_cpu_version() >> 16;
 
     strcpy(eq_file_name, argv[1]);
     strcpy(mdt_file_name, argv[2]);
@@ -97,6 +118,10 @@ int main(int argc, char **argv)
         printf("Could not collect system config detail. Exiting...\n");
         exit(1);
     }
+    ptr = getenv("HTXSCRIPTS");
+    if (ptr != NULL) {
+         strcpy(scripts_dir, ptr);
+    }
     create_default_stanza(mdt_fp, eq_file_name);
     while (1) {
         line_num++;
@@ -119,166 +144,141 @@ int main(int argc, char **argv)
             if ((strcmp(keywd, "time_quantum") == 0) ||
                 (strcmp(keywd, "startup_time_delay") == 0) ||
                 (strcmp(keywd, "log_duration") == 0) ||
+                (strcmp(keywd, "offline_cpu") == 0) ||
                 (strcmp(keywd, "pattern_length") == 0)) {
                 continue;
            } else {
-               i= 0;
-               if ((chr_ptr[i++] = strtok(line," \n\t")) != NULL) {
-                   sscanf(chr_ptr[0], "%s", affinity_str);
-                   for (; i < MAX_PARAMS_IN_ROW; i++) {
-                       if ((chr_ptr[i] = strtok(NULL, " \t\n")) == NULL) {
-                           printf("Improper data provided in line num %d.\n%s Exiting\n", line_num, line);
-                           exit(1);
-                       }
-                   }
-                   sscanf(chr_ptr[1], "%s", dev_name);
-                   sscanf(chr_ptr[6], "%s", rule_file_name);
-                   create_dev_stanza(mdt_fp, affinity_str, dev_name, rule_file_name);
-               }
-           }
-       }
-    }
-
-    return 0;
+                num_devs = 0;
+                if ((resource_ptr = strtok(line," \t")) != NULL) {
+                    sscanf(resource_ptr, "%s", resource_str);
+                    while ((dev_info_ptr[num_devs] = strtok(NULL, " ,\t\n")) != NULL) {
+                        num_devs++;
+                    }
+                    for (i = 0; i < num_devs; i++) {
+                        strcpy(tmp_str, dev_info_ptr[i]);
+                        if (strcasecmp(tmp_str, "sleep") == 0) {
+                            continue;
+                        }
+                        dev_ptr[0] = strtok(tmp_str, "[");
+                        sscanf(dev_ptr[0], "%s", dev_input[i].dev_name);
+                        for (j = 0; j < MAX_DEV_INPUT; j++) {
+                            if ((dev_ptr[j] = strtok(NULL, ":]")) == NULL) {
+                                printf("Improper data provided in line num %d.\n%s Exiting\n", line_num, line);
+                                exit(1);
+                            }
+                        }
+                        sscanf(dev_ptr[0], "%s", dev_input[i].rule_file_name);
+                        sscanf(dev_ptr[1], "%d", &dev_input[i].start_delay);
+                        sscanf(dev_ptr[2], "%d", &dev_input[i].runtime);
+                        sscanf(dev_ptr[3], "%s", dev_input[i].cpu_utilization);
+                    }
+                    create_dev_stanza(mdt_fp, resource_str, dev_input);
+                }
+            }
+         }
+     }
+     return 0;
 }
 
-int create_dev_stanza (FILE *fp, char *affinity_str, char *dev_name, char *rule_file)
+void create_device_entries(FILE *fp, char *dev_name_str, struct dev_exer_map cur_dev_map, struct dev_info cur_dev_input )
 {
-    int num_entries, lcpu=0, start_index;
-    int i, j, k, l;
-    char dev_name_str[16], rule_file_name[64], *chr_ptr[4];
-    char *ptr, tmp[4], tmp_str[16];
-    int node_num, chip_num, core_num, thread_num;
-    int num_of_nodes, num_of_chips, num_of_cores, num_of_threads;
+    char tmp_str[256];
+
+    fprintf(fp, "%s:\n", dev_name_str);
+    create_string_entry(fp, "HE_name", cur_dev_map.exer, "* Hardware Exerciser name, 14 char");
+    create_string_entry(fp, "adapt_desc", cur_dev_map.adapt_desc, "* adapter description, 11 char max");
+    create_string_entry(fp, "device_desc", cur_dev_map.dev_desc, "* device description, 15 char max.");
+    create_string_entry(fp, "reg_rules", cur_dev_input.rule_file_name, "* reg");
+    create_string_entry(fp, "cont_on_err", "NO", "* continue on error (YES/NO)");
+    if ((cur_dev_input.start_delay) != 0) {
+        sprintf(tmp_str, "%d", cur_dev_input.start_delay);
+        create_numeric_entry(fp, "start_delay", tmp_str, "* Exerciser start delay.");
+    }
+    if ((cur_dev_input.runtime) != 0) {
+        sprintf(tmp_str, "%d", cur_dev_input.runtime);
+        create_numeric_entry(fp, "run_time", tmp_str, "* Exerciser run time.");
+    }
+    sprintf(tmp_str, "%s", cur_dev_input.cpu_utilization);
+    create_string_entry(fp, "cpu_utilization", tmp_str, "* cpu utilization info for the exerciser");
+    fprintf(fp, "\n");
+}
+
+int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
+{
+    int i, j, k, num_entries, num_cpus;
+    int node, chip, core, cpu;
+    char dev_name_str[16], rule_file_name[64], cmd_str[128];
+    char filter_str[2][128];
     struct dev_exer_map cur_dev_map;
+    struct dev_info cur_dev_input;
+    int granularity, resource_list[MAX_CPUS];
+    struct resource_filter_info filter;
 
+    strcpy (filter_str[0], resource_str);
     num_entries = sizeof(map_array) / sizeof(struct dev_exer_map);
-    for (i = 0; i < num_entries; i++) {
-        if (strcasecmp (map_array[i].dev, dev_name) == 0) {
-            strcpy(cur_dev_map.exer, map_array[i].exer);
-            strcpy(cur_dev_map.adapt_desc, map_array[i].adapt_desc);
-            strcpy(cur_dev_map.dev_desc, map_array[i].dev_desc);
-            break;
+    for (i = 0; i < num_devs; i++) {
+        for (j = 0; j < num_entries; j++) {
+             if (strcasecmp (map_array[j].dev, dev_input[i].dev_name) == 0) {
+                strcpy(cur_dev_map.exer, map_array[j].exer);
+                strcpy(cur_dev_map.adapt_desc, map_array[j].adapt_desc);
+                strcpy(cur_dev_map.dev_desc, map_array[j].dev_desc);
+                break;
+            }
         }
-    }
-    strcpy(rule_file_name, cur_dev_map.exer);
-    strcat(rule_file_name, "/");
-    strcat(rule_file_name, rule_file);
 
-    if (i == num_entries) {
-        printf ("dev %s is not supported under equaliser.\n", dev_name);
-        exit(1);
-    }
+        if (j == num_entries) {
+            printf ("dev %s is not supported under equaliser.\n", dev_input[i].dev_name);
+            exit(1);
+        }
 
-    i = 0;
-    if ((chr_ptr[i++] = strtok(affinity_str, "NPCT")) != NULL) {
-        for (; i < 4; i++) {
-            if ((chr_ptr[i] = strtok(NULL, "NPCT")) == NULL) {
-                printf("Improper data is provided in line %d. i: %d\n", line_num, i);
-                exit(1);
-            }
-        }
-    }
-    if (chr_ptr[0][0] == '*') {
-        node_num = 0;
-        num_of_nodes = get_num_of_nodes_in_sys();
-    } else if (strchr(chr_ptr[0], '[') != NULL) { /* means a range of nodes is given */
-        strcpy(tmp_str, chr_ptr[0]);
-        ptr = strtok(tmp_str, "[]-");
-        node_num = atoi(ptr);
-        ptr = strtok(NULL, "[]-");
-        strcpy(tmp, ptr);
-        if (tmp[0] == 'n' || tmp[0] == 'N') {
-            num_of_nodes = get_num_of_nodes_in_sys();
-            num_of_nodes = num_of_nodes - node_num;
+        /* If device name is mem, we need not to parse the resource str. Resource str will be updated in
+           the rulefile used by the device and exerciser will parse that string. "mem" device name will
+           also be updated to distinguish between multiple mem device entries.
+         */
+        if ((pvr >= PV_POWER9_NIMBUS) && (strcasecmp(dev_input[i].dev_name, "mem") == 0)) {
+			/* create new rulefile and update the resource str there */
+            sprintf(dev_name_str, "%s%d", dev_input[i].dev_name, num_mem_instances);
+            /* sprintf(dev_name_str, "%s%c", dev_input[i].dev_name, mem_instance_str[num_mem_instances]); */
+            sprintf(dev_input[i].rule_file_name, "default.eq.%s", dev_name_str);
+            num_mem_instances++;
+            num_cpus = 1;
+            strcpy(rule_file_name, cur_dev_map.exer);
+            strcat(rule_file_name, "/");
+            strcat(rule_file_name, dev_input[i].rule_file_name);
+            memcpy(&cur_dev_input, &dev_input[i], sizeof(struct dev_info));
+            strcpy(cur_dev_input.rule_file_name, rule_file_name);
+            create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
         } else {
-            num_of_nodes = atoi(tmp) - node_num + 1;
-        }
-    } else {
-        node_num = atoi(chr_ptr[0]);
-        num_of_nodes = 1;
-    }
-    for (i = 0; i < num_of_nodes; i++, node_num++) {
-        if (chr_ptr[1][0] == '*') {
-            chip_num = 0;
-            num_of_chips = get_num_of_chips_in_node(node_num);
-        } else if (strchr(chr_ptr[1], '[') != NULL) { /* means a range of chips is given */
-            strcpy(tmp_str, chr_ptr[1]);
-            ptr = strtok(tmp_str, "[]-");
-            chip_num = atoi(ptr);
-            ptr = strtok(NULL, "[]-");
-            strcpy(tmp, ptr);
-            if (tmp[0] == 'n' || tmp[0] == 'N') {
-                num_of_chips = get_num_of_chips_in_node(node_num);
-                num_of_chips -= chip_num;
-            } else {
-                num_of_chips = atoi(tmp) - chip_num + 1;
-            }
-        } else {
-           chip_num = atoi(chr_ptr[1]);
-           num_of_chips = 1;
-        }
-        for (j = 0; j < num_of_chips; j++, chip_num++) {
-            if (chr_ptr[2][0] == '*') {
-                core_num = 0;
-                num_of_cores = get_num_of_cores_in_chip(node_num, chip_num);
-            } else if (strchr(chr_ptr[2], '[') != NULL) { /* means a range of cores is defined */
-                strcpy(tmp_str, chr_ptr[2]);
-                ptr = strtok(tmp_str, "[]-");
-                core_num = atoi(ptr);
-                ptr = strtok(NULL, "[]-");
-                strcpy(tmp, ptr);
-                if (tmp[0] == 'n' || tmp[0] == 'N') {
-                    num_of_cores = get_num_of_cores_in_chip(node_num, chip_num);
-                    num_of_cores -= core_num;
-                } else {
-                    num_of_cores = atoi(tmp) - core_num + 1;
-                }
-            } else {
-                core_num = atoi(chr_ptr[2]);
-                num_of_cores = 1;
-            }
-            for (k = 0; k < num_of_cores; k++, core_num++) {
-                /* Exclude N0P0C0T* if wof test is enabled */
-                if (wof_test == 1 && core_num == 0 && chip_num == 0 && node_num == 0) {
+            parse_filter(filter_str, &filter, 1);
+            strcpy(rule_file_name, cur_dev_map.exer);
+            strcat(rule_file_name, "/");
+            strcat(rule_file_name, dev_input[i].rule_file_name);
+            memcpy(&cur_dev_input, &dev_input[i], sizeof(struct dev_info));
+            strcpy(cur_dev_input.rule_file_name, rule_file_name);
+            for (node = 0; node < filter.num_nodes; node++) {
+                if (filter.node[node].node_num == -1) {
                     continue;
                 }
-                if (chr_ptr[3][0] == '*') {
-                    thread_num = 0;
-                    num_of_threads = get_num_of_cpus_in_core(node_num, chip_num, core_num);
-                } else if (strchr(chr_ptr[3], '[') != NULL) {
-                    strcpy(tmp_str, chr_ptr[3]);
-                    ptr = strtok(tmp_str, "[]-");
-                    thread_num = atoi(ptr);
-                    ptr = strtok(NULL, "[]-");
-                    strcpy(tmp, ptr);
-                    if (tmp[0] == 'n' || tmp[0] == 'N') {
-                        num_of_threads = get_num_of_cpus_in_core(node_num, chip_num, core_num);
-                        num_of_threads -= thread_num;
-                    } else {
-                        num_of_threads = atoi(tmp) - thread_num + 1;
+                for (chip = 0; chip < filter.node[node].num_chips; chip++) {
+                    if (filter.node[node].chip[chip].chip_num == -1) {
+                        continue;
                     }
-                } else {
-                    thread_num =  atoi(chr_ptr[3]);
-                    num_of_threads = 1;
-                }
-                for (l = 0; l < num_of_threads; l++, thread_num++) {
-                    lcpu = get_logical_cpu_num(node_num, chip_num, core_num, thread_num);
-                    sprintf(dev_name_str, "%s%d", dev_name, lcpu);
-                    fprintf(fp, "%s:\n", dev_name_str);
-
-                    create_string_entry(fp, "HE_name", cur_dev_map.exer, "* Hardware Exerciser name, 14 char");
-                    create_string_entry(fp, "adapt_desc", cur_dev_map.adapt_desc, "* adapter description, 11 char max");
-                    create_string_entry(fp, "device_desc", cur_dev_map.dev_desc, "* device description, 15 char max.");
-                    create_string_entry(fp, "reg_rules", rule_file_name, "* reg");
-                    create_string_entry(fp, "emc_rules", rule_file_name, "* emc");
-                    create_string_entry(fp, "cont_on_err", "NO", "* continue on error (YES/NO)");
-                    fprintf(fp, "\n");
+                    for (core = 0; core < filter.node[node].chip[chip].num_cores; core++) {
+                        if (filter.node[node].chip[chip].core[core].core_num == -1) {
+                            continue;
+                        }
+                        for (cpu = 0; cpu < filter.node[node].chip[chip].core[core].num_procs; cpu++) {
+                            if (filter.node[node].chip[chip].core[core].lprocs[cpu] == -1 ) {
+                                continue;
+                            }
+                            sprintf(dev_name_str, "%s%d", dev_input[i].dev_name, filter.node[node].chip[chip].core[core].lprocs[cpu]);
+                            create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
+                        }
+                    }
                 }
             }
         }
     }
-
     return 0;
 }
 
@@ -303,21 +303,38 @@ void create_numeric_entry(FILE *fp, char *param_name, char *param_value, char *d
     fprintf(fp, "\t%s = %s %s%s\n", param_name, param_value, comment, desc);
 }
 
-void create_default_stanza(FILE *fp, char *eq_file)
+int get_string_value(char *eq_file, char *string)
 {
-    char buf[24], str[128], *tmp_str;
+    int val = 0;
+    char buf[32], str[256];
     FILE *tmp_fp;
 
-    sprintf(str, "cat %s | grep wof_test | grep -v \"#\" | awk '{ print $NF}'", eq_file);
+    sprintf(str, "cat %s | grep %s | grep -v '#' | awk '{ print $NF}'", eq_file, string);
     tmp_fp = popen (str, "r");
     if (tmp_fp == NULL) {
         printf("Error for popen in create_eq_mdt. Exiting...");
         exit(1);
     }
-    if (fgets(buf,24,fp) != NULL) {
-        sscanf(buf, "%d", &wof_test);
+    if (fgets(buf,24,tmp_fp) != NULL) {
+        sscanf(buf, "%d", &val);
     }
     pclose(tmp_fp);
+    return val;
+}
+
+void create_default_stanza(FILE *fp, char *eq_file)
+{
+    char str[128], *tmp_str;
+
+    time_quantum = get_string_value(eq_file, "time_quantum");
+    startup_time_delay = get_string_value(eq_file, "startup_time_delay");
+    log_duration = get_string_value(eq_file, "log_duration");
+    pattern_length = get_string_value(eq_file, "pattern_length");
+    if (pattern_length == 0) {
+        pattern_length = DEFAULT_PATTERN_LENGTH;
+    }
+    offline_cpu = get_string_value(eq_file, "offline_cpu");
+
     fprintf(fp, "default:\n");
     create_string_entry(fp, "HE_name", "", "* Hardware Exerciser name, 14 char");
     create_string_entry(fp, "adapt_desc", "", "* adapter description, 11 char max");
@@ -341,9 +358,17 @@ void create_default_stanza(FILE *fp, char *eq_file)
     create_string_entry(fp, "log_vpd", "y", "* Show detailed error log");
     create_numeric_entry(fp, "equaliser_flag", "1", "* Equaliser flag enabled for supervisor");
     create_numeric_entry(fp, "equaliser_debug_flag", "0", "* Equaliser debug flag for supervisor");
-    if ( wof_test == 1) {
-        create_numeric_entry(fp, "wof_test", "1", "* Wof test enabled for supervisor");
+    sprintf(str, "%d", time_quantum);
+    create_numeric_entry(fp, "eq_time_quantum", str, "* Equaliser time quantum");
+    if ( offline_cpu == 1) {
+        create_numeric_entry(fp, "offline_cpu", "1", "* offlining the cpus is enabled");
     }
+    sprintf(str, "%d", startup_time_delay);
+    create_numeric_entry(fp, "eq_startup_time_delay", str, "* Equaliser startup time delay");
+    sprintf(str, "%d", log_duration);
+    create_numeric_entry(fp, "eq_log_duration", str, "* Equaliser log duration");
+    sprintf(str, "%d", pattern_length);
+    create_numeric_entry(fp, "eq_pattern_length", str, "* Equaliser default pattern length");
     strcpy(str, eq_file);
     tmp_str = basename(str);
     create_string_entry(fp, "cfg_file", tmp_str, "* Corresponding cfg file for this mdt");

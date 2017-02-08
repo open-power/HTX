@@ -20,9 +20,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include "htxsyscfg64.h"
 
 #define MAX_PATTERN		32
@@ -31,9 +28,9 @@
 #define NUM_OF_SETS		5
 #define MAX_SMT			8
 
-#define FXU 	0
-#define VSU	1
-#define ANY	2
+#define FXU 	    0
+#define VSU	    1
+#define ANY	    2
 
 char pattern[MAX_PATTERN][MAX_PATTERN_LENGTH];
 int util_seq[MAX_SMT][MAX_UTIL_SEQ];
@@ -56,22 +53,21 @@ void make_entry(int, int);
 void create_pattern(void);
 void create_cfg_maxpwr_switch(void);
 void create_cfg_maxpwr_exp(void);
+void create_cfg_th_trans_switch(void);
+void create_cfg_th_trans_mix(void);
+void create_th_switch_seq(void);
 void create_cfg_100_75_50_25_util(void);
 void create_cfg_cpu_mem_50(void);
 void create_cfg_msrp_1p3m_28s_act_52s_idle(void);
 void create_cfg_p8_8fd_char(void);
 void create_cfg_p8_rdp_switch(void);
 void create_cfg_p8_swicthing_cmp(void);
-void create_cfg_th_trans_switch(void);
-void create_cfg_th_trans_mix(void);
 void get_htx_home_dir(char *);
 
 int main(int argc, char **argv)
 {
     int rc = 0, time_quantum, wof_test = 0;
-    char cfg_file[128], ewm_file_name[64], htx_path[32];
-    char *tmp_ptr = NULL;
-    struct stat stat_buf;
+    char cfg_file[128], eq_cfg_path[128], *tmp_ptr = NULL;
 
     rc = init_syscfg_with_malloc();
     if (rc == -1) {
@@ -81,16 +77,17 @@ int main(int argc, char **argv)
 
     get_hardware_stat(&sys_stat);
     get_smt_details(&t);
-    smt_threads = t.smt_threads;
+    smt_threads = t.min_smt_threads;
     pvr = get_cpu_version();
     pvr = pvr >> 16;
 
-    /* Get htx_path from env. variable */
-    tmp_ptr = getenv("HTXPATH");
+    /* Get eq_cfg_path from env. variable */
+    tmp_ptr = getenv("HTXCFGPATH");
     if (tmp_ptr != NULL) {
-                strcpy(htx_path, tmp_ptr);
+		strcpy(eq_cfg_path, tmp_ptr);
     } else {
-        get_htx_home_dir(htx_path);
+        printf("Looks like HTX env. is not setup. Hence exiting.\nPlease setup teh env. and re-run.\n");
+        exit(1);
     }
 
     /* Get the base page size. Based on this, we will either use default.mem.eq.4k OR */
@@ -101,7 +98,7 @@ int main(int argc, char **argv)
     } else if (v.page_details[PAGE_INDEX_64K].supported) {
         strcpy(mem_eq_rulefile, "default.mem.eq.64k");
     }
-    
+
     /***************************************************************************************/
     /* Type of workloads for below 2 cfgs:                                                 */
     /* The kind of workload will be such that when the core is in the list of active cores */
@@ -113,7 +110,7 @@ int main(int argc, char **argv)
     /***************************************************************************************/
 
     /*  Create cfg file for switching test case. */
-    sprintf(cfg_file, "%shtx_eq_maxpwr_switch.cfg", htx_path);
+    sprintf(cfg_file, "%s/htx_eq_maxpwr_switch.cfg", eq_cfg_path);
     open_file(cfg_file);
     time_quantum = 100;
     make_entry(time_quantum, wof_test); /* Will create common entries in cfg file. */
@@ -121,17 +118,17 @@ int main(int argc, char **argv)
     fclose(fp);
 
     /*  Create cfg file for exponential inc./dec. test case. */
-    sprintf(cfg_file, "%shtx_eq_maxpwr_exp.cfg", htx_path);
+    sprintf(cfg_file, "%s/htx_eq_maxpwr_exp.cfg", eq_cfg_path);
     open_file(cfg_file);
     time_quantum = 4000;
     make_entry(time_quantum, wof_test);
     create_cfg_maxpwr_exp();
     fclose(fp);
 
-    /* Below 2 cfgs are created only if SMT is multiple of 4 */
+    /* Below 2 mdts are created only if SMT is multiple of 4 */
     if (smt_threads % 4 == 0) {
-        /* Create cfg file for 100/75/50/25 % cpu load */
-        sprintf(cfg_file, "%shtx_eq_100_75_50_25_util.cfg", htx_path);
+		/* Create cfg file for 100/75/50/25 % cpu load */
+        sprintf(cfg_file, "%s/htx_eq_100_75_50_25_util.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 300000;
         make_entry(time_quantum, wof_test);
@@ -139,7 +136,7 @@ int main(int argc, char **argv)
         fclose(fp);
 
         /* Create cfg file for 50% cpu & 50% memory usage */
-        sprintf(cfg_file, "%shtx_eq_cpu_mem_50.cfg", htx_path);
+        sprintf(cfg_file, "%s/htx_eq_cpu_mem_50.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 300000;
         make_entry(time_quantum, wof_test);
@@ -154,7 +151,7 @@ int main(int argc, char **argv)
     /************************************************************/
 
     if (smt_threads > 1) {
-        sprintf(cfg_file, "%shtx_eq_th_trans_switch.cfg", htx_path);
+		sprintf(cfg_file, "%s/htx_eq_th_trans_switch.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 6000;
         make_entry(time_quantum, wof_test);
@@ -162,7 +159,7 @@ int main(int argc, char **argv)
         fclose(fp);
 
         if ((pvr == 75 || pvr == 76 || pvr == 77) && (smt_threads == 8)) { /* only for P8 */
-            sprintf(cfg_file, "%shtx_eq_th_trans_mix.cfg", htx_path);
+            sprintf(cfg_file, "%s/htx_eq_th_trans_mix.cfg", eq_cfg_path);
             open_file(cfg_file);
             time_quantum = 6000;
             make_entry(time_quantum, wof_test);
@@ -171,46 +168,39 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Below are hxeewm cfgs. should be created only if 
-     * hxeewm binary is present 
-     */
-    sprintf(ewm_file_name, "%s/bin/", htx_path);
-    strcat(ewm_file_name, "hxeewm");
-    rc = stat(ewm_file_name, &stat_buf);
-    if (rc != -1) {
-        /* Below cfg is created only if SMT is multiple of 4 */
-        if (smt_threads % 4 == 0) {
-            sprintf(cfg_file, "%shtx_ewm_msrp_1p3m_28s_act_52s_idle.cfg", htx_path);
-            open_file(cfg_file);
-            time_quantum = 4000;
-            make_entry(time_quantum, wof_test);
-            create_cfg_msrp_1p3m_28s_act_52s_idle();
-            fclose(fp);
-        }
+    /* Below are hxeewm cfgs */
+    /* Below cfg is created only if SMT is multiple of 4 */
+    if (smt_threads % 4 == 0) {
+		sprintf(cfg_file, "%s/htx_ewm_msrp_1p3m_28s_act_52s_idle.cfg", eq_cfg_path);
+        open_file(cfg_file);
+        time_quantum = 4000;
+        make_entry(time_quantum, wof_test);
+        create_cfg_msrp_1p3m_28s_act_52s_idle();
+        fclose(fp);
+    }
 
-        /* Below 3 mdts are created for P8 with SMT 8 */
-        if ((pvr == 75 || pvr == 76 || pvr == 77) && (smt_threads == 8)) { /* only for P8 */
-            sprintf(cfg_file, "%shtx_ewm_p8_8fd_char.cfg", htx_path);
-            open_file(cfg_file);
-            time_quantum = 2000;
-            make_entry(time_quantum, wof_test);
-            create_cfg_p8_8fd_char();
-            fclose(fp);
+    /* Below 3 mdts are created for P8 with SMT 8 */
+    if ((pvr == 75 || pvr == 76 || pvr == 77) && (smt_threads == 8)) { /* only for P8 */
+        sprintf(cfg_file, "%s/htx_ewm_p8_8fd_char.cfg", eq_cfg_path);
+        open_file(cfg_file);
+        time_quantum = 2000;
+        make_entry(time_quantum, wof_test);
+        create_cfg_p8_8fd_char();
+        fclose(fp);
 
-            sprintf(cfg_file, "%shtx_ewm_p8_rdp_switch.cfg", htx_path);
-            open_file(cfg_file);
-            time_quantum = 400;
-            make_entry(time_quantum, wof_test);
-            create_cfg_p8_rdp_switch();
-            fclose(fp);
+        sprintf(cfg_file, "%s/htx_ewm_p8_rdp_switch.cfg", eq_cfg_path);
+        open_file(cfg_file);
+        time_quantum = 400;
+        make_entry(time_quantum, wof_test);
+        create_cfg_p8_rdp_switch();
+        fclose(fp);
 
-            sprintf(cfg_file, "%shtx_ewm_p8_swicthing_cmp.cfg", htx_path);
-            open_file(cfg_file);
-            time_quantum = 800;
-            make_entry(time_quantum, wof_test);
-            create_cfg_p8_swicthing_cmp();
-            fclose(fp);
-        }
+        sprintf(cfg_file, "%s/htx_ewm_p8_swicthing_cmp.cfg", eq_cfg_path);
+        open_file(cfg_file);
+        time_quantum = 800;
+        make_entry(time_quantum, wof_test);
+        create_cfg_p8_swicthing_cmp();
+        fclose(fp);
     }
     return 0;
 }
@@ -232,8 +222,8 @@ void get_htx_home_dir(char *path)
 
     fp_tmp = fopen("/var/log/htx_install_path", "r");
     if (fp_tmp == NULL) {
-            printf("ERROR: HTX environment variable HTX_HOME_DIR is not, please export HTX_HOME_DIR with value as HTX installation directory and re-try...\n");
-            exit(1);
+	    printf("ERROR: HTX environment variable HTX_HOME_DIR is not, please export HTX_HOME_DIR with value as HTX installation directory and re-try...\n");
+	    exit(1);
     }
     fscanf(fp_tmp, "%s", path);
     fclose(fp_tmp);
@@ -251,9 +241,10 @@ void make_entry(int time_quantum, int wof_test)
     if (wof_test == 1) {
         fprintf(fp, "wof_test = 1\n\n");
     }
-    fprintf(fp, "# In utilizationSequence,up to 10 steps are allowed.\n#\n");
-    fprintf(fp, "#\tAffinity\tTest name\teq_control\tutilization_sequence\t\tutilization_pattern\t\t\tMode\t\tRule file\n");
-    fprintf(fp, "#\t--------\t---------\t----------\t--------------------\t\t-------------------\t\t\t----\t\t---------\n");
+    fprintf(fp, "# In utilizationSequence,upto 10 steps are allowed.\n#\n");
+    fprintf(fp, "#\tResource Name\tComma separated device list with various input params\n");
+    fprintf(fp, "#\t             \t<dev_name>[<rule_file>:start_delay:runtime:utilzation]\n");
+    fprintf(fp, "#\t-------------\t------------------------------------------------------\n");
 }
 
 /**************************************************************/
@@ -296,20 +287,20 @@ void create_cfg_maxpwr_switch()
         }
     }
     for (j = 0, k = 0; j < fpu_inst; j++, k++) {
-        fprintf(fp, "\tN*P*C*T%d\t\tfpu\t\t\tY\t\t\t\t[50]\t\t\t\t[11111111110000000000]\t\tNA\t\tdefault.fpu.eq\n", k);
+        fprintf(fp, "\tN*P*C*T%d\t\tfpu[default.fpu.eq:0:0:UTIL_LEFT%%50]\n", k);
     }
     for (j = 0; j < cpu_inst; j++, k++) {
-        fprintf(fp, "\tN*P*C*T%d\t\tcpu\t\t\tY\t\t\t\t[50]\t\t\t\t[11111111110000000000]\t\tNA\t\tdefault.cpu.eq\n", k);
+        fprintf(fp, "\tN*P*C*T%d\t\tcpu[default.cpu.eq:0:0:UTIL_LEFT%%50]\n", k);
     }
     for (j = 0; j < mem_inst; j++, k++) {
-        fprintf(fp, "\tN*P*C*T%d\t\tmem\t\t\tY\t\t\t\t[50]\t\t\t\t[11111111110000000000]\t\tNA\t\t%s\n", k, mem_eq_rulefile);
+        fprintf(fp, "\tN*P*C*T%d\t\tmem[%s:0:0:UTIL_LEFT%%50]\n", k, mem_eq_rulefile);
     }
 }
 
 void create_pattern()
 {
     int num_of_patterns, num_of_cores, pattern_length;
-    int i, j, k, picked, l;
+    int i, j, k, picked;
 
     num_of_cores = sys_stat.cores;
     num_of_patterns = num_of_cores;
@@ -352,10 +343,10 @@ void create_pattern()
 /******************************************************************/
 void create_cfg_maxpwr_exp()
 {
-    int cores_per_set[MAX_PATTERN];
+    int cores_per_set[MAX_PATTERN] = {0};
     int num_of_cores, pattern_num;
     int allocated_cores, remaining_cores;
-    int i, j, k, l, m, left;
+    int i, j, k, left;
     int fpu_inst = 0, cpu_inst = 0, mem_inst = 0;
     int num_nodes, num_chips, num_cores;
     char cur_pattern[MAX_PATTERN_LENGTH];
@@ -416,14 +407,24 @@ void create_cfg_maxpwr_exp()
         for (j = 0; j < num_chips; j++) {
             num_cores = get_num_of_cores_in_chip(i, j);
             for (k = 0; k < num_cores; k++) {
-                for (l = 0, m = 0; l < fpu_inst; l++, m++) {
-                    fprintf(fp, "\tN%dP%dC%dT%d\t\tfpu\t\tY\t\t[50]\t\t\t[%s]\t\tNA\t\tdefault.fpu.eq\n", i, j, k, m, cur_pattern);
+                if (fpu_inst == 1) {
+                    fprintf(fp, "\tN%dP%dC%dT%d\t\tfpu[default.fpu.eq:0:0:%s]\n", i, j, k, (fpu_inst-1), cur_pattern);
+                } else {
+                    fprintf(fp, "\tN%dP%dC%dT[0-%d]\t\tfpu[default.fpu.eq:0:0:%s]\n", i, j, k, (fpu_inst-1), cur_pattern);
                 }
-                for (l = 0; l < cpu_inst; l++, m++) {
-                    fprintf(fp, "\tN%dP%dC%dT%d\t\tcpu\t\tY\t\t[50]\t\t\t[%s]\t\tNA\t\tdefault.cpu.eq\n", i, j, k, m, cur_pattern);
+                if (cpu_inst != 0) {
+                    if (cpu_inst == 1) {
+                        fprintf(fp, "\tN%dP%dC%dT%d\t\tcpu[default.cpu.eq:0:0:%s]\n", i, j, k, fpu_inst, cur_pattern);
+                    } else {
+                        fprintf(fp, "\tN%dP%dC%dT[%d-%d]\t\tcpu[default.cpu.eq:0:0:%s]\n", i, j, k, fpu_inst, (fpu_inst + cpu_inst -1), cur_pattern);
+                    }
                 }
-                for (l = 0; l < mem_inst; l++, m++) {
-                    fprintf(fp, "\tN%dP%dC%dT%d\t\tmem\t\tY\t\t[50]\t\t\t[%s]\t\tNA\t\t%s\n", i, j, k, m, cur_pattern, mem_eq_rulefile);
+                if (mem_inst != 0) {
+                    if (mem_inst == 1) {
+                        fprintf(fp, "\tN%dP%dC%dT%d\t\tmem[%s:0:0:%s]\n", i, j, k, (fpu_inst + cpu_inst), mem_eq_rulefile, cur_pattern);
+                    } else {
+                        fprintf(fp, "\tN%dP%dC%dT[%d-%d]\t\tmem[%s:0:0:%s]\n", i, j, k, (fpu_inst + cpu_inst), (fpu_inst + cpu_inst + mem_inst -1), mem_eq_rulefile, cur_pattern);
+                    }
                 }
                 allocated_cores++;
                 if (allocated_cores == cores_per_set[pattern_num]) {
@@ -436,7 +437,6 @@ void create_cfg_maxpwr_exp()
             }
         }
     }
-
 }
 
 void create_th_switch_seq()
@@ -453,13 +453,12 @@ void create_th_switch_seq()
         smt_array[smt_array_size] = threads;
     }
 
-    /* Initially all the threads should be running.So, all having utilzation as 100% */
+    /* Initally all the threads should be running.So, all having utilzation as 100% */
     cur_no_act_threads = smt_threads;
     for (i = 0; i < smt_threads; i++) {
-        strcpy(util_str[i], "[");
         util_seq[i][0] = 100;
-        sprintf(tmp_str, "%d,", util_seq[i][0]);
-        strcat(util_str[i], tmp_str);
+        sprintf(tmp_str, "%d_", util_seq[i][0]);
+        strcpy(util_str[i], tmp_str);
     }
 
     /* Create a 2 dimensional array of size m X n. where m is smt_threads and n will be num
@@ -500,18 +499,18 @@ void create_th_switch_seq()
             }
         }
         for (j = 0; j < smt_threads; j++) {
-            sprintf(tmp_str, "%d,", util_seq[j][i]);
+            sprintf(tmp_str, "%d_", util_seq[j][i]);
             strcat(util_str[j], tmp_str);
         }
     }
-    for (i = 0; i < smt_threads; i++) {
-        strcat(util_str[i], "]");
-/*         for (j = 0; j < MAX_UTIL_SEQ; j++) {
+/*  for (i = 0; i < smt_threads; i++) {
+        strcat(util_str[i], "}");
+        for (j = 0; j < MAX_UTIL_SEQ; j++) {
             printf ("%3d\,",util_seq[i][j]);
         }
         printf ("%40s\n", util_str[i]);
-*/
     }
+*/
 }
 
 /********************************************************************/
@@ -524,7 +523,7 @@ void create_cfg_th_trans_switch()
 {
    int i, j, k, l, cores_per_set[NUM_OF_SETS] = {0};
    int num_of_cores, remaining_cores, allocated_cores, allocated_cores_per_set;
-   int set_num, num_nodes, num_chips, num_cores, core_num;
+   int set_num, num_nodes, num_chips, num_cores;
 
     /* only 5 different group of sequences will be genrated. Each group will
      * be further having no. of sequence equal to no. of SMT threads enabled.
@@ -543,7 +542,6 @@ void create_cfg_th_trans_switch()
 
     allocated_cores = 0;
     allocated_cores_per_set = 0;
-    core_num = 0;
     set_num = 0;
     create_th_switch_seq();
     num_nodes = get_num_of_nodes_in_sys();
@@ -553,7 +551,7 @@ void create_cfg_th_trans_switch()
             num_cores = get_num_of_cores_in_chip(i, j);
             for (k = 0; k < num_cores; k++) {
                 for (l = 0; l < smt_threads; l++) {
-                    fprintf(fp, "\tN%dP%dC%dT%d\t\tcpu\t\t\tY\t\t%-45sUTIL_LEFT\t\tNA\t\tdefault.cpu.eq\n", i, j, k, l, util_str[l]);
+                    fprintf(fp, "\tN%dP%dC%dT%d\t\tcpu[default.cpu.eq:0:0:UTIL_LEFT%%%s]\n", i, j, k, l, util_str[l]);
                 }
                 allocated_cores++;
                 allocated_cores_per_set++;
@@ -581,7 +579,7 @@ void create_th_mix_seq(struct thread_info *FXU_threads, struct thread_info *VSU_
     }
 
     for (i = 0; i < smt_threads; i++) {
-        strcpy(util_str[i], "[");
+        strcpy(util_str[i], "");
     }
 
     /* allocate thread nos. to run VSU or FXU on */
@@ -606,7 +604,7 @@ void create_th_mix_seq(struct thread_info *FXU_threads, struct thread_info *VSU_
         /* initially, all the threads should be running. So, %utilization is 100 for all of them */
         for (i = 0; i < smt_threads; i++) {
             util_seq[i][j] = 100;
-            sprintf(tmp_str, "%d,", util_seq[i][j]);
+            sprintf(tmp_str, "%d_", util_seq[i][j]);
             strcat(util_str[i], tmp_str);
         }
         j++;
@@ -649,7 +647,7 @@ void create_th_mix_seq(struct thread_info *FXU_threads, struct thread_info *VSU_
             util_seq[th_num][j] = 100;
         }
         for (i = 0; i < smt_threads; i++) {
-            sprintf(tmp_str, "%d,", util_seq[i][j]);
+            sprintf(tmp_str, "%d_", util_seq[i][j]);
             strcat(util_str[i], tmp_str);
         }
         j++;
@@ -692,19 +690,19 @@ void create_th_mix_seq(struct thread_info *FXU_threads, struct thread_info *VSU_
             util_seq[th_num][j] = 0;
         }
         for (i = 0; i < smt_threads; i++) {
-            sprintf(tmp_str, "%d,", util_seq[i][j]);
+            sprintf(tmp_str, "%d_", util_seq[i][j]);
             strcat(util_str[i], tmp_str);
         }
     }
-    for (i = 0; i < smt_threads; i++) {
-       strcat(util_str[i], "]");
-/*        printf("util_seq[%d]:", i);
+/*  for (i = 0; i < smt_threads; i++) {
+       strcat(util_str[i], "}");
+       printf("util_seq[%d]:", i);
        printf("%s\n", util_str[i]);
        for (j = 0; j < 9; j++) {
            printf("%3d, ", util_seq[i][j]);
        }
        printf("\n");
-*/   }
+    } */
 }
 
 /*********************************************************************/
@@ -718,7 +716,7 @@ void create_cfg_th_trans_mix()
     int i, j, k, l, removal_flag, cores_per_set[NUM_OF_SETS];
     int num_of_cores, remaining_cores, allocated_cores, allocated_cores_per_set = 0;
     int threads_to_remove, create_new_seq;
-    int set_num, num_nodes, num_chips, num_cores, core_num;
+    int set_num, num_nodes, num_chips, num_cores;
     struct thread_info FXU_threads, VSU_threads;
 
     /* only 5 different group of sequences will be genrated. Each group will
@@ -804,7 +802,7 @@ void create_cfg_th_trans_mix()
                     create_new_seq = 0;
                 }
                 for (l = 0; l < smt_threads; l++) {
-                    fprintf(fp, "\tN%dP%dC%dT%d\t\tcpu\t\t\tY\t\t%-45sUTIL_LEFT\t\tNA\t\tdefault.cpu.eq\n", i, j, k, l, util_str[l]);
+                    fprintf(fp, "\tN%dP%dC%dT%d\t\tcpu[default.cpu.eq:0:0:UTIL_LEFT%%%s]\n", i, j, k, l, util_str[l]);
                 }
                 allocated_cores++;
                 allocated_cores_per_set++;
@@ -833,59 +831,86 @@ void create_cfg_100_75_50_25_util()
 
     for (i = 0; i < loop_count; i++) {
         j = 4 * i;
-        fprintf (fp, "\tN*P*C*T%d\t\tmem\t\t\tY\t\t\t\t[100]\t\t\t\t\t[1111]\t\t\t\t\tNA\t\t%s\n", j, mem_eq_rulefile);
+        fprintf (fp, "\tN*P*C*T%d\t\tmem[%s:0:0:1111]\n", j, mem_eq_rulefile);
         j++;
-        fprintf (fp, "\tN*P*C*T%d\t\tcpu\t\t\tY\t\t\t\t[75]\t\t\t\t\t[1110]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", j);
+        fprintf (fp, "\tN*P*C*T%d\t\tcpu[default.cpu.eq:0:0:1110]\n", j);
         j++;
-        fprintf (fp, "\tN*P*C*T%d\t\tcpu\t\t\tY\t\t\t\t[50]\t\t\t\t\t[1100]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", j);
+        fprintf (fp, "\tN*P*C*T%d\t\tcpu[default.cpu.eq:0:0:1100]\n", j);
         j++;
-        fprintf (fp, "\tN*P*C*T%d\t\tcpu\t\t\tY\t\t\t\t[25]\t\t\t\t\t[1000]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", j);
+        fprintf (fp, "\tN*P*C*T%d\t\tcpu[default.cpu.eq:0:0:1000]\n", j);
     }
 }
 
 void create_cfg_cpu_mem_50()
 {
     int i;
+    int num_nodes, num_chips, num_cores;
 
-    fprintf (fp, "\tN0P0C0T0\t\tmem\t\tY\t\t[50]\t\t\t[1010]\t\t\t\t\tNA\t\tmem.eq.50\n");
-    fprintf (fp, "\tN0P0C0T1\t\tcpu\t\tY\t\t[50]\t\t\t[0101]\t\t\t\t\tNA\t\tdefault.cpu.eq\n");
+    fprintf (fp, "\tN0P0C0T0\t\tmem[mem.eq.50:0:0:1010]\n");
+    fprintf (fp, "\tN0P0C0T1\t\tcpu[default.cpu.eq:0:0:0101]\n");
     for (i = 2; i < smt_threads; i++) {
         if (i % 2 == 0) {
-            fprintf (fp, "\tN0P0C0T%d\t\tcpu\t\tY\t\t[50]\t\t\t[1010]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", i);
+            fprintf (fp, "\tN0P0C0T%d\t\tcpu[default.cpu.eq:0:0:1010]\n", i);
         } else {
-            fprintf (fp, "\tN0P0C0T%d\t\tcpu\t\tY\t\t[50]\t\t\t[0101]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", i);
+            fprintf (fp, "\tN0P0C0T%d\t\tcpu[default.cpu.eq:0:0:0101]\n", i);
         }
     }
 
-    for (i = 0; i < smt_threads; i++) {
-        if (i % 2 == 0) {
-            fprintf (fp, "\tN[1-n]P[1-n]C[1-n]T%d\tcpu\t\tY\t\t[50]\t\t\t[1010]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", i);
-        } else {
-            fprintf (fp, "\tN[1-n]P[1-n]C[1-n]T%d\tcpu\t\tY\t\t[50]\t\t\t[0101]\t\t\t\t\tNA\t\tdefault.cpu.eq\n", i);
+    num_nodes = get_num_of_nodes_in_sys();
+    num_chips = get_num_of_chips_in_node(0);
+    num_cores = get_num_of_cores_in_chip(0, 0);
+
+    if (num_cores > 1) {
+        for (i = 0; i < smt_threads; i++) {
+            if (i % 2 == 0) {
+                fprintf (fp, "\tN0P0C[1-n]T%d\tcpu[default.cpu.eq:0:0:1010]\n", i);
+            } else {
+                fprintf (fp, "\tN0P0C[1-n]T%d\tcpu[default.cpu.eq:0:0:0101]\n", i);
+            }
+        }
+    }
+
+    if (num_chips > 1) {
+        for (i = 0; i < smt_threads; i++) {
+            if (i % 2 == 0) {
+                fprintf (fp, "\tN0P[1-n]C*T%d\tcpu[default.cpu.eq:0:0:1010]\n", i);
+            } else {
+                fprintf (fp, "\tN0P0C[1-n]T%d\tcpu[default.cpu.eq:0:0:0101]\n", i);
+            }
+        }
+    }
+
+    if (num_nodes > 1) {
+        for (i = 0; i < smt_threads; i++) {
+            if (i % 2 == 0) {
+                 fprintf (fp, "\tN[1-n]P*C*T%d\tcpu[default.cpu.eq:0:0:1010]\n", i);
+            } else {
+                fprintf (fp, "\tN[1-n]P*C*T%d\tcpu[default.cpu.eq:0:0:0101]\n", i);
+            }
         }
     }
 }
 
 void create_cfg_msrp_1p3m_28s_act_52s_idle()
 {
-    fprintf (fp, "\tN*P*C*T0\t\tpv\t\t\tY\t\t\t\t[35]\t\t\t\t\tUTIL_LEFT\t\t\t\t\tNA\t\trule.pv\n");
-    fprintf (fp, "\tN*P*C*T[1-3]\tddot\t\tY\t\t\t\t[35]\t\t\t\t\tUTIL_LEFT\t\t\t\t\tNA\t\trule.ddot_200M\n");
+    fprintf (fp, "\tN*P*C*T0\t\tpv[rule.pv:0:0:UTIL_LEFT%%35]\n");
+    fprintf (fp, "\tN*P*C*T[1-3]\tddot[rule.ddot_200M:0:0:UTIL_LEFT%%35]\n");
 }
 
 void create_cfg_p8_8fd_char()
 {
-    fprintf (fp, "\tN*P*C*T[0-3]\tfdaxpy\t\t\tY\t\t\t\t[25]\t\t\t\t\tUTIL_LEFT\t\t\t\t\tNA\t\trule.fdaxpy\n");
-    fprintf (fp, "\tN*P*C*T[4-7]\tfdaxpy\t\t\tY\t\t\t\t[100]\t\t\t\t\tUTIL_LEFT\t\t\t\t\tNA\t\trule.fdaxpy\n");
+    fprintf (fp, "\tN*P*C*T[0-3]\tfdaxpy[rule.fdaxpy:0:0:UTIL_LEFT%%25]\n");
+    fprintf (fp, "\tN*P*C*T[4-7]\tfdaxpy[rule.fdaxpy:0:0:UTIL_LEFT%%100]\n");
 }
 
 void create_cfg_p8_rdp_switch()
 {
-    fprintf (fp, "\tN*P*C*T[0-3]\t\trdp\t\t\tY\t\t\t\t[50]\t\t\t\t\tUTIL_LEFT\t\t\t\t\tNA\t\trule.rdp\n");
-    fprintf (fp, "\tN*P*C*T[4-7]\t\trdp\t\t\tY\t\t\t\t[0] \t\t\t\t\tUTIL_LEFT\t\t\t\t\tNA\t\trule.rdp\n");
+    fprintf (fp, "\tN*P*C*T[0-3]\t\trdp[rule.rdp:0:0:UTIL_LEFT%%50]\n");
+    fprintf (fp, "\tN*P*C*T[4-7]\t\trdp[rule.rdp:0:0:UTIL_LEFT%%0]\n");
 }
 
 void create_cfg_p8_swicthing_cmp()
 {
-    fprintf (fp, "\tN*P*C*T*\t\tfdaxpy\t\t\tY\t\t\t\t[50]\t\t\t\t\tUTIL_LEFT\t\t\t\tNA\t\trule.fdaxpy\n");
+    fprintf (fp, "\tN*P*C*T*\t\tfdaxpy[rule.fdaxpy:0:0:UTIL_LEFT%%50]\n");
 }
 

@@ -219,11 +219,54 @@ int htxd_get_equaliser_debug_flag(void)
 	return htxd_global_instance->equaliser_debug_flag;
 }
 
+void htxd_set_equaliser_time_quantum(int value)
+{
+        htxd_global_instance->equaliser_time_quantum = value;
+}
+
+
+int htxd_get_equaliser_time_quantum(void)
+{
+        return htxd_global_instance->equaliser_time_quantum;
+}
+
+void htxd_set_equaliser_pattern_length(int value)
+{
+        htxd_global_instance->equaliser_pattern_length = value;
+}
+
+
+int htxd_get_equaliser_pattern_length(void)
+{
+        return htxd_global_instance->equaliser_pattern_length;
+}
+
+void htxd_set_equaliser_startup_time_delay(int value)
+{
+        htxd_global_instance->equaliser_startup_time_delay = value;
+}
+
+
+int htxd_get_equaliser_startup_time_delay(void)
+{
+        return htxd_global_instance->equaliser_startup_time_delay;
+}
+
+void htxd_set_equaliser_log_duration(int value)
+{
+        htxd_global_instance->equaliser_log_duration = value;
+}
+
+
+int htxd_get_equaliser_log_duration(void)
+{
+        return htxd_global_instance->equaliser_log_duration;
+}
+
 void htxd_set_equaliser_offline_cpu_flag(int value)
 {
 	htxd_global_instance->enable_offline_cpu = value;
 }
-
 
 int htxd_get_equaliser_offline_cpu_flag(void)
 {

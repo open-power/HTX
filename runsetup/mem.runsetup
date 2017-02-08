@@ -1,66 +1,64 @@
-###### This script is used to collect the required memory statistics for hxemem64 exerciser.
+#!/bin/ksh
 
-OS=$(uname)
-if [ "$OS" != "AIX" ]; then
-####### case (OS != AIX)
-####### Collect all the memory statistics in the file /tmp/memstats.txt
+proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
+proc_ver_dec=`printf %d $proc_ver`
 
-# Making 'KERNEL_26' variable 'true' always for 2.6 and higher kernels as 2.4 is no more being used now.
-# KERNEL_26=$(uname -r | grep "2\.6\.");
-
-KERNEL_26="true"
-
-	rm -f /tmp/memstat.txt 2>/dev/null
-	cat /proc/meminfo | grep SwapTotal | awk '{print $2}' > /tmp/memstats.txt
-        cat /proc/meminfo | grep SwapFree | awk '{print $2}' >> /tmp/memstats.txt
-        cat /proc/meminfo | grep MemTotal | awk '{print $2}' >> /tmp/memstats.txt
-        cat /proc/meminfo | grep MemFree  | awk '{print $2}' >> /tmp/memstats.txt
-        free -k | awk 'NR==2 {print $2}' >> /tmp/memstats.txt
-        free -k | awk 'NR==2 {print $4}' >> /tmp/memstats.txt
-     if [ $KERNEL_26 ] ; then
-        echo 1 >> /tmp/memstats.txt
-        cat /proc/meminfo | grep HugePages_Total | awk '{print $2}' >> /tmp/memstats.txt
-        cat /proc/meminfo | grep HugePages_Free | awk '{print $2}' >> /tmp/memstats.txt
-        cat /proc/meminfo | grep Hugepagesize | awk '{print $2}' >> /tmp/memstats.txt
-      else   
-        echo 0 >> /tmp/memstats.txt
-      fi  
-else 
-###### case  (OS == AIX)
-###### Collect the large and huge page memory required memory statistics 
-###### into the file /tmp/freepages
-
-num_proc=`/usr/sbin/bindprocessor -q | sed 's/.* //' | sed 's/.* //'`
-
-#sctu needs at least leave_no number  of memory pages (of 16M or 16G pages)
-leave_no=$((((num_proc-1)/16)+1))
-
-#echo "avail_16M=$avail_16M, used_16M=$used_16M, avail_16G=$avail_16G, used_16G=$used_16G"
-#echo "num_proc=$num_proc, leave_no=$leave_no"
-
-free_16M=0
-free_16G=0
-
-if [ x$avail_16M != "x" ]; then
-free_16M=$(($avail_16M-$used_16M))
-else
-avail_16M=0
+#Script will be executed only for P9, For P8 and below
+# it will exit.
+if [[ $proc_ver_dec -lt 78 ]]
+then
+    exit
 fi
 
-if [ x$avail_16G != "x" ]; then
-free_16G=$(($avail_16G-$used_16G))
-else
-avail_16G=0
+cur_mdt=`echo ${HTXMDT}mdt`
+
+if [ ! -f $cur_mdt ]
+then
+    echo "$cur_mdt doesnt exists. Exiting...."
+        exit
 fi
 
-#echo "free_16M=$free_16M, free_16G=$free_16G"
+#echo "cur_mdt: $cur_mdt"
+#This runsetup script is executed only if memory exerciser is run under equaliser control
+#So, check if selected mdt does not have equaliser_flag set to "1", exit.
+eq_flag=`cat $cur_mdt | grep equaliser_flag | awk '{print $3}'`
 
-free_16M=$((free_16M-leave_no))
-free_16G=$((free_16G-leave_no))
-if [ free_16M -lt 0 ]; then free_16M=0
-fi
-if [ free_16G -lt 0 ]; then free_16G=0
+if [[ $eq_flag != "1" ]]
+then
+    exit
 fi
 
-echo "avail_16M=$avail_16M,avail_16G=$avail_16G,free_16M=$free_16M,free_16G=$free_16G" >  /tmp/freepages
+num_mem_instances=`cat $cur_mdt | grep mem | grep : | wc -l`
+if [[ $num_mem_instances == "0" ]]
+then
+    exit
 fi
+
+total_mem_usage=70
+memory_usage_per_instance=$((total_mem_usage/$num_mem_instances))
+
+cfg_file=`cat $cur_mdt | grep cfg_file | awk '{print $3}'`
+cfg_file="${cfg_file%\"}"
+cfg_file="${cfg_file#\"}"
+#echo "num_mem_instances: $num_mem_instances, memory_usage_per_instance: $memory_usage_per_instance, cfg_file: $cfg_file"
+
+rm ${HTXREGRULES}/hxemem64/default.eq.mem* 2> /dev/null
+
+mem_instance=0
+cat ${HTXCFGPATH}/$cfg_file | grep mem | while read -r str
+do
+    resource_str=`echo $str | awk '{print $1}'`
+    # Find out number of mem devices entry for a given resource string line
+    num_mem_dev_entry=`echo $str | awk '{while (match($0, /mem\[/)) {++c; $0=substr($0, RSTART+RLENGTH)}} END {print c}'`
+    #echo "num_mem_dev_entry: $num_mem_dev_entry"
+    while [ $num_mem_dev_entry -ne "0" ]
+    do
+         rule_file=${HTXREGRULES}/hxemem64/default.eq.mem$mem_instance
+         cp ${HTXREGRULES}/hxemem64/default.eq $rule_file
+         echo "cpu_filter = $resource_str" >> $rule_file
+         echo "global_alloc_mem_percent = $memory_usage_per_instance" >> $rule_file
+         let mem_instance=mem_instance+1
+         let num_mem_dev_entry=num_mem_dev_entry-1
+    done
+done
+

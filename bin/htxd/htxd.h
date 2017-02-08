@@ -78,6 +78,10 @@ typedef struct
 	int			dr_reconfig_restart;
 	int			dr_is_done; /* check usage */
 	int			equaliser_debug_flag;
+	int         equaliser_time_quantum;
+	int         equaliser_startup_time_delay;
+	int         equaliser_log_duration;
+	int         equaliser_pattern_length;
 	int         enable_offline_cpu;
 	union shm_pointers	equaliser_shm_addr;
 	int			equaliser_semhe_id;

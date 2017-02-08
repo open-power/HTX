@@ -72,6 +72,7 @@ print_exiting_script()
   export HTXPATH=$HTX_HOME_DIR
   export HTXLINUXLEVEL=${HTXLPP}/htxlinuxlevel # Its a file. Last / should not be there.
   export HTXPATTERNS=${HTXLPP}/pattern/
+  export HTXCFGPATH=${HTXLPP}/equaliser_cfgs/
   export HTXRULES=${HTXLPP}/rules/
   export HTXREGRULES=${HTXRULES}/reg/
   export HTXECG=${HTXLPP}/ecg/

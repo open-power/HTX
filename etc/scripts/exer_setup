@@ -55,6 +55,13 @@
           fi
   fi
 
+  if [[ -n $(grep "hxemem64" $1 2>/dev/null) ]]
+     then if [[ -e ${HTXRUNSETUP}mem.runsetup ]]
+             then echo "Preparing mem(s)"
+                  ${HTXRUNSETUP}mem.runsetup
+          fi
+  fi
+
   if [[ -n $(grep "hxeglx" $1 2>/dev/null) ]]
      then if [[ -e ${HTXRUNSETUP}glx.runsetup ]]
              then echo "Preparing Galaxy ethernet"

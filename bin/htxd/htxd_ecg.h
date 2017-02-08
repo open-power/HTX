@@ -43,10 +43,14 @@
 
 typedef struct
 {
-	int	enable_flag;
-	int	debug_flag;
-	int offline_cpu;
-	char	config_file[128];
+	int		enable_flag;
+	int		debug_flag;
+	int 	offline_cpu;
+    int 	time_quantum;
+    int 	startup_time_delay;
+    int 	log_duration;
+    int 	pattern_length;
+ 	char	config_file[128];
 }htxd_ecg_equaliser_details;
 
 
