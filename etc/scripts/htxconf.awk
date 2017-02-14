@@ -518,6 +518,17 @@ BEGIN {
                 }
     }
 
+	cmd = "";
+	temp_cmd = "";
+	cmd = "ls /dev/cxl/ 2> /dev/null | awk '/afu[0-9].[0-9]d/ { print $1 }'";
+
+	while(cmd | getline afu_device) {
+		temp_cmd = sprintf("cat /sys/class/cxl/%s/device/mode",afu_device);
+		if(snarf(temp_cmd) == "dedicated_process") {
+			 mkstanza("hxecapi", "AFU MEMCOPY", "Corsa A5", afu_device, "hxecapi", "default","default");
+		}
+	}
+	close(cmd);
 
     cmd = "";
 	DIR = snarf("echo $HTX_HOME_DIR");
