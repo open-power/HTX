@@ -1,11 +1,10 @@
 
-@(#)62  1.2  src/htx/usr/lpp/htx/equaliser.readme, htx_sup, htxubuntu 3/3/14 03:36:28
-
 README for Equaliser Feature in HTX
 ================================================================================
 Last update:
-		3rd April, 2014 - Preeti Dhir (preedir@in.ibm.com)
-		1st March,2009 - Amit Gupta (amgupta9@in.ibm.com)
+                22nd Dec, 2016 - Preeti Dhir (preedhir@in.ibm.com)
+                3rd April, 2014 - Preeti Dhir (preedhir@in.ibm.com)
+                1st March,2009 - Amit Gupta (amgupta9@in.ibm.com)
 
 Table of contents:
 ================================================================================
@@ -15,60 +14,58 @@ Table of contents:
 4)  Supported OS
 5)  General info
 6)  Prerequisites
-7)  Description
-8)  Sample Rule
-9)  Exerciser specific Log files
-10) Understanding htxstats
-11) Throughput numbers
-12) Common config errors
-13) Miscompare analysis & Debugging
-14) Limitations
-15) Known Issues
-16) Rule File Description
+7)  Description and sample Files
+8)  Exerciser specific Log files
+9)  Understanding htxstats
+10) Throughput numbers
+11) Common config errors
+12) Miscompare analysis & Debugging
+13) Limitations
+14) Known Issues
 
 ================================================================================
 
 1) Goal:
 --------
 
-HTX Equalizer would give the user the ability to throttle the HTX exercisers to a certain amount of time ( much the same way as one would using an equalizer in a soundboard ).
+HTX Equalizer would give the user the ability to throttle the HTX exercisers to a certain amount of time ( much the same way as one would using an equalizer in a 
+soundboard). The need for Equaliser came due to the requirement of providing the ability to  start/stop the exercisers as per a given pattern over a time interval. 
+The Processor Characterization wanted this HTX feature to do their thermal and power testing.
 
-The need for Equaliser arose out of a similar feature implemented in Power-mixer. Power-mixer uses standard compute loads like daxpy, memburner etc and provides ability to start/stop them in a given pattern over a time interval. The Processor Characterization team wanted something similar for HTX exercisers.
-
-More power workloads  thread utilization, and erratic workload behavior to stress the systems ability to manage power, thermal & performance are  needed across all P7 systems.
-
-Thus the ability to control the HTX exerciser's physical thread affinity, definitively start/stop them in specific time intervals configure the above using a control file & allow for clean inter-operation with Power-mixer, were all required in order to allow the tester to effectively stress the target system.
-
-Therefore the  Equaliser feature in HTX was developed to provide all of the above functionality, in order to augment testing of Power Management features in Power7.
+More power workloads, thread utilization, and erratic workload behavior to stress the systems ability to manage power, thermal & performance are  needed across all 
+P7 systems.Thus the ability to control the HTX exerciser's physical thread affinity, definitively start/stop them in specific time intervals configure the above 
+using a control file & allow for clean inter-o peration, were all required in order to allow the tester to effectively stress the target system.Therefore the  
+Equaliser feature in HTX was developed to provide all of the above functionality, in order to augment testing of Power Management features in Power7.
 
 
 2) Salient Features:
 --------------------
-
-a. The Equaliser supports deterministic STOP/START's of the following HTX exercisers: 
+a. The Equaliser supports deterministic STOP/START's of the following HTX exercisers:
    1. hxefpu64 - Floating Point test program
    2. hxecache - Cache stress program
    3. hxemem64 - Memory stress program
-   4. hxecpu   - Generic cpu exerciser 
-   
+   4. hxecpu   - Generic cpu exerciser
+   5. hxeewm   - Energy workload manager exerciser
+
 Any combination of these exercisers can be used depending on the machine configuration.
 
-b. Specialized rule files, for each of the exercisers supported, to configure them to exert a single Hardware Thread load on the cpu they 
-   bind to, when running under the equaliser.
+b. Specialized rule files, for each of the exercisers supported, to configure them on the cpu they bind to, when running under the equaliser.
 
-c. The Equaliser is configured by the tester via the Equaliser configuration file ( /usr/lpp/htx/htx_eq.cfg ). Via this file ,the following 
-   may be specified for each individual exerciser:
-   1. Program to run and its cpu affinity. 
-   2. Each Programs individual Cpu Utilization for a time interval (  %age number/s )
-   3. Each Programs individual Cpu Utilization sequence ( a bit pattern )
+c. The Equaliser is configured by the tester via the Equaliser configuration file ( e.g. $HTXPATH/htx_eq.cfg. By default HTXPATH is /usr/lpp/htx)
+ . Via this file ,the following may be specified for each individual exerciser:
+   1. Resource id string (tells on which all cpu resources to run the test program.
+   2. Test Program to run 
+   3. Test program start time and run time.
+   4. Each Programs individual Cpu Utilization for a time interval ( %age number/s )
+   5. Each Programs individual Cpu Utilization sequence ( a bit pattern )
    Please see "Description" section below for a detailed description of config file parameters.
 
-d. A parsing script is provided, that can be used by the tester to create an htx mdt file for the Equaliser based on the configuration file.  
-   Please see "Description" section below for a detailed description of how to use the parsing script.
+d. create_eq_mdt binary in $HTXPATH/bin directory  can be used by the tester to create an htx mdt file for the Equaliser based on the
+   configuration file. Please see "Description" section below for a detailed description of how to use it.
 
 e. Equaliser provides high granularity of control over Load scenarios. Run time controllability is given to the tester, without the need to
    consult exerciser experts. Run/Stop Control is provided to the tester at an individual exerciser level.
-
+   
 f. Specific processor modules can be targeted by the tester.
 
 
@@ -76,8 +73,8 @@ f. Specific processor modules can be targeted by the tester.
 -------------------------------------
 
 HTX Equaliser is supported on Power6 and above.
-Its mainly intended to enhance the testing of Power management features of Power7 and later using HTX exerciser's.
-
+It is mainly intended to enhance the testing of Power management features of processor chip using HTX exerciser's.
+ 
 4) Supported OS:
 ----------------
 
@@ -91,16 +88,17 @@ BML: Y
 
 Quick Start - ( at the root command prompt )
 
-a. First switch user to htx (su - htx) in order to complete the initial HTX setup.
-a. Place the desired HTX Equaliser config file name htx_eq.cfg in the HTX HOME FOLDER ( /usr/lpp/htx )
-b. Go to the SCRIPTS FOLDER ( /usr/lpp/htx/etc/scripts ) and run the "parse_Equaliser_config_file.awk" script,
-   with the  command "./parse_Equaliser_configuration_file.awk > ../../mdt/mdt.eq"
-c. A new mdt file would now have been created in the MDT FOLDER ( /usr/lpp/htx/mdt ) by name "mdt.eq"
+a. First HTX setup is required to create any mdt file manually coressponding to any cfg file. Run below script
+   to setup the env.
+   ${HTXPATH}/etc/scripts/htx_env.sh (for Linux)
+   ${HTXPATH}/etc/scripts/htx_env (for AIX)
+b. Go to the $HTXPATH/bin folder and run the create_eq_mdt binary with the  command 
+   ./create_eq_mdt <cfg_file> <mdt file to create>
+   Both the file names should be absolute path.
+c. A new mdt file would now have been created by the name specified
 d. Verify that the equaliser rule files are present in each of the exerciser rule folders.
-   ( rule files are named as default.<exerciser name>.eq ). 
-d. Go back to the HTX HOME folder, and start the Supervisor (type the "htx" command).
-e. When prompted for mdt file name, select the new mdt file created "mdt.eq".
-e. Start running the exercisers using the Supervisor options. (ref Supervisor README file for detailed description of each option)
+   ( rule files are named as default.<exerciser name>.eq ).
+e. Run the HTX test by choosing the mdt created using above step.
 
 
 6) Prerequisites:
@@ -108,55 +106,65 @@ e. Start running the exercisers using the Supervisor options. (ref Supervisor RE
 
 h/w requirements - Should be used on P6 and above.
 
-s/w config - 
-	     Can be run only under the HTX framework i.e HTX must be installed correctly.
-    	     Initial HTX setup must be complete ( done when we switch user to htx, i.e "su - htx" command )
-    	     An adequate configuration file must be present in the HTX HOME folder ( /usr/lpp/htx ) named "htx_eq.cfg"
-	     An mdt file with entries corresponding to the Equaliser configuration file, is required in the HTX MDT FOLDER.
-	     ( Requires an additional manual step of running the parsing script as described in the section "Quick Start" )
+s/w config -
+             Can be run only under the HTX framework i.e HTX must be installed correctly.
+             Initial HTX setup must be complete ( done when we switch user to htx, i.e "su - htx" command )
+             An adequate configuration file must be present in the HTX HOME folder ( default is /usr/lpp/htx ) named "htx_eq.cfg"
+             An mdt file with entries corresponding to the Equaliser configuration file, is required in the HTX MDT FOLDER.
+             ( Requires an additional manual step of running the parsing script as described in the section "Quick Start" )
 
+             NOTE: All the equaliser cfgs and mdts are created only if the system is not in "shared processor mode".
 7) Description:
 ----------------------
-
+   
 The various components of the Equaliser in the HTX framework are as follows:
 
-Equaliser Configuration File - 
+Equaliser Configuration File 
+-----------------------------
 
 The Equaliser configuration file is means by which the tester can specify the following:
 
-a. The value of time_quantum variable in milliseconds. 
-     This basically represents the minimum granularity of start/stop control the Equaliser will have over any exerciser.     Each bit of a Cpu Utilization pattern (explained few lines later), is therefore mapped onto one 'time_quantum'.
-     A '1' bit means 'ON' or “Running” and a '0' bit means 'OFF' or “Stopped” , for the corresponding exerciser, for that   
-     'time_quantum' duration. Each Cpu Utilization pattern being taken as 20 bits long, means that an interval of 20
-     'time_quantum' s , forms one cycle of execution for each exerciser under the Equaliser. 
+a. The value of time_quantum variable in milliseconds.
+     This basically represents the minimum granularity of start/stop control the Equaliser will have over any exerciser.
+     Each bit of a Cpu Utilization pattern (explained later), is therefore mapped onto one 'time_quantum'.
+     A '1' bit means 'ON' or "Running"
+     A '0' bit means 'OFF' or "Stopped"
+     'time_quantum' duration: Each Cpu Utilization pattern can be taken as <n> bits long, means that an interval of <n>
+     'time_quantum' s , forms one cycle of execution for each exerciser under the Equaliser.
 
 b. The value of startup_time_delay in seconds.
      This is the initial time duration for which all the exercisers are allowed to run uninterrupted, before each of the ones
      configured under the Equaliser are modulated as per their respective Cpu Utilization Sequences/Patterns.
      Some exercisers spend a larger chunk of time initially in order to perform some setup tasks prior to doing their actual
-     intended work. This configurable delay allows them to complete those setup tasks,and get into doing real work , before 
+     intended work. This configurable delay allows them to complete those setup tasks,and get into doing real work , before
      their execution is modulated by the supervisor.
 
 c. log_duration is specified in seconds. This specifies the time duration for which to keep the log entries.
 
 d. pattern_length specifies the length of utilization pattern.
 
-e. The exerciser/s to run.
+e. offline_cpu tells whether to make a cpu offline when the exerciser running is STOPPED. (Support in Linux only)
 
-f. The Cpu affinity of each exerciser.
+f. Resource Id string (in the form of N*P*C*T*)
 
-g. The Cpu Utilization Sequence for each exerciser.
-     This represents the Cpu Utilization as a percentage (%) number , for each exerciser , for one cycle of execution (20 time_quantum's) 
-     of the exerciser. As we will see later, more than one value may be specified for each cycle of execution as a list. 
+g. The exerciser/s to run.
 
-h. The Cpu Utilization Pattern for each exerciser ( by default, a 20 bit pattern)
+h. Rule file to be used by each exerciser.
+
+i. exerciser start time
+
+j. run time of the exerciser (i.e. duration for which exerciser will be running)
+ 
+k. Cpu Utilization Sequence for each exerciser.
+     This represents the Cpu Utilization as a percentage (%) number , for each exerciser , for one cycle of execution (20 time_quantum's)
+     of the exerciser. As we will see later, more than one value may be specified for each cycle of execution as a list.
+
+l. The Cpu Utilization Pattern for each exerciser ( by default, a 20 bit pattern)
      This is a 20 bit number or less, that represents the ON/OFF sequence,that each exerciser will follow, for one execution cycle.
-
-For the Equaliser to work, this configuration file must be named as "htx_eq.cfg" and placed in the HTX HOME FOLDER ( /usr/lpp/htx/ ).
 
 A detailed description of the above in the context of a sample Equaliser configuration file follows:
 
-A sample snapshot of the Equaliser configuration file is as below:
+Sample snapshot of the Equaliser configuration file is as below:
 
 ============================================================================================
 # if first letter in the line is "#", its taken as a comment
@@ -173,26 +181,27 @@ log_duration = 60
 #Length of utilizationPattern in case of UTIL_LEFT/UTIL_RIGHT/UTIL_RANDOM
 pattern_length = 20
 
+#Flag to specify whether to make  cpu offline when workload running on it is STOPPED.
+offline_cpu = 0
+
 # In utilisationSequence,upto 10 steps are allowed.
-#  
+#
 
-#  exer_name	   EqControl         utilisationSequence	utilisationPattern
-#  ----------	   ---------         ---------------------	-------------------
-
-     mem0	      Y	   		[20,50,80]		   UTIL_LEFT
-     fpu1	      N			40			   UTIL_RANDOM
-     cpu3	      N	     		[10,30]			[11001100110011001100]
-     cache2	      Y	       		[60]			    [11011010]		    
+#Resource id    #Comma separated device list with config parameters
+#-----------    ----------------------------------------------------
+N0P0C0T0        mem[default.mem.eq.64k:0:0:UTIL_LEFT%20_50_80]
+N0P0C0T1        fpu[default.fpu.eq:0:0:UTIL_RANDOM%40]
+N0P0C0T2        cache[default.cache.eq:10:20:11001100110011001100]
+N0P0C0T3        cpu[default.cpu.eq:0:0:11011010]
 
 =============================================================================================
-
 Important points to note are :
-a. As we can see, any line starting with a '#' is treated as a comment and ignored.
+a. Any line starting with a '#' is treated as a comment and ignored.
 
-b. The value of 'time_quantum' is specified in milliseconds. 
+b. The value of 'time_quantum' is specified in milliseconds.
      This is the minimum granularity of start/stop control the Equaliser will have over any exerciser. Only a decimal value can be given here.
 
-c. The value of startup_time_delay is specified in seconds. 
+c. The value of startup_time_delay is specified in seconds.
      This parameter controls the time interval for which all the exercisers will be allowed to run un-interrupted. There are some exercisers
      that spend their first few cpu cycles doing some initial setup (setting up shared memory etc), before they get to do any actual work.
      This delay allows them that time duration before the utilisation patterns/sequences are interpreted and acted upon by the Equaliser.
@@ -204,77 +213,99 @@ d. log_duration is specified in seconds.
 e. pattern_length specifies the length of utilization pattern.
     This paramater will be valid only for the devices whose utilization pattern is UTIL_LEFT/UTIL_RIGHT/UTIL_RANDOM. In case of explicitly defined
     utilization pattern, it will be ignored. Default value for this is 20.
+f. offline_cpu specifies whether to make cpu offline or not.
+    If this parameter is set to "1", when exerciser goes from "RN" to "STOPPED" state, cpu will be made offline by setting "0" in below file:
+    /sys/devices/system/cpu/cpu*/online
+    Before workload start running again, cpu will be brought online.
 
 The rest of the configuration file is interpreted as follows:
 
-f. FIRST COLUMN: 
-     This is taken as the exerciser name , appended with a number. The number is interpreted as the cpu number to which that
-     exerciser will bind. Therefore in the above example, cache12 implies that hxecache will bind to logical cpu number 12.
+g. FIRST COLUMN:
+     This specifies the affinity of the device to a particular cpu. It is represented in the form of
+     N*P*C*T*
+     where N stands for node number, P for chip number, C for core number and T for thread number.
+     * specifies all the nodes/cpus/core/threads on the system.
 
-g. SECOND COLUMN: 
-     This column tells whether exerciser will run under equaliser control or not. In case, one wants to run only certain exercisers defined in config file
-     under equliser control, this parameter can be used.
+     One can specify a paticulr number also for any of these. e.g.
+     N0P0C0T0
+     which means affinity is to the thread 0 of node0, chip 0 and core 0.
 
-h. THIRD COLUMN
-     This column is interpreted as the "Utilization Sequence". 
-       The utilization sequence can be a single number or  a series of comma separated numbers (upto 10 numbers), that specify the 
-       percentage Cpu utilization,that each exerciser will have exert on the cpu it will bind to. These number should be with a range of
-       [0-100] in multiples of 5. Specifying more that 10 numbers will result in the Equaliser exiting out. Each utilization sequence number
-       is applies to a time interval of 20 time_quantum's i.e "20*time_quantum". Therefore when a list of numbers is specified, the first one
-       applies to first "20*time_quantum" interval, the second number applies to the next such interval and so on. When more than one number
-       is specified,they must be specified as a comma separated list within square brackets like : [20,40,60]
+     Even a range of numbers can be specified. e.g.
+     N*P*C*T[0-2]
+     which meand thread 0, 1 and 2 of all the cores on all cpu of all the nodes present in the system.
 
-       In the example above, for mem13, the sequence is [20,50,80]. This means that hxemem64 will run on cpu 13 and will have 20% cpu
-       utilization in the first "20*time_quantum interval" and 50% cpu utilization in the next "20*time_quantum interval" and 80% in the
-       third interval.The list of sequence number is applied in a Round Robin fashion.i.e when at the end of the list, in the next time
-       interval, the cpu utilization applied ,will again be the first one specified in the list.
+     Another way of specifying the range is as below:
+     N*P*C[2-n]T0
+     here range specifies from core 2 to n where "n" means till the last core number available for each of
+     the cpu for all the nodes on the system.
 
-i. FOURTH COLUMN: 
-     This is a pattern of '1's and '0's interpreted as the "Utilization Pattern".
-       Each bit represents a RUN/STOP state of the corresponding exerciser for one time_quantum. A '1' represents a “Running” and '0'
-       represents “Stopped”. This is used to target a desired cpu utilization in a specific way. 
+h. SECOND COLUMN:
+     This is the device name followed by various input parameters for it in square bracket. These parameters are 
+     separated by ':'  which is used as a delimiter.
+     One can define multiple devices for a given resource id separated by comma. e.g.
+         N0P0C0T0        mem[default.mem.eq.64k:0:10:UTIL_LEFT%20_50_80],fpu[default.fpu.eq:10:20:1100110]
+         
+     1st paramter tells which rule file to use for that specific exerciser given.
      
-       When a specific bit pattern is specified, then the utilization sequence for that exerciser is ignored. 
-
-       The values allowed for utilization Pattern are:
-
-       1. UTIL_LEFT: 
-          In this case, all the '1' bits for a given % cpu utilization will be aligned to left. E.g. if cpu utilization defined in column 2
+     2nd paramater gives the time delay to start this particular exerciser. This is the time difference between HTX start time and
+     exerciser start time.
+     
+     3rd parameter tells about the runtime of the exerciser i.e. duration for which it will be running.
+     
+     4th parameter is cpu utilization. It can either be %age cpu utilization or explicit bit pattern.
+     
+     %age utilization can be a single number or  a series of "_" separated numbers (upto 10 numbers). These number should be with a range of
+     [0-100] in multiples of 5. Each %age utilization number applies to a time interval of <pattern_length> * time_quantum's.
+     By default pattern_lenmgth is 20. So, %age utilization will be applied to "20*time_quantum".
+     When more than one %age number is specified,they must be specified as a "_" separated list e.g.
+         mem[default.mem.eq.64k:0:0:UTIL_LEFT%20_50_80]
+         This means that mem will have 20% cpu
+         utilization in the first "20*time_quantum interval" and 50% cpu utilization in the next "20*time_quantum interval" and 80% in the
+         third interval.The list of sequence number is applied in a Round Robin fashion.i.e when at the end of the list, in the next time
+         interval, the cpu utilization applied ,will again be the first one specified in the list.    
+      
+      The %age utilization is prefixed by UTIL_LEFT/UTIL_RIGHT/UTIL_RANDOM.
+      Below is the meaning of each of these values:
+      
+       1. UTIL_LEFT:
+          In this case, all the '1' bits for a given % cpu utilization will be aligned to left. E.g. if cpu utilization defined 
           is 40%  , The utilization Pattern will be 11111111000000000000 i.e. all the 1 bits will be aligned to left.
 
-       2. UTIL_RIGHT: 
-          In this case, all the 1 bits for a given % cpu utilization will be aligned to right. e.g. if cpu utilization defined in column  2
+       2. UTIL_RIGHT:
+          In this case, all the 1 bits for a given % cpu utilization will be aligned to right. e.g. if cpu utilization defined 
           is 40%  , The utilization Pattern  will be 00000000000011111111 i.e. all 1 bits aligned to right.
 
-       3. UTIL_RANDOM:  
-          In this case, utilization pattern generated will be such that the 1 bits generated for a given % cpu utilization can be placed   
-          randomly anywhere.  After every 20 time_quantum's, a new pattern will be generated.
-
-       4. One can also specify explicitly a particular pattern of 0's and 1's . 
-          example:
-            [11001100101100101010]. In this case, the % cpu utilization defined in column 3 is ignored. 
-          
-
-Individual Exerciser Rule Files -
+       3. UTIL_RANDOM:
+          In this case, utilization pattern generated will be such that the 1 bits generated for a given % cpu utilization can be placed
+          randomly anywhere.  After every <pattern_length> time_quantum's, a new pattern will be generated.
+     
+      Explicit bit pattern is a pattern of '1's and '0's. Each bit represents a RUN/STOP state of the corresponding exerciser for one 
+      time_quantum. A '1' represents "running" and '0' represents "stopped" e.g 11001100101100101010
+     
+     
+Individual Exerciser Rule Files 
 
 a. Each exerciser running under the Equaliser uses a specialized rule file present under the rules folder for that exerciser.
 b. The naming convention of each exercisers Equaliser rule file is default.<exerciser name>.eq.
-     Example:  for hxecache, the relevant rule file would be /usr/lpp/htx/rules/reg/hxecache/default.hxecache.eq .
+     Example:  for hxecache, the relevant rule file would be in $HTXPATH/rules/reg/hxecache directory .
 c. The special rule files are to configure the exercisers to only run 1 thread, so that the utilization sequences/patterns specified
    against those exercisers are accurately applied when the exerciser is running.
 d. These values should not be modified.
 e. Refer to the individual exerciser README files for a detailed description of their rule file parameters.
 
-Equaliser configuration file Parser script - 
+Creating mdt corresponding to equaliser configuration file 
 
-a. This script is named "parse_Equaliser_configuration_file.awk" and is found in the HTX SCRIPTS FOLDER ( /usr/lpp/htx/etc/scripts )
-b. It will be used by the tester to create an mdt for the equaliser, corresponding to the testers configuration in the Equaliser 
-   Configuration File.
-     It can be used as: 
-                Go to the HTX SCRIPTS FOLDER, and execute "./parse_Equaliser_configuration_file.awk > ../../mdt/mdt.eq"
-     This will create the desired mdt file for the Equaliser with the name "mdt.eq" in the HTX MDT FOLDER ( /usr/lpp/htx/mdt )
+   During HTX setup time, by default whatever cfg files are present in $HTXPATH/equaliser_cfgs directory, a corresponding mdt will be
+   created for each one of them. To explicitly create a mdt corresponding to a given cfg, use following steps:
 
-Equaliser MDT File - 
+a. The binary named "create_eq_mdt" found in the $HTXPATH/bin directory is used to create an mdt corresponding to
+   configuration in the Equaliser
+   It can be used as:
+       $HTXPATH/bin/create_eq_mdt $HTXPATH/equaliser_cfgs/htx_eq.cfg $HTXPATH/mdt/mdt.eq
+   This will create the desired mdt file for the Equaliser with the name "mdt.eq" in the HTX MDT FOLDER ( $HTXPATH/mdt )
+
+Sample Equaliser MDT File 
+--------------------------
 
 The snapshot of a sample mdt.eq file generated for the sample Equaliser configuration file as shown as above:
 
@@ -299,18 +330,24 @@ default:
         cont_on_err = "YES"               * continue on error (YES/NO)
         halt_level = "1"                  * level <= which HE halts
         start_halted = "n"                * exerciser halted at startup
-        dup_device = "n"                  * duplicate the device 
+        dup_device = "n"                  * duplicate the device
         log_vpd = "y"                     * Show detailed error log
         equaliser_flag = "1"              * Equaliser flag enabled for supervisor
         equaliser_debug_flag = "0"        * Equaliser Debug Flag for supervisor
+        eq_time_quantum = "1000"          * Equaliser time quantum
+        eq_startup_time_delay = "60"      * Equaliser startup time delay
+        eq_log_duration = "60"            * Equaliser log duration
+        eq_pattern_length = "10"          * Equaliser default pattern length
+        cfg_file = "htx_eq.cfg"           * Corresponding cfg file for this mdt
 
 mem0:
         HE_name = "hxemem64"              * Hardware Exerciser name, 14 char
         adapt_desc = "64bit"              * adapter description, 11 char max.
         device_desc = "memory"            * device description, 15 char max.
-        reg_rules = "hxemem64/default.mem.eq"       * reg
-        emc_rules = "hxemem64/default.mem.eq"       * emc
+        reg_rules = "hxemem64/default.mem.eq.64k"   * reg
+        emc_rules = "hxemem64/default.mem.eq.64k"   * emc
         cont_on_err = "NO"                * continue on error (YES/NO)
+        cpu_utilization = "UTIL_LEFT%20_50_80"      * cpu utilization info for the exerciser
 
 fpu1:
         HE_name = "hxefpu64"              * Hardware Exerciser name, 14 char
@@ -319,7 +356,18 @@ fpu1:
         reg_rules = "hxefpu64/default.fpu.eq"       * reg
         emc_rules = "hxefpu64/default.fpu.eq"       * emc
         cont_on_err = "NO"                * continue on error (YES/NO)
+        cpu_utilization = "UTIL_RANDOM%40"          * cpu utilization info for the exerciser
 
+cache2:
+        HE_name = "hxecache"              * Hardware Exerciser name, 14 char
+        device_desc = "Processor_Cache"   * device description, 15 char max.
+        reg_rules = "hxecache/default.cache.eq"     * reg
+        emc_rules = "hxecache/default.cache.eq"     * emc
+        cont_on_err = "NO"                * continue on error (YES/NO)
+        start_delay = "10"                * Exerciser start delay.
+        run_time = "20"                   * Exerciser run time.
+        cpu_utilization = "11001100110011001100"    * cpu utilization info for the exerciser
+        
 cpu3:
         HE_name = "hxefpu64"              * Hardware Exerciser name, 14 char
         adapt_desc = "core"               * adapter description, 11 char max.
@@ -327,132 +375,103 @@ cpu3:
         reg_rules = "hxefpu64/default.fpu.eq"       * reg
         emc_rules = "hxefpu64/default.fpu.eq"       * emc
         cont_on_err = "NO"                * continue on error (YES/NO)
-
-cache2:
-        HE_name = "hxecache"              * Hardware Exerciser name, 14 char
-        device_desc = "Processor_Cache"   * device description, 15 char max.
-        reg_rules = "hxecache/default.cache.eq"         * reg
-        emc_rules = "hxecache/default.cache.eq"         * emc
-        cont_on_err = "NO"                * continue on error (YES/NO
+        cpu_utilization = "11011010"                * cpu utilization info for the exerciser
 
 =============================================================================================
 
-Important points to note are :
+various parameters which are present in default stanza and are meant only for equlaiser process are:
+a. equaliser_flag: The Equaliser flag is set to "1" in the default stanza. This flag indicates to enable the equaliser under HTX.
 
-Under the stanza named "default":
-a. The Equaliser flag is enabled in the default stanza. This flag tells the supervisor to run the Equaliser.
+b. equaliser_debug_flag: This is DISABLED by default. In order to enable some additional debug messages in the HTX log files (/tmp/htxmsg), 
+   this flag may be manually enabled for such purposes. With this exception, we strongly recommend that the Equaliser mdt file NOT be modified
+   manually and/or hand crafted. It should ALWAYS be created using the parsing script ( $HTXPATH/etc/scripts/parse_Equaliser_config_file.awk ).
 
-b. Under the stanza named default, there is a flag called "Equaliser_debug_flag". This is DISABLED by default. In order to enable some 
-   additional debug messages in the HTX log files (/tmp/htxmsg), this flag may be manually enabled for such purposes. With this exception, 
-   we strongly recommend that the Equaliser mdt file NOT be modified manually and/or hand crafted. It should ALWAYS be created using the
-   parsing script ( /usr/lpp/htx/etc/scripts/parse_Equaliser_config_file.awk ).
+c. cfg_file : This tells the CFG file name corresponding to the mdt.
 
-The rest of the stanza's :
+Other parameters which are meant only for equaliser process and are explained earlier(these are taken from CFG file):
+eq_time_quantum: .
+eq_startup_time_delay
+eq_log_duration 
+eq_pattern_length
 
-c. We have one stanza for each of the exercisers as mentioned by the Equaliser configuration file.
-
-d. The numbers next to each stanza name, refer to the cpu that will be bound to by that exerciser. This is again as specified by the
-   Equaliser configuration file.
-
-e. More than one instance of an exerciser can exist, although it is strongly recommended that they target different logical cpu's. 
-
-(*** Please also refer to the "Assumptions" and "Common Errors" section of this document ***)
+In the exerciser stanza, additional parameter which is meant only for equaliser process is:
+cpu_utilization: This gives the % utilization or the explicit bit pattern to define the workload running pattern.
 
 
-Assumptions made by Equaliser - 
-
-In a Equaliser kind of environment its assumed that each hardware thread runs exactly one exerciser load. Meaning there are no process  
-level contentions for running on a particular hardware thread and this is required to effectively guarantee that the start/stop modulation 
-of the exerciser load works in a deterministic fashion. Its even more important because the modulation is implemented using signals which 
-are best-effort delivery mechanisms hence process contention could introduce additional un-necessary delays in the modulation mechanism.
-
-Therefore configuring, lets say 'mem0' and 'cache0', in the same Equaliser configuration file would not be recommended and wont lead to 
-accurate load modulation.
-
-One instance of the hxemem64 exerciser , using the default.mem.eq rules file will exercise 256MB of memory. The tester must ensure that when configuring multiple instances of this exerciser , he/she not overshoot the free memory in the system. This would cause a memory crunch in the system and will be fatal for other exercisers. Ideally,even after accounting for the collective memory requirements of all the instances of hxemem64, some amount of free memory of the system (30% usually) should be left available for other processes to run.
-
-8) Sample Files:
----------------
-Covered above.
-
-9) Exerciser specific Log files:
+8) Exerciser specific Log files:
 --------------------------------
-1. /tmp/htxmsg is the primary logfile to look at.
-      START/STOP messages are printed with the 'htx_equaliser:' tag and this can be grep-ed for within this file.
-      Additional greps (using pipe '|' ) can be done within this output for START/STOP messages specific to an
-      exerciser.
+1. $HTX_LOG_DIR/eq_status (by default $HTX_LOG_DIR is /tmp) is the primary logfile to look at for all equaliser 
+   related logs for sending signal to varioyus exerciser. START/STOP messages are printed for all the 
+   exercisers here.
+   
+2. With equaliser_debug_flag enabled, additional msgs. can be seen in htxmsg log also.
 
-2. For exerciser specific log file information, please refer to the exerciser's README file.
+3. For exerciser specific log file information, please refer to the exerciser's README file.
 
-10) Understanding htxstats:
+9) Understanding htxstats:
 ---------------------------
 This information is exerciser specific.
 Please refer to exerciser README file, for the exercisers configured.
 
 
-11) Throughput numbers:
+10) Throughput numbers:
 -----------------------
 This information is exerciser specific.
 Please refer to exerciser README file, for the exercisers configured.
 
 
-12) Common config errors:
+11) Common config errors:
 -------------------------
 All of the following must be kept in mind when configuring and running the Equaliser:
 
-a. For the Equaliser configuration file ( /usr/lpp/htx/htx_eq.cfg file  ), we support the use of a UNIX ASCII text file only. Use of a file 
+a. For the Equaliser configuration file, we support the use of a UNIX ASCII text file only. Use of a file
    created/edited on windows is not supported as they can lead to unexpected behaviors of the Equaliser.
-b. The above argument also applies to the Equaliser mdt file ( /usr/lpp/htx/mdt/mdt.eq )
-c. The Resource requirements of each instance of an exerciser that the tester intends to configure must be verified as available by the 
+b. The above argument also applies to the Equaliser mdt file ( $HTXPATH/mdt/mdt.eq )
+c. The Resource requirements of each instance of an exerciser that the tester intends to configure must be verified as available by the
    tester before configuring & running the Equaliser.
 d. Additional HTX exercisers may be added to the equaliser mdt file manually if required for a particular run/configuration.
    Although, this must be done with discretion, keep (b) & (c) in mind. Also the existing, configured stanza's must not be
-   altered. 
+   altered.
 
-As a general rule of thumb: 
-  "Accuracy and deterministic behavior of the Equaliser will deteriorate,when resource contention starts to happen between the processes on 
-   the system".Therefore it is generally good to make the Equaliser configuration keeping in mind whether the available physical resources 
+As a general rule of thumb:
+  "Accuracy and deterministic behavior of the Equaliser will deteriorate,when resource contention starts to happen between the processes on
+   the system".Therefore it is generally good to make the Equaliser configuration keeping in mind whether the available physical resources
    are more than sufficient.
 
 A few examples:
-1. Logical Cpu 12 must be present ,before an exerciser can be bound to it by specifying the same in the Equaliser config file (i.e like   
+1. Logical Cpu 12 must be present before an exerciser can be bound to it by specifying the same in the Equaliser config file (i.e like
    saying cache12)
 2. Memory requirements for each instance of the exercisers must be met on the system.
-   Ex. Every instance of "mem" exerciser (hxemem64), when run with its Equaliser rule file, requires 256MB of memory. Therefore the total sum 
+   Ex. Every instance of "mem" exerciser (hxemem64), when run with its Equaliser rule file, requires 256MB of memory. Therefore the total sum
    of memory required by all instance of hxemem64, must be < 70% of the total available memory ( leaving 30% for other System processes to
    run ).
-3. More than 1 exerciser must not be configured to bind the the same cpu. The exerciser Start/Stop times become less deterministic, Cpu
- utilization numbers for each of those exercisers will become more inaccurate as there are more than 1 process contending for runtime on
- the same cpu.
 
-e. Specifying a bit pattern larger than 20 bits is not allowed and will cause the Equaliser to exit out.
+e. Specifying a Cpu Utilization Sequence with more than 10 numbers is not allowed and will cause the Equaliser to exit out.
 
-f. Specifying a Cpu Utilization Sequence with more than 10 numbers is not allowed and will cause the Equaliser to exit out.
-
-g. If any required field like time_quantum is missing or both Cpu utilization sequence and pattern is missing, the Equaliser    
+f. If any required field like time_quantum is missing or both Cpu utilization sequence and pattern is missing, the Equaliser
    will error out.
 
-13) Miscompare analysis & Debugging :
-------------------------
-This is exerciser specific.
+12) Miscompare analysis & Debugging :
+------------------------------------
+Miscomapre analysis if any during equaliser test run  is exerciser specific.
 Please refer to the exerciser's README file that reported the miscompare.
 
-A few tips for Debugging -
+A few tips for Debugging the equaliser process-
 
 a. Equaliser Debug Flag.
-     There is a "Equaliser_debug_flag"  under the default stanza in the Equaliser mdt file, that may be enabled to put additional debug 
-     messages in the HTX message files ( /tmp/htxmsg ). With this flag enabled , every time an exerciser is STARTED/STOPPED, a message is 
-     logged with a timestamp and the exerciser name. Therefore this file may be "grep"-ped for messages of a specific problematic exerciser 
+     There is a "Equaliser_debug_flag"  under the default stanza in the Equaliser mdt file, that may be enabled to put additional debug
+     messages in the HTX message files ( /tmp/htxmsg ). With this flag enabled , every time an exerciser is STARTED/STOPPED, a message is
+     logged with a timestamp and the exerciser name. Therefore this file may be "grep"-ped for messages of a specific problematic exerciser
      and the accuracy of the timings may be verified.
 
 b. Using 'topas' utility (on AIX) to verify CPU utilization values.
      The topas utility gives us "live" updates of the cpu/memory utilization and many other stat's of the all processes running on the system.
-     Topas updates these stats periodically (by default every 2 seconds),and the stats displayed are an cumulative average of that sampling   
+     Topas updates these stats periodically (by default every 2 seconds),and the stats displayed are an cumulative average of that sampling
      period. This time interval may be modified by the user using  ' -i ' flag , like : " topas -i <interval in seconds>".
      One could align the Topas sampling interval to the interval times of the Equaliser (i.e "20*time_quantum" , based on what is configured
      in the Equaliser configuration file). This way the Cpu Utilization numbers for each exerciser can be verified to fairly accurate values
      ( i.e approximately equal to the configured values).( Leaving room of course for inherent inaccuracies introduced by a possible mismatch
-     between alignment of the Equaliser time interval & the topas time interval (i.e depends on when topas is actually run from the command 
+     between alignment of the Equaliser time interval & the topas time interval (i.e depends on when topas is actually run from the command
      line )
 
 A sample snapshot of using topas this way is below :
@@ -469,21 +488,20 @@ time_quantum = 1000
 startup_time_delay = 30
 
 # In utilisationSequence,upto 10 steps and in utilisationPattern upto 20 bits are allowed.
-#  
+#
 
-#  exer_name     EqControl     utilisationSequence             utilisationPattern
-#  ----------    ---------     ---------------------           -------------------
-
-     mem0           Y       	[20,50,80]                        UTIL_LEFT
-     fpu1           Y            40                           UTIL_RANDOM
-
+#resource id     Comma separated device list with config parameters
+#-----------      --------------------------------------------------
+ N0P0C0T0          mem[default.mem.eq:0:0:UTIL_LEFT%20_50_80]
+ N0P0C0T1          fpu[default.fpu.eq:0:0:UTIL_RANDOM%40]
+ 
 =============================================================================================
 
 
 topas -i 20  (time quantum being 1 sec,therefore topas interval set to 20 seconds)
 =============================================================================================
 
-Topas Monitor for host:    spartapart3-lx       EVENTS/QUEUES    FILE/TTY                                                                    
+Topas Monitor for host:    spartapart3-lx       EVENTS/QUEUES    FILE/TTY
 Wed Mar  4 02:59:08 2009   Interval: 20         Cswitch      65  Readch      289
                                                 Syscall   29735  Writech     171
 CPU  User%  Kern%  Wait%  Idle%                 Reads         0  Rawin         0
@@ -496,39 +514,30 @@ Disk    Busy%     KBPS     TPS KB-Read KB-Writ                   MEMORY
 
 Total     0.4      6.2     1.5     0.0     6.2  PAGING           Real,MB    7168
                                                 Faults       13  % Comp     32
-                                                                 
+
 FileSystem        KBPS     TPS KB-Read KB-Writ  Steals        0  % Noncomp   1
 Total              0.4     1.1    0.3    0.1    PgspIn        0  % Client    1
                                                 PgspOut       0
 
 Name            PID  CPU%  PgSp Owner           PageIn        0  PAGING SPACE
-                                                                  
+
 hxefpu64    2015392  39.9   2.1 root            PageOut       0  Size,MB   10752
-hxemem64     417978  19.3   0.7 root            Sios          0  % Used      0   
+hxemem64     417978  19.3   0.7 root            Sios          0  % Used      0
 
 =============================================================================================
 
 Therefore we see hxefpu64's & hxemem64's respective Cpu Utilization values very close the values configured in
 the Equaliser configuration file shown above.
 
-14) Limitations:
+13) Limitations:
 ----------------
-Currently only the following 3 exercisers are supported under the Equaliser:
+Currently only the following 5 exercisers are supported under the Equaliser:
 
    a. hxefpu64 - Floating Point test program
    b. hxecpu - Generic Fixed point test program
    c. hxecache - Cache stress program
    d. hxemem64 - Memory stress program
+   e. hxeewm - energy workload manager program
 
-15) Known Issues:
+14) Known Issues:
 -----------------
-
-
-16) Rule File Description:  
---------------------------
-
-a. The naming convention of each exercisers Equaliser rule file is default.<exerciser name>.eq.
-b. Each exerciser running under the Equaliser uses a specialized rule file present under the rules folder for that exerciser 
-   ( /usr/lpp/htx/rules/reg/<exerciser name>/default.<exerciser name>.eq ).
-
-

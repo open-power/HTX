@@ -1,7 +1,7 @@
 include htx.mk
 
 SUBDIRS= inc lib bin rules etc mdt cleanup pattern setup runsetup \
-	runcleanup Documentation
+	runcleanup Documentation equaliser_cfgs
 SUBDIRS_CLEAN = $(patsubst %,%.clean,$(SUBDIRS))
 
 TARGET= .htx_profile \

@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-static char sccsid[] = "@(#)85        1.15.1.19  src/htx/usr/lpp/htx/lib/htxsyscfg64/htxsyscfg.c, htx_libhtxsyscfg64, htxfedora 5/19/15 01:28:11";
-
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
@@ -32,7 +30,7 @@ static char sccsid[] = "@(#)85        1.15.1.19  src/htx/usr/lpp/htx/lib/htxsysc
 /* Global variables */
 GLOBAL_SYSCFG *global_ptr = NULL;
 int shm_id_htxsyscfg=-1;
-extern struct htx_data             *misc_htx_data; 
+extern struct htx_data             *misc_htx_data;
 extern char                        msg[];
 
 int numberArray[MAX_CORES_PER_CHIP][3],numberArray_copy[MAX_CORES_PER_CHIP][3];
@@ -72,7 +70,7 @@ int read_core_exclusion_array(void)
 	}
 
     if (myFile == NULL)
-		return 0;	
+		return 0;
 	else{
 		while(fgets(buffer, sizeof(buffer), myFile)){
 			if((strcmp("\n",buffer))){
@@ -129,7 +127,7 @@ int init_syscfg(void)
     if ( r ) {
 		sprintf(msg,"update_syscfg() failed with rc=%d\n", r);
         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-		return(103);	
+		return(103);
     }
 	return 0;
 }
@@ -321,7 +319,7 @@ int attach_to_syscfg(void)
     if (shm_id_htxsyscfg == -1)/* perror ("Creation ");*/{
             sprintf(msg,"inside attach_to_syscfg, shm_id creation failed= %d \n",errno);
             hxfmsg(misc_htx_data, 0, HTX_HE_SOFT_ERROR, msg);
-		return(107); 
+		return(107);
     }
 
 	global_ptr=(GLOBAL_SYSCFG *)shmat(shm_id_htxsyscfg,0,0);
@@ -374,7 +372,7 @@ int detach_syscfg(void)
 				sprintf(msg,"global_ptr->global_core.rw_lock_destroy() failed with rc=%d\n", lock6);
 	            hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 		}
-	
+
 	    shmdt_check = shmdt(global_ptr);
 		if (shmdt_check ==  -1){
 				sprintf(msg,"shmdt failed with errno=%d", errno);
@@ -479,7 +477,7 @@ void remove_newline_at_end(char *dest)
 /*Retrieves hostname*/
 int get_hostname_update(void)
 {
-	int rc = 0;    
+	int rc = 0;
 	gethostname((global_ptr->global_lpar.host_name),100);
     remove_newline_at_end(global_ptr->global_lpar.host_name);
 	return(rc);
@@ -564,7 +562,7 @@ int phy_logical_virt_cpus(htxsyscfg_cpus_t *t)
 			}
         }
 		else{
-                sprintf(msg,"global_ptr->global_lpar.rw_lock() failed with rc=%d\n",rc1); 
+                sprintf(msg,"global_ptr->global_lpar.rw_lock() failed with rc=%d\n",rc1);
 				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
 				return(rc1);
 		}
@@ -630,7 +628,7 @@ int get_lpar_details(htxsyscfg_lpar_t *t)
 			}
         }
 		else{
-                sprintf(msg,"global_ptr->global_lpar.rw_lock()in get_lpar_details  failed with rc=%d\n",rc1); 
+                sprintf(msg,"global_ptr->global_lpar.rw_lock()in get_lpar_details  failed with rc=%d\n",rc1);
 				hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
 				return(rc1);
 		}
@@ -642,7 +640,7 @@ int get_lpar_details(htxsyscfg_lpar_t *t)
 			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
 			return(rc2);
 	}
-    return 0; 
+    return 0;
 }
 
 /*Retrieves smt details*/
@@ -677,7 +675,7 @@ int get_smt_details_update(void)
 
 int get_smt_details(htxsyscfg_smt_t *t)
 {
-	int rc1,rc2,rc1_1;	
+	int rc1,rc2,rc1_1;
 	rc1=rc2=0;
 	rc1 = pthread_rwlock_rdlock(&(global_ptr->global_core.rw));
     if (rc1!=0  ) {
@@ -717,12 +715,12 @@ int get_min_smt(void)
 	int min_smt,smt,i;
 	min_smt = get_smt_status(0);
 	for(i=1; i<global_ptr->system_cpu_map.stat.cores; i++){
-		smt = get_smt_status(i);	
+		smt = get_smt_status(i);
 		if(min_smt > smt)
 		{
 			min_smt = smt;
 		}
-	}	
+	}
 	global_ptr->global_core.smtdetails.min_smt_threads=min_smt;
 	return 0;
 }
@@ -749,15 +747,15 @@ int get_hw_smt(void)
 	if (Pvr == PV_POWER6){
 		global_ptr->global_core.smtdetails.smt_threads = 2;
 		return 0;
-	}	
+	}
 	else if (Pvr == PV_POWER7 || Pvr == PV_POWER7PLUS){
 		global_ptr->global_core.smtdetails.smt_threads=  4;
 		return 0;
-	}	
+	}
 	else if (Pvr == PV_POWER8_MURANO || Pvr == PV_POWER8_VENICE || Pvr == PV_POWER8_PRIME){
 		global_ptr->global_core.smtdetails.smt_threads= 8;
 		return 0;
-	}	
+	}
 	else if (Pvr == PV_POWER9_NIMBUS){
 		global_ptr->global_core.smtdetails.smt_threads = 4;
 		return 0;
@@ -771,7 +769,7 @@ int get_hw_smt(void)
             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
 		global_ptr->global_core.smtdetails.smt_threads= -1;
 		return -1;
-	}	
+	}
 	return 0;
 }
 
@@ -930,13 +928,13 @@ int get_memory_size_update(void)
     int r1, r2;
 
     r1 = get_cmd_op(dest, "cat /proc/meminfo | grep MemTotal | awk '{ print $2 }'");
-    t->real_mem = atoll(dest);     
+    t->real_mem = atoll(dest);
     t->real_mem = (t->real_mem * 1024);/*Size of total real memory in bytes*/
 
     r2 = get_cmd_op(dest, "cat /proc/meminfo | grep MemFree | awk '{ print $2 }'");
-    t->free_real_mem = atoll(dest);     
+    t->free_real_mem = atoll(dest);
     t->free_real_mem = (t->free_real_mem * 1024);/*Size of free real memory in bytes*/
-	
+
     return ( r1 | r2 );
  #else
     int rc;
@@ -999,6 +997,8 @@ int get_memory_pools(void) {
 	FILE *fp=0;
 	char command[200],fname[100];
 	int i,j,rc,cpu,lcpu,huge_page_size,tot_pools=0;
+	unsigned long total_pages, free_pages;
+	total_pages = free_pages = 0;
 
 	char tmp_path[64],scripts_path[64];
 	char *tmp_path_temp;
@@ -1049,7 +1049,7 @@ int get_memory_pools(void) {
 	for(i=0;(i<tot_pools) && (i<MAX_POOLS);i++) {
 		t[i].has_cpu_or_mem = FALSE;
 		rc = fscanf(fp,"node_num=%d,mem_avail=%llu,mem_free=%llu,cpus_in_node=%d,Hugepagesize=%d,HugePages_Total=%lu,HugePages_Free=%lu,cpus,",&t[i].node_num,&t[i].mem_total,&t[i].mem_free,
-					&t[i].num_procs,&huge_page_size,&t[i].page_info_per_mempool[PAGE_INDEX_16M].total_pages,&t[i].page_info_per_mempool[PAGE_INDEX_16M].free_pages);
+					&t[i].num_procs,&huge_page_size,&total_pages,&free_pages);
 		if (rc == 0 || rc == EOF) {
 			printf("fscanf: fetching mem and cpu details in node =%d from file %s failed with rc = %d, errno =%d",i,fname,rc, errno);
 			fclose(fp);
@@ -1069,8 +1069,16 @@ int get_memory_pools(void) {
 		if(huge_page_size == 16384) {
 			t[i].page_info_per_mempool[PAGE_INDEX_16M].page_size  = 16777216;
 			t[i].page_info_per_mempool[PAGE_INDEX_16M].supported  = TRUE;
+			t[i].page_info_per_mempool[PAGE_INDEX_16M].total_pages = total_pages;
+			t[i].page_info_per_mempool[PAGE_INDEX_16M].free_pages = free_pages;
 		}
-			
+		else if(huge_page_size == 2048) {
+			t[i].page_info_per_mempool[PAGE_INDEX_2M].page_size  = 2097152;
+			t[i].page_info_per_mempool[PAGE_INDEX_2M].supported  = TRUE;
+			t[i].page_info_per_mempool[PAGE_INDEX_2M].total_pages = total_pages;
+			t[i].page_info_per_mempool[PAGE_INDEX_2M].free_pages = free_pages;
+		}
+
 	/*	printf("node_num=%d,mem_avail=%llu,mem_free=%llu,cpus_in_node=%d,Hugepagesize=%d,HugePages_Total=%d,HugePages_Free=%d,cpus=",t[i].node_num,t[i].mem_total,t[i].mem_free,
 				t[i].num_procs,huge_page_size,t[i].page_info_per_mempool[PAGE_INDEX_16M].total_pages,t[i].page_info_per_mempool[PAGE_INDEX_16M].free_pages);
 	*/
@@ -1089,7 +1097,7 @@ int get_memory_pools(void) {
 	}
 	fclose(fp);
 	return (tot_pools);
-}	
+}
 
 /********************************
 * Retrieves page wise memory details
@@ -1125,7 +1133,7 @@ int  get_page_details(void){
     pclose(fp);
 	if(syscfg_base_page_size == 4096){
 		syscfg_base_pg_idx = PAGE_INDEX_4K;
-		t[syscfg_base_pg_idx].page_size = 4096; 
+		t[syscfg_base_pg_idx].page_size = 4096;
 	}
 	else if(syscfg_base_page_size == 65536) {
 		syscfg_base_pg_idx = PAGE_INDEX_64K;
@@ -1138,28 +1146,28 @@ int  get_page_details(void){
 	t[syscfg_base_pg_idx].supported = TRUE;
 
 	fp=popen("cat /proc/meminfo | grep MemTotal | awk '{print $2}' ","r");
-	if (fp == NULL || fp ==  (void *)-1 ) {	
+	if (fp == NULL || fp ==  (void *)-1 ) {
 		pclose(fp);
 		return -3;
-	} 
+	}
 	rc = fscanf(fp,"%lu\n",&t[syscfg_base_pg_idx].total_pages);
 	if(rc == EOF || rc == 0)
-	{	
+	{
 		pclose(fp);
 		printf("Could not read MemTotal,rc=%d amd errno=%d\n",rc,errno);
 		return -3;
 	}
 	t[syscfg_base_pg_idx].total_pages = ((t[syscfg_base_pg_idx].total_pages * 1024) / t[syscfg_base_pg_idx].page_size);
 	pclose(fp);
-		
+
 	fp=popen("cat /proc/meminfo | grep MemAvailable | awk '{print $2}' ","r");
-	if (fp == NULL || fp ==  (void *)-1 ) {	
+	if (fp == NULL || fp ==  (void *)-1 ) {
 		pclose(fp);
 		return -3;
-	} 
+	}
 	rc = fscanf(fp,"%lu\n",&t[syscfg_base_pg_idx].free_pages);
 	if(rc == EOF || rc == 0)
-	{	
+	{
 		pclose(fp);
 		fp=popen("cat /proc/meminfo | grep MemFree  | awk '{print $2}' ","r");
 		    if (fp == NULL || fp == (void *)-1 ) {
@@ -1200,7 +1208,7 @@ int  get_page_details(void){
 		rc = fscanf(fp,"%lu\n",&t[PAGE_INDEX_2M].total_pages);
 		if(rc == EOF || rc == 0) {
 			t[PAGE_INDEX_2M].total_pages= 0;
-		}	
+		}
 		pclose(fp);
 		fp=popen("cat /proc/meminfo | grep HugePages_Free | awk '{print $2}' ","r");
 		if (fp == NULL || fp == (void *)-1 ) {
@@ -1210,8 +1218,8 @@ int  get_page_details(void){
 		rc = fscanf(fp,"%lu\n",&t[PAGE_INDEX_2M].free_pages);
 		if(rc == EOF || rc == 0) {
 			t[PAGE_INDEX_2M].free_pages= 0;
-		}	
-		
+		}
+
 		pclose(fp);
 	}
 	else if (huge_page_size == 16777216) {
@@ -1225,7 +1233,7 @@ int  get_page_details(void){
 		rc = fscanf(fp,"%lu\n",&t[PAGE_INDEX_16M].total_pages);
 		if(rc == EOF || rc == 0) {
 			t[PAGE_INDEX_16M].total_pages= 0;
-		}	
+		}
 		pclose(fp);
 		fp=popen("cat /proc/meminfo | grep HugePages_Free | awk '{print $2}' ","r");
 		if (fp == NULL || fp == (void *)-1 ) {
@@ -1235,8 +1243,8 @@ int  get_page_details(void){
 		rc = fscanf(fp,"%lu\n",&t[PAGE_INDEX_16M].free_pages);
 		if(rc == EOF || rc == 0) {
 			t[PAGE_INDEX_16M].free_pages= 0;
-		}	
-		
+		}
+
 		pclose(fp);
 	}
 	return 0;
@@ -1249,7 +1257,7 @@ int get_page_size_update(void)
     int i,j,k,num;
     char ch,dest[100];
     unsigned int Pvr;
-	htxsyscfg_pages_t *t;  
+	htxsyscfg_pages_t *t;
 	i = j = k = num = 0;
     t=&(global_ptr->global_memory.page_details);
 
@@ -1388,8 +1396,8 @@ int get_memory_details_update(void)
 {
     int r1,r2,r3;
     r1 = r2 = r3 = 0;
-	htxsyscfg_memory_t *t; 
-    t = &(global_ptr->global_memory); 
+	htxsyscfg_memory_t *t;
+    t = &(global_ptr->global_memory);
     //r2 = get_page_size(&(t->page_details)); /*Page sizes supported and swap space*/
 /*	r2 = get_page_details(&(t->page_details[0]));
     r3 = get_memory_pools(&(t->mem_pools[0]));
@@ -1461,7 +1469,7 @@ int L1cache_update(void)
 
     Pvr = get_true_cpu_version();
     Pvr = Pvr>>16;
-       
+
 #ifdef __HTX_LE__
     /*L1 data cache size*/
     if(Pvr == 0x3e)
@@ -1509,7 +1517,7 @@ int L1cache_update(void)
     else if (Pvr == 0x3f )
         r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-size |  cut -c 15-19 ");
     else if (Pvr == 0x4a || Pvr == 0x4b )
-        r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-size |  cut -c 15-19 ");
+        r1 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/d-cache-size |  cut -c 15-19 ");
 
     t->L1_dsize = atoi(dest);
 
@@ -1519,7 +1527,7 @@ int L1cache_update(void)
     else if (Pvr == 0x3f )
         r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-size |  cut -c 15-19");
     else if (Pvr == 0x4a || Pvr == 0x4b )
-        r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-size |  cut -c 15-19");
+        r2 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/i-cache-size |  cut -c 15-19");
 
     t->L1_isize = atoi(dest);
 
@@ -1529,7 +1537,7 @@ int L1cache_update(void)
     else if (Pvr == 0x3f )
         r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-line-size |  cut -c 17-19 ");
     else if (Pvr == 0x4a || Pvr == 0x4b )
-        r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/d-cache-line-size |  cut -c 17-19 ");
+        r3 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/d-cache-line-size |  cut -c 17-19 ");
 
     t->L1_dline = atoi(dest);
 
@@ -1539,20 +1547,20 @@ int L1cache_update(void)
     else if(Pvr == 0x3f )
         r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-line-size |  cut -c 17-19");
     else if (Pvr == 0x4a || Pvr == 0x4b )
-        r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/PowerPC,POWER7@0/i-cache-line-size |  cut -c 17-19");
+        r4 = get_cmd_op(dest, "od -i /proc/device-tree/cpus/*POWER*0/i-cache-line-size |  cut -c 17-19");
 
     t->L1_iline = atoi(dest);
 #endif
     if (Pvr == PV_POWER8_MURANO || Pvr == PV_POWER8_VENICE || Pvr == PV_POWER8_PRIME){
         t->L1_dsize = 32*1024;
 		t->L1_isize = 64*1024;
-		t->L1_dline = 128; 
+		t->L1_dline = 128;
 		t->L1_iline = 128;
 	}
 	else if (Pvr == PV_POWER9_NIMBUS || Pvr == PV_POWER9_CUMULUS){
         t->L1_dsize = 32*1024;
 		t->L1_isize = 32*1024;
-		t->L1_dline = 128; 
+		t->L1_dline = 128;
 		t->L1_iline = 128;
 	}
     return ( r1 | r2 | r3 | r4 );
@@ -1592,7 +1600,7 @@ int L1cache(htxsyscfg_cache_t *t)
 			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
 			return(rc2);
 	}
-    return 0;   
+    return 0;
 }
 
 /*Retrieves L2 & L3 details*/
@@ -1675,7 +1683,7 @@ int L2L3cache_update(void)
 		t->L3_asc  = 8;
 		t->L3_line = 128;
 	}
-   /* For P9 processor */	
+   /* For P9 processor */
     else if(Pvr == PV_POWER9_NIMBUS || Pvr == PV_POWER9_CUMULUS)
     {
         t->L2_size = 512*1024 ;
@@ -1683,7 +1691,7 @@ int L2L3cache_update(void)
         t->L2_line = 128 ;
 
         t->L3_size = 10*1024*1024;
-        t->L3_asc  = 8;
+        t->L3_asc  = 20;
         t->L3_line = 128;
     }
 	else  {
@@ -1726,7 +1734,7 @@ int L2L3cache(htxsyscfg_cache_t *t)
 			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
 			return(rc2);
 	}
-    return 0;   
+    return 0;
 }
 
 
@@ -1752,7 +1760,7 @@ int get_node(unsigned int pvr, int pir) {
 		case PV_POWER9_NIMBUS:
 			rc = P9_NIMBUS_GET_NODE(pir);
 			break;
-		
+
 		case PV_POWER9_CUMULUS:
 			rc = P9_CUMULUS_GET_NODE(pir);
 			break;
@@ -1787,7 +1795,7 @@ int get_chip(unsigned int pvr, int pir) {
 		case PV_POWER9_NIMBUS:
 			rc = P9_NIMBUS_GET_CHIP(pir);
 			break;
-		
+
 		case PV_POWER9_CUMULUS:
 			rc = P9_CUMULUS_GET_CHIP(pir);
 			break;
@@ -1819,11 +1827,11 @@ int get_core(unsigned int pvr, int pir) {
 		case PV_POWER8_PRIME:
 			rc = P8_GET_CORE(pir);
 			break;
-		
+
 		case PV_POWER9_NIMBUS:
 			rc = P9_NIMBUS_GET_CORE(pir);
 			break;
-		
+
 		case PV_POWER9_CUMULUS:
 			rc = P9_CUMULUS_GET_CORE(pir);
 			break;
@@ -1847,7 +1855,7 @@ int get_p6_compat_mode(unsigned int Pvr)
 #ifdef DEBUG
 printf("Pvr=%x,temp=%d\n", Pvr, temp);
 #endif
-    
+
     if ( ( Pvr == PV_POWER7  || Pvr == PV_POWER7PLUS ) && ( temp > 0 ) )
 		return 1;
 	else
@@ -1862,7 +1870,7 @@ int get_p7_compat_mode(unsigned int Pvr)
 
     temp = get_cmd_op(dest, "cat /proc/cpuinfo | grep -i POWER7 | wc -l");
     temp = atoi(dest);
-    
+
 #ifdef DEBUG
 printf("Pvr=%x,temp=%d\n", Pvr, temp);
 #endif
@@ -1874,7 +1882,7 @@ printf("Pvr=%x,temp=%d\n", Pvr, temp);
 }
 
 /*provides endiamness and virtualization type of the architecture*/
-int get_env_details_update(void) 
+int get_env_details_update(void)
 {
     unsigned int i = 1;
     int temp,r1;
@@ -1895,7 +1903,7 @@ int get_env_details_update(void)
 
     e =&(global_ptr->global_lpar.env_details);
 	/* initialize as PVM guest*/
-	e->virt_flag = PVM_GUEST; 
+	e->virt_flag = PVM_GUEST;
 	strcpy(e->virt_typ,"PVM_GUEST");
 	strcpy(e->proc_shared_mode,"no");
 
@@ -1912,7 +1920,7 @@ int get_env_details_update(void)
     {
         e->virt_flag = NV;
 		strcpy(e->virt_typ,"NV");
-		strcpy(e->proc_shared_mode,"no");	
+		strcpy(e->proc_shared_mode,"no");
     }
 
     r1 = get_cmd_op(dest, "cat /proc/cpuinfo | grep -i qemu | wc -l");  /* guest machine */
@@ -1948,12 +1956,12 @@ int get_env_details_update(void)
     if ( (*(char*)&i) == 1 )
     {
 		strcpy(e->endianess,"LE");
-		
+
 	}
 	else
 	{
 		strcpy(e->endianess,"BE");
-	}	
+	}
 
 return 0;
 }
@@ -2239,7 +2247,7 @@ core_exclude_flag = array_index = x  = 0;
 							else{
 							}
                     }
-					sys_conf->node[nnode].chip[nchip].num_cores = physical_scfg.node[i].chip[j].num_cores - sys_conf->node[nnode].chip[nchip].num_cores_excluded; 
+					sys_conf->node[nnode].chip[nchip].num_cores = physical_scfg.node[i].chip[j].num_cores - sys_conf->node[nnode].chip[nchip].num_cores_excluded;
                     nchip++;
                 }
             }
@@ -2294,18 +2302,18 @@ nnode = 0;
 
 /* eliminating the duplicate entries in excluded_cores_array */
 n = MAX_CORES_PER_CHIP - 1;
- for(x=0; x < n; x++) 
+ for(x=0; x < n; x++)
    {
       for(y=x+1; y < n; )
       {
          if((excluded_cores_array[y][0] == excluded_cores_array[x][0]) && (excluded_cores_array[y][1] == excluded_cores_array[x][1]) && (excluded_cores_array[y][2] == excluded_cores_array[x][2]))
          {
-            for(k=y; k < n;k++) 
+            for(k=y; k < n;k++)
             {
                excluded_cores_array[k][0] = excluded_cores_array[k+1][0];
 				excluded_cores_array[k][1] = excluded_cores_array[k+1][1];
 				excluded_cores_array[k][2] = excluded_cores_array[k+1][2];
-				
+
             }
             n--;
          }
@@ -2533,7 +2541,7 @@ int get_hardware_stat(SYS_STAT *sys_stat)
 int get_cpus_in_core(int core_no,signed int *cpus_in_core)
 {
     int              i,j;
-    
+
     for(i=0; i<MAX_THREADS_PER_CORE; i++) {
         cpus_in_core[i] = -1;
     }
@@ -2681,31 +2689,44 @@ int get_num_of_nodes_in_sys(void)
 
 int get_num_of_chips_in_node(int node_num)
 {
+    if ( node_num > global_ptr->syscfg.num_nodes) {
+        return -1;
+    }
 	return(global_ptr->syscfg.node[node_num].num_chips);
 }
 
 int get_num_of_cores_in_chip(int node_num, int chip_num)
 {
+    if ((node_num > global_ptr->syscfg.num_nodes) || (chip_num > global_ptr->syscfg.node[node_num].num_chips)) {
+        return -1;
+    }
 	return(global_ptr->syscfg.node[node_num].chip[chip_num].num_cores);
 }
 
 int get_num_of_cpus_in_core(int node_num, int chip_num, int core_num)
 {
+    if ((node_num > global_ptr->syscfg.num_nodes) ||
+        (chip_num > global_ptr->syscfg.node[node_num].num_chips) ||
+        (core_num > global_ptr->syscfg.node[node_num].chip[chip_num].num_cores)) {
+        return -1;
+    }
     return(global_ptr->syscfg.node[node_num].chip[chip_num].core[core_num].num_procs);
 }
 
 int get_logical_cpu_num(int node_num, int chip_num, int core_num, int thread_num)
 {
-	int k,logical_cpu_num;
-	k = logical_cpu_num = 0;
+	int logical_cpu_num = 0;
 
-	for( k=0 ; k<global_ptr->syscfg.node[node_num].chip[chip_num].core[core_num].num_procs ; k++) {
-		if(k == thread_num){
-			logical_cpu_num = global_ptr->syscfg.node[node_num].chip[chip_num].core[core_num].lprocs[k];
-		}
-	}
+    if ((node_num > global_ptr->syscfg.num_nodes) ||
+        (chip_num > global_ptr->syscfg.node[node_num].num_chips) ||
+        (core_num > global_ptr->syscfg.node[node_num].chip[chip_num].num_cores)) {
+        return -1;
+    }
+
+    logical_cpu_num = global_ptr->syscfg.node[node_num].chip[chip_num].core[core_num].lprocs[thread_num];
     return logical_cpu_num;
 }
+
 /* This function is used to repopulate the system configuration structure.      */
 /* Returns 0 on success.                                                        */
 
@@ -2745,7 +2766,7 @@ int repopulate_syscfg(struct htx_data *p_htx_data)
 			if ( temp_shm_key == -1 && errno == EEXIST ) {
 				/*shm already existing*/
 				rc = attach_to_syscfg();
-			if ( rc ){ 
+			if ( rc ){
 	                sprintf(msg,"Error in repopulate_syscfg. errno=%d\n", rc);
 		            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
 				return(rc);
@@ -2776,15 +2797,77 @@ int get_smt_status(int core_no)
 {
     int              smt = -1;
     smt = global_ptr->system_cpu_map.cpus_index_in_core[core_no].num_cpus;
-    
+
     return (smt);
+}
+
+int get_cores_in_chip(int node_num, int chip_num, int *core_number_list )
+{
+    int i, j, k, index = 0;
+    int got_details = 0, core = 0;
+
+    if ((node_num > global_ptr->syscfg.num_nodes) || (chip_num > global_ptr->syscfg.node[node_num].num_chips)) {
+        return -1;
+    }
+    /* Loop through the syscfg structure  */
+    /* Loop through nodes until the node*/
+    /* number equals the node that*/
+    /* we are interested. While the core  */
+    /* number is always incremented. In   */
+    /* this way, when we reach our node,  */
+    /* the core numbers are actually the  */
+    /* cores in the node*/
+
+    for( i = 0 ; i < global_ptr->syscfg.num_nodes && got_details == 0 ; i++) {
+        for( j=0 ; j<global_ptr->syscfg.node[i].num_chips ; j++ ) {
+            if((i == node_num) && (j == chip_num)) {
+                for( k=0 ; k<global_ptr->syscfg.node[i].chip[j].num_cores ; k++, core++) {
+                    core_number_list[index++] = core;
+                }
+                got_details = 1;
+                break;
+            } else {
+                core += global_ptr->syscfg.node[i].chip[j].num_cores;
+            }
+        }
+    }
+    return index;
+}
+
+int get_chips_in_node(int node_num, int *chip_number_list )
+{
+    int i, j, chip = 0, index = 0;
+
+    if ( node_num > global_ptr->syscfg.num_nodes) {
+        return -1;
+    }
+    /* Loop through the syscfg structure  */
+    /* Loop through nodes until the node*/
+    /* number equals the node that*/
+    /* we are interested. While the chip  */
+    /* number is always incremented. In   */
+    /* this way, when we reach our node,  */
+    /* the chip numbers are actually the  */
+    /* chips in the node*/
+
+    for( i = 0 ; i < global_ptr->syscfg.num_nodes ; i++) {
+        if (i == node_num) {
+             for( j=0 ; j<global_ptr->syscfg.node[i].num_chips ; j++, chip++ ) {
+                chip_number_list[index++] = chip;
+            }
+            break;
+        } else {
+            chip += global_ptr->syscfg.node[i].num_chips;
+        }
+    }
+    return index;
 }
 
 int get_cores_in_node(int node_num, int *core_number_list )
 {
     int              node=0,chip=0,core=0,index=0;
     int              i,j,k;
-    
+
 
     /* Loop through the syscfg structure  */
     /* Loop through nodes until the node*/
@@ -3094,7 +3177,7 @@ int update_syscfg(void)
     if(r19 >= 0) {
 		global_ptr->global_memory.num_numa_nodes = r19;
 	}
-	
+
 	r7=get_memory_details_update();
 	if ( r7 ) {
 			sprintf(msg,"get_memory_details_update() failed with rc=%d\n", r7);
@@ -3127,7 +3210,7 @@ int update_syscfg(void)
 			sprintf(msg,"L2cache_update() failed with rc=%d\n", r9);
 			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
     }
-	
+
 	lock6 = pthread_rwlock_unlock(&(global_ptr->global_cache.rw));
 	if (lock6!=0  ) {
 			sprintf(msg,"global_ptr->global_cache.rw_unlock() failed with rc=%d\n", lock6);
@@ -3242,3 +3325,537 @@ int update_syscfg(void)
     return (r1|r2|r3|r5|r6|r7|r8|r9|r10|r11|r12|r13|r14|r15|r16|r17);
 }
 
+/**********************************************************************************************/
+/*   Function to parse the resource string to provide resources enabled in the given string   */
+/**********************************************************************************************/
+int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info *filter, int num_cpu_filters)
+{
+    int i= 0, j = 0, k = 0, filt_idx, resource_array[24];
+    int num_nodes = 0, num_chips = 0, num_cores=0, num_cpus=0;
+    unsigned long node_num, chip_num, core_num, cpu_num;
+    unsigned int begin_node, begin_chip, begin_core, begin_cpu;
+    unsigned int end_node, end_chip, end_core, end_cpu;
+    char tmp_str[128], tmp_str1[128], msg[8092], msg_temp[2048];
+    char *chr_ptr[4], *end_ptr, htx_msg[256];
+    char *ptr[16], *tmp, tmp_filter_str[128];
+
+    filter->num_nodes =0;
+    for (node_num = 0; node_num < MAX_NODES; node_num++ ) {
+        for (chip_num = 0; chip_num < MAX_CHIPS_PER_NODE; chip_num++) {
+            for (core_num = 0; core_num < MAX_CORES_PER_CHIP; core_num++) {
+                for (cpu_num = 0; cpu_num < MAX_CPUS_PER_CORE; cpu_num++) {
+                    filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num]=-1;
+                }
+                filter->node[node_num].chip[chip_num].core[core_num].num_procs = 0;
+                filter->node[node_num].chip[chip_num].core[core_num].core_num = -1;
+            }
+            filter->node[node_num].chip[chip_num].num_cores = 0;
+            filter->node[node_num].chip[chip_num].chip_num = -1;
+        }
+        filter->node[node_num].num_chips = 0;
+        filter->node[node_num].node_num = -1;
+    }
+
+    for (filt_idx = 0; filt_idx < num_cpu_filters; filt_idx++) {
+        strcpy(tmp_filter_str, filter_str[filt_idx]);
+        if ((chr_ptr[i] = strtok(tmp_filter_str, "NPCT")) != NULL) {
+            i++;
+            while ((chr_ptr[i] = strtok(NULL, "NPCT")) != NULL) {
+                i++;
+            }
+        } else {
+            sprintf(htx_msg, "[%d]%s:Improper value is provided for cpu filter: %s, filter num:%d\n",
+                    __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+            return (-1);
+        }
+        filter->num_nodes = get_num_of_nodes_in_sys();
+        if (chr_ptr[0][0] == '*') {
+           for (node_num = 0; node_num < filter->num_nodes; node_num++) {
+               if (filter->node[node_num].node_num == -1) {
+                   filter->node[node_num].node_num = node_num;
+               }
+           }
+        } else if (strchr(chr_ptr[0], '[') != NULL) {  /* indicates single/multiple values are given in [] */
+            strcpy(tmp_str, chr_ptr[0]);
+            if ((ptr[j++] = strtok(tmp_str,"[],")) == NULL) {
+                sprintf(htx_msg, "[%d]%s: Improper value is provided for cpu filter: %s, filter num:%d\n",
+                        __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                return (-1);
+            }
+            while ((ptr[j]=strtok(NULL,",]")) != NULL ) {
+                j++;
+            }
+            for (k = 0; k < j; k++) {
+                if ((tmp = strchr(ptr[k],'%')) != NULL) { /* indicates a percentage of nodes is given in filter->*/
+                    num_nodes = (filter->num_nodes * (float)((atoi(tmp+1))/100.0));
+                    if (num_nodes < 0 || num_nodes > filter->num_nodes) {
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu filter: %s, filter num:%d\n"
+                                 "node percentage as %d%(num_nodes=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                 filt_idx, atoi(tmp+1), filter->num_nodes);
+                        hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                        return (-1);
+                    }
+                    if (num_nodes == 0) {
+                        num_nodes = 1;
+                    }
+                    for (node_num = 0; node_num < filter->num_nodes; node_num++) {
+                        if (filter->node[node_num].node_num == -1) {
+                            filter->node[node_num].node_num = node_num;
+                        }
+                    }
+                } else if (strchr(ptr[k], '-') != NULL) { /* indicates that range of nodes is given in filter->*/
+                    strcpy (tmp_str1, ptr[k]);
+                    if ((tmp = strtok (tmp_str1, "-")) == NULL) {
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                                 __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                        hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                        return(-1);
+                    }
+                    errno = 0;
+                    begin_node = strtol (tmp, &end_ptr, 10);
+                    if (begin_node >= filter->num_nodes ||  errno != 0 || end_ptr == ptr[k]) {
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                 "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                 filt_idx, begin_node, filter->num_nodes);
+                         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                         return (-1);
+                    }
+                    if ((tmp = strtok (NULL, "-")) == NULL) {
+                        hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                    }
+                    errno = 0;
+                    if (tmp[0] == 'n' || tmp[0] == 'N') {
+                        end_node = filter->num_nodes - 1;
+                    } else {
+                        end_node = strtol (tmp, &end_ptr, 10);
+                    }
+                    if (end_node >= filter->num_nodes ||  errno != 0 || end_ptr == ptr[k]) {
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                 "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                 filt_idx, end_node, filter->num_nodes);
+                        hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                        return (-1);
+                    }
+                    for (node_num = begin_node; node_num <= end_node; node_num++) {
+                        if (filter->node[node_num].node_num == -1) {
+                            filter->node[node_num].node_num = node_num;
+                        }
+                    }
+                } else {
+                    errno = 0;
+                    node_num = strtol (ptr[k], &end_ptr, 10);
+                    if (node_num >= filter->num_nodes || errno != 0 || end_ptr == ptr[k]) {
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                 "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                 filt_idx, node_num, filter->num_nodes);
+                        hxfmsg (misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                        return(-1);
+                    } else {
+                        if (filter->node[node_num].node_num == -1) {
+                            filter->node[node_num].node_num = node_num;
+                        }
+                    }
+                }
+            }
+        } else if ((tmp = strchr (chr_ptr[0], '%')) != NULL) { /* indicates a percentage of nodes is given in filter->*/
+            num_nodes = (filter->num_nodes * (float)((atoi(tmp+1))/100.0));
+            if ((num_nodes < 0) ||  (num_nodes > filter->num_nodes)) {
+                sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d,"
+                         "node percentage as %d%(num_nodes=%d)\n",   __LINE__, __FUNCTION__, filter_str[filt_idx],
+                         filt_idx, num_nodes, filter->num_nodes);
+                hxfmsg (misc_htx_data, 0, HTX_HE_INFO, msg);
+                return (-1);
+            }
+            if (num_nodes == 0) {
+                num_nodes = 1;
+            }
+            for (node_num = 0; node_num < num_nodes; node_num++) {
+                if (filter->node[node_num].node_num == -1) {
+                    filter->node[node_num].node_num = node_num;
+                }
+            }
+        } else {
+            errno = 0;
+            node_num = strtol (chr_ptr[0], &end_ptr, 10);
+            if (node_num >= filter->num_nodes ||  errno != 0 || end_ptr == chr_ptr[0]) {
+                 sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d,"
+                         "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                         filt_idx, node_num, filter->num_nodes);
+                hxfmsg (misc_htx_data, 0, HTX_HE_INFO, msg);
+                return (-1);
+            }
+            if (filter->node[node_num].node_num == -1) {
+                filter->node[node_num].node_num = node_num;
+            }
+        }
+        /* Parse for chip detail for each enabled node */
+        for (node_num = 0; node_num < filter->num_nodes; node_num++) {
+            if (filter->node[node_num].node_num == -1 || filter->node[node_num].num_chips != 0) {
+                continue;
+            }
+            filter->node[node_num].num_chips = get_chips_in_node (node_num, resource_array);
+            if (chr_ptr[1][0] == '*') {
+                for (chip_num = 0; chip_num < filter->node[node_num].num_chips; chip_num++) {
+                    if (filter->node[node_num].chip[chip_num].chip_num == -1) {
+                        filter->node[node_num].chip[chip_num].chip_num = resource_array[chip_num];
+                    }
+                }
+            } else if (strchr(chr_ptr[1], '[') != NULL) { /* indicates single/multiple values are given in [] */
+                strcpy(tmp_str, chr_ptr[1]);
+                j = 0;
+                if ((ptr[j++] = strtok(tmp_str,"[],")) == NULL){
+                    sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                             __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                    return (-1);
+                }
+                while ((ptr[j] = strtok(NULL, ",]")) != NULL ) {
+                    j++;
+                }
+                for (k = 0; k < j; k++) {
+                    if ((tmp = strchr (ptr[k], '%')) != NULL) { /* indicates a percentage of chips is given in filter->*/
+                        num_chips = (filter->node[node_num].num_chips * (float)((atoi (tmp+1)) / 100.0));
+                        if ((num_chips < 0) ||  (num_chips > filter->node[node_num].num_chips)) {
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                     "chip percentage as %d%(num_chips=%d)\n", __LINE__, __FUNCTION__,
+                                     filter_str[filt_idx], filt_idx, atoi(tmp+1), filter->node[node_num].num_chips);
+                            hxfmsg (misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        if (num_chips == 0) {
+                            num_chips = 1;
+                        }
+                        for (chip_num = 0; chip_num < num_chips; chip_num++) {
+                            if (filter->node[node_num].chip[chip_num].chip_num == -1) {
+                                filter->node[node_num].chip[chip_num].chip_num = resource_array[chip_num];
+                            }
+                        }
+                    } else if (strchr (ptr[k], '-') != NULL) { /* indicates that a range of chips is given in filter->*/
+                        strcpy(tmp_str1, ptr[k]);
+                        if ((tmp = strtok (tmp_str1, "-")) == NULL) {
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                                    __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        errno = 0;
+                        begin_chip = strtol (tmp, &end_ptr, 10);
+                        if (begin_chip >= filter->node[node_num].num_chips || errno != 0 || end_ptr == ptr[k]) {
+                            sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                     "chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                     filt_idx, begin_chip, filter->node[node_num].num_chips);
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        if ((tmp = strtok (NULL, "-")) == NULL) {
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                                    __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        errno = 0;
+                        if (tmp[0] == 'n' || tmp[0] == 'N') {
+                            end_chip = filter->node[node_num].num_chips - 1;
+                        } else {
+                            end_chip = strtol (tmp, &end_ptr, 10);
+                        }
+                        if (end_chip >= filter->node[node_num].num_chips || errno != 0 || end_ptr == ptr[k]) {
+                            sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                     "chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                     filt_idx, end_chip, filter->node[node_num].num_chips);
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        for (chip_num = begin_chip; chip_num <= end_chip; chip_num++) {
+                            if (filter->node[node_num].chip[chip_num].chip_num == -1) {
+                                filter->node[node_num].chip[chip_num].chip_num = resource_array[chip_num];
+                            }
+                        }
+                    } else {
+                        errno = 0;
+                        chip_num = strtol (ptr[k], &end_ptr, 10);
+                        if (chip_num > filter->node[node_num].num_chips || errno != 0 || end_ptr == ptr[k]) {
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                        }
+                        if (filter->node[node_num].chip[chip_num].chip_num == -1) {
+                            filter->node[node_num].chip[chip_num].chip_num = resource_array[chip_num];
+                        }
+                    }
+                }
+            } else if ((tmp = strchr (chr_ptr[1], '%')) != NULL) { /* indicates a percentage of chips is given in filter->*/
+                num_chips = (filter->node[node_num].num_chips * (float)(( atoi(tmp+1))/100.0));
+                if ((num_chips < 0) ||  (num_chips > filter->node[node_num].num_chips)) {
+                    sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                             "chip percentage as %d%(num_chips=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                             filt_idx, atoi(tmp+1), filter->node[node_num].num_chips);
+                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                    return (-1);
+                }
+                if (num_chips == 0) {
+                    num_chips = 1;
+                }
+                for (chip_num = 0; chip_num < num_chips; chip_num++) {
+                    if (filter->node[node_num].chip[chip_num].chip_num == -1) {
+                        filter->node[node_num].chip[chip_num].chip_num = resource_array[chip_num];
+                    }
+                }
+            } else {
+                errno = 0;
+                chip_num = strtol (chr_ptr[1], &end_ptr, 10);
+                if (chip_num >= filter->node[node_num].num_chips ||  errno != 0 || end_ptr == chr_ptr[1]) {
+                    sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                             "chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                             filt_idx, chip_num, filter->node[node_num].num_chips);
+                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                    return (-1);
+                }
+                if (filter->node[node_num].chip[chip_num].chip_num == -1) {
+                    filter->node[node_num].chip[chip_num].chip_num = resource_array[chip_num];
+                }
+            }
+
+            /* Start parsing for core string */
+            for (chip_num = 0; chip_num < filter->node[node_num].num_chips; chip_num++) {
+                if (filter->node[node_num].chip[chip_num].chip_num  == -1 || filter->node[node_num].chip[chip_num].num_cores != 0) {
+                    continue;
+                }
+                filter->node[node_num].chip[chip_num].num_cores = get_cores_in_chip (node_num, chip_num, resource_array);
+                if (chr_ptr[2][0] == '*') {
+                    for (core_num = 0; core_num < filter->node[node_num].chip[chip_num].num_cores; core_num++) {
+                        if (filter->node[node_num].chip[chip_num].core[core_num].core_num == -1) {
+                            filter->node[node_num].chip[chip_num].core[core_num].core_num = resource_array[core_num];
+                        }
+                    }
+                } else if (strchr (chr_ptr[2], '[') != NULL) { /*indicates single/multiple values are given in [] */
+                    j = 0;
+                    strcpy (tmp_str, chr_ptr[2]);
+                    if ((ptr[j++] = strtok (tmp_str, "[],")) == NULL) {
+                        sprintf (htx_msg, "Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                                 __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                        hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                        return (-1);
+                    }
+                    while ((ptr[j] = strtok (NULL, ",]")) != NULL) {
+                        j++;
+                   }
+                   for (k = 0; k < j; k++) {
+                       if ((tmp = strchr (ptr[k], '%')) != NULL) { /* indicates a percentage of cores is given in filter->*/
+                           num_cores = (filter->node[node_num].chip[chip_num].num_cores * (float)(( atoi(tmp+1))/100.0));
+                           if ((num_cores < 0) ||  (num_cores > filter->node[node_num].chip[chip_num].num_cores)) {
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
+                                       "core percentage as %d%(num_cores=%d)\n",  __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                       filt_idx, atoi(tmp+1), filter->node[node_num].chip[chip_num].num_cores);
+                               hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                               return (-1);
+                           }
+                           if (filter->node[node_num].chip[chip_num].core[core_num].core_num == -1) {
+                               filter->node[node_num].chip[chip_num].core[core_num].core_num = resource_array[core_num];
+                           }
+                       } else if (strchr (ptr[k], '-') != NULL) { /* indicates a range of cores given in filter->*/
+                           strcpy (tmp_str1, ptr[k]);
+                           if ((tmp = strtok (tmp_str1, "-")) == NULL) {
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d",
+                               __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                               hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                               return (-1);
+                           }
+                           errno = 0;
+                           begin_core = strtol (tmp, &end_ptr, 10);
+                           if (begin_core >= filter->node[node_num].chip[chip_num].num_cores || errno != 0 || end_ptr == ptr[k]) {
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
+                                       "core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                       filt_idx, begin_core, filter->node[node_num].chip[chip_num].num_cores);
+                               hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                               return (-1);
+                           }
+                           if ((tmp = strtok (NULL, "-")) == NULL) {
+                               hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                           }
+                           errno = 0;
+                           if (tmp[0] == 'n' || tmp[0] == 'N') {
+                               end_core = filter->node[node_num].chip[chip_num].num_cores - 1;
+                           } else {
+							   end_core = strtol (tmp, &end_ptr, 10);
+                           }
+                           if (end_core >= filter->node[node_num].chip[chip_num].num_cores || errno != 0 || end_ptr == ptr[k]) {
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
+                                       "core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                       filt_idx, end_core, filter->node[node_num].chip[chip_num].num_cores);
+                               hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                               return (-1);
+                           }
+                           for (core_num = begin_core; core_num <= end_core; core_num++) {
+                               if (filter->node[node_num].chip[chip_num].core[core_num].core_num == -1) {
+                                   filter->node[node_num].chip[chip_num].core[core_num].core_num = resource_array[core_num];
+                               }
+                           }
+                       } else {
+                           errno = 0;
+                           core_num = strtol (ptr[k], &end_ptr, 10);
+                           if (core_num >= filter->node[node_num].chip[chip_num].num_cores ||  errno != 0 || end_ptr == ptr[k]) {
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
+                                        "core filed as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                        filt_idx, core_num, filter->node[node_num].chip[chip_num].num_cores);
+                               hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                               return (-1);
+                           }
+                           if (filter->node[node_num].chip[chip_num].core[core_num].core_num == -1) {
+                               filter->node[node_num].chip[chip_num].core[core_num].core_num = resource_array[core_num];
+                           }
+                       }
+                    }
+                } else if ((tmp = strchr (chr_ptr[2], '%')) != NULL ) {/* indicates a percentage of cores is given in filter->*/
+                    num_cores = (filter->node[node_num].chip[chip_num].num_cores * (float)(( atoi(tmp+1))/100.0));
+                    if ((num_cores < 0) ||  (num_cores > filter->node[node_num].chip[chip_num].num_cores)) {
+                         sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
+                                  "core filed as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                  filt_idx, atoi(tmp+1), filter->node[node_num].chip[chip_num].num_cores);
+                         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                         return (-1);
+                    }
+                    if (filter->node[node_num].chip[chip_num].core[core_num].core_num == -1) {
+                        filter->node[node_num].chip[chip_num].core[core_num].core_num = resource_array[core_num];
+                    }
+                } else {
+                    errno = 0;
+                    core_num = strtol (chr_ptr[2], &end_ptr, 10);
+                    if (core_num >= filter->node[node_num].chip[chip_num].num_cores ||  errno != 0 || end_ptr == ptr[k]) {
+                        sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
+                                 "core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                        filt_idx, core_num, filter->node[node_num].chip[chip_num].num_cores);
+                        hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                        return (-1);
+                    }
+                    if (filter->node[node_num].chip[chip_num].core[core_num].core_num == -1) {
+                        filter->node[node_num].chip[chip_num].core[core_num].core_num = resource_array[core_num];
+                    }
+                }
+                /* Start parsing for cpu string */
+                for (core_num = 0; core_num < filter->node[node_num].chip[chip_num].num_cores; core_num++) {
+                    if ((filter->node[node_num].chip[chip_num].core[core_num].core_num == -1) || (filter->node[node_num].chip[chip_num].core[core_num].num_procs != 0)) {
+                        continue;
+                    }
+                    filter->node[node_num].chip[chip_num].core[core_num].num_procs = get_num_of_cpus_in_core(node_num, chip_num, core_num);
+                    if (chr_ptr[3][0] == '*') {
+                        for (cpu_num = 0; cpu_num < filter->node[node_num].chip[chip_num].core[core_num].num_procs; cpu_num++) {
+                            filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] =  get_logical_cpu_num(node_num, chip_num, core_num, cpu_num);
+                        }
+                    } else if (strchr (chr_ptr[3], '[') != NULL) { /* Indicates single/multiple values given in [] */
+                        strcpy (tmp_str, chr_ptr[3]);
+                        j = 0;
+                        if ((ptr[j++] = strtok (tmp_str, "[],")) == NULL) {
+                            sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                                      __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        while ((ptr[j] = strtok (NULL, ",]")) != NULL ) {
+                            j++;
+                        }
+                        for (k =0; k < j; k++) {
+                            if ((tmp = strchr (ptr[k], '%')) != NULL) { /* indicates a percentage of cpus is given in filter->*/
+                                num_cpus = (filter->node[node_num].chip[chip_num].core[core_num].num_procs * (float) ((atoi (tmp+1)) / 100.0));
+                                if ((num_cpus < 0) ||  (num_cpus > filter->node[node_num].chip[chip_num].core[core_num].num_procs)) {
+                                    sprintf (htx_msg, "Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                             "cpu percentage as %d%(num_cpus=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                             filt_idx, atoi(tmp+1), filter->node[node_num].chip[chip_num].core[core_num].num_procs);
+                                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                                    return (-1);
+                                }
+                                for (cpu_num = 0; cpu_num < num_cpus; cpu_num++) {
+                                    if (filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] == -1) {
+                                        filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] = get_logical_cpu_num(node_num, chip_num, core_num, cpu_num);
+                                    }
+                                }
+                            } else if (strchr (ptr[k], '-') != NULL) {
+                                strcpy (tmp_str1, ptr[k]);
+                                if ((tmp = strtok (tmp_str1, "-")) == NULL) {
+                                    sprintf (htx_msg, "[%d]%s:Improper value is provided  for cpu_filer:%s,filter num:%d\n",
+                                             __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                                    return (-1);
+                                }
+                                errno = 0;
+                                begin_cpu = strtol (tmp, &end_ptr, 10);
+                                if (begin_cpu > filter->node[node_num].chip[chip_num].core[core_num].num_procs || errno != 0 || end_ptr == ptr[k]) {
+                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
+                                             "thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                             filt_idx, begin_cpu, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
+                                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                                    return (-1);
+                                }
+                                if ((tmp = strtok (NULL, "-")) == NULL) {
+                                     sprintf (htx_msg, "Improper value is provided  for cpu_filer:%s,filter num:%d\n",
+                                              __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
+                                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                                    return (-1);
+                                }
+                                errno = 0;
+                                if (tmp[0] == 'n' || tmp[0] == 'N') {
+                                    end_cpu = filter->node[node_num].chip[chip_num].core[core_num].num_procs - 1;
+                                } else {
+							        end_cpu = strtol (tmp, &end_ptr, 10);
+                                }
+                                if (end_cpu > filter->node[node_num].chip[chip_num].core[core_num].num_procs || errno != 0 || end_ptr == ptr[k]) {
+                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
+                                             "thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                             filt_idx, end_cpu, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
+                                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                                    return (-1);
+                                }
+                                for (cpu_num = begin_cpu; cpu_num <= end_cpu; cpu_num++) {
+                                    if (filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] == -1) {
+                                        filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] = get_logical_cpu_num(node_num, chip_num, core_num, cpu_num);
+                                    }
+                                }
+                            } else {
+                                errno = 0;
+                                cpu_num = strtol (ptr[k], &end_ptr, 10);
+                                if (cpu_num >= filter->node[node_num].chip[chip_num].core[core_num].num_procs  ||  errno != 0 || end_ptr == ptr[k]) {
+                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
+                                             "thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                             filt_idx, cpu_num, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
+                                    hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+                                    return (-1);
+                                }
+                                if (filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] == -1) {
+                                    filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] = get_logical_cpu_num(node_num, chip_num, core_num, cpu_num);
+                                }
+                            }
+                        }
+                    } else if ((tmp = strchr (chr_ptr[3], '%')) != NULL) { /* indicates a percentage of cpus is given in filter->*/
+                        num_cpus = (filter->node[node_num].chip[chip_num].core[core_num].num_procs * (float) ((atoi (tmp+1)) / 100.0));
+                        if ((num_cpus < 0) ||  (num_cpus > filter->node[node_num].chip[chip_num].core[core_num].num_procs)) {
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
+                                     "thread percentage as %d%(num_cpus=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                     filt_idx, atoi (tmp+1), filter->node[node_num].chip[chip_num].core[core_num].num_procs);
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        for (cpu_num= 0; cpu_num < num_cpus; cpu_num++) {
+                            if (filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] == -1) {
+                                filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] = get_logical_cpu_num(node_num, chip_num, core_num, cpu_num);
+                            }
+                        }
+                    } else {
+                        errno = 0;
+                        cpu_num = strtol (chr_ptr[3], &end_ptr, 10);
+                        if (cpu_num >= filter->node[node_num].chip[chip_num].core[core_num].num_procs  ||  errno != 0 || end_ptr == ptr[k]) {
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
+                                     "cpu field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                     filt_idx, cpu_num, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
+                            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
+                            return (-1);
+                        }
+                        if (filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] == -1) {
+                            filter->node[node_num].chip[chip_num].core[core_num].lprocs[cpu_num] = get_logical_cpu_num(node_num, chip_num, core_num, cpu_num);
+                        }
+                    }
+                } /* parsing done for cpu string */
+            } /* Parsing done for core string */
+        } /* Parsing done for chip string */
+    }
+    return 0;
+}

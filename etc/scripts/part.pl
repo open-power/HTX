@@ -693,11 +693,11 @@ sub get_parts_to_exclude
         		    $is_nvme_device = 1;
         		}
         		print("Disk $disk_info[$i]{name}, has $disk_info[$i]{num_partitions} partitions\n") if($debug);
-        		if($disk_info[$i]{num_partitions} >= 1) {
-        		    $dev_name=basename($disk_info[$i]{name});
-        		    print("Excluding disk=$dev_name as it has partitions\n") if($debug);
-        		    $parts_to_exclude[$cnt++]=$dev_name;
-        		}
+        		#if($disk_info[$i]{num_partitions} >= 1) {
+        		#    $dev_name=basename($disk_info[$i]{name});
+        		#    print("Excluding disk=$dev_name as it has partitions\n") if($debug);
+        		#    $parts_to_exclude[$cnt++]=$dev_name;
+        		#}
         		for($j=0;$j<$disk_info[$i]{num_partitions};$j++) {
                		 	print("partition $disk_info[$i]{$j}{partition_name}, fs_type=$disk_info[$i]{$j}{fs_type}, used_as=$disk_info[$i]{$j}{used_as} \n") if($debug);
 				# If partition is already used by system we exclude it .. 
@@ -963,7 +963,7 @@ sub get_parts_to_exclude
        		# Check for validity of this mpath first ....
 		print(" Checking exclude for mpath = $path \n") if($debug); 
        		$abs_path="/dev/mapper/" . $path ;
-		$res=`ls -l /dev/mapper | grep "$abs_path"`;
+		$res=`ls -l /dev/mapper | grep "$path"`;
 		if ($res) {
 		    # first of all check if mpath has partitions. exclude mpath itself.
 		    # Then check any system partition on it

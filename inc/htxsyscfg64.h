@@ -108,6 +108,8 @@
 #define MAX_PAGE_SIZES 5
 #define MAX_POOLS 64
 
+#define MAX_FILTER_STR    128
+
 /****************** Common include files  ******************/
 
 #include <stdio.h>
@@ -524,7 +526,34 @@ typedef struct {
 	
 extern GLOBAL_SYSCFG *global_ptr;
 
+/* Below structures are used for filtering and storing info about enabled
+   system resources for a given resource string  of format N*P*C*T* */
 
+struct core_filter_info{
+    unsigned int core_num;
+    unsigned int num_procs;
+    unsigned int lprocs[MAX_CPUS_PER_CORE];
+};
+
+struct chip_filter_info{
+    unsigned int chip_num;
+    unsigned int num_cores;
+    unsigned int lprocs[MAX_CPUS_PER_CHIP];
+    struct core_filter_info core[MAX_CORES_PER_CHIP];
+    /* struct mem_info mem_details; */
+};
+
+struct node_filter_info{
+    unsigned int node_num;
+    unsigned int num_chips;
+    unsigned int lprocs[MAX_CPUS_PER_NODE];
+    struct chip_filter_info chip[MAX_CHIPS_PER_NODE];
+};
+
+struct resource_filter_info {
+    struct node_filter_info node[MAX_NODES];
+    int num_nodes;
+};
 
 /********************     Function Declarations     ********************/
 
@@ -688,6 +717,13 @@ int get_num_of_cores_in_chip(int node_num, int chip_num);
 int get_num_of_cpus_in_core(int node_num, int chip_num, int core_num);
 
 int get_logical_cpu_num(int node_num, int chip_num, int core_num, int thread_num);
+
+int get_chips_in_node(int node_num, int *chip_number_list);
+
+int get_cores_in_chip(int node_num, int chip_num, int *core_number_list);
+
+/* Function to parse the resource string to provide resources enabled in the given string */
+int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info *filter, int num_cpu_filters);
 
 /*Retrieves No of cpus, cores, chips and nodes in hardware*/
 int get_hardware_stat(SYS_STAT *sys_stat);

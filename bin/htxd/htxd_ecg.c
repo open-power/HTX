@@ -962,6 +962,10 @@ int htxd_init_equaliser_info( htxd_ecg_info *p_ecg_info)
 	p_ecg_info->ecg_equaliser_info.debug_flag	= 0;
 	p_ecg_info->ecg_equaliser_info.config_file[0]	= '\0';
 	p_ecg_info->ecg_equaliser_info.offline_cpu = 0;
+	p_ecg_info->ecg_equaliser_info.time_quantum = 0;
+	p_ecg_info->ecg_equaliser_info.startup_time_delay = 0;
+	p_ecg_info->ecg_equaliser_info.log_duration = 0;
+	p_ecg_info->ecg_equaliser_info.pattern_length = 0;
 
 	mdt_fd = cfgcopsf (p_ecg_info->ecg_name);
 	if (mdt_fd == (CFG__SFT *) NULL) {
@@ -1006,6 +1010,30 @@ int htxd_init_equaliser_info( htxd_ecg_info *p_ecg_info)
 					}
 				}
 			#endif
+			}
+
+            return_code = cfgcskwd("eq_time_quantum", default_mdt_snz, temp_str);
+            if(return_code ==  CFG_SUCC) {
+                p_ecg_info->ecg_equaliser_info.time_quantum = atoi(htxd_unquote(temp_str));
+                htxd_set_equaliser_time_quantum(p_ecg_info->ecg_equaliser_info.time_quantum);
+            }
+
+            return_code = cfgcskwd("eq_startup_time_delay", default_mdt_snz, temp_str);
+            if(return_code ==  CFG_SUCC) {
+                p_ecg_info->ecg_equaliser_info.startup_time_delay = atoi(htxd_unquote(temp_str));
+                htxd_set_equaliser_startup_time_delay(p_ecg_info->ecg_equaliser_info.startup_time_delay);
+            }
+
+            return_code = cfgcskwd("eq_log_duration", default_mdt_snz, temp_str);
+            if(return_code ==  CFG_SUCC) {
+                p_ecg_info->ecg_equaliser_info.log_duration = atoi(htxd_unquote(temp_str));
+                htxd_set_equaliser_log_duration(p_ecg_info->ecg_equaliser_info.log_duration);
+            }
+
+            return_code = cfgcskwd("eq_pattern_length", default_mdt_snz, temp_str);
+            if(return_code ==  CFG_SUCC) {
+                p_ecg_info->ecg_equaliser_info.pattern_length = atoi(htxd_unquote(temp_str));
+                htxd_set_equaliser_pattern_length(p_ecg_info->ecg_equaliser_info.pattern_length);
 			}
 			htxd_set_equaliser_shm_addr(p_ecg_info->ecg_shm_addr);
 			htxd_set_equaliser_semhe_id(p_ecg_info->ecg_sem_id);

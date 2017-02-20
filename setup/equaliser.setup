@@ -1,8 +1,21 @@
 #!/bin/ksh
 
-# @(#)60	1.9  src/htx/usr/lpp/htx/setup/equaliser.setup, htx_sup, htxubuntu 1/4/16 23:26:04 
-
 # Check if the equaliser configuration file is present
+
+if [[ -z ${HTX_HOME_DIR} ]];
+then
+    HTX_HOME_DIR=`cat /var/log/htx_install_path 2> /dev/null`;
+
+    if [[ -f ${HTX_HOME_DIR}/etc/scripts/htx_env.sh ]];
+    then
+        . ${HTX_HOME_DIR}/etc/scripts/htx_env.sh;
+    else
+        echo "htx_env.sh could not be found at ${HTX_HOME_DIR}/etc/scripts/"
+        echo "Please make sure HTX is installed and installation path is"
+        echo "updated in /var/log/htx_install_path. Exiting"
+        exit 1
+    fi
+fi
 
 proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
 proc_ver_dec=`printf %d $proc_ver`
@@ -13,18 +26,18 @@ proc_ver_dec=`printf %d $proc_ver`
 create_mdt()
 {
     echo " Creating Equaliser mdt file $2 "
-    ${HTX_HOME_DIR}/bin/create_eq_mdt $1 $2
-    echo " Backing up Equaliser config file in ${HTX_LOG_DIR}"
-    cp $1 ${HTX_LOG_DIR}/
-    echo " Backing up Equaliser mdt file in ${HTX_LOG_DIR}"
-    cp $2 ${HTX_LOG_DIR}/
+    ${HTXPATH}/bin/create_eq_mdt $1 $2
+    echo " Backing up Equaliser config file in /tmp"
+    cp $1 /tmp/
+    echo " Backing up Equaliser mdt file in /tmp"
+    cp $2 /tmp/
 }
 #############################
 #funcion create_mdt ends here
 #############################
 
 #################################
-#	Main code starts here	#
+#       Main code starts here   #
 #################################
 
 # If system is in shared processor mode, return. Don't create any cfg and mdt.
@@ -35,114 +48,40 @@ then
     exit
 fi
 
-# Creating mdt file corresponding to htx_eq.cfg which is the default equaliser file shipped.
-# Used mainly for manual editing
-
-if [ -f ${HTX_HOME_DIR}/htx_eq.cfg ]
-then
-	create_mdt ${HTX_HOME_DIR}/htx_eq.cfg ${HTXMDT}mdt.eq
-
-else
-	# If equaliser configuration file not present, print message and exit
-	echo " Equaliser configuration file htx_eq.cfg not provided in ${HTX_HOME_DIR} "
-	echo " Will not be able to create the equaliser mdt file mdt.eq"
-fi
-
 #=============================================================
 # Creating all the cfg files.
 # These files will be generated or P7 and above.
 #=============================================================
 
 # Remove all old cfg files.
-for file in `/bin/ls $HTX_HOME_DIR[a-zA-Z]*.cfg 2>/dev/null | grep -v "htx_eq\.cfg"`
+for file in `/bin/ls $HTXCFGPATH/[a-zA-Z]*.cfg 2>/dev/null | grep -v "htx_eq\.cfg"`
 do
     rm $file
 done
 
+#create links for cfg defined in trial_cfgs directory (if any present)
+for file in `/bin/ls $HTXPATH/trial_cfgs/[a-zA-Z]*.cfg 2>/dev/null`
+do
+    file_name=`basename $file`
+    ln -s $file $HTXCFGPATH/$file_name
+done
+
 if [[ $proc_ver_dec -ge 63 ]]
 then
-    ${HTX_HOME_DIR}/bin/create_eq_cfg
+    ${HTXPATH}/bin/create_eq_cfg
 fi
 
-if [ -f ${HTX_HOME_DIR}htx_eq_maxpwr_switch.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_eq_maxpwr_switch.cfg ${HTXMDT}mdt.eq_maxpwr_switch
-fi
-if [ -f ${HTX_HOME_DIR}htx_eq_maxpwr_exp.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_eq_maxpwr_exp.cfg ${HTXMDT}mdt.eq_maxpwr_exp
-fi
-if [ -f ${HTX_HOME_DIR}htx_eq_100_75_50_25_util.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_eq_100_75_50_25_util.cfg ${HTXMDT}mdt.eq_100_75_50_25_util
-fi
-#    if [ -f ${HTX_HOME_DIR}htx_eq_cpu_mem_100.cfg ]
-#    then
-#        create_mdt ${HTX_HOME_DIR}htx_eq_cpu_mem_100.cfg ${HTXMDT}mdt.eq_cpu_mem_100
-#    fi
-if [ -f ${HTX_HOME_DIR}htx_eq_cpu_mem_50.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_eq_cpu_mem_50.cfg ${HTXMDT}mdt.eq_cpu_mem_50
-fi
-
-#Adding support for ewm cfgs
-#===========================
-if [ -f ${HTX_HOME_DIR}htx_ewm_msrp_1p3m_28s_act_52s_idle.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_ewm_msrp_1p3m_28s_act_52s_idle.cfg ${HTXMDT}mdt.ewm_msrp_1p3m_28s_act_52s_idle
-fi
-
-if [ -f ${HTX_HOME_DIR}htx_ewm_p8_8fd_char.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_ewm_p8_8fd_char.cfg ${HTXMDT}mdt.ewm_p8_8fd_char
-fi
-
-if [ -f ${HTX_HOME_DIR}htx_ewm_p8_rdp_switch.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_ewm_p8_rdp_switch.cfg ${HTXMDT}mdt.ewm_p8_rdp_switch
-fi
-
-if [ -f ${HTX_HOME_DIR}htx_ewm_p8_swicthing_cmp.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}htx_ewm_p8_swicthing_cmp.cfg ${HTXMDT}mdt.ewm_p8_swicthing_cmp
-fi
-
-#========================================================================================
-# Creating cfg and corresponding mdt files for generating test scenarios for thread transitioning 
-# feature in p8. 2 testing scenarios are generated. Switching scenarios will be generated on p7 
-# and above. While mixing/thread re-balancing scenario is targated for P8 pnly. Will be created only 
-# for BML.
-#==========================================================================================
-
-if [ -f ${HTX_HOME_DIR}/eq_th_trans_switch.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}/eq_th_trans_switch.cfg ${HTXMDT}mdt.eq_th_trans_switch
-fi
-    
-if [ -f ${HTX_HOME_DIR}/eq_th_trans_mix.cfg ]
-then
-    create_mdt ${HTX_HOME_DIR}/eq_th_trans_mix.cfg ${HTXMDT}mdt.eq_th_trans_mix
-fi
-
-#=============================================================================
-# Creating softlink for default.mem.eq to point to either default.mem.eq.4k or
-# default.mem.eq.64k based on the base page size supported.
-#=============================================================================
-base_pg_size=`getconf PAGESIZE`
-if [[ "$base_pg_size" == "65536" ]]
-then
-	echo "default.mem.eq points to default.mem.eq.64k"
-	ln -sf default.mem.eq.64k ${HTXREGRULES}/hxemem64/default.mem.eq
-else
-	echo "default.mem.eq points to default.mem.eq.4k"
-	ln -sf default.mem.eq.4k ${HTXREGRULES}/hxemem64/default.mem.eq
-fi
-
+for file in `/bin/ls $HTXCFGPATH/[a-zA-Z]*.cfg 2>/dev/null`
+do
+    file_name=`basename $file`
+    suffix=`echo $file_name| sed "s/htx_//" | sed "s/\.cfg//"`
+    mdt_name=mdt.$suffix
+    create_mdt ${HTXCFGPATH}/$file_name ${HTXMDT}/$mdt_name
+done
 
 #########################
 #Main code ends here
 #########################
-    
-    
+
 
 
