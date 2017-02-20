@@ -47,6 +47,7 @@ rule_id = stride_4
 oper = stride
 num_oper = 1
 pattern_id = HEXFF(8) ADDRESS HEXZEROS(8)
+switch_pat_per_seg = yes
 width = 8
 affinity = local
 mem_filter = N*P*[4K_50%,64K_50%,2M_100%,16M_100%]

@@ -78,7 +78,7 @@
 	
   	if [ $proc_ver_dec -ge 78 ]; then
 		create_my_mdt mem:default.mfg.nodelay > ${HTXMDT}/mdt.mem
-		create_my_mdt mem:default tlbie:tlbie > ${HTXMDT}/mdt.mem_tlbie
+		create_my_mdt mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_tlbie
 	else
 		create_my_mdt mem:memmfg.nodelay > ${HTXMDT}/mdt.mem
 		create_my_mdt mem:memmfg.nodelay tlbie: > ${HTXMDT}/mdt.mem_tlbie		
@@ -100,7 +100,7 @@
 	# sctu devices created are half compared to sctu devices in mdt.bu
         echo "Creating mdt.mem_nest ..."
 	if [ $proc_ver_dec -ge 78 ]; then
-		create_my_mdt cache:$cache_sw_prefetch_rf mem:default > ${HTXMDT}/mdt.mem_nest
+		create_my_mdt cache:$cache_sw_prefetch_rf mem:default.mfg > ${HTXMDT}/mdt.mem_nest
 	else
 		create_my_mdt cache:$cache_sw_prefetch_rf mem:memmfg > ${HTXMDT}/mdt.mem_nest
 	fi
@@ -232,8 +232,8 @@
 	fi
 	
 	if [ $proc_ver_dec -ge 78 ]; then
-		create_my_mdt $hxestorage_default mem:default ven:default > ${HTXMDT}/mdt.mem.io
-		create_my_mdt $hxestorage_default ven:default mem:default cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+		create_my_mdt $hxestorage_default mem:default.mfg ven:default > ${HTXMDT}/mdt.mem.io
+		create_my_mdt $hxestorage_default ven:default mem:default.mfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
 	else
 		create_my_mdt $hxestorage_default mem:memmfg ven:default > ${HTXMDT}/mdt.mem.io
 		create_my_mdt $hxestorage_default ven:default mem:memmfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io

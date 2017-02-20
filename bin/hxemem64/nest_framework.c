@@ -54,13 +54,14 @@ void SIGTERM_hdl (int sig, int code, struct sigcontext *scp)
     hxfmsg(&g_data.htx_d,0,HTX_HE_INFO,"hxemem64: Sigterm Received!\n");
     g_data.exit_flag = 1;
 }
+#if 0
 void SIGSEGV_hdl(int sig, int code, struct sigcontext *scp)
 {
     char msg[50];
     hxfmsg(&g_data.htx_d,0,HTX_HE_INFO,"hxemem64: sig11 Received!\n");
      
 }
-
+#endif
 
 
 #ifndef __HTX_LINUX__
@@ -386,13 +387,17 @@ int get_system_details() {
 
     #ifdef __HTX_LINUX__
     rc = get_memory_pools();
-    if(rc > 0){
-        sysptr->num_chip_mem_pools = sys_mem_info.num_numa_nodes;
+    if(rc < 0){
+		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:get_memory_pools() failed with rc = %d\n",
+			__LINE__,__FUNCTION__,rc);
+			return (rc);
     }
     #else
 	rc = get_memory_pools_update();
-	if(rc > 0){
-		sysptr->num_chip_mem_pools = sys_mem_info.num_srads;
+	if(rc < 0){
+		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:get_memory_pools_update() failed with rc = %d\n",
+			__LINE__,__FUNCTION__,rc);
+			return (rc);
 	}
     #endif
 	rc = get_memory_details(&sys_mem_info);
@@ -400,8 +405,8 @@ int get_system_details() {
         displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:get_memory_details() returned rc = %d\n",__LINE__,__FUNCTION__,rc);
         return(FAILURE);
     }
-	memptr->total_mem_avail = sys_mem_info.mem_size.real_mem;/*REV: change in AIX syscfg is required (real_mem * 4KB)*/
-	memptr->total_mem_free  = sys_mem_info.mem_size.free_real_mem;/*REV: change in AIX syscfg is required (real_mem * 4KB)*/
+	memptr->total_mem_avail = sys_mem_info.mem_size.real_mem;
+	memptr->total_mem_free  = sys_mem_info.mem_size.free_real_mem;
 #ifndef __HTX_LINUX__
 	memptr->pspace_avail	  = sys_mem_info.mem_size.paging_space_total;/*RV2: check, pspase can be removed*/
 	memptr->pspace_free 	  = sys_mem_info.mem_size.paging_space_free;
@@ -423,6 +428,11 @@ int get_system_details() {
 #else
 	sysptr->num_chip_mem_pools = sys_mem_info.num_srads;
 #endif
+	if(sysptr->num_chip_mem_pools <= 0){
+		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:Incorrect value of srads/numa_nodes obtained : %d, "
+			"Some issue in reading system config by syscfg, Exiting\n",__LINE__,__FUNCTION__,sysptr->num_chip_mem_pools);	
+		exit(1);
+	}
     sysptr->unbalanced_sys_config = 0;
 	for(i=0;i<sysptr->num_chip_mem_pools;i++){
 		mem_details_per_chip[i].num_cpus						= sys_mem_info.mem_pools[i].num_procs; /* No of cpus in this chip*/
@@ -476,7 +486,12 @@ int get_system_details() {
 	sysptr->chips = hw_stat.chips;
 	sysptr->cores = hw_stat.cores;
 	sysptr->tot_cpus = hw_stat.cpus;
+
+#ifndef __HTX_LINUX__
+    rc = syscfg_lock_sem(SYSCFG_LOCK);
+#else
     rc = pthread_rwlock_rdlock(&(global_ptr->syscfg.rw));
+#endif
     if (rc != 0 ) {
        displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:lock inside nest_framework.c failed with rc = %d and errno=%d\n", __LINE__,__FUNCTION__,rc,errno);
         
@@ -507,7 +522,11 @@ int get_system_details() {
 	    	}
 		}
     }
+#ifndef __HTX_LINUX__
+    rc = syscfg_unlock_sem(SYSCFG_LOCK);
+#else
     rc = pthread_rwlock_unlock(&(global_ptr->syscfg.rw));
+#endif
     if (rc !=0  ) {
         displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:unlock inside framework.c failed with rc = %d and errno=%d\n",__LINE__,__FUNCTION__,rc,errno);
 		return(FAILURE);
@@ -528,7 +547,7 @@ int apply_process_settings() {
     int policies[VM_NUM_POLICIES] = {/* -1 = don't change policy */
     -1, /* VM_POLICY_TEXT */
     -1, /* VM_POLICY_STACK */
-    -1, /* VM_POLICY_DATA */
+    P_FIRST_TOUCH, /* VM_POLICY_DATA */
     P_FIRST_TOUCH, /* VM_POLICY_SHM_NAMED */
     P_FIRST_TOUCH, /* VM_POLICY_SHM_ANON */
     -1, /* VM_POLICY_MAPPED_FILE */

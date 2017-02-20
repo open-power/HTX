@@ -2943,7 +2943,7 @@ int fill_mem_info_data_linux(void)
    		}
 		displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Changing the /proc/sys/kernel/shmmax variable to 256MB\n");
 	}
-    displaym(HTX_HE_INFO,DBG_MUST_PRINT,"shmmax: %llu \n", strtoul(shm_max,NULL,10));
+    displaym(HTX_HE_INFO,DBG_MUST_PRINT,"shmmax: %lu \n", strtoul(shm_max,NULL,10));
 
 	/*
 	 * Determine the page size config for the system
@@ -3039,7 +3039,7 @@ int fill_mem_info_data_linux(void)
 	if (ret < 0) {
 		displaym(4,DBG_MUST_PRINT,"unable to change the /proc/sys/kernel/shmall variable\n");
 	} else {
-		displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Changing the /proc/sys/kernel/shmall variable to %d(In terms of 4K)\n", new_shmall_4K);
+		displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Changing the /proc/sys/kernel/shmall variable to %lu(In terms of 4K)\n", new_shmall_4K);
 
 	}
 
@@ -3088,7 +3088,8 @@ int fill_mem_info_data_linux(void)
 
 	/* Assume support for huge pages */
 	mem_info.lpage_type = TRUE;
-    int huge_page_idx,huge_page_size;
+    unsigned long huge_page_size;
+	int huge_page_idx;
 
 	/*
 	 * Check if /proc/ppc64/lparcfg contains the string: cmo_enabled
@@ -3132,7 +3133,7 @@ int fill_mem_info_data_linux(void)
         huge_page_idx = PAGE_INDEX_16M;
     }
     else{
-        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"huge_page_size=%d, is neither 2M or 16M,ignoring huge page size\n",huge_page_size);
+        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"huge_page_size=%lu, is neither 2M or 16M,ignoring huge page size\n",huge_page_size);
     }
     mem_info.pdata[huge_page_idx].psize = huge_page_size;
 	pclose(fp);
@@ -6181,7 +6182,7 @@ int fill_srad_data()
 	FILE *fp;
 	char command[200],fname[100];
 	int cur_node, num_procs, lcpu;
-	int srad_mem_avail, srad_mem_free;
+	unsigned long long srad_mem_avail, srad_mem_free;
 
     strcpy(fname,stats.htx_exer_log_dir);
 	strcat(fname,"/mem_node_details");
@@ -6216,8 +6217,8 @@ int fill_srad_data()
 
 	for (sradidx = 0; (sradidx < numrads) && (sradidx < MAX_SRADS); sradidx++) {
 		/* Fetch the current chip and the num procs in the chip */
-		rc = fscanf(fp,"node_num=%d,mem_avail=%d,mem_free=%d,cpus_in_node=%d,cpus",&cur_node,&srad_mem_avail,&srad_mem_free, &num_procs);
-		displaym(HTX_HE_INFO, DBG_MUST_PRINT, "node_num=%d,mem_avail=%d,mem_free=%d,cpus_in_node=%d\n", cur_node, srad_mem_avail, srad_mem_free, num_procs);
+		rc = fscanf(fp,"node_num=%d,mem_avail=%llu,mem_free=%llu,cpus_in_node=%d,cpus",&cur_node,&srad_mem_avail,&srad_mem_free, &num_procs);
+		displaym(HTX_HE_INFO, DBG_MUST_PRINT, "node_num=%dmem_avail=%llu,mem_free=%llu,cpus_in_node=%d\n", cur_node, srad_mem_avail, srad_mem_free, num_procs);
 		if (rc == 0 || rc == EOF) {
 			displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT, "fscanf: sradidx=%d,Fetching of cpus in node error from"
 								" file %s failed with rc = %d, errno =%d",sradidx,fname,rc, errno);
