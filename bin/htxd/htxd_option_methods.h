@@ -38,14 +38,14 @@ typedef struct
 } htxd_option_method_object;
 
 
-#define OPTION_METHOD_ARGS (char **)
+#define OPTION_METHOD_ARGS (char **, htxd_command *)
 
 //typedef int(*ecg_process_function)(char*);
 
 extern void init_option_list(void);
 extern int htxd_validate_command_requirements(htxd *, char *);
-extern void htxd_init_option_method(htxd_option_method_object *);
-extern int htxd_process_command(char **, int *);
+extern void htxd_init_option_method(htxd_option_method_object *, htxd_command *);
+extern int htxd_process_command(char **, htxd_command *);
 //int htxd_process_all_active_ecg(ecg_process_function, char *);
 
 extern int htxd_option_method_create_mdt OPTION_METHOD_ARGS;

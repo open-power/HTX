@@ -219,6 +219,7 @@ pid_t htxd_create_child_process(void)
 {
 	pid_t new_pid;
 	char trace_string[256];
+	int return_code;
 
 
 	htxd_set_FD_close_on_exec_flag();
@@ -226,6 +227,15 @@ pid_t htxd_create_child_process(void)
 	if(new_pid == -1) {
 		sprintf(trace_string, "fork failed with errno <%d>", errno);
 		HTXD_TRACE(LOG_ON, trace_string);
+	}
+
+	if(new_pid == 0) {
+		/* unblock all the signals for new process */
+		return_code = htxd_thread_unblock_all_signals();
+		if(return_code != 0) {
+			sprintf(trace_string, "htxd_thread_unblock_all_signals returned with erro code <%d>", return_code);
+			HTXD_TRACE(LOG_ON, trace_string);
+		}
 	}
 
 	return new_pid;
@@ -353,14 +363,15 @@ short htxd_send_message(char *msg_text, int errno_val, int  severity, mtyp_t msg
 {
 	int msgqid;
 	time_t  system_time;
-	char *str_time_ptr;
+	char str_time_temp[50];
 	char *program_name;
-	char char_time[40];
+	char char_time[50];
 	short exit_code = 0;
 	int errno_save;
 	char error_msg[512];
 	struct htx_msg_buf msg_buffer;
 	size_t str_length;
+	struct tm new_time;
 
 
 	msgqid = htxd_get_msg_queue_id();
@@ -380,9 +391,10 @@ short htxd_send_message(char *msg_text, int errno_val, int  severity, mtyp_t msg
 
 #ifdef __HTX_LINUX__
 		system_time = time((time_t *) NULL);
-		str_time_ptr = ctime((const time_t *) &system_time);
-		strncpy(char_time, "", sizeof(char_time));
-		strncpy(char_time, (str_time_ptr + 4), 20);
+		localtime_r(&system_time, &new_time);
+		asctime_r(&new_time, str_time_temp);
+		memset(char_time, '\0', sizeof(char_time));
+		strncpy(char_time, (str_time_temp + 4), 20);
 #else
 		system_time = time((time_t *) NULL);
 		if(system_time ==0) {
@@ -394,9 +406,10 @@ short htxd_send_message(char *msg_text, int errno_val, int  severity, mtyp_t msg
 			exit_code |= BAD_GETTIMER;
 			strcpy(char_time, "time() error");
 		} else {
-			str_time_ptr = ctime((time_t *) (&system_time));
-			strncpy(char_time, "", sizeof(char_time));
-			strncpy(char_time, (str_time_ptr + 4), 20);
+			localtime_r(&system_time, &new_time);
+			asctime_r(&new_time, str_time_temp);
+			memset(char_time, '\0', sizeof(char_time));
+			strncpy(char_time, (str_time_temp + 4), 20);
 		}
 #endif
 
@@ -548,3 +561,44 @@ void htxd_ipc_cleanup_on_process_exit(int exit_pid)
 	system(command_string);
 
 }
+
+
+
+int htxd_get_daemon_state_string(int daemon_state, char *daemon_state_string)
+{
+	switch(daemon_state) {
+		case HTXD_DAEMON_STATE_IDLE:
+		strcpy(daemon_state_string, "IDLE");
+		break;
+
+		case HTXD_DAEMON_STATE_CREATING_MDT:
+		strcpy(daemon_state_string, "CREATING_MDT");
+		break;
+
+		case HTXD_DAEMON_STATE_SELECTING_MDT:
+		strcpy(daemon_state_string, "SELECTING_MDT");
+		break;
+
+		case HTXD_DAEMON_STATE_SELECTED_MDT:
+		strcpy(daemon_state_string, "SELECTED_MDT");
+		break;
+
+		case HTXD_DAEMON_STATE_STARTING_MDT:
+		strcpy(daemon_state_string, "STARTING_MDT");
+		break;
+
+		case HTXD_DAEMON_STATE_RUNNING_MDT:
+		strcpy(daemon_state_string, "RUNNING_MDT");
+		break;
+
+		case HTXD_DAEMON_SHUTTING_DOWN_MDT:
+		strcpy(daemon_state_string, "SHUTTING_DOWN_MDT");
+		break;
+
+		default:
+		strcpy(daemon_state_string, "UNKNOWN_STATE");
+	}
+
+	return 0;
+}
+

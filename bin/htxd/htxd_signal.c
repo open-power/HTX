@@ -96,9 +96,9 @@ void child_death(int sig, int code, struct sigcontext *scp)
 			htxd_reset_exer_pid(child_pid, exit_reason);
 		}
 
-		if(is_ipc_cleanup_required == 1) {
+	/*	if(is_ipc_cleanup_required == 1) {
 			htxd_ipc_cleanup_on_process_exit(child_pid);
-		}
+		} */
 	} 
 
 }
@@ -307,9 +307,9 @@ void register_signal_handlers(void)
 	 /*else
 	    sigvector.sa_handler = (void (*)(int)) sig_end;*/
 		break;
-	 /*   case SIGINT:             / * interrupt (rubout)  * /
+	    case SIGINT:             /* interrupt (rubout)  */
 		sigvector.sa_handler = (void (*)(int)) sig_end;
-		break; */
+		break; 
 	    case SIGQUIT:            /* quit (ASCII FS)     */
 		sigvector.sa_handler = SIG_IGN;
 		break;

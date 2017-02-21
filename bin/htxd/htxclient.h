@@ -77,6 +77,7 @@ typedef struct
 	int	daemon_port_number;
 	int	master_mode;
 	int	view_mode;
+	int	quick_start;
 }htxclient_parameter;
 
 

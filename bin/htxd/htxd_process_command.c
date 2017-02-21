@@ -29,13 +29,14 @@
 #include "htxd_instance.h"
 #include "htxd_util.h"
 #include "htxd_trace.h"
+#include "htxd_define.h"
 
 #define INDEX_STRING_LENGTH 10
 
 
 
 /* process input command and generates output result string */
-int htxd_process_command(char **result_string, int *p_command_type)
+int htxd_process_command(char **result_string, htxd_command *p_command_object)
 {
 	int index;
 	int return_code;
@@ -47,14 +48,30 @@ int htxd_process_command(char **result_string, int *p_command_type)
 	char *header_line = "Currently running ECG/MDT :";
 	char *under_line = "===========================";
 	char	trace_str[512];
+	int	daemon_state;
+	char  daemon_state_string[128];
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_process_command");
 
-	index = htxd_get_command_index();
-	*p_command_type = option_list[index].command_type;
+	index = p_command_object->command_index; 
+	p_command_object->command_type = option_list[index].command_type;
 
-	return_code = option_list[index].option_method(&temp_result);
+	sprintf(trace_str, "command option string received to process <%s>, command index <%d>", option_list[index].option_string, index);
+	HTXD_TRACE(LOG_OFF, trace_str);
+
+	daemon_state = htxd_get_daemon_state();
+	if( (daemon_state & option_list[index].command_state) == 0) {
+		htxd_get_daemon_state_string(daemon_state, daemon_state_string);
+		*result_string = malloc(1000);	
+		memset(*result_string, 0, 1000);
+		sprintf(*result_string, "Daemon state is <%s>, command option <%s> is not supported at this daemon state", daemon_state_string, option_list[index].option_string );
+		strcpy(trace_str, *result_string);
+		HTXD_TRACE(LOG_ON, trace_str);
+		return -1;
+	}
+
+	return_code = option_list[index].option_method(&temp_result, p_command_object);
 
 	if (option_list[index].running_ecg_display_flag != 0){
 		running_ecg_count = htxd_get_running_ecg_count();
@@ -112,27 +129,34 @@ int htxd_process_command(char **result_string, int *p_command_type)
 /* validate the initail requirements for a command */
 int htxd_validate_command_requirements(htxd *htxd_instance, char *error_string)
 {
+	int daemon_state;
 
-	if( htxd_is_daemon_idle() == TRUE) {
-		strcpy(error_string, "No ECG/MDT is currently running, daemon is idle");
+	daemon_state = htxd_get_daemon_state();
+	if( (daemon_state != HTXD_DAEMON_STATE_RUNNING_MDT) && (daemon_state != HTXD_DAEMON_STATE_SELECTED_MDT)) {
+		strcpy(error_string, "No ECG/MDT is currently running");
 		return -1;
+	}
+
+	if(htxd_instance->p_ecg_manager == NULL) {
+		strcpy(error_string, "No ECG/MDT is currently running");
+		return -2;
 	}
 
 	if(htxd_instance->p_ecg_manager->ecg_info_list == NULL) {
 		strcpy(error_string, "No ECG/MDT is currently running");
-		return -2;
+		return -3;
 	}
 
 	return 0;
 }
 
 
-void htxd_init_option_method(htxd_option_method_object *p_query_method)
+void htxd_init_option_method(htxd_option_method_object *p_query_method, htxd_command *p_command)
 {
 
 	p_query_method->htxd_instance = htxd_get_instance();
-	strcpy(p_query_method->command_ecg_name, htxd_get_command_ecg_name() );
-	strcpy(p_query_method->command_option_list, htxd_get_command_option_list() );
+	strcpy(p_query_method->command_ecg_name, p_command->ecg_name );
+	strcpy(p_query_method->command_option_list, p_command->option_list );
 	htxd_correct_device_list_for_all_devices(p_query_method->command_option_list);
 	p_query_method->error_string[0] = '\0';
 	p_query_method->return_code = 0;

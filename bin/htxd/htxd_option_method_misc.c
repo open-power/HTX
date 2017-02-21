@@ -96,10 +96,11 @@ int htxd_is_list_regular_expression(char *device_name_list)
 	}
 }
 
-int htxd_option_method_getactecg(char **result)
+int htxd_option_method_getactecg(char **result, htxd_command *p_command)
 {
 	htxd *htxd_instance;
 	int active_ecg_count;
+	int daemon_state;
 
 
 	htxd_instance = htxd_get_instance();
@@ -108,11 +109,16 @@ int htxd_option_method_getactecg(char **result)
 	if(*result == NULL) {
 		return 1;	
 	}
-	
-	if( htxd_is_daemon_idle() == TRUE) {
-		strcpy(*result, "No ECG/MDT is currently running, daemon is idle");
+
+	daemon_state = htxd_get_daemon_state();	
+	if( (daemon_state != HTXD_DAEMON_STATE_RUNNING_MDT) && (daemon_state != HTXD_DAEMON_STATE_SELECTED_MDT)) {
+		strcpy(*result, "No ECG/MDT is currently running");
 		return 0;
-		
+	}
+
+	if(htxd_instance->p_ecg_manager == NULL) {
+		strcpy(*result, "No ECG/MDT is currently running");
+		return 0;
 	}
 
 	if(htxd_instance->p_ecg_manager->ecg_info_list == NULL) {
@@ -319,7 +325,7 @@ int htxd_query_all_device(htxd_ecg_info * p_ecg_info_to_query, char *command_res
 }
 
 
-int htxd_option_method_query(char **command_result)
+int htxd_option_method_query(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list;
@@ -328,7 +334,7 @@ int htxd_option_method_query(char **command_result)
 	int device_entries_present;
 
 
-	htxd_init_option_method(&query_method);
+	htxd_init_option_method(&query_method, p_command);
 
 	query_method.return_code = htxd_validate_command_requirements(query_method.htxd_instance, query_method.error_string);
 	if(query_method.return_code != 0) {
@@ -480,14 +486,14 @@ int htxd_status_all_device(htxd_ecg_info * p_ecg_info_to_status, char *command_r
 }
 
 
-int htxd_option_method_status(char **command_result)
+int htxd_option_method_status(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list;
 	htxd_option_method_object status_method;
 	int device_entries_present;
 
-	htxd_init_option_method(&status_method);
+	htxd_init_option_method(&status_method, p_command);
 
 	status_method.return_code = htxd_validate_command_requirements(status_method.htxd_instance, status_method.error_string);
 	if(status_method.return_code != 0) {
@@ -533,7 +539,7 @@ int htxd_option_method_status(char **command_result)
 
 
 
-int htxd_option_method_refresh(char **command_result)
+int htxd_option_method_refresh(char **command_result, htxd_command *p_command)
 {
 
 	htxd *htxd_instance;
@@ -611,7 +617,7 @@ int htxd_activate_all_device(htxd_ecg_info * p_ecg_info_to_activate, char *comma
 
 
 
-int htxd_option_method_activate(char **command_result)
+int htxd_option_method_activate(char **command_result, htxd_command *p_command)
 {
 	htxd_ecg_info *p_ecg_info_list = NULL;
 	htxd_option_method_object activate_method;
@@ -620,7 +626,7 @@ int htxd_option_method_activate(char **command_result)
 	int device_entries_present;
 
 
-	htxd_init_option_method(&activate_method);
+	htxd_init_option_method(&activate_method, p_command);
 
 	activate_method.return_code = htxd_validate_command_requirements(activate_method.htxd_instance, activate_method.error_string);
 	if(activate_method.return_code != 0) {
@@ -723,7 +729,7 @@ int htxd_suspend_all_device(htxd_ecg_info * p_ecg_info_to_suspend, char *command
 
 
 
-int htxd_option_method_suspend(char **command_result)
+int htxd_option_method_suspend(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info *p_ecg_info_list = NULL;
@@ -733,7 +739,7 @@ int htxd_option_method_suspend(char **command_result)
 	int device_entries_present;
 
 
-	htxd_init_option_method(&suspend_method);
+	htxd_init_option_method(&suspend_method, p_command);
 
 	suspend_method.return_code = htxd_validate_command_requirements(suspend_method.htxd_instance, suspend_method.error_string);
 	if(suspend_method.return_code != 0) {
@@ -897,7 +903,7 @@ int htxd_terminate_all_device(htxd_ecg_info *p_ecg_info_to_terminate, char *comm
 }
 
 
-int htxd_option_method_terminate(char **command_result)
+int htxd_option_method_terminate(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info *p_ecg_info_list = NULL;
@@ -907,7 +913,7 @@ int htxd_option_method_terminate(char **command_result)
 	int device_entries_present;
 
 
-	htxd_init_option_method(&terminate_method);
+	htxd_init_option_method(&terminate_method, p_command);
 
 	terminate_method.return_code = htxd_validate_command_requirements(terminate_method.htxd_instance, terminate_method.error_string);
 	if(terminate_method.return_code != 0) {
@@ -1034,7 +1040,7 @@ int htxd_restart_all_device(htxd_ecg_info * p_ecg_info_to_restart, char *command
 
 }
 
-int htxd_option_method_restart(char **command_result)
+int htxd_option_method_restart(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info *p_ecg_info_list = NULL;
@@ -1044,7 +1050,7 @@ int htxd_option_method_restart(char **command_result)
 	int device_entries_present;
 
 
-	htxd_init_option_method(&restart_method);
+	htxd_init_option_method(&restart_method, p_command);
 
 	restart_method.return_code = htxd_validate_command_requirements(restart_method.htxd_instance, restart_method.error_string);
 	if(restart_method.return_code != 0) {
@@ -1154,7 +1160,7 @@ int htxd_coe_all_device(htxd_ecg_info * p_ecg_info_to_coe, char *command_result)
 
 
 
-int htxd_option_method_coe(char **command_result)
+int htxd_option_method_coe(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list = NULL;
@@ -1164,7 +1170,7 @@ int htxd_option_method_coe(char **command_result)
 	int device_entries_present;
 
 
-	htxd_init_option_method(&coe_method);
+	htxd_init_option_method(&coe_method, p_command);
 
 	coe_method.return_code = htxd_validate_command_requirements(coe_method.htxd_instance, coe_method.error_string);
 	if(coe_method.return_code != 0) {
@@ -1275,7 +1281,7 @@ int htxd_soe_all_device(htxd_ecg_info * p_ecg_info_to_soe, char *command_result)
 
 
 
-int htxd_option_method_soe(char **command_result)
+int htxd_option_method_soe(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list = NULL;
@@ -1285,7 +1291,7 @@ int htxd_option_method_soe(char **command_result)
 	int device_entries_present;
 
 
-	htxd_init_option_method(&soe_method);
+	htxd_init_option_method(&soe_method, p_command);
 
 	soe_method.return_code = htxd_validate_command_requirements(soe_method.htxd_instance, soe_method.error_string);
 	if(soe_method.return_code != 0) {
@@ -1379,7 +1385,7 @@ void htxd_bootme_error_string(int error_code, char ** result_string)
 }
 
 
-int htxd_option_method_bootme(char **command_result)
+int htxd_option_method_bootme(char **command_result, htxd_command *p_command)
 {
 
 	htxd_option_method_object bootme_method;
@@ -1393,7 +1399,7 @@ int htxd_option_method_bootme(char **command_result)
 	char temp_string[300];
 
 
-	htxd_init_option_method(&bootme_method);
+	htxd_init_option_method(&bootme_method, p_command);
 
 	*command_result = malloc( 2 * 1024);
 	if(*command_result == NULL) {
@@ -1484,7 +1490,7 @@ int htxd_option_method_bootme(char **command_result)
 
 
 
-int htxd_option_method_exersetupinfo(char **command_result)
+int htxd_option_method_exersetupinfo(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list = NULL;
@@ -1495,7 +1501,7 @@ int htxd_option_method_exersetupinfo(char **command_result)
 	char trace_string[256];
 
 
-	htxd_init_option_method(&exersetupinfo_method);
+	htxd_init_option_method(&exersetupinfo_method, p_command);
 	*command_result = malloc(EXTRA_BUFFER_LENGTH);
 	if(*command_result == NULL) {
 		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
@@ -1579,7 +1585,7 @@ int htxd_getstats_ecg(htxd_ecg_info * p_ecg_info_to_getstats, char **command_res
 }
 
 
-int htxd_option_method_getstats(char **command_result)
+int htxd_option_method_getstats(char **command_result, htxd_command *p_command)
 {
 
 	htxd *htxd_instance;
@@ -1589,7 +1595,7 @@ int htxd_option_method_getstats(char **command_result)
 	char command_ecg_name[MAX_ECG_NAME_LENGTH];
 
 	htxd_instance = htxd_get_instance();
-	strcpy(command_ecg_name, htxd_get_command_ecg_name() );
+	strcpy(command_ecg_name, p_command->ecg_name );
 
 	*command_result = NULL;
 
@@ -1599,6 +1605,12 @@ int htxd_option_method_getstats(char **command_result)
 
 	return_code = htxd_validate_command_requirements(htxd_instance, error_string);
 
+	if(return_code == 0) {
+		if( htxd_get_daemon_state() != HTXD_DAEMON_STATE_RUNNING_MDT ) {
+			strcpy(error_string,"No ECG/MDT is currently running");
+			return_code = -1;
+		}
+	}
 
 	if(return_code != 0) {
 		*command_result = malloc(512);
@@ -1632,7 +1644,7 @@ int htxd_option_method_getstats(char **command_result)
 
 
 
-int htxd_option_method_geterrlog(char **command_result)
+int htxd_option_method_geterrlog(char **command_result, htxd_command *p_command)
 {
 	int return_code;
 	char temp_string[300];
@@ -1654,7 +1666,7 @@ int htxd_option_method_geterrlog(char **command_result)
 
 
 
-int htxd_option_method_clrerrlog(char **command_result)
+int htxd_option_method_clrerrlog(char **command_result, htxd_command *p_command)
 {
 	int return_code;
 	char temp_string[300];
@@ -1679,19 +1691,16 @@ int htxd_option_method_clrerrlog(char **command_result)
 
 
 
-int htxd_option_method_get_file(char **command_result)
+int htxd_option_method_get_file(char **command_result, htxd_command *p_command)
 {
 	int return_code = 0;
-	htxd *htxd_instance;
 	char filename[512];
 	char *running_mdt_name;
 	int  htx_stats_pid;
 	char command_string[128];
 
 
-	htxd_instance = htxd_get_instance();
-
-	strcpy(filename, htxd_instance->p_command->option_list);
+	strcpy(filename, p_command->option_list);
 
 	if(strcmp(STATS_FILE_STRING,  filename) == 0) {
 		htx_stats_pid = htxd_get_htx_stats_pid();
@@ -1728,21 +1737,19 @@ int htxd_option_method_get_file(char **command_result)
 
 
 
-int htxd_option_method_cmd(char **command_result)
+int htxd_option_method_cmd(char **command_result, htxd_command *p_command)
 {
 
 	int return_code;
 	char command_string[512];
-	htxd *htxd_instance;
 	char temp_string[300];
 
-	htxd_instance = htxd_get_instance();
 
 	sprintf(temp_string, "%s/%s", global_htxd_log_dir, HTX_CMD_RESULT_FILE);
-	sprintf(command_string, "echo \" Error: failed to execute command \<%s\> \" >%s; sync",  htxd_instance->p_command->option_list, temp_string);
+	sprintf(command_string, "echo \" Error: failed to execute command \<%s\> \" >%s; sync",  p_command->option_list, temp_string);
 	system(command_string);
 
-	sprintf(command_string, " (%s) > %s 2>&1 ; sync", htxd_instance->p_command->option_list, temp_string);
+	sprintf(command_string, " (%s) > %s 2>&1 ; sync", p_command->option_list, temp_string);
 	system(command_string);
 
 	return_code = htxd_read_file(temp_string, command_result);
@@ -1762,16 +1769,14 @@ int htxd_option_method_cmd(char **command_result)
 }
 
 
-int htxd_option_method_set_eeh(char **command_result)
+int htxd_option_method_set_eeh(char **command_result, htxd_command *p_command)
 {
 
 	int return_code = 0;
-	htxd *htxd_instance;
 	char *ptr_env = NULL;
 	char trace_string[256];
 
 
-	htxd_instance = htxd_get_instance();
 
 	*command_result = malloc(512);
 	if(*command_result == NULL) {
@@ -1780,21 +1785,21 @@ int htxd_option_method_set_eeh(char **command_result)
 		return -1;
 	}
 
-	if(strlen(htxd_instance->p_command->option_list) == 0) {
+	if(strlen(p_command->option_list) == 0) {
 		ptr_env = getenv("HTXEEH");	
 		if(ptr_env == NULL) {
 			strcpy(*command_result, "HTXEEH is not set");
 		} else {
 			sprintf(*command_result, "HTXEEH value is %s", ptr_env);
 		}
-	} else  if(strcmp(htxd_instance->p_command->option_list, "1") == 0)  {
+	} else  if(strcmp(p_command->option_list, "1") == 0)  {
 		return_code = setenv("HTXEEH", "1", 1);
 		if(return_code != 0) {
 			sprintf(*command_result, "Error while setting HTXEEH environment variable, return code =<%d>, errono=<%d>", return_code, errno);
 		} else {
 			strcpy(*command_result, "set eeh flag successfully");
 		}
-	} else if(strcmp(htxd_instance->p_command->option_list, "0") == 0) {
+	} else if(strcmp(p_command->option_list, "0") == 0) {
 		return_code = setenv("HTXEEH", "0", 1);
 		if(return_code != 0) {
 			sprintf(*command_result, "Error while setting HTXEEH environment variable, return code =<%d>, errono=<%d>", return_code, errno);
@@ -1810,16 +1815,13 @@ int htxd_option_method_set_eeh(char **command_result)
 }
 
 
-int htxd_option_method_set_kdblevel(char **command_result)
+int htxd_option_method_set_kdblevel(char **command_result, htxd_command *p_command)
 {
 
 	int return_code = 0;
-	htxd *htxd_instance;
 	char *ptr_env = NULL;
 	char trace_string[256];
 
-
-	htxd_instance = htxd_get_instance();
 
 	*command_result = malloc(512);
 	if(*command_result == NULL) {
@@ -1828,21 +1830,21 @@ int htxd_option_method_set_kdblevel(char **command_result)
 		return -1;
 	}
 
-	if(strlen(htxd_instance->p_command->option_list) == 0) {
+	if(strlen(p_command->option_list) == 0) {
 		ptr_env = getenv("HTXKDBLEVEL");	
 		if(ptr_env == NULL) {
 			strcpy(*command_result, "HTXKDBLEVEL is not set");
 		} else {
 			sprintf(*command_result, "HTXKDBLEVEL value is %s", ptr_env);
 		}
-	} else  if(strcmp(htxd_instance->p_command->option_list, "1") == 0)  {
+	} else  if(strcmp(p_command->option_list, "1") == 0)  {
 		return_code = setenv("HTXKDBLEVEL", "1", 1);
 		if(return_code != 0) {
 			sprintf(*command_result, "Error while setting HTXKDBLEVEL environment variable, return code =<%d>, errono=<%d>", return_code, errno);
 		} else {
 			strcpy(*command_result, "set kdb level flag successfully");
 		}
-	} else if(strcmp(htxd_instance->p_command->option_list, "0") == 0) {
+	} else if(strcmp(p_command->option_list, "0") == 0) {
 		return_code = setenv("HTXKDBLEVEL", "0", 1);
 		if(return_code != 0) {
 			sprintf(*command_result, "Error while setting HTXKDBLEVEL environment variable, return code =<%d>, errono=<%d>", return_code, errno);
@@ -1862,7 +1864,7 @@ int htxd_option_method_set_kdblevel(char **command_result)
 
 
 
-int htxd_option_method_set_hxecom(char **command_result)
+int htxd_option_method_set_hxecom(char **command_result, htxd_command *p_command)
 {
 	char temp_string[300];
 
@@ -1890,17 +1892,14 @@ int htxd_option_method_set_hxecom(char **command_result)
 
 
 
-int htxd_option_method_set_htx_env(char **command_result)
+int htxd_option_method_set_htx_env(char **command_result, htxd_command *p_command)
 {
 
 	int return_code = 0;
-	htxd *htxd_instance;
 	char variable[128] = "";
 	char value[128] = "";
 	char trace_string[256];
 
-
-	htxd_instance = htxd_get_instance();
 
 	*command_result = malloc(512);
 	if(*command_result == NULL) {
@@ -1910,12 +1909,12 @@ int htxd_option_method_set_htx_env(char **command_result)
 	}
 
 
-	if(strlen(htxd_instance->p_command->option_list) == 0) {
+	if(strlen(p_command->option_list) == 0) {
 		strcpy(*command_result, "Please provide environment variable and value");
 		return 1;
 	}
 
-	sscanf(htxd_instance->p_command->option_list, "%s %s", variable, value);
+	sscanf(p_command->option_list, "%s %s", variable, value);
 	if(strlen(variable) == 0) {
 		strcpy(*command_result, "could not find environment variable");
 		return 1;
@@ -1934,16 +1933,13 @@ int htxd_option_method_set_htx_env(char **command_result)
 
 
 
-int htxd_option_method_get_htx_env(char **command_result)
+int htxd_option_method_get_htx_env(char **command_result, htxd_command *p_command)
 {
 
-	htxd *htxd_instance;
 	char variable[128] = "";
 	char *value = NULL;
 	char trace_string[256];
 
-
-	htxd_instance = htxd_get_instance();
 
 	*command_result = malloc(512);
 	if(*command_result == NULL) {
@@ -1953,12 +1949,12 @@ int htxd_option_method_get_htx_env(char **command_result)
 	}
 
 
-	if(strlen(htxd_instance->p_command->option_list) == 0) {
+	if(strlen(p_command->option_list) == 0) {
 		strcpy(*command_result, "Please provide environment variable");
 		return 1;
 	}
 
-	sscanf(htxd_instance->p_command->option_list, "%s", variable);
+	sscanf(p_command->option_list, "%s", variable);
 	if(strlen(variable) == 0) {
 		strcpy(*command_result, "could not find environment variable");
 		return 1;
@@ -1977,7 +1973,7 @@ int htxd_option_method_get_htx_env(char **command_result)
 
 
 
-int htxd_option_method_getvpd(char **command_result)
+int htxd_option_method_getvpd(char **command_result, htxd_command *p_command)
 {
 	int return_code;
 	char vpd_command_string[512];
@@ -2095,7 +2091,7 @@ int htxd_getecgsum_all_device(htxd_ecg_info * p_ecg_info_to_getecgsum, char *com
 
 
 
-int htxd_option_method_getecgsum(char **command_result)
+int htxd_option_method_getecgsum(char **command_result, htxd_command *p_command)
 {
 	htxd *htxd_instance;
 	char error_string[512];
@@ -2106,7 +2102,7 @@ int htxd_option_method_getecgsum(char **command_result)
 
 
 	htxd_instance = htxd_get_instance();
-	strcpy(command_ecg_name, htxd_get_command_ecg_name() );
+	strcpy(command_ecg_name, p_command->ecg_name );
 
 	*command_result = malloc(EXTRA_BUFFER_LENGTH *4);
 	if(*command_result == NULL) {
@@ -2141,7 +2137,7 @@ int htxd_option_method_getecgsum(char **command_result)
 
 
 
-int htxd_option_method_getecglist(char **command_result)
+int htxd_option_method_getecglist(char **command_result, htxd_command *p_command)
 {
 	int mdt_count = 0;
 	int return_code;
@@ -2396,7 +2392,7 @@ int htxd_screen_5_all_device(htxd_ecg_info * p_ecg_info_to_screen_5, int device_
 
 
 
-int htxd_option_method_screen_5(char **command_result)
+int htxd_option_method_screen_5(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list;
@@ -2407,7 +2403,7 @@ int htxd_option_method_screen_5(char **command_result)
 
 
 
-	htxd_init_option_method(&screen_5_method);
+	htxd_init_option_method(&screen_5_method, p_command);
 
 	*command_result = malloc(result_size);
 	if(*command_result == NULL) {
@@ -2502,7 +2498,7 @@ int htxd_screen_2_4_all_device(htxd_ecg_info * p_ecg_info, int device_start_posi
 
 
 
-int htxd_option_method_screen_4(char **command_result)
+int htxd_option_method_screen_4(char **command_result, htxd_command *p_command)
 {
 	
 	htxd_ecg_info * p_ecg_info_list;
@@ -2511,7 +2507,7 @@ int htxd_option_method_screen_4(char **command_result)
 	char trace_string[256];
 
 
-	htxd_init_option_method(&screen_4_method);
+	htxd_init_option_method(&screen_4_method, p_command);
 
 	*command_result = malloc(1024 * 10);
 	if(*command_result == NULL) {
@@ -2599,7 +2595,7 @@ int htxd_screen_2_all_device(htxd_ecg_info * p_ecg_info_to_screen_2, int device_
 
 
 
-int htxd_option_method_screen_2(char **command_result)
+int htxd_option_method_screen_2(char **command_result, htxd_command *p_command)
 {
 	
 	htxd_ecg_info * p_ecg_info_list;
@@ -2608,7 +2604,7 @@ int htxd_option_method_screen_2(char **command_result)
 	char trace_string[256];
 
 
-	htxd_init_option_method(&screen_2_method);
+	htxd_init_option_method(&screen_2_method, p_command);
 
 	*command_result = malloc(1024 * 10);
 	if(*command_result == NULL) {
@@ -2680,7 +2676,7 @@ int htxd_toggle_coe_soe(htxd_ecg_info *p_ecg_info, int device_position, int oper
 
 
 
-int htxd_option_method_coe_soe(char **command_result)
+int htxd_option_method_coe_soe(char **command_result, htxd_command *p_command)
 {
 	
 	htxd_ecg_info			*p_ecg_info_list;
@@ -2691,7 +2687,7 @@ int htxd_option_method_coe_soe(char **command_result)
 	char				trace_string[256];
 
 
-	htxd_init_option_method(&coe_soe_method);
+	htxd_init_option_method(&coe_soe_method, p_command);
 
 	*command_result = malloc(1024 * 10);
 	if(*command_result == NULL) {
@@ -2759,7 +2755,7 @@ int htxd_toggle_activate_halt(htxd_ecg_info *p_ecg_info, int device_position, in
 
 
 
-int htxd_option_method_activate_halt(char **command_result)
+int htxd_option_method_activate_halt(char **command_result, htxd_command *p_command)
 {
 	
 	htxd_ecg_info * p_ecg_info_list;
@@ -2770,7 +2766,7 @@ int htxd_option_method_activate_halt(char **command_result)
 	char trace_string[256];
 
 
-	htxd_init_option_method(&activate_halt_method);
+	htxd_init_option_method(&activate_halt_method, p_command);
 
 	*command_result = malloc(1024 * 10);
 	if(*command_result == NULL) {
@@ -2809,7 +2805,7 @@ int htxd_option_method_activate_halt(char **command_result)
 
 
 
-int htxd_option_method_device_count(char **command_result)
+int htxd_option_method_device_count(char **command_result, htxd_command *p_command)
 {
 	
 	int device_count;
@@ -2834,7 +2830,7 @@ int htxd_option_method_device_count(char **command_result)
 
 
 
-int htxd_option_method_get_daemon_state(char **command_result)
+int htxd_option_method_get_daemon_state(char **command_result, htxd_command *p_command)
 {
 	int daemon_state;
 	int test_running_state;
@@ -2860,7 +2856,7 @@ int htxd_option_method_get_daemon_state(char **command_result)
 
 
 
-int htxd_option_method_test_activate_halt(char **command_result)
+int htxd_option_method_test_activate_halt(char **command_result, htxd_command *p_command)
 {
 
 #ifdef __HTX_LINUX__
@@ -2974,7 +2970,7 @@ int htxd_option_method_test_activate_halt(char **command_result)
 
 
 
-int htxd_option_method_config_net(char **command_result)
+int htxd_option_method_config_net(char **command_result, htxd_command *p_command)
 {
 	
 	htxd_option_method_object config_net_method;
@@ -2983,7 +2979,7 @@ int htxd_option_method_config_net(char **command_result)
 	char trace_string[256];
 
 
-	htxd_init_option_method(&config_net_method);
+	htxd_init_option_method(&config_net_method, p_command);
 
 	*command_result = malloc(256);
 	if(*command_result == NULL) {
@@ -3023,7 +3019,7 @@ int htxd_option_method_config_net(char **command_result)
 
 
 
-int htxd_option_method_append_net_mdt(char **command_result)
+int htxd_option_method_append_net_mdt(char **command_result, htxd_command *p_command)
 {
 	htxd_option_method_object append_net_mdt_method;
 	char mdt_name[300];
@@ -3032,7 +3028,7 @@ int htxd_option_method_append_net_mdt(char **command_result)
 	char trace_string[256];
 
 
-	htxd_init_option_method(&append_net_mdt_method);
+	htxd_init_option_method(&append_net_mdt_method, p_command);
 
 	*command_result = malloc(384);
 	if(*command_result == NULL) {
@@ -3054,7 +3050,7 @@ int htxd_option_method_append_net_mdt(char **command_result)
 		return 1;
 	}
 
-	sprintf(command_string, "%s/mdt/mdt_net %s >%s/%s  2>&1", global_htx_home_dir, mdt_name, global_htxd_log_dir, MDT_NET_LOG);
+	sprintf(command_string, "%s/etc/scripts/mdt_net %s >%s/%s  2>&1", global_htx_home_dir, mdt_name, global_htxd_log_dir, MDT_NET_LOG);
 	system(command_string); 
 
 	sprintf(*command_result, "net.mdt is appaned to mdt <%s>", mdt_name);
@@ -3064,7 +3060,7 @@ int htxd_option_method_append_net_mdt(char **command_result)
 
 
 
-int htxd_option_method_test_net(char **command_result)
+int htxd_option_method_test_net(char **command_result, htxd_command *p_command)
 {
 
 	char command_string[64];
@@ -3100,7 +3096,7 @@ int htxd_option_method_test_net(char **command_result)
 
 
 
-int htxd_option_method_get_run_time(char **command_result)
+int htxd_option_method_get_run_time(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list = NULL;
@@ -3110,7 +3106,7 @@ int htxd_option_method_get_run_time(char **command_result)
 	int mdt_run_time;
 
 
-	htxd_init_option_method(&get_run_time_method);
+	htxd_init_option_method(&get_run_time_method, p_command);
 	*command_result = malloc(EXTRA_BUFFER_LENGTH);
 	if(*command_result == NULL) {
 		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
@@ -3149,7 +3145,7 @@ int htxd_option_method_get_run_time(char **command_result)
 
 
 
-int htxd_option_method_get_last_update_time(char **command_result)
+int htxd_option_method_get_last_update_time(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list = NULL;
@@ -3162,7 +3158,7 @@ int htxd_option_method_get_last_update_time(char **command_result)
 	int i;
 
 
-	htxd_init_option_method(&get_last_update_time_method);
+	htxd_init_option_method(&get_last_update_time_method, p_command);
 	*command_result = malloc(EXTRA_BUFFER_LENGTH);
 	if(*command_result == NULL) {
 		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
@@ -3210,7 +3206,7 @@ int htxd_option_method_get_last_update_time(char **command_result)
 }
 
 
-int htxd_option_method_get_fail_status(char **command_result)
+int htxd_option_method_get_fail_status(char **command_result, htxd_command *p_command)
 {
 	htxd_ecg_info			*p_ecg_info_list = NULL;
 	htxd_option_method_object	get_last_update_time_method;
@@ -3230,7 +3226,7 @@ int htxd_option_method_get_fail_status(char **command_result)
 
 
 
-	htxd_init_option_method(&get_last_update_time_method);
+	htxd_init_option_method(&get_last_update_time_method, p_command);
 	*command_result = malloc(EXTRA_BUFFER_LENGTH);
 	if(*command_result == NULL) {
 		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
@@ -3305,7 +3301,7 @@ int htxd_option_method_get_fail_status(char **command_result)
 
 
 /* to calulate cumulative device cycles */
-int htxd_option_method_get_dev_cycles(char **command_result)
+int htxd_option_method_get_dev_cycles(char **command_result, htxd_command *p_command)
 {
 
 	htxd_ecg_info * p_ecg_info_list = NULL;
@@ -3319,7 +3315,7 @@ int htxd_option_method_get_dev_cycles(char **command_result)
 	int device_name_search_length;
 
 
-	htxd_init_option_method(&get_dev_cycles_method);
+	htxd_init_option_method(&get_dev_cycles_method, p_command);
 	*command_result = malloc(EXTRA_BUFFER_LENGTH);
 	if(*command_result == NULL) {
 		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);

@@ -30,7 +30,7 @@
 #include "htxd_signal.h"
 
 
-extern int htxd_option_method_run_mdt(char **);
+extern int htxd_option_method_run_mdt(char **, htxd_command *);
 
 int htxd_get_autostart_mdt_name(char *flagfile, char *mdt_name)
 {
@@ -59,7 +59,7 @@ int htxd_autostart(htxd *htxd_instance)
 	char trace_str[256];
 	char autostart_mdt_name[256] = {'\0'};
 	char temp_string[300];
-
+	htxd_command autostart_run_command;
 
 
 	sprintf(temp_string, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
@@ -104,12 +104,10 @@ int htxd_autostart(htxd *htxd_instance)
 	if(htxd_is_profile_initialized(htxd_instance) != TRUE) {
 		HTXD_TRACE(LOG_ON, "initialize HTX profile details from auto start");
 		htxd_init_profile(&(htxd_instance->p_profile));
-		register_signal_handlers();	
 	}
 
-	htxd_set_command_ecg_name(autostart_mdt_name);
-
-	return_code = htxd_option_method_run_mdt(&result_str);
+	strcpy(autostart_run_command.ecg_name, autostart_mdt_name);
+	return_code = htxd_option_method_run_mdt(&result_str, &autostart_run_command);
 	if(return_code != 0) {
 		sprintf(trace_str, "autostart failed to start MDT <%s>, result str<%s>, return code <%d>", autostart_mdt_name, result_str, return_code);
 		HTXD_TRACE(LOG_ON, trace_str);

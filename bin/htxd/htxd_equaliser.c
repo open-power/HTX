@@ -321,7 +321,6 @@ void htxd_equaliser(void)
     useconds_t micro_seconds;
     char global_htxd_log_dir[256] = "/tmp/";
     long clock, tm_log_save;
-    char *p_tm;
     struct stat buf1;
 
     static char process_name[] = "htx_equaliser";
@@ -331,6 +330,8 @@ void htxd_equaliser(void)
     struct sigaction sigvector;     /* structure for signals             */
     run_time_config *exer_conf;
     char equaliser_log_file[300], equaliser_log_file_save[300];
+    struct tm new_time;
+    char str_time[50];
 
   /*
    ***********************  beginning of executable code  *******************
@@ -453,12 +454,13 @@ void htxd_equaliser(void)
                                     /* sprintf(msg, "Action is:%d", Action);
                                     htxd_send_message(msg, 0, HTX_SYS_INFO, HTX_SYS_MSG);  */
 						            if((action == 0) && ((p_htxshm_HE + index)->equaliser_halt == 0)) {
-										clock = time((long *) 0);
-							            p_tm = ctime(&clock);
-							            sprintf(msg, "Sending SIGSTOP to %s at %s", (p_htxshm_HE + index)->sdev_id, p_tm);
+								    clock = time((long *) 0);
+								    localtime_r(&clock, &new_time);
+								    asctime_r(&new_time, str_time);
+							            sprintf(msg, "Sending SIGSTOP to %s at %s", (p_htxshm_HE + index)->sdev_id, str_time);
 							            fprintf (log_fp, "%s", msg);
 							            if(htxd_get_equaliser_debug_flag() == 1) {
-								            sprintf(msg, "htx_equaliser: Sending SIGSTOP to %s at %s", (p_htxshm_HE + index)->sdev_id, p_tm);
+								            sprintf(msg, "htx_equaliser: Sending SIGSTOP to %s at %s", (p_htxshm_HE + index)->sdev_id, str_time);
 								            htxd_send_message(msg, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 							            }
 							            kill_return_code = 0;
@@ -479,7 +481,8 @@ void htxd_equaliser(void)
 							            }
 						            } else if((action == 1) && ((p_htxshm_HE + index)->equaliser_halt == 1)) {
 							            clock = time((long *) 0);
-							            p_tm = ctime(&clock);
+								    localtime_r(&clock, &new_time);
+								    asctime_r(&new_time, str_time);
                                     #ifdef __HTX_LINUX__
                                         if (test_config.offline_cpu) {
                                         /* bring CPU online and bind the process to that */
@@ -495,10 +498,10 @@ void htxd_equaliser(void)
                                             }
                                         }
                                     #endif
-						                sprintf(msg, "Sending SIGCONT to %s at %s", (p_htxshm_HE + index)->sdev_id, p_tm);
+						                sprintf(msg, "Sending SIGCONT to %s at %s", (p_htxshm_HE + index)->sdev_id, str_time);
 							            fprintf (log_fp, "%s", msg);
 							            if(htxd_get_equaliser_debug_flag() == 1) {
-							  	            sprintf(msg, "htx_equaliser: Sending SIGCONT to %s at %s", (p_htxshm_HE + index)->sdev_id, p_tm);
+							  	            sprintf(msg, "htx_equaliser: Sending SIGCONT to %s at %s", (p_htxshm_HE + index)->sdev_id, str_time);
 								            htxd_send_message(msg, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 							            }
 							            kill_return_code = 0;

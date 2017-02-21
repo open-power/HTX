@@ -353,7 +353,7 @@ int htxd_activate_all_ecg_devices(htxd_ecg_manager *this_ecg_manager)
 
 
 /* run command main function */
-int htxd_option_method_run_mdt(char **result)
+int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 {
 	htxd *htxd_instance;
 	htxd_ecg_info * p_ecg_info_list;
@@ -368,7 +368,7 @@ int htxd_option_method_run_mdt(char **result)
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_run_mdt");
 	/* htxd instance will be created only first time */
 	htxd_instance = htxd_get_instance();
-	strcpy(command_ecg_name, htxd_get_command_ecg_name());
+	strcpy(command_ecg_name, p_command->ecg_name);
 
 	sprintf(trace_str, "ECG name from command = <%s>", command_ecg_name);
 	HTXD_TRACE(LOG_OFF, trace_str);
@@ -379,6 +379,11 @@ int htxd_option_method_run_mdt(char **result)
 
 	if(command_ecg_name[0] == '\0') {
 		sprintf(command_ecg_name, "%s/mdt/%s", global_htx_home_dir, DEFAULT_ECG_NAME);
+	}
+
+	if(htxd_instance->is_mdt_created == 0) {
+		htxd_execute_shell_profile();	
+		htxd_instance->is_mdt_created = 1;
 	}
 
 	*result = malloc(1024);
@@ -452,6 +457,7 @@ int htxd_option_method_run_mdt(char **result)
 		ecg_manager->selected_ecg_name[0] = '\0';
 	}
 
+	htxd_set_daemon_state(HTXD_DAEMON_STATE_STARTING_MDT);
 	ecg_manager->current_loading_ecg_info->ecg_run_start_time = (int) time((time_t *) 0);
 
 	/* initializing syscfg */
@@ -509,7 +515,6 @@ int htxd_option_method_run_mdt(char **result)
 		HTXD_TRACE(LOG_ON, "run started stop watch monitor thread");
 	}
 
-	htxd_instance->run_state = HTXD_DAEMON_RUNNING;
 	htxd_set_test_running_state(HTXD_TEST_ACTIVATED);
 	strcpy(ecg_manager->running_ecg_name, command_ecg_name);
 
@@ -535,6 +540,7 @@ int htxd_option_method_run_mdt(char **result)
 	htxd_set_system_header_info_shm_with_current_shm_key(p_ecg_info_to_run->ecg_shm_key);
 
 	htxd_send_message (*result, 0, HTX_SYS_INFO, HTX_SYS_MSG);
+	htxd_set_daemon_state(HTXD_DAEMON_STATE_RUNNING_MDT);
 	HTXD_TRACE(LOG_ON, *result);
 	HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_option_method_run_mdt");
 	return 0;
@@ -544,7 +550,7 @@ int htxd_option_method_run_mdt(char **result)
 
 
 /* select mdt command main function */
-int htxd_option_method_select_mdt(char **result)
+int htxd_option_method_select_mdt(char **result, htxd_command *p_command)
 {
 	htxd *htxd_instance;
 	htxd_ecg_info * p_ecg_info_list;
@@ -561,9 +567,14 @@ int htxd_option_method_select_mdt(char **result)
 
 	*result = malloc(1024);
 	ecg_manager = htxd_get_ecg_manager();
-	strcpy(command_ecg_name, htxd_get_command_ecg_name());
+	strcpy(command_ecg_name, p_command->ecg_name);
 
-	if(htxd_instance->run_state == HTXD_DAEMON_SELECTED) {
+	if(htxd_instance->is_mdt_created == 0) {
+		htxd_execute_shell_profile();	
+		htxd_instance->is_mdt_created = 1;
+	}
+
+	if(htxd_instance->run_state == HTXD_DAEMON_STATE_SELECTED_MDT) {
 		if(strcmp(command_ecg_name, ecg_manager->selected_ecg_name) == 0) {
 			sprintf(*result, "Failed to select specified ecg/mdt(%s), same ecg/mdt is already selected", command_ecg_name);
 		} else {
@@ -572,7 +583,7 @@ int htxd_option_method_select_mdt(char **result)
 		return 1;
 	}
 
-	if(htxd_instance->run_state == HTXD_DAEMON_RUNNING) {
+	if(htxd_instance->run_state == HTXD_DAEMON_STATE_RUNNING_MDT) {
 		if(strcmp(command_ecg_name, ecg_manager->running_ecg_name) == 0) {
 			sprintf(*result, "Failed to select specified ecg/mdt(%s), same ecg/mdt is being run", command_ecg_name);
 		} else {
@@ -616,6 +627,8 @@ int htxd_option_method_select_mdt(char **result)
 		p_ecg_info_list = p_ecg_info_list->ecg_info_next;
 	}
 
+	htxd_set_daemon_state(HTXD_DAEMON_STATE_SELECTING_MDT);
+
 	/* copy run mdt to current mdt */
 	sprintf(temp_str, "cp %s %s/mdt/mdt ; sync", command_ecg_name, global_htx_home_dir);
 	system(temp_str);
@@ -646,8 +659,6 @@ int htxd_option_method_select_mdt(char **result)
 		HTXD_TRACE(LOG_ON, "run started htxsmsg process");
 	}
 
-
-	htxd_instance->run_state = HTXD_DAEMON_SELECTED;
 	strcpy(ecg_manager->selected_ecg_name, command_ecg_name);
 
 	/* to DEBUG */
@@ -669,6 +680,7 @@ int htxd_option_method_select_mdt(char **result)
 
 	htxd_send_message (*result, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 	HTXD_TRACE(LOG_ON, *result);
+	htxd_set_daemon_state(HTXD_DAEMON_STATE_SELECTED_MDT);
 	HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_option_method_select_mdt");
 	return 0;
 

@@ -46,6 +46,7 @@
 typedef struct
 {
 	int	command_index;
+	int	command_type;
 	char	ecg_name[MAX_ECG_NAME_LENGTH];
 	char	option_list[MAX_OPTION_LIST_LENGTH];
 } htxd_command;
@@ -72,7 +73,6 @@ typedef struct
 	int			port_number;
 	pid_t *			p_child_pid_list;
 	htxd_profile *		p_profile;
-	htxd_command *		p_command;
 	int			dr_sem_key;
 	int			dr_sem_id;
 	int			dr_reconfig_restart;
@@ -90,6 +90,7 @@ typedef struct
 	int			init_syscfg_flag;
 	int			master_client_mode;
 	int			is_test_active;
+	int			is_mdt_created;
 	int			is_stop_watch_monitor_initailized;
 } htxd;
 
