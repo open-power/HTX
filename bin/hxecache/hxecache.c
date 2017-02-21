@@ -1463,9 +1463,12 @@ int find_reqd_contig_pages( unsigned int mem_req, struct ruleinfo *rule, int mem
 		next_page_status	= rule->mem_page_status[i+1];
 
 		if (next_page_distance == huge_page_size && current_page_status == PAGE_FREE && next_page_status == PAGE_FREE)  {
+			if(contig_mem_size == huge_page_size){
+				save_index = i;
+			}
 			contig_mem_size += huge_page_size;
 			if(contig_mem_size >= mem_req) {
-				save_index = i;
+				/*save_index = i;*/
 				for(j = 0, k = save_index; k <= (i+1) ; j++, k++) {
 					rule->mem_page_status[k]	= CACHE_PAGE;
 					rule->cont_memory_pool.cont_mem_set[memory_set][j] = mem.ea[k];
@@ -4789,7 +4792,7 @@ void dump_rule_structure(struct ruleinfo *rule_ptr) {
 
 	struct ruleinfo *rule;
 	int 			testcase_num;
-	int				i;
+	int				i,j;
 	int				loop_count;
 	char			*active_prefetch_algos;
 
@@ -4867,8 +4870,11 @@ void dump_rule_structure(struct ruleinfo *rule_ptr) {
 		print_log("\n[%d] Number of sets of contiguous pages     = %d",__LINE__,rule->cont_memory_pool.num_sets);
 		
 		for(i=0; i<rule->cont_memory_pool.num_sets; i++) {
-			print_log("\n[%d] cache_thread_address[%d][0]             = %p",__LINE__,i,rule->cont_memory_pool.cont_mem_set[i][0]);
-			print_log("\n[%d] cache_thread_address[%d][1]             = %p",__LINE__,i,rule->cont_memory_pool.cont_mem_set[i][1]);
+			for(j=0;j<MAX_HUGE_PAGES_PER_CORE;j++){
+				if(rule->cont_memory_pool.cont_mem_set[i][j] != 0){
+					print_log("\n[%d] cache_thread_address[%d][%d]             = %p",__LINE__,i,j,rule->cont_memory_pool.cont_mem_set[i][j]);
+				}
+			}
 		}
 
 		for(i=0; i<rule->cont_memory_pool.prefetch_sets; i++) {

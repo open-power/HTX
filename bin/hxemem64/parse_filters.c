@@ -50,12 +50,16 @@ int parse_mem_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
         r.filter.mf.node[node].node_num=-1;
     }r.filter.mf.num_nodes =0;
 
-    sprintf(msg,"\n====================================================\n"
-        "Memory filter details\n====================================================\n");
+	if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+    	sprintf(msg,"\n====================================================\n"
+        	"Memory filter\n====================================================\n");
+	}
     for(filt_idx = 0; filt_idx < r.num_mem_filters; filt_idx++){
-        
-        sprintf(msg_temp,"mem filter[%d]=%s\n",filt_idx,filter_ptr[filt_idx]);
-        strcat(msg,msg_temp);
+	
+		if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+        	sprintf(msg_temp,"mem filter[%d]=%s\n",filt_idx,filter_ptr[filt_idx]);
+        	strcat(msg,msg_temp);
+		}
         i = 0,j=0,node_num=0,num_nodes=0;
         strcpy(tmp_filter_str,filter_ptr[filt_idx]);
         if((strchr(tmp_filter_str,'N') == NULL)||(strchr(tmp_filter_str,'P')== NULL)){
@@ -204,13 +208,15 @@ int parse_mem_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
             }
         }
 
-        sprintf(msg_temp,"\nnum_nodes=%d:\t",num_nodes);
-        strcat(msg,msg_temp);
-        for(int k=0;k<MAX_NODES;k++){
-            if(r.filter.mf.node[k].node_num == -1) continue;
-            sprintf(msg_temp," %d \t",r.filter.mf.node[k].node_num);
-            strcat(msg,msg_temp);
-        }
+		if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+        	sprintf(msg_temp,"\nnodes=%d:\t",num_nodes);
+        	strcat(msg,msg_temp);
+        	for(int k=0;k<MAX_NODES;k++){
+            	if(r.filter.mf.node[k].node_num == -1) continue;
+            	sprintf(msg_temp," %d \t",r.filter.mf.node[k].node_num);
+            	strcat(msg,msg_temp);
+        	}	
+		}
         struct chip_info *chip_ptr = NULL;
         r.filter.mf.num_nodes = num_nodes;
 
@@ -414,11 +420,13 @@ int parse_mem_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
                              return (FAILURE);
                     }
                     debug(HTX_HE_INFO,DBG_MUST_PRINT,"page_value_tok[%d]=%s,num_value=%d\n",k,page_value_tok[k],num_value);
-					for(int chip_n =0; chip_n < MAX_CHIPS_PER_NODE; chip_n++){
-						if(chip_ptr[chip_n].chip_num == -1)continue;	
-                    	sprintf(msg_temp,"\nmem filter node[%d]chip[%d]page[%s] page_wise_mem_to_use =%lu\n",n,chip_n,page_size_name[page_index],
-                        	r.filter.mf.node[n].chip[chip_n].mem_details.pdata[page_index].page_wise_usage_mem);
-                    	strcat(msg,msg_temp);
+					if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+						for(int chip_n =0; chip_n < MAX_CHIPS_PER_NODE; chip_n++){
+							if(chip_ptr[chip_n].chip_num == -1)continue;	
+                    		sprintf(msg_temp,"\nmem filter N[%d]P%d]page[%s] mem_to_use =%lu\n",n,chip_n,page_size_name[page_index],
+                        		r.filter.mf.node[n].chip[chip_n].mem_details.pdata[page_index].page_wise_usage_mem);
+                    		strcat(msg,msg_temp);
+						}
 					}
                 }                    
                 free(tmp_str);
@@ -442,7 +450,7 @@ int parse_mem_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
 int parse_cpu_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
     int i,j,filt_idx,num_nodes = 0,num_chips = 0,num_cores=0,num_cpus=0;
     unsigned long node_num,chip_num,core_num,cpu_num,cores_in_this_chip,chips_in_this_node,nodes_in_this_sys,cpus_in_this_core;
-    char *tmp_str=NULL,msg[8092],msg_temp[2048];
+    char *tmp_str=NULL,msg[8192],msg_temp[2048];
     char* chr_ptr[r.num_cpu_filters][8],*end_ptr;
     char *ptr[16],*tmp,c[8],tmp_filter_str[MAX_POSSIBLE_ENTRIES];
 
@@ -471,11 +479,15 @@ int parse_cpu_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
         }
     }
 #endif
-    sprintf(msg,"CPU Filter Details:");
+	if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+    	sprintf(msg,"CPU Filter:");
+	}
     for(filt_idx = 0; filt_idx < r.num_cpu_filters; filt_idx++){
-        sprintf(msg_temp,"\n=======================================================================\n"
-            "cpu filter[%d]=%s\n",filt_idx,filter_ptr[filt_idx]);
-        strcat(msg,msg_temp);
+		if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+        	sprintf(msg_temp,"\n=====================================================\n"
+            	"cpu filter[%d]=%s\n",filt_idx,filter_ptr[filt_idx]);
+        	strcat(msg,msg_temp);
+		}
         i = 0,j=0,node_num=0,num_nodes=0;
         strcpy(tmp_filter_str,filter_ptr[filt_idx]);
         if((strchr(tmp_filter_str,'N') == NULL)||(strchr(tmp_filter_str,'P')== NULL)||(strchr(tmp_filter_str,'C')== NULL)||(strchr(tmp_filter_str,'T')== NULL)){
@@ -622,14 +634,15 @@ int parse_cpu_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
                 r.filter.cf.node[node_num].node_num = node_num;
             }
         }
-
-        sprintf(msg_temp,"num_nodes=%d:\t",num_nodes);
-        strcat(msg,msg_temp);
-        for(int k=0;k<MAX_NODES;k++){
-            if(r.filter.cf.node[k].node_num == -1) continue;
-            sprintf(msg_temp," %d \t",r.filter.cf.node[k].node_num);
-            strcat(msg,msg_temp);
-        } 
+		if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+				sprintf(msg_temp,"nodes=%d:\t",num_nodes);
+				strcat(msg,msg_temp);
+				for(int k=0;k<MAX_NODES;k++){
+					if(r.filter.cf.node[k].node_num == -1) continue;
+					sprintf(msg_temp," %d \t",r.filter.cf.node[k].node_num);
+					strcat(msg,msg_temp);
+        		} 
+		}
         struct chip_info *chip_ptr = NULL;
         r.filter.cf.num_nodes = num_nodes;
         for (int n = 0; n < MAX_NODES; n++) {
@@ -766,13 +779,15 @@ int parse_cpu_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
                 
             }
             r.filter.cf.node[n].num_chips = num_chips;
-            sprintf(msg_temp,"\nnode:%d,num_chips=%d:\t",n,num_chips);
-            strcat(msg,msg_temp);
-            for(int k=0;k<MAX_CHIPS_PER_NODE;k++){
-                if(chip_ptr[k].chip_num == -1)continue;
-                sprintf(msg_temp," %d \t",chip_ptr[k].chip_num);
-                strcat(msg,msg_temp);
-            }
+			if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+				sprintf(msg_temp,"\nN:%d,chips=%d:\t",n,num_chips);
+				strcat(msg,msg_temp);
+				for(int k=0;k<MAX_CHIPS_PER_NODE;k++){
+					if(chip_ptr[k].chip_num == -1)continue;
+					sprintf(msg_temp," %d \t",chip_ptr[k].chip_num);
+					strcat(msg,msg_temp);
+				}
+			}	
             for (int chp = 0; chp < MAX_CHIPS_PER_NODE; chp++) {
                 num_cores = 0;core_num=0;
                 cores_in_this_chip=get_num_of_cores_in_chip(n,chp);
@@ -908,13 +923,15 @@ int parse_cpu_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
                     }
                 }
                 r.filter.cf.node[n].chip[chp].num_cores = num_cores;
-                sprintf(msg_temp,"\nnode:%d chip: %d,num_cores=%d:\t",n,chp,num_cores);
-                strcat(msg,msg_temp);
-                for(int k=0;k<MAX_CORES_PER_CHIP;k++){
-                    if(core_ptr[k].core_num == -1)continue;
-                    sprintf(msg_temp," %d \t",core_ptr[k].core_num);
-                    strcat(msg,msg_temp);
-                }
+				if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+                	sprintf(msg_temp,"\nN:%d P:%d,cores=%d:\t",n,chp,num_cores);
+                	strcat(msg,msg_temp);
+                	for(int k=0;k<MAX_CORES_PER_CHIP;k++){
+                    	if(core_ptr[k].core_num == -1)continue;
+                    	sprintf(msg_temp," %d \t",core_ptr[k].core_num);
+                    	strcat(msg,msg_temp);
+                	}
+				}
                 for (int cor = 0; cor < MAX_CORES_PER_CHIP; cor++) {
                     num_cpus = 0;cpu_num=0;
                     cpus_in_this_core= get_num_of_cpus_in_core(n,chp,cor);
@@ -1048,12 +1065,20 @@ int parse_cpu_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
                         }
                     }
                     r.filter.cf.node[n].chip[chp].core[cor].num_procs = num_cpus;
-                    sprintf(msg_temp,"\nnode:%d chip:%d core:%d,num_cpus=%d:\t",n,chp,cor,num_cpus);
-                    strcat(msg,msg_temp);
-                    for(int k=0;k<MAX_CPUS_PER_CORE;k++){
-                        sprintf(msg_temp," %d \t",thread_ptr[k]);
-                        strcat(msg,msg_temp);
-                    }
+					if(g_data.gstanza.global_debug_level >= DBG_DEBUG_PRINT){
+                    	sprintf(msg_temp,"\nN:%d P:%d C:%d,cpus=%d:\t",n,chp,cor,num_cpus);
+                    	strcat(msg,msg_temp);
+						if(num_cpus == get_num_of_cpus_in_core(n,chp,cor)){
+							sprintf(msg_temp," [%d - %d]\n",thread_ptr[0],thread_ptr[num_cpus-1]);
+							strcat(msg,msg_temp);
+						}else{
+                    		for(int k=0;k<MAX_CPUS_PER_CORE;k++){
+								if(thread_ptr[k] == -1)continue;
+                        		sprintf(msg_temp," %d \t",thread_ptr[k]);
+                        		strcat(msg,msg_temp);
+                    		}
+						}
+					}
                 }
 
             }

@@ -589,12 +589,12 @@ int run_stanza_operation(){
                 }
                 mem_g.total_segments += mem_details_per_chip[n].memory_details.pdata[pi].num_of_segments;
             }
-            if(count == num_of_chips){
-                debug(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s:system configuration does't seems to be good, few chips have only cpus and few have only" 
-                    "memory, count=%d, num_of_chips=%d\n",__LINE__,__FUNCTION__,count,num_of_chips);
-                print_partition_config();
-                return (FAILURE);
-            }
+        }
+        if(count == num_of_chips){
+            debug(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s:system configuration does't seems to be good, few chips have only cpus and few have only" 
+                "memory, count=%d, num_of_chips=%d\n",__LINE__,__FUNCTION__,count,num_of_chips);
+            print_partition_config();
+            return (FAILURE);
         }
         return (SUCCESS);
     }
@@ -2568,6 +2568,10 @@ int run_stanza_operation(){
 						,g_data.sys_details.chip_mem_pool_data[n].memory_details.pdata[pi].in_use_num_of_segments);
 					strcat(msg,msg_temp);
 				}
+			}
+			if(strlen(msg) >= (2*KB)){
+    			displaym(HTX_HE_INFO,DBG_MUST_PRINT,"%s\n",msg);
+				sprintf(msg,NULL);
 			}
 		}   
 	}

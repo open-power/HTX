@@ -150,8 +150,8 @@ struct rule_format {
                             /* NO -  no compare                               */
     char  max_mem[4];      /* YES - Use 70% of available memory by default    */
                             /* NO -  Use specified seg_size/num_seg           */
-    long  seg_size[4];        /* segment size in bytes                          */
-    int   num_seg[4];         /* number of segments (default 1 segment)         */
+    long  seg_size[MAX_NUM_PAGE_SIZES];        /* segment size in bytes                          */
+    int   num_seg[MAX_NUM_PAGE_SIZES];         /* number of segments (default 1 segment)         */
 
     int   width;           /* 1, 4, or 8 bytes at a time                     */
     int   debug_level; /* Only 0 1 2 3 value .See the #define DBG_MUST_PRINT for more*/

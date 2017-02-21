@@ -25,7 +25,7 @@ ${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.ab q
 
 proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
 proc_ver_dec=`printf %d $proc_ver`
-P6Compatmode=`${HTX_LOG_DIR}/htx_syscfg | grep -i Power6Compatmode | awk -F: '{print $2}'|sed -e 's/^ *//' `
+P6Compatmode=`cat ${HTX_LOG_DIR}/htx_syscfg | grep -i Power6Compatmode | awk -F: '{print $2}'|sed -e 's/^ *//' `
 
 echo "Creating mdt.ab_mem ..."
 if [[ $proc_ver_dec -ge 63 && $P6Compatmode = "False" ]] # Shifts for P7 & above
