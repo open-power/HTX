@@ -18,8 +18,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-
-
 #include <pthread.h>
 #ifdef  __HTX_LINUX__
 	#include <curses.h> 
@@ -109,6 +107,11 @@ int htxscreen_get_mdt_list_line_count(char *text)
 			line_count++;
 		}
 	}
+
+	if(text_length > 0) {
+		line_count++;
+	}
+
 	return line_count;
 }
 
@@ -870,11 +873,11 @@ int htxscreen_main_menu_screen_display(daemon_states current_state)
 #endif
 
 	memset(temp_str, 0, sizeof(temp_str));
-	wmove(stdscr, 3, 36);
-	if(current_state.daemon_state == HTXD_DAEMON_SELECTED) {
+	wmove(stdscr, 3, 33);
+	if(current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) {
 		sprintf(temp_str, "SELECTED <%s>", global_selected_mdt_name);
 		waddstr(stdscr, temp_str);
-	} else if(current_state.daemon_state == HTXD_DAEMON_RUNNING) {
+	} else if(current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT) {
 		if(current_state.test_state == 0) {
 			sprintf(temp_str, "HALTED <%s>", global_selected_mdt_name);
 		} else {
@@ -882,7 +885,7 @@ int htxscreen_main_menu_screen_display(daemon_states current_state)
 		}
 		waddstr(stdscr, temp_str);
 	} else {
-		waddstr(stdscr, "IDLE    ");
+		waddstr(stdscr, "IDLE       ");
 	}
 
 	htxscreen_display_htx_screen_header();	
@@ -907,7 +910,7 @@ int htxscreen_start_selected_mdt(void)
 
 	htxscreen_get_daemon_states(&current_state);
 
-	if(current_state.daemon_state == HTXD_DAEMON_SELECTED) { 
+	if(current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) { 
 		PRTMSG(MSGLINE, 0, ("Starting MDT : %s, please wait...", global_selected_mdt_name) );
 		initialize_command_object(&command_object, "-run");
 		initialize_response_object(&response_object);
@@ -2239,6 +2242,25 @@ void htxscreen_clean_string(char *string_value)
 }
 
 
+
+int htxd_get_mdt_name_from_number(char *mdt_list, int mdt_number)
+{
+	char search_string[80];
+	char *location_found;
+
+	
+	sprintf(search_string, "(%2d)", mdt_number);
+	location_found = strstr(mdt_list, search_string);
+	if(location_found == NULL) {
+		return -1;
+	}
+
+	sscanf(location_found+strlen(search_string), "%s", global_selected_mdt_name);
+
+	return 0;
+}
+
+
 char * htxscreen_get_mdt_list_line_start(char *mdt_list, int page_count, int lines_per_page)
 {
 	int text_length;
@@ -2287,6 +2309,8 @@ int htxscreen_mdt_list_display(int previous_return_code)
 	int quit_flag = 0;
 	char *line_start;
 	char *line_end;
+	int mdt_number = 0;
+	char error_tag[100] = {'\0'};
 
 
 
@@ -2330,15 +2354,16 @@ int htxscreen_mdt_list_display(int previous_return_code)
 
 				refresh();
 				if(previous_return_code == 0) {
-					PRTMSG(MSGLINE, 0, ("Please enter a valid option (s, f, b or q)"));
+					PRTMSG(MSGLINE, 0, ("%s Please enter a valid option (s, f, b q)", error_tag));
 				} else {
 					previous_return_code = 0;
 				}
 			}
 
-			strncpy(input, "", DIM(input));     /* clear input */
-			htxscreen_get_string(stdscr, 21, 11, input, (size_t) DIM(input), "sSfFbBqQDd", (tbool) TRUE);			
+			memset(input, 0, DIM(input));     /* clear input */
+			htxscreen_get_string(stdscr, 21, 11, input, (size_t) DIM(input), "sSfFbBqQDd1234567890", (tbool) TRUE);			
 			CLRLIN(MSGLINE, 0);
+			error_tag [0] = '\0';
 			switch (input[0]) {
 			case 's':
 			case 'S':
@@ -2394,6 +2419,23 @@ int htxscreen_mdt_list_display(int previous_return_code)
 			case 'd':
 			case 'D':
 				refresh_flag = 1;
+
+			default:
+				if(strlen(input) > 0) {
+					mdt_number = atoi(input);
+					if(mdt_number != 0) {
+						return_code = htxd_get_mdt_name_from_number(response_object.response_buffer, mdt_number);
+						if(return_code != -1) {
+							PRTMSG(MSGLINE, 0, ("Selected MDT is <%s>", global_selected_mdt_name));
+							quit_flag = 1;
+						} else {
+							sprintf(error_tag, "Invalid MDT number <%s>", input);
+							PRTMSG(MSGLINE, 0, ("%s, please provide a valid input", error_tag)); 
+						}
+					} else {
+						sprintf(error_tag, "Invalid MDT number <%s>", input);
+					}
+				}
 			}
 		} while(quit_flag == 0);
 	}
@@ -2772,9 +2814,9 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 
 		case 1:
 			if(global_master_mode == 1) {
-				if( current_state.daemon_state == HTXD_DAEMON_SELECTED) {
+				if( current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) {
 					htxscreen_start_selected_mdt();
-				} else if (current_state.daemon_state == HTXD_DAEMON_RUNNING){
+				} else if (current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT){
 					if(current_state.test_state == 1) {
 						PRTMSG(MSGLINE, 0, ("Halting the test, please wait..."));
 					} else {
@@ -2782,6 +2824,8 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 					}
 					htxscreen_activate_halt_test(result_string);
 					PRTMSG(MSGLINE, 0, (result_string));
+				} else {
+					PRTMSG(MSGLINE, 0, ("MDT should be selected/running for option 1"));
 				}
 			} else {
 				PRTMSG(MSGLINE, 0, ("Operation is not allowed in view mode"));
@@ -2789,7 +2833,7 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 			break;
 
 		case 2:
-			if( (current_state.daemon_state == HTXD_DAEMON_RUNNING) || (current_state.daemon_state == HTXD_DAEMON_SELECTED) ) {
+			if( (current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT) || (current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) ) {
 				htxscreen_activate_halt_device();
 			} else {
 				PRTMSG(MSGLINE, 0, ("MDT should be selected/running for option 2"));
@@ -2797,8 +2841,8 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 			break;
 
 		case 3:
-			if( (current_state.daemon_state == HTXD_DAEMON_RUNNING) || (current_state.daemon_state == HTXD_DAEMON_SELECTED) ) {
-				PRTMSG(MSGLINE, 0, ("MDT is already selected, stop the current MDT to select another MDT"));
+			if( (current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT) || (current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) ) {
+				PRTMSG(MSGLINE, 0, ("MDT is already selected, shutdown the current MDT to select another MDT"));
 			} else {
 				clear();
 				refresh();
@@ -2810,7 +2854,7 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 			break;
 
 		case 4:
-			if( (current_state.daemon_state == HTXD_DAEMON_RUNNING) || (current_state.daemon_state == HTXD_DAEMON_SELECTED) ) {
+			if( (current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT) || (current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) ) {
 				htxscreen_continue_on_error_device();
 			} else {
 				PRTMSG(MSGLINE, 0, ("MDT should be selected/running for option 4"));
@@ -2818,7 +2862,7 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 			break;
 
 		case 5:
-			if( (current_state.daemon_state == HTXD_DAEMON_RUNNING) || (current_state.daemon_state == HTXD_DAEMON_SELECTED) ) {
+			if( (current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT) || (current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) ) {
 				htxscreen_display_screen_5();
 			} else {
 				PRTMSG(MSGLINE, 0, ("MDT should be selected/running for option 5"));
@@ -2826,11 +2870,11 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 			break;
 
 		case 6:
-			if( (current_state.daemon_state == HTXD_DAEMON_RUNNING) || (current_state.daemon_state == HTXD_DAEMON_SELECTED) ) {
+			if(current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT) {
 				PRTMSG(MSGLINE, 0, ("Updating HTX statistics file..."));
 				htxscreen_display_file(STATS_FILE_STRING);
 			} else {
-				PRTMSG(MSGLINE, 0, ("MDT should be selected/running for option 6"));
+				PRTMSG(MSGLINE, 0, ("MDT should be running for option 6"));
 			}
 			break;
 
@@ -2847,7 +2891,7 @@ int htxscreen_main_menu_execute_option(int option, daemon_states current_state)
 			break;
 
 		case 9:
-			if(current_state.daemon_state == HTXD_DAEMON_RUNNING || current_state.daemon_state == HTXD_DAEMON_SELECTED) {
+			if(current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT || current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) {
 				PRTMSG(MSGLINE, 0, ("Getting running MDT ..."));
 				htxscreen_display_file(RUNNING_MDT_STRING);
 			} else {
@@ -2952,7 +2996,7 @@ int htxscreen_main_menu(void)
 
 
 	htxscreen_get_daemon_states(&current_state);
-	if( (current_state.daemon_state != HTXD_DAEMON_RUNNING) && (current_state.daemon_state != HTXD_DAEMON_SELECTED) ) {
+	if( (current_state.daemon_state != HTXD_DAEMON_STATE_RUNNING_MDT) && (current_state.daemon_state != HTXD_DAEMON_STATE_SELECTED_MDT) ) {
 		global_selected_mdt_name[0] = '\0';	
 	} else {
 		htxscreen_get_selected_mdt();
@@ -2980,7 +3024,7 @@ int htxscreen_main_menu(void)
 				break;
 
 			case 's':
-				if(current_state.daemon_state == HTXD_DAEMON_RUNNING || current_state.daemon_state == HTXD_DAEMON_SELECTED) {
+				if(current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT || current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) {
 					if(global_master_mode == 1) {
 						sprintf(workstr, "Do you really want to shutdown MDT <%s> ? (y/n) : ", global_selected_mdt_name);
 						PRTMSG(MSGLINE, 0, (workstr));
@@ -2988,7 +3032,7 @@ int htxscreen_main_menu(void)
 						htxscreen_get_string(stdscr, MSGLINE, strlen(workstr), input1, (size_t) DIM(input1), "yYnN", (tbool) TRUE);
 						CLRLIN(MSGLINE, 0);
 						if ((input1[0] == 'Y') || (input1[0] == 'y')) {
-							PRTMSG(MSGLINE, 0, ("Stopping MDT <%s>. Please wait....", global_selected_mdt_name));
+							PRTMSG(MSGLINE, 0, ("Shutting MDT <%s>. Please wait....", global_selected_mdt_name));
 							initialize_command_object(&command_object, "-shutdown");
 							initialize_response_object(&response_object);
 							shutdown_socket_fd = htxclient_create_socket();
@@ -3047,7 +3091,7 @@ int htxscreen_main_menu(void)
 
 		htxscreen_get_daemon_states(&current_state);
 
-		if( (current_state.daemon_state != HTXD_DAEMON_RUNNING) && (current_state.daemon_state != HTXD_DAEMON_SELECTED) ) {
+		if( (current_state.daemon_state != HTXD_DAEMON_STATE_RUNNING_MDT) && (current_state.daemon_state != HTXD_DAEMON_STATE_SELECTED_MDT) ) {
 			global_selected_mdt_name[0] = '\0';	
 		} else {
 			htxscreen_get_selected_mdt();
@@ -3069,6 +3113,7 @@ void htxscreen_display_usage(char *program_name)
 	printf("default SUT hostname is %s\n", DEFAULT_SUT_HOSTNAME);
 	printf("-m : master mode\n");
 	printf("-v : view mode\n");
+	printf("-q : quick start\n");
 }
 
 
@@ -3191,9 +3236,10 @@ void htxscreen_get_parameters(int argument_count, char *argument_vector[])
 	global_parameter.daemon_port_number = 0;
 	global_parameter.master_mode = 0;
 	global_parameter.view_mode = 0;
+	global_parameter.quick_start = 0;
 
 	
-	while ((parameter_switch = getopt (argument_count, argument_vector, "s:p:f:mv")) != -1) {
+	while ((parameter_switch = getopt (argument_count, argument_vector, "s:p:f:mvq")) != -1) {
 		switch (parameter_switch) {
 			case 's':
 				strcpy(global_parameter.sut_hostname, optarg);
@@ -3226,6 +3272,10 @@ void htxscreen_get_parameters(int argument_count, char *argument_vector[])
 					exit(1);
 				}
 				global_parameter.view_mode = 1;
+				break;
+			
+			case 'q':
+				global_parameter.quick_start = 1;
 				break;
 
 			case '?':
@@ -3474,6 +3524,11 @@ int main(int argc, char *argv[])
 	htxclient_global_error_text[0] = '\0';
 	atexit(htxscreen_clean_exit);
 
+	temp_env_val_ptr = getenv("TERM");
+	if(strncmp("ansi", temp_env_val_ptr, 4) == 0) {
+		setenv("TERM", "vt100", 1);
+	}
+
 	temp_env_val_ptr = getenv("HTX_HOME_DIR");
 	if( (temp_env_val_ptr == NULL ) || (strlen(temp_env_val_ptr) == 0) ) {
 		if(htxscreen_get_home_htx_install_path() != 0) {
@@ -3511,10 +3566,12 @@ int main(int argc, char *argv[])
 	if(current_state.daemon_state == -1){
 		printf("unknown daemon state, exiting...\n");
 		exit(-1);
-	} else if( ( current_state.daemon_state != HTXD_DAEMON_IDLE) && (global_parameter.ecg_name[0] != 0) ) {
-		printf("HTX daemon is not at IDLE state, stop the currently choosen MDT to start MDT from command option, exiting...\n");
+	} else if( ( current_state.daemon_state != HTXD_DAEMON_STATE_IDLE) && (global_parameter.ecg_name[0] != 0) ) {
+		printf("HTX daemon is not at IDLE state, shutdown the currently choosen MDT to start MDT from command option, exiting...\n");
 		exit(-1);
-	} else if(current_state.daemon_state == HTXD_DAEMON_IDLE) {
+	} else if(global_parameter.view_mode == 1) {
+		master_mode_request = 0;
+	} else if(current_state.daemon_state == HTXD_DAEMON_STATE_IDLE) {
 		master_mode_request = 1;
 	} else if(global_parameter.master_mode == 1) {
 		master_mode_request = 1;
@@ -3530,7 +3587,7 @@ int main(int argc, char *argv[])
 	htxscreen_set_htxscreen_start_time();
 	htxscreen_init_screen();
 	htxscreen_get_level_details();
-	if( (current_state.daemon_state == HTXD_DAEMON_SELECTED) || (current_state.daemon_state == HTXD_DAEMON_RUNNING) || (global_master_mode == 0)) {
+	if( (current_state.daemon_state == HTXD_DAEMON_STATE_SELECTED_MDT) || (current_state.daemon_state == HTXD_DAEMON_STATE_RUNNING_MDT) || (global_master_mode == 0) || (global_parameter.quick_start == 1) ) {
 		htxscreen_main_menu();
 	} else {
 		htxscreen_htx_logo_screen_display();

@@ -19,7 +19,7 @@
 /* @(#)34	1.5  src/htx/usr/lpp/htx/bin/htxd/htxd.c, htxd, htxubuntu 8/4/15 03:37:17 */
 
 
-
+#include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
@@ -48,6 +48,7 @@ char global_htxd_log_dir[256] = "/tmp";
 int htxd_trace_level = 2;
 FILE *htxd_trace_fp;
 FILE *htxd_log_fp;
+pthread_t global_main_thread_id;
 
 #ifdef __HTX_LINUX__
 	int smt, bind_th_num;
@@ -193,6 +194,9 @@ int main(int argc, char *argv[])
 		printf("exiting...\n\n");
 		exit(1);
 	} else if( (temp_env_val_ptr != NULL) && (strlen(temp_env_val_ptr) > 0) ) {
+		if(temp_env_val_ptr[strlen(temp_env_val_ptr) - 1 ] == '/') {
+			temp_env_val_ptr[strlen(temp_env_val_ptr) - 1 ] = '\0';
+		}
 		strcpy(global_htx_home_dir, temp_env_val_ptr);	
 	}
 
@@ -205,14 +209,19 @@ int main(int argc, char *argv[])
 	
 	temp_env_val_ptr = getenv("HTX_LOG_DIR");
 	if( (temp_env_val_ptr != NULL) && (strlen(temp_env_val_ptr) > 0) ) {
+		if(temp_env_val_ptr[strlen(temp_env_val_ptr) - 1 ] == '/') {
+			temp_env_val_ptr[strlen(temp_env_val_ptr) - 1 ] = '\0';
+		}
 		strcpy(global_htx_log_dir, temp_env_val_ptr);
-		sprintf(global_htxd_log_dir, "%s/htxd", global_htx_log_dir);
+		sprintf(global_htxd_log_dir, "%s/htx/htxd", global_htx_log_dir);
 	}
 	sprintf(temp_str, "mkdir -p %s > /dev/null 2>&1", global_htxd_log_dir);
 	system(temp_str);
 
 	sprintf(trace_str, "date +\"HTX Daemon (htxd) was started on %%x at %%X %%Z\">> %s/%s", global_htxd_log_dir, HTXD_START_STOP_LOG);
 	system(trace_str);
+
+	htxd_trace_log_lock_init();
 
 	sprintf(temp_str, "%s/%s", global_htxd_log_dir, HTXD_TRACE_LOG);
 	htxd_trace_fp = fopen(temp_str, "w");
@@ -257,8 +266,13 @@ int main(int argc, char *argv[])
 #ifndef __HTX_LINUX__
 		setpriority(PRIO_PROCESS, 0, -1);
 #endif
+
+		global_main_thread_id = pthread_self();
 		htxd_set_program_name(argv[0]);
 		htxd_set_htx_path(global_htx_home_dir);
+
+		register_signal_handlers();
+	/*	htxd_register_signal_handler_thread(); */
 
 		htxd_start_heart_beat_monitor();
 
@@ -274,6 +288,8 @@ int main(int argc, char *argv[])
 	sprintf(trace_str, "date +\"HTX Daemon (htxd) was stopped on %%x at %%X %%Z\">>%s/%s", global_htxd_log_dir, HTXD_START_STOP_LOG);
 	system(trace_str);
 	HTXD_FUNCTION_TRACE(FUN_EXIT, "main");
+
+	htxd_trace_log_lock_destroy();
 	return 0;
 }
 

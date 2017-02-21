@@ -43,7 +43,7 @@ htxd * htxd_get_instance(void)
 
 int htxd_is_daemon_idle(void)
 {
-	if(htxd_global_instance->run_state == HTXD_DAEMON_IDLE) {
+	if(htxd_global_instance->run_state == HTXD_DAEMON_STATE_IDLE) {
 		return TRUE;
 	}
 
@@ -53,7 +53,7 @@ int htxd_is_daemon_idle(void)
 
 int htxd_is_daemon_selected(void)
 {
-	if(htxd_global_instance->run_state == HTXD_DAEMON_SELECTED) {
+	if(htxd_global_instance->run_state == HTXD_DAEMON_STATE_SELECTED_MDT) {
 		return TRUE;
 	}
 
@@ -63,7 +63,7 @@ int htxd_is_daemon_selected(void)
 
 void htxd_set_daemon_idle(void)
 {
-	htxd_global_instance->run_state = HTXD_DAEMON_IDLE;
+	htxd_global_instance->run_state = HTXD_DAEMON_STATE_IDLE;
 }
 
 
@@ -267,6 +267,7 @@ void htxd_set_equaliser_offline_cpu_flag(int value)
 {
 	htxd_global_instance->enable_offline_cpu = value;
 }
+
 
 int htxd_get_equaliser_offline_cpu_flag(void)
 {
@@ -503,11 +504,10 @@ void init_htxd_instance(htxd *p_htxd_instance)
 	p_htxd_instance->equaliser_pid			= 0;
 	p_htxd_instance->port_number			= HTXD_DEFAULT_PORT;
 	p_htxd_instance->run_level			= 0;
-	p_htxd_instance->run_state			= HTXD_DAEMON_IDLE;
+	p_htxd_instance->run_state			= HTXD_DAEMON_STATE_IDLE;
 	p_htxd_instance->trace_level			= 0;
 	p_htxd_instance->p_child_pid_list		= NULL;
 	p_htxd_instance->p_profile			= NULL;
-	p_htxd_instance->p_command			= htxd_create_command();
 	p_htxd_instance->dr_sem_key			= 0xDEADBEEF;
 	p_htxd_instance->dr_sem_id			= -1;
 	p_htxd_instance->dr_reconfig_restart		= 0;
@@ -520,6 +520,7 @@ void init_htxd_instance(htxd *p_htxd_instance)
 	p_htxd_instance->init_syscfg_flag		= FALSE;
 	p_htxd_instance->master_client_mode		= 0;
 	p_htxd_instance->is_test_active			= 0;
+	p_htxd_instance->is_mdt_created			= 0;
 	p_htxd_instance->is_stop_watch_monitor_initailized	= 0;
 }
 
@@ -619,74 +620,36 @@ int htxd_get_string_value(char *command_string, char *string_value)
 }
 
 
-int htxd_update_command_object(char *command_string)
+int htxd_update_command_object(char *command_string, htxd_command *p_command)
 {
 
 	char temp_string[512];
-	htxd *p_htxd_instance;
 	int start_position = 1;
 
-	p_htxd_instance = htxd_get_instance();
 
 	memset(temp_string, 0, sizeof(temp_string));
 
 	start_position += htxd_get_string_value(command_string + start_position, temp_string);
-	p_htxd_instance->p_command->command_index = atoi(temp_string);
+	p_command->command_index = atoi(temp_string);
 
 	start_position++;
 
 	start_position += htxd_get_string_value(command_string + start_position, temp_string);
 	if( (strlen(temp_string) > 0) && (strchr(temp_string, '/') == NULL) ) {
-		sprintf(p_htxd_instance->p_command->ecg_name, "%s/mdt/%s", global_htx_home_dir, temp_string);
+		sprintf(p_command->ecg_name, "%s/mdt/%s", global_htx_home_dir, temp_string);
 	} else {
-		strcpy(p_htxd_instance->p_command->ecg_name, temp_string);
+		strcpy(p_command->ecg_name, temp_string);
 	}
 
 	start_position++;
 
-	strcpy(p_htxd_instance->p_command->option_list, command_string + start_position);
-	p_htxd_instance->p_command->option_list[(strlen(command_string + start_position ) - 1)] = 0;  /* deleting the last : symbol */
+	strcpy(p_command->option_list, command_string + start_position);
+	p_command->option_list[(strlen(command_string + start_position ) - 1)] = 0;  /* deleting the last : symbol */
 
 
 	return 0;
 }
 
-
-int htxd_get_command_index(void)
-{
-	htxd *p_htxd_instance;
-
-	p_htxd_instance = htxd_get_instance();
-
-	return p_htxd_instance->p_command->command_index;
-}
-
-void htxd_set_command_ecg_name(char *ecg_name)
-{
-	htxd *p_htxd_instance;
-
-	p_htxd_instance = htxd_get_instance();
-
-	strcpy(p_htxd_instance->p_command->ecg_name, ecg_name);
-}
-
-char * htxd_get_command_ecg_name(void)
-{
-	htxd *p_htxd_instance;
-
-	p_htxd_instance = htxd_get_instance();
-
-	return p_htxd_instance->p_command->ecg_name;
-}
-
-char * htxd_get_command_option_list(void)
-{
-	htxd *p_htxd_instance;
-
-	p_htxd_instance = htxd_get_instance();
-
-	return p_htxd_instance->p_command->option_list;
-}
 
 
 int htxd_get_number_of_running_ecg(void)

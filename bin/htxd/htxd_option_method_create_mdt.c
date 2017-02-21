@@ -28,21 +28,32 @@
 #include "htxd_define.h"
 #include "htxd_util.h"
 #include "htxd_trace.h"
+#include "htxd.h"
+#include "htxd_instance.h"
 
 
-int htxd_option_method_create_mdt(char **result_string)
+int htxd_option_method_create_mdt(char **result_string, htxd_command *p_command)
 {
 	int return_code;
 	char trace_string[300];
 	int stanza_count;
 	FILE *fp;
+	htxd *htxd_instance;
 
+
+	htxd_set_daemon_state(HTXD_DAEMON_STATE_CREATING_MDT);
+	htxd_instance = htxd_get_instance();
+	if(htxd_instance->is_mdt_created == 0) {
+		htxd_instance->is_mdt_created = 1;
+	}
 	*result_string = malloc(512);
 	if(*result_string == NULL) {
 		sprintf(trace_string, "Error: malloc failed with errno <%d>", errno);	
 		HTXD_TRACE(LOG_ON, trace_string);
+		htxd_set_daemon_state(HTXD_DAEMON_STATE_CREATING_MDT);
 		return -1;
 	}
+
 
 	return_code = htxd_execute_shell_profile();
 	sprintf(trace_string, "grep HE_name %s/mdt/mdt.bu 2>/dev/null | wc -l", global_htx_home_dir);
@@ -51,6 +62,7 @@ int htxd_option_method_create_mdt(char **result_string)
 		sprintf(trace_string, "Error: popen failed with errno <%d>", errno);
 		strcpy(*result_string, trace_string);
 		HTXD_TRACE(LOG_ON, trace_string);
+		htxd_set_daemon_state(HTXD_DAEMON_STATE_IDLE);
 		return -1;
 	}
 
@@ -60,6 +72,7 @@ int htxd_option_method_create_mdt(char **result_string)
 		sprintf(trace_string, "Error: pclose failed with errno <%d>", errno);
 		strcpy(*result_string, trace_string);
 		HTXD_TRACE(LOG_ON, trace_string);
+		htxd_set_daemon_state(HTXD_DAEMON_STATE_IDLE);
 		return -1;
 	}
 	
@@ -71,8 +84,11 @@ int htxd_option_method_create_mdt(char **result_string)
 		sprintf(*result_string, "Error: mdt creation is failed, please check error at log file <%s/htxd_bash_profile_output>.", global_htxd_log_dir);
 		strcpy(trace_string, *result_string);
 		HTXD_TRACE(LOG_ON, trace_string);
+		htxd_set_daemon_state(HTXD_DAEMON_STATE_IDLE);
 		return -1;
 	}
+
+	htxd_set_daemon_state(HTXD_DAEMON_STATE_IDLE);
 
 	return 0;
 }

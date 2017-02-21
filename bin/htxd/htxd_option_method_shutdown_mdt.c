@@ -113,7 +113,7 @@ int htxd_unload_exercisers(htxd_ecg_info *p_ecg_info_list)
 		pid_to_unload = (shm_union_pointer.HE_addr + i)->PID;
 		if(pid_to_unload != 0) {
 			kill(pid_to_unload, SIGTERM);
-			sprintf(trace_str, "htxd_unload_exercisers() sent SIGTERM to PID <%d>", pid_to_unload);
+			sprintf(trace_str, "htxd_unload_exercisers() sent SIGTERM to PID <%d>, exerciser <%s>", pid_to_unload, (shm_union_pointer.HE_addr + i)->sdev_id);
 			HTXD_TRACE(LOG_OFF, trace_str);
 		//	sleep(5);
 		}
@@ -154,22 +154,24 @@ void htxd_execute_post_run_script(char *ecg_name)
 
 
 /* ecg shutdown command function */
-int htxd_option_method_shutdown_mdt(char **result)
+int htxd_option_method_shutdown_mdt(char **result, htxd_command *p_command)
 {
 	htxd *htxd_instance;
 	htxd_ecg_info * p_ecg_info_list;
 	htxd_ecg_info * p_ecg_info_node_to_remove = NULL;
 	char command_ecg_name[MAX_ECG_NAME_LENGTH];
 	char temp_str[512];
+	int daemon_state;
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_shutdown_mdt");
 	htxd_instance = htxd_get_instance();
-	strcpy(command_ecg_name, htxd_get_command_ecg_name() );
+	strcpy(command_ecg_name, p_command->ecg_name );
 
 	*result = malloc(100);
 
-	if( htxd_is_daemon_idle() == TRUE) {
+	daemon_state = htxd_get_daemon_state();
+	if( (daemon_state != HTXD_DAEMON_STATE_RUNNING_MDT) && (daemon_state != HTXD_DAEMON_STATE_SELECTED_MDT)) {
 		strcpy(*result, "No ECG/MDT is currently running");
 		HTXD_TRACE(LOG_OFF, *result);
 		HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_option_method_shutdown_mdt");
@@ -206,6 +208,7 @@ int htxd_option_method_shutdown_mdt(char **result)
 		return 1;
 	}
 
+	htxd_set_daemon_state(HTXD_DAEMON_SHUTTING_DOWN_MDT);
 	htxd_ecg_shutdown_flag = TRUE;
 
 	HTXD_TRACE(LOG_OFF, "shutdown detaching ecg_info node");
@@ -264,7 +267,7 @@ int htxd_shutdown_all_mdt(void)
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_shutdown_all_mdt");
 	htxd_instance = htxd_get_instance();
 
-	if (htxd_get_daemon_state() == HTXD_DAEMON_IDLE)  {
+	if (htxd_get_daemon_state() == HTXD_DAEMON_STATE_IDLE)  {
 		HTXD_FUNCTION_TRACE(FUN_EXIT, "htxd_shutdown_all_mdt");
 		return 1;
 	}

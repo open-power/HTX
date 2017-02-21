@@ -73,7 +73,7 @@ int htxd_list_files(char *path_name, char **file_list)
 			strcat(*file_list, "\n");
 		}
 
-		sprintf(list_item, "%2d) %-30s", i, p_dir_entry->d_name);
+		sprintf(list_item, "(%2d) %-30s", i, p_dir_entry->d_name);
 		strcat(*file_list, list_item);
 
 		if((i % 2 == 1) && strlen(p_dir_entry->d_name) > 25) { 
@@ -86,6 +86,7 @@ int htxd_list_files(char *path_name, char **file_list)
 
 		i++;
 	}
+	strcat(*file_list, "\n");
 
 	if(closedir(p_dir)) {
 		perror("dir close failed");
@@ -96,7 +97,7 @@ int htxd_list_files(char *path_name, char **file_list)
 }
 
 
-int htxd_option_method_list_mdt(char **result)
+int htxd_option_method_list_mdt(char **result, htxd_command *p_command)
 {
 	int return_code = 0;
 	char temp_string[300];

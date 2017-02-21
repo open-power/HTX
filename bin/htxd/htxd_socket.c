@@ -221,11 +221,14 @@ int htxd_send_ack_command_length(int new_fd)
 {
 	int result;
 	char ack_string[] = ":length received:";
+	char	trace_string[256];
 
 	
 	result = send (new_fd, ack_string, strlen (ack_string), 0);
 	if(result == -1)
 	{
+		sprintf(trace_string, "htxd_receive_bytes: send() returned with <%d>. errno <%d>", result, errno); 
+		HTXD_TRACE(LOG_ON, trace_string);
 		return result;
 	}
 
@@ -239,12 +242,15 @@ int htxd_receive_bytes(int new_fd, char * receive_buffer, int receive_length)
 {
 	int	received_bytes;
 	int	remaining_bytes;
+	char	trace_string[256];
 
 
 	remaining_bytes = receive_length;
 	while(remaining_bytes > 0) {
 		received_bytes = recv(new_fd, receive_buffer, remaining_bytes, 0);
 		if(received_bytes == -1) {
+			sprintf(trace_string, "htxd_receive_bytes: recv() returned with <%d>. errno <%d>", received_bytes, errno); 
+			HTXD_TRACE(LOG_ON, trace_string);
 			return -1;
 		}
 
@@ -299,6 +305,8 @@ char * htxd_receive_command(int new_fd)  /* note: have to change for error handl
 	result = htxd_receive_bytes(new_fd, command_details_buffer, command_length);
 	if(result == -1)
 	{
+		sprintf(trace_string, "htxd_receive_command: htxd_receive_bytes returned with <%d>", result); 
+		HTXD_TRACE(LOG_ON, trace_string)
 		return NULL;
 	}
 
@@ -318,20 +326,23 @@ int htxd_send_response(int new_fd, char *command_result, int command_type, int c
 	int number_of_bytes_sent;
 	int cumulative_number_of_bytes_sent = 0;
 	int number_of_bytes_to_send;
+	char	trace_string[256];
 
 
 	if(command_type == HTXCMDLINE_COMMAND) {
 	buffer_length = strlen(command_result) + 10 + 10 + 10;
 		response_buffer = malloc(buffer_length);
 		memset(response_buffer, 0, buffer_length);
-		sprintf(response_buffer, "%010d%010d%s", command_return_code,strlen(command_result), command_result);
+		sprintf(response_buffer, "%010d%010d%s", command_return_code,(int)strlen(command_result), command_result);
 		number_of_bytes_to_send = strlen(response_buffer);
 
 		while(cumulative_number_of_bytes_sent < number_of_bytes_to_send) {
 			number_of_bytes_sent = send(new_fd, response_buffer + cumulative_number_of_bytes_sent, number_of_bytes_to_send - cumulative_number_of_bytes_sent, 0);
 			if(number_of_bytes_sent == -1)
 			{
-				printf("[DEBUG] : Error : htxd_send_response() send() returns -1, errno <%d\n", errno);
+				sprintf(trace_string, "1.htxd_send_response: send() returned with <%d>, errono <%d>", number_of_bytes_sent, errno); 
+				HTXD_TRACE(LOG_ON, trace_string)
+				return -1;
 			}
 			cumulative_number_of_bytes_sent += number_of_bytes_sent;
 		}
@@ -343,6 +354,11 @@ int htxd_send_response(int new_fd, char *command_result, int command_type, int c
 
 		while(cumulative_number_of_bytes_sent < number_of_bytes_to_send) {
 			number_of_bytes_sent = send(new_fd, (response_buffer + cumulative_number_of_bytes_sent) , number_of_bytes_to_send - cumulative_number_of_bytes_sent, 0);
+			if(number_of_bytes_sent == -1) {
+				sprintf(trace_string, "2. htxd_send_response: send() returned with <%d>, errono <%d>", number_of_bytes_sent, errno); 
+				HTXD_TRACE(LOG_ON, trace_string)
+				return -1;
+			}
 			cumulative_number_of_bytes_sent += number_of_bytes_sent;
 		}
 	}
