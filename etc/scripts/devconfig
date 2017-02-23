@@ -51,6 +51,13 @@
   cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk  fpu cache cpu rng tlbie > ${HTXMDT}mdt.cpu
   cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk sctu mem tlbie fpu cache cpu rng > ${HTXMDT}mdt.io
 
+  afu_dev=`ls /dev/cxl/ 2>/dev/null | awk '/afu[0-9].[0-9]d/ { print $1 }'`
+  
+  if [[ "$afu_dev" != "" ]];
+  then
+    # Create mdt.memcopy stanza for afu dedicated mode
+    create_my_mdt afu[0-9].[0-9]d:default > ${HTXMDT}/mdt.memcopy
+  fi	
  
   if [ $proc_ver_dec -ge 63  ]; # Shifts for P7 & above
   then

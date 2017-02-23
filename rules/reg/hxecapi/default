@@ -1,0 +1,38 @@
+*****************************************************************
+* Stanza1 - COPY TEST,
+*           Issues COPY command 1024 times to AFU for buffer size 
+*           1 * 128 bytes.  
+*****************************************************************
+
+rule_id = CAPI1
+buffer_cl = 1 
+timeout = 60 
+alignment = 1 
+compare = TRUE
+num_oper = 1024
+
+*****************************************************************
+* Stanza2 - COPY TEST,
+*           Issues COPY command 2048 times to AFU for buffer size 
+*           32 * 128 bytes.
+*****************************************************************
+
+rule_id = CAPI2
+buffer_cl = 32
+timeout = 60 
+alignment = 1
+compare = TRUE
+num_oper = 2048
+
+****************************************************************
+* Stanza2 - COPY TEST,
+*           Issues COPY command 512 times to AFU for buffer size 
+*           16 * 128 bytes.
+****************************************************************
+
+rule_id = CAPI3
+buffer_cl = 16
+timeout = 60 
+alignment = 1
+compare = TRUE
+num_oper = 512 
