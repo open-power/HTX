@@ -1,6 +1,8 @@
 Network setup procedure for running hxecom exerciser 
-----------------------------------------------------
-hxecom/hxedapl is a network subsystem test porgram (a.k.a exerciser). hxecom/hxedapl
+====================================================
+
+
+hxecom/hxedapl is a network subsystem test porgram (a.k.a exerciser). hxecom
 supports testing of pure ethernet, Infiniband(IB) and RDMA capable adapters (RoCE).
 hxecom tests IB adapter with help of IP over IB layer. hxedapl tests IB/RoCE adapters
 using RDMA with help of DAPL lib (Direct Access Transport Libraries).
@@ -8,15 +10,17 @@ Before hxecom/hxedapl exerciser can run on network adapters, certain setup is
 required to be done. This setup is done by build_net script. This document describes
 steps to run build_net.
 
-hxecome/hxedapl can test network ports in two different network setup:
+hxecom/hxedapl can test network ports in two different network setup:
 
 *	Single system network setup
+	---------------------------
 	Network that is created by connecting network ports of a single system. One can create multiple
 	networks by connecting pair of network ports using back to back cable or through network switch.
 	Each connected pair of network ports is called a test network (a.k.a TESTNET). Each TESTNET has
 	its unique test network id.
 
 *	Multi system network setup
+	--------------------------
 	A Network that is created by connecting network ports of two different systems
 	(VMs or machines). One can create multiple networks by connecting pair of network ports from two
 	different machines (VMs) using back to back cable or through network switch. Each connected
@@ -38,7 +42,8 @@ hxecome/hxedapl can test network ports in two different network setup:
 	
 
 	Network hardware setup prerequisites:
-	--------------------------------------
+	====================================
+
 	a) Physically connect the network adapter ports, back to back or through a network switch. 
 	
 	b) Please ensure that network cables used in Step a) are good and compatible with network 
@@ -46,7 +51,8 @@ hxecome/hxedapl can test network ports in two different network setup:
 
 	
 	Other setup Prerequisites: 
-	--------------------------
+	=========================
+
 	"build_net" script relies on system's hostname to detect site network, and takes necessary
 	steps to avoid accidently altering ethernet interface connected to site network. However,
 	if /etc/hosts is not properly capturing the correct hostname, build_net considers COMNET
@@ -67,9 +73,11 @@ hxecome/hxedapl can test network ports in two different network setup:
 	Following steps shows netowrk setup for pure ethernet adapter only.
   
 	Building Single-system Networks (Pure Ethernet adapter (TCP)): 
-	--------------------------------------------------------------
+	==============================================================
+
 	Automatic setup and configuration
-	---------------------------------
+	=================================
+
 	While logging in as user htx, HTX automatically checks to see if there is an existing single
 	system setup available on the system. If so, it automatically detects the connections and
 	creates /tmp/networks file. If user wants to run network tests, along with any other MDT file
@@ -134,13 +142,14 @@ hxecome/hxedapl can test network ports in two different network setup:
 		
 	
 	Manual setup and configuration
-	------------------------------
+	==============================
+
 	Setup procedure can be summarized in three separate steps as mentioned below : 
 
 		STEP 1.
 		Run "build_net help" to build the template file, bpt. bpt file includes details of 
 		avaliable network interfaces in the system. This step is interactive and asks several 
-		questions about test setup. 
+		questions about test setup. Default bpt file path is /usr/lpp/htx/. 
 		Section below provides more details on different questions and possible inputs to 
 		them :  
 
@@ -169,7 +178,7 @@ hxecome/hxedapl can test network ports in two different network setup:
         Do you want automation scripts to automatically detect network topology, enter yes(y) or no(n)
         y  <-- Type 'y' to let build_net automatically detect your network setup.
 
-	    Expected Inputs :
+	Expected Inputs :
         -----------------
         1) Enter 'y' to let build_net automatically detect your network topology.  STEP 2.1 walks through 
 			further details for this user response.  
@@ -182,7 +191,7 @@ hxecome/hxedapl can test network ports in two different network setup:
 
 				root@fr70p01:~# build_net help y y
 				Your host com_dev for comname fr70p01 is set to eth0, netmask=255.255.255.0
-				Creating profile template... /root/bpt
+				Creating profile template... /usr/lpp/htx/bpt
 				onesys=y
 				Automation script will now try to detect your network topology.
 				In case of errors manually edit bpt file and run build_net bpt to setup hxecom networks
@@ -212,8 +221,8 @@ hxecome/hxedapl can test network ports in two different network setup:
     		STEP 2.1.2 :  build_net would assign netids to each detected TESTNET.  
 	
 			build_net will automatically configure netid's in bpt file based on
-    	    network topology detected in STEP 2.1.1. Build_net later invokes "build_net bpt"
-        	to configure test networks.
+    	    		network topology detected in STEP 2.1.1. Build_net later invokes "build_net bpt"
+	        	to configure test networks.
 
 			Note : 
 			=====
@@ -231,12 +240,12 @@ hxecome/hxedapl can test network ports in two different network setup:
 				Is this a one system test? y or n
 				y
 				Your host com_dev for comname fr70p01 is set to eth0, netmask=255.255.255.0
-				Creating profile template... /root/bpt
+				Creating profile template... /usr/lpp/htx/bpt
 				onesys=y
 				 Do you want automation scripts to automatically detect network topology, enter yes(y) or no(n)
 				n
 				Manually edit bpt file and run build_net bpt to setup hxecom networks
-				root@fr70p01:~# cat bpt
+				root@fr70p01:~# cat /usr/lpp/htx/bpt
 				onesys=yes
 				thishostid=24
 				nexthostid=24
@@ -280,7 +289,7 @@ hxecome/hxedapl can test network ports in two different network setup:
 	
 			Sample Edited Bpt file : 
 			-----------------------
-				root@fr70p01:~# cat bpt
+				root@fr70p01:~# cat /usr/lpp/htx/bpt
 				onesys=yes
 				thishostid=24
 				nexthostid=24
@@ -321,7 +330,7 @@ hxecome/hxedapl can test network ports in two different network setup:
 	
 			Sample run : 
 			------------
-				root@fr70p01:~# build_net bpt
+				root@fr70p01:~# build_net /usr/lpp/htx/bpt
 				Running build_net bpt to configure test networks ....
 				Your host com_dev for comname fr70p01 is set to eth0, netmask=255.255.255.0
 				Running Linux version of build_net.
@@ -349,8 +358,10 @@ hxecome/hxedapl can test network ports in two different network setup:
 		Step 3 is the basis for running hxecom. Please ensure that all the networks configured in bpt file 
 		passes ping test.
 
+	
 	Building Multi-system Networks : 
-	-------------------------------
+	================================
+	
 	Multi system setup is similar to single system test, except for STEP 1.   
 	
 	STEP 1 : Run "build_net help" on all the systems to build the template file, bpt, which includes all of 
@@ -363,12 +374,12 @@ hxecome/hxedapl can test network ports in two different network setup:
 		Is this a one system test? y or n
 		n
 		Your host com_dev for comname fr70p01 is set to eth0, netmask=255.255.255.0
-		Creating profile template... /root/bpt
+		Creating profile template... /usr/lpp/htx/bpt
 		onesys=n
 		 
 		Sample BPT file looks like :
 		----------------------------
-			root@fr70p01:~# cat bpt
+			root@fr70p01:~# cat /usr/lpp/htx/bpt
 			onesys=no
 			thishostid=24
 			other_ids=9.3.183.24:
@@ -410,7 +421,7 @@ hxecome/hxedapl can test network ports in two different network setup:
 		
 		Sample edited bpt file looks like : 
 		----------------------------------
-		root@fr70p01:~# cat bpt
+		root@fr70p01:~# cat /usr/lpp/htx/bpt
 		onesys=no
 		thishostid=24
 		other_ids=9.3.183.24:9.3.183.27
@@ -446,7 +457,7 @@ hxecome/hxedapl can test network ports in two different network setup:
 		#bondX XXX/n/com device_name no/yes   XXXX no/yes TCP/RDMA xx.xx.xx.x.x
 
 	STEP 3 : After editing the file, run "build_net bpt" to build the networks. 
-		root@fr70p01:~# build_net bpt
+		root@fr70p01:~# build_net /usr/lpp/htx/bpt
 		Running build_net bpt to configure test networks ....
 		Your host com_dev for comname fr70p01 is set to eth0, netmask=255.255.255.0
 		Running Linux version of build_net.
@@ -468,12 +479,14 @@ hxecome/hxedapl can test network ports in two different network setup:
 		
 		User Note : 
 		==========
-			1. Step 1 to 3 has to be done on all systems participating in Multi System Test. Ensure you configure Unique NETIDs to the test network pairs connected back to back.
+			1. Step 1 to 3 has to be done on all systems participating in Multi System Test. 
+			Ensure you configure Unique NETIDs to the test network pairs connected back to back.
 
 =====================================================================================================================		
 
 Understanding bpt file : 
-------------------------
+========================
+
 Section below gives detailed description of parameters used in bpt file :   	
 
 	1) ONESYS
@@ -483,16 +496,7 @@ Section below gives detailed description of parameters used in bpt file :
 	   	system test it is set to no. 
 		Possible Values : 'y' or 'n' 	
 
-	2) SEED
-	--------	
-		This is the random seed selected by build_net to create this profile. If you wish to rerun 
-		build_net help and produce this exact same profile, you must supply this same seed when 
-		asked for a seed.You should not need to supply a seed unless you are trying to reproduce a 
-		defect. Even then, you can just rerun build_net on the original bpt file to produce the 
-		same test.
-		Possible Vaules : Positive Integer.	
-	
-	3) THISHOSTID
+	2) THISHOSTID
 	-------------	
 		This value is set by build_net. It comes from the ip address of the comnet. In most cases 
 		this is the site connections ip address. The hostid is the last octet. For example for 
@@ -500,7 +504,7 @@ Section below gives detailed description of parameters used in bpt file :
 		ip 9.3.50.23, the hostid is 50.23 for class B addresses.
 		Possible Values : 0 - 254. 
 	
-	4) OTHER_IDS
+	3) OTHER_IDS
 	------------
 		This line you have to edit.The first host id will already be here, build_net supply it. 
 		It is the ip address of this systems comnet. You have to supply the ip or hostname of the 
@@ -509,7 +513,7 @@ Section below gives detailed description of parameters used in bpt file :
 		Example : 9.3.12.34:iofrocketsp04.
 		Possible Values : pingable ipaddresses of the participating test machines. 
 	
-	5) STRESSLEVEL
+	4) STRESSLEVEL
 	--------------
 		If you wish to increase the system stress level you can set this value from 1-6. If you 
 		have a lot of networks, you should have stress level b/w 1 to 4. Stress level 5 is designed  
@@ -525,17 +529,17 @@ Section below gives detailed description of parameters used in bpt file :
 		Possible Values : 1 to 6. 
 		Default Vaule : 5 or 6(randomly selected).
 	
-	6) COMHOSTNAME
+	5) COMHOSTNAME
 	--------------
 		The comnet hostname will be filled in for you if you have a site ring connection already
 		configured.This is the easiest way to run build_net and hxecom. 
 		Possible Values : Hostname of the current machine.	
 
-	7) Device line  
+	6) Device line  
 	---------------
 	
 		Sample Device line in bpt file : 
-		-------------------------------- 
+		================================ 
 
 		#dev net_id type use_defaults mtu jumbo testcase tx_tcp_reseg rx_tcp_reseg cksum location PdDvLn
 		----------------------------------------------------------------------------------------------------
@@ -653,8 +657,8 @@ Please Note :
 		required inputs through command line argument. 
 		
 		Syntax			:	build_net  help onesys use_automation
-		Possible Values :       	          y/n      y/n 
-		Example 	 	:   build_net  help y y 
+		Possible Values 	:       	         y/n      y/n 
+		Example 	 	:	build_net  help y y 
 
 
 MTU setup for adapters with SRIOV_Virtual_Function from HMC:
@@ -710,35 +714,197 @@ Link Aggregation Enablement for Linux:
 	on which you would like to setup network teaming in similar manner shown below. build_net
 	execution procedure/commands remain same.
 
-							Link             -------------	 Loopback 1
+				Link             -------------	 Loopback 1
 	 ------------------- Aggregation |------| Interface 1 |-----------------
 	|Network Team port 0|------------        -------------                  |
 	 -------------------             |------| Interface 2 |--------------	|	
-											 -------------   Loopback 2  |	|
-																		 |	|
-							Link             -------------               |	|
+						 -------------   Loopback 2  |	|
+					 |	|
+				Link             -------------               |	|
 	 ------------------- Aggregation |------| Interface 3 |--------------	|
 	|Network Team port 1|------------        ------------                   |
 	 -------------------             |------| Interface 4 |-----------------
-											 -------------
+						 -------------
 
 	Note: 
 
 	For RHEL:	Supported naming convention for Network Team devices is tmX,
-				where X is 1,2,3.... Make sure you name team devices as tm0,tm1,tm3.
+			where X is 1,2,3.... Make sure you name team devices as tm0,tm1,tm3.
 	For SLES/Ubuntu: Supported naming convention for Network Team devices is bondX,
-						where X is 1,2,3.... Make sure you name team devices as bond0,bond1,bond3.
+			where X is 1,2,3.... Make sure you name team devices as bond0,bond1,bond3.
 
-	Build_net debug logs
-	====================
+Network setup procedure for running hxedapl RDMA exerciser 
+==========================================================
+
+	RDMA Stack Requirements :
+	=======================
+
+	Please make sure following packages are installed correctly on system, to install you can run following 
+	command ( works for Debian based distros, you can use other supported installers , package name generally 
+	remain same across distros)
+
+	apt-get install -y opensm infiniband-diags ibutils ibverbs-utils rdmacm-utils perftest libmthca1 libmlx4-1 libmlx5-1 libipathverbs1 libdapl2 dapl2-utils
+
+	Edit /etc/modules to add modules needed for infiniband:
+	mlx4_ib
+	ib_core
+	ib_sa
+	ib_addr
+	ib_mad
+	ib_umad
+	ib_cm
+	ib_ucm
+	ib_uverbs
+	rdma_cm
+	rdma_ucm
+	ib_ipoib
+	mlx5_ib
+
+	# /etc/init.d/opensm start
+	- Then reboot system in order for ib ports to show up.
+
+
+	Step 1:
+	Run ibv_devinfo utility and ascertain Mellanox Infiniband devices are configured and displayed correctly. 
+	Make sure all the Port state is in active state.
+	Ex  :
+	hca_id: mlx5_0
+        transport:                      InfiniBand (0)
+        fw_ver:                         10.10.4050
+        node_guid:                      f452:1403:0056:6320     <------ Node GUID
+        sys_image_guid:                 f452:1403:0056:6320
+        vendor_id:                      0x02c9
+        vendor_part_id:                 4113
+        hw_ver:                         0x0
+        board_id:                       IBM1210111019
+        phys_port_cnt:                  2
+                port:   1
+                        state:                  PORT_ACTIVE (4)          <-------- Port state
+                        max_mtu:                4096 (5)
+                        active_mtu:             4096 (5)
+                        sm_lid:                 9
+                        port_lid:               8
+                        port_lmc:               0x00
+                        link_layer:             InfiniBand
+
+                port:   2
+                        state:                  PORT_ACTIVE (4)       <-------- Port State
+                        max_mtu:                4096 (5)
+                        active_mtu:             4096 (5)
+                        sm_lid:                 9
+                        port_lid:               9
+                        port_lmc:               0x00
+                        link_layer:             InfiniBand
+
+ 
+
+	Ports can be in 3 states :
+
+	        DOWN : No loop-back connection is present or ports are not connected to IB switch  present,
+        	INIT : connection is present but Subnet Manager has not yet run to setup negotiation protocols and
+	        ACTIVE : good to do data transfer.
+
+
+	To bring the ports to ACTIVE state, try following :
+	    1. If connected back to back, try running opensm utlity : opensm -g <node GUID>
+	    2. If connected using IB switch : Login to  IB switch to check OPEN SM is running or not.
+
+
+	STEP 2 :
+
+	Once Ports are active. Run low level RDMA utility to validate setup is good. Utilities are part 
+	of perftest package, if not installed try : apt-get install perftest Example below uses  ib_send_bw 
+	and runs these commands from two different windows :  
+
+	Server : ib_send_bw -a -d mlx5_0 -i 1
+
+	Client : ib_send_bw -a -d mlx5_0 -i 2 tul7p07
+
+
+	STEP 3 :
+
+	HTX RDMA test case uses RDMA uDAPL stack to push RDMA packages, make sure they are installed : dapl2-utils 
+	generally installs all dependent packages automatically.
+       		To Install : apt-get install dapl2-utils
+
+	STEP 4 :  Run build_net manual configuration procedure, for RDMA testcase you would need to update net_ids to connected ports 
+	of adapter in RDMA section of bpt file. Automation is not supported for RDMA testcase.
+     
+	Example :
+
+ 
+
+	[htx@tul7p07] /usr/lpp/htx/bin# cat /usr/lpp/htx/bpt
+	onesys=yes
+	thishostid=164
+	nexthostid=164
+	stresslevel=5
+	comhostname=tul7p07
+
+	#Transmission Control Protocl(TCP) Testcase ..
+	#dev   net_id   dev_type use_defaults mtu jumbo testcase location
+	#ethX XXX/n/com device_name no/yes   XXXX no/yes TCP/RDMA xx.xx.xx.x.x
+	eth0 com virtual_ent  yes 1500 no TCP U8284.22A.TUC06FP-V7-C2-T1
+
+	#Internet Protocol over Infiniband(IPoIB) Testcase ..
+	#DEV NET_ID   DEV_TYPE    DEV     PORT  TESTCASE   LOCATION
+	#ibXXX XXX/n/com device_type mlx[4/5]_X X   IPoIB  xx.xx.xx.x.x
+	ib0 n Unknown  NA NA IPoIB  U78CB.001.WZS02NH-P1-C5-T1                   <----- If you want to run IPoIB on these interfaces update net_id in this section
+	ib1 n Unknown  NA NA IPoIB  U78CB.001.WZS02NH-P1-C5-T1
+
+	#Transmission Control Protocl(TCP) Testcase ..
+	#dev   net_id   dev_type use_defaults mtu jumbo testcase location
+	#ethX XXX/n/com device_name no/yes   XXXX no/yes TCP/RDMA xx.xx.xx.x.x
+
+	#Remote Direct Memory Access(RDMA) Testcase ..
+	#DEV NET_ID   DEV_TYPE    IA     PORT  TESTCASE   LOCATION
+	#ibXXX XXX/n/com device_name ibX X   ibX/- RDMA xx.xx.xx.x.x
+	mlx5_0 101 Unknown mlx5_0-1 1 RDMA U78CB.001.WZS02NH-P1-C5-T1            <------ To run RDMA testcase update net_id to connected ports.
+	mlx5_0 101 Unknown mlx5_0-2 2 RDMA U78CB.001.WZS02NH-P1-C5-T1
+
+ 
+
+	There after run "build_net bpt", to setup RDMA testcase.
+
+	Notes :
+
+
+	1. Please note what Interface name (ethXX) is to Ethernet devices, IA(interface attribute) is to IB devices,
+	   they would not be physically present on system but are used to resolve which Infiniband adapter and port 
+	   they are attached to. So a unique IA is assumed for each ACTIVE Infiniband port.
+
+	2. HTX follows the naming convention for IA : <adapter_name>-<port_number> ex : mlx5_0-1, mlx5_1-2, these 
+	   IA names would appear as device name in mdt file and HTX screen 5.
+
+	Exerciser binary is renamed as  hxedapl,  default mdt file created would be net.mdt, 
+	run /usr/lpp/htx/mdt/mdt_net <mdt_name> to append hxedapl stanzas to any other mdt.
+
+
+	STEP 4 :
+
+	Run dapltest, what  pingum script is for hxecom, dapltest does the same for hxedapl. 
+	dapltest should run fine before starting hxedapl. 
+
+	Note : dapltest is part of dapl2-utils so make sure you have this package installed, steps mentioned in Section 3 above.
+
+	Example :
+	To Run this utility :
+
+	Server : dapltest -T S -D mlx5_0-2                            <--- IA name  (Explained in section 3 above)
+	Client : dapltest -T P -D mlx5_0-1 -s tul7p07 RR              <---- IA name  ( Explained in section 3 above).
+
+
+Build_net debug logs
+====================
 	Users can avail detailed build_net logs in test system under /tmp/ folder.
-	/tmp/build_net.log.<pid> file contains message/error logs which gives users 
+	/tmp/build_net.log file contains message/error logs which gives users 
 	more information on configuration  details and also helps in debugging.
 
 ############################################# DOCUMENT ENDS ##############################################
 
-Change History : 
+Change History :
 ================
+3rd Mar 2017, Shilpa Chandrappa
 21st Mar 2016, Shilpa Chandrappa
 18th Jan 2016, Shilpa Chandrappa
 5th Jan 2016, Shilpa Chandrappa
