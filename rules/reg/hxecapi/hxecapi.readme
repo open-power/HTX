@@ -1,0 +1,104 @@
+README For hxecapi exerciser
+============================
+
+Goal:
+-----
+To create a test configuration with in HTX to stress and validate CAPI infrastructure
+provided on Power8 Architecture adhering to CAIA architecture.
+
+Features:
+---------
+1) Supports COPY test case on Memcopy AFU Dedicated Mode.
+
+Brief description of hxecapi exerciser :
+---------------------------------------
+Hxecapi exerciser use libcxl APIs to perform memcopy operation on Memcopy AFU. It is a
+single process application that stress memcopy AFU running afu dedicated mode.
+
+Hardware supported & HW test scope:
+-----------------------------------
+This exerciser can only run on CAPI enabled hardware and software.
+So supported hardware should be Power8 and above. Supported
+Linux release is Ubuntu and Rhel7 LE. Supported mode is AFU Dedicated.
+
+Supported OS:
+-------------
+AIX   : n 
+Linux : y
+BML   : n
+
+Prerequisites:
+--------------
+1) Hardware should support CAIA Architecture, so this exerciser should
+        run on Power 8 chip or above.
+
+2) Libcxl library needs to be installed prior to running exerciser.
+libcxl.so library needs to be placed under /usr/lib for Ubuntu
+libcxl.so library needs to placed under /lib64/power8/ for RHEL7 LE
+
+libcxl library can be installed using:
+1. "apt-get install libcxl1" : After installing kindly see if libcxl.so is placed under /usr/lib.
+If not search where it is installed and move the file to /usr/lib. [Applied for Ubuntu only]
+2. Download libcxl source from path "https://github.com/ibm-capi/libcxl" and compile and place the
+library file under /usr/lib if ubuntu or under /lib64/power8/ for RHEL7 LE
+
+Dependent packages:
+------------------
+
+libcxl source is dependent package in order to compile hxecapi exerciser.
+Kindly download source from "https://github.com/ibm-capi/libcxl" and place libcxl.h file under
+directory /usr/include.
+
+List of mdt files:
+-----------------
+If afuX.Yd device is detected and is in Available state, stanza entry for afuX.Yd
+is created in mdt.bu and mdt.memcopy.
+
+List of rules:
+--------------
+default
+
+Rule File Parameters:
+--------------------
+
+HTX capi exerciser sample rules file looks like :
+
+rule_id = CAPI1
+buffer_cl = 1
+timeout = 60
+alignment = 1
+compare = TRUE
+num_oper = 1024
+
+This rule Issues COPY command 1024 times to AFU for buffer size 1 * 128 bytes.
+
+
+1) RULE_ID :
+        This parameter is used to assign unique name to each of the rule stanza
+        in the rule file. The value should be of type character string.
+        Default - MEMCOPY0.
+
+2) BUFFER_Cl:
+	Size of buffer in terms of cache line size
+	Default - 2
+
+3) TIMEOUT:
+	Memcopy status bit Timeout value;
+	Default -  1
+
+4) ALIGNMENT:
+	If aligned use posix_memalign api to allocate buffers; Else uses regular malloc api.
+	Default -  1 [posix_memalign]
+
+5) COMPARE:
+	This parameter indicates whether to compare source and destination buffer.
+        This parameter is only supported with COPY test-case.
+        Possible Values = TRUE or FALSE
+        Default - TRUE.
+
+6) NUM_OPER:
+	This parameter indicates number of times test(specified by TEST parameter)
+        has to be performed. For COPY test buffer size changes in each iteration.
+        Possible Values = Input should be positive real number.
+	Default - 10.
+
