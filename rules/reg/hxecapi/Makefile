@@ -1,7 +1,7 @@
 include ../../../htx.mk
 
 TARGET= \
-	default
+	default hxecapi.readme
 
 .PHONY: all clean
 
