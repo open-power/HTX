@@ -17,6 +17,8 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+static char sccsid[] = "@(#)85        1.15.1.19  src/htx/usr/lpp/htx/lib/htxsyscfg64/htxsyscfg.c, htx_libhtxsyscfg64, htxfedora 5/19/15 01:28:11";
+
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
@@ -743,7 +745,9 @@ int get_max_smt(void)
 int get_hw_smt(void)
 {
 	unsigned int Pvr;
-    Pvr = global_ptr->global_pvr;
+	int dd1_bit = 0;
+	Pvr = global_ptr->global_pvr;
+
 	if (Pvr == PV_POWER6){
 		global_ptr->global_core.smtdetails.smt_threads = 2;
 		return 0;
@@ -756,12 +760,12 @@ int get_hw_smt(void)
 		global_ptr->global_core.smtdetails.smt_threads= 8;
 		return 0;
 	}
-	else if (Pvr == PV_POWER9_NIMBUS){
-		global_ptr->global_core.smtdetails.smt_threads = 4;
-		return 0;
-	}
-	else if (Pvr == PV_POWER9_CUMULUS){
-		global_ptr->global_core.smtdetails.smt_threads = 8;
+    else if (Pvr == PV_POWER9_NIMBUS || Pvr == PV_POWER9_CUMULUS){ 
+		dd1_bit = get_p9_core_type();
+		if (dd1_bit == DD1_NORMAL_CORE)
+            global_ptr->global_core.smtdetails.smt_threads =  4; 
+		else if (dd1_bit == DD1_FUSED_CORE)
+			global_ptr->global_core.smtdetails.smt_threads =  8;
 		return 0;
 	}
 	else {
@@ -996,7 +1000,8 @@ int get_memory_pools(void) {
 	htxsyscfg_mempools_t *t;
 	FILE *fp=0;
 	char command[200],fname[100];
-	int i,j,rc,cpu,lcpu,huge_page_size,tot_pools=0;
+	int i,j,rc,cpu,lcpu,huge_page_size;
+	int tot_pools = -1;
 	unsigned long total_pages, free_pages;
 	total_pages = free_pages = 0;
 
@@ -1033,16 +1038,19 @@ int get_memory_pools(void) {
 	sprintf(fname,"%smem_pool_details",tmp_path);
 	sprintf(command,"%s/get_mem_pool_details.sh > %s",scripts_path,fname);
 	if ( (rc = system(command)) == -1 ) {
-		printf("%sget_mem_pool_details.sh failed\n",scripts_path);
+		sprintf(msg,"%sget_mem_pool_details.sh failed\n",scripts_path);
+		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 		return -4;
 	}
 	if ((fp=fopen(fname,"r"))==NULL){
-		printf("fopen of file %s failed with errno=%d",fname,errno);
+		sprintf(msg,"fopen of file %s failed with errno=%d",fname,errno);
+		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 		return -4;
 	}
 	rc = fscanf(fp,"num_nodes= %d\n",&tot_pools);
 	if (rc == 0 || rc == EOF) {
-		printf("fscanf of num_nodes on file %s failed with errno =%d",fname,errno);
+		sprintf(msg,"fscanf of num_nodes on file %s failed with errno =%d",fname,errno);
+		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 		fclose(fp);
 		return -4;
 	}
@@ -1051,7 +1059,8 @@ int get_memory_pools(void) {
 		rc = fscanf(fp,"node_num=%d,mem_avail=%llu,mem_free=%llu,cpus_in_node=%d,Hugepagesize=%d,HugePages_Total=%lu,HugePages_Free=%lu,cpus,",&t[i].node_num,&t[i].mem_total,&t[i].mem_free,
 					&t[i].num_procs,&huge_page_size,&total_pages,&free_pages);
 		if (rc == 0 || rc == EOF) {
-			printf("fscanf: fetching mem and cpu details in node =%d from file %s failed with rc = %d, errno =%d",i,fname,rc, errno);
+			sprintf(msg,"fscanf: fetching mem and cpu details in node =%d from file %s failed with rc = %d, errno =%d",i,fname,rc, errno);
+			hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 			fclose(fp);
 			return -4;
 		}
@@ -1085,7 +1094,8 @@ int get_memory_pools(void) {
 		for(cpu=0;cpu < t[i].num_procs;cpu++) {
 			rc = fscanf(fp,":%d",&lcpu);
 			if ( rc == 0 || rc == EOF) {
-				printf("fscanf: cpu fetch error in node=%d from file %s with errno=%d and rc=%d\n",i,fname,errno,rc);
+				sprintf(msg,"fscanf: cpu fetch error in node=%d from file %s with errno=%d and rc=%d\n",i,fname,errno,rc);
+				hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 				fclose(fp);
 				return -4;
 			}
@@ -1096,6 +1106,13 @@ int get_memory_pools(void) {
 		fscanf(fp,"\n");
 	}
 	fclose(fp);
+    if(tot_pools > 0) {
+		global_ptr->global_memory.num_numa_nodes = tot_pools;
+    }
+	else{
+		sprintf(msg,"global_memory.num_numa_nodes giving value of %d \n",global_ptr->global_memory.num_numa_nodes);
+		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
+	}
 	return (tot_pools);
 }
 
@@ -1740,8 +1757,9 @@ int L2L3cache(htxsyscfg_cache_t *t)
 
 int get_node(unsigned int pvr, int pir) {
 
-	int rc = 0;
+    int dd1_bit = 0;
 
+	int rc = 0;
 	switch(pvr) {
 		case PV_POWER6 :
 			rc = P6_GET_NODE(pir);
@@ -1758,13 +1776,13 @@ int get_node(unsigned int pvr, int pir) {
 			rc = P8_GET_NODE(pir);
 			break;
 		case PV_POWER9_NIMBUS:
-			rc = P9_NIMBUS_GET_NODE(pir);
-			break;
-
 		case PV_POWER9_CUMULUS:
-			rc = P9_CUMULUS_GET_NODE(pir);
+			dd1_bit = get_p9_core_type();
+	        if (dd1_bit == DD1_NORMAL_CORE)
+				rc = P9_NORMAL_CORE_MODE_GET_NODE(pir);
+        	else if (dd1_bit == DD1_FUSED_CORE)
+				rc = P9_FUSED_CORE_MODE_GET_NODE(pir);
 			break;
-
 		default:
 			rc = -1;
 			break;
@@ -1776,6 +1794,7 @@ int get_node(unsigned int pvr, int pir) {
 int get_chip(unsigned int pvr, int pir) {
 
 	int rc = 0;
+    int dd1_bit = 0;
 
 	switch(pvr) {
 		case PV_POWER6 :
@@ -1793,13 +1812,13 @@ int get_chip(unsigned int pvr, int pir) {
 			rc = P8_GET_CHIP(pir);
 			break;
 		case PV_POWER9_NIMBUS:
-			rc = P9_NIMBUS_GET_CHIP(pir);
-			break;
-
-		case PV_POWER9_CUMULUS:
-			rc = P9_CUMULUS_GET_CHIP(pir);
-			break;
-
+        case PV_POWER9_CUMULUS:
+			dd1_bit = get_p9_core_type();
+            if (dd1_bit == DD1_NORMAL_CORE)
+                rc = P9_NORMAL_CORE_MODE_GET_CHIP(pir);
+            else if (dd1_bit == DD1_FUSED_CORE)
+                rc = P9_FUSED_CORE_MODE_GET_CHIP(pir);
+            break;
 		default:
 			rc = -1;
 			break;
@@ -1811,6 +1830,7 @@ int get_chip(unsigned int pvr, int pir) {
 int get_core(unsigned int pvr, int pir) {
 
 	int rc = 0;
+    int dd1_bit = 0;
 
 	switch(pvr) {
 		case PV_POWER6 :
@@ -1829,12 +1849,13 @@ int get_core(unsigned int pvr, int pir) {
 			break;
 
 		case PV_POWER9_NIMBUS:
-			rc = P9_NIMBUS_GET_CORE(pir);
-			break;
-
 		case PV_POWER9_CUMULUS:
-			rc = P9_CUMULUS_GET_CORE(pir);
-			break;
+			dd1_bit = get_p9_core_type();
+            if (dd1_bit == DD1_NORMAL_CORE)
+                rc = P9_NORMAL_CORE_MODE_GET_CORE(pir);
+            else if (dd1_bit == DD1_FUSED_CORE)
+                rc = P9_FUSED_CORE_MODE_GET_CORE(pir);
+            break;
 
 		default:
 			rc = -1;
@@ -2680,6 +2701,32 @@ int get_true_cpu_revision(void)
     return pvr_last_two_bytes;
 }
 
+/* API to see if the chip is in fused or normal core mode   */
+/* DD1_NORMAL_CORE = 1 and DD1_FUSED_CORE = 0         */
+/* check for DD1_NORMAL_CORE or DD1_FUSED_CORE in exer*/
+
+int get_p9_core_type(void)
+{
+    int pvr = 0;
+    int dd1_bit = 0;
+    pvr = global_ptr->global_pvr;
+	int pvr_full = (int)get_cpu_version();
+	if (pvr == PV_POWER9_NIMBUS || pvr == PV_POWER9_CUMULUS){
+    	dd1_bit = ((pvr_full >> 20)  & 0x01); /* 19th bit in pvr signifies the fused/normal core mode*/
+		if( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"PVM_GUEST") == 0)
+    	    return(dd1_bit);
+	    else if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"NV") == 0)
+    	    return(DD1_NORMAL_CORE);
+	    else if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"KVM_GUEST") == 0)
+    	    return(DD1_NORMAL_CORE);
+    	else
+        	return(dd1_bit);
+	}
+	else
+		return(DD1_NORMAL_CORE);
+}
+
+
 
 
 int get_num_of_nodes_in_sys(void)
@@ -3174,8 +3221,12 @@ int update_syscfg(void)
     }
 
     r19 = get_memory_pools();
-    if(r19 >= 0) {
+    if(r19 > 0) {
 		global_ptr->global_memory.num_numa_nodes = r19;
+	}
+	else{
+		sprintf(msg,"global_memory.num_numa_nodes giving value of %d \n",global_ptr->global_memory.num_numa_nodes);
+		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 	}
 
 	r7=get_memory_details_update();
