@@ -17,13 +17,14 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+
 /* @(#)86       1.10.1.10  src/htx/usr/lpp/htx/inc/htxsyscfg64_new.h, htx_libhtxsyscfg64, htxfedora 5/19/15 06:49:43  */
 
 /* Name : htxsyscfg64.h                                  *
  * Description: Contains declarations for variable and *
  *              functions in htxsyscfg library         *
  */
- 
+
 #ifndef __HTXSYSCFG_H64__
 #define __HTXSYSCFG_H64__
 
@@ -33,9 +34,9 @@
 #    include <sys/procfs.h>
 #endif
 
-#define P9_NIMBUS_NODE_MASK 0x0000000000007800
-#define P9_NIMBUS_CHIP_MASK 0x0000000000000700
-#define P9_NIMBUS_CORE_MASK 0x000000000000007C
+#define P9_NORMAL_CORE_MODE_NODE_MASK 0x0000000000007800
+#define P9_NORMAL_CORE_MODE_CHIP_MASK 0x0000000000000700
+#define P9_NORMAL_CORE_MODE_CORE_MASK 0x000000000000007C
 
 /*
 0111 1000 0000 0000  8 possible nodes   >> 11
@@ -45,9 +46,9 @@
 */
 
 
-#define P9_CUMULUS_NODE_MASK 0x0000000000007800
-#define P9_CUMULUS_CHIP_MASK 0x0000000000000700
-#define P9_CUMULUS_CORE_MASK 0x0000000000000078
+#define P9_FUSED_CORE_MODE_NODE_MASK 0x0000000000007800
+#define P9_FUSED_CORE_MODE_CHIP_MASK 0x0000000000000700
+#define P9_FUSED_CORE_MODE_CORE_MASK 0x0000000000000078
 
 /*
 0111 1000 0000 0000  8 possible nodes   >> 11
@@ -64,7 +65,7 @@
 0 0011 1000 0000  8 possible chips   >> 7
 0 0000 0111 1000  12 possible cores  >> 3
 0 0000 0000 0111  8 possible threads
-*/ 
+*/
 #define P7_NODE_MASK 0x00000380
 #define P7_CHIP_MASK 0x00000060
 #define P7_CORE_MASK 0x0000001C
@@ -72,14 +73,14 @@
 #define P6_CHIP_MASK 0x00000018
 #define P6_CORE_MASK 0x00000002
 /* P9 macros for CUMULUS */
-#define P9_CUMULUS_GET_NODE(_PIR_)   ((_PIR_ & P9_CUMULUS_NODE_MASK) >> 11)
-#define P9_CUMULUS_GET_CHIP(_PIR_)   ((_PIR_ & P9_CUMULUS_CHIP_MASK) >> 8)
-#define P9_CUMULUS_GET_CORE(_PIR_)   ((_PIR_ & P9_CUMULUS_CORE_MASK) >> 3)
+#define P9_FUSED_CORE_MODE_GET_NODE(_PIR_)   ((_PIR_ & P9_FUSED_CORE_MODE_NODE_MASK) >> 11)
+#define P9_FUSED_CORE_MODE_GET_CHIP(_PIR_)   ((_PIR_ & P9_FUSED_CORE_MODE_CHIP_MASK) >> 8)
+#define P9_FUSED_CORE_MODE_GET_CORE(_PIR_)   ((_PIR_ & P9_FUSED_CORE_MODE_CORE_MASK) >> 3)
 
 /* P9 macros for NIMBUS */
-#define P9_NIMBUS_GET_NODE(_PIR_)   ((_PIR_ & P9_NIMBUS_NODE_MASK) >> 11)
-#define P9_NIMBUS_GET_CHIP(_PIR_)   ((_PIR_ & P9_NIMBUS_CHIP_MASK) >> 8)
-#define P9_NIMBUS_GET_CORE(_PIR_)   ((_PIR_ & P9_NIMBUS_CORE_MASK) >> 2)
+#define P9_NORMAL_CORE_MODE_GET_NODE(_PIR_)   ((_PIR_ & P9_NORMAL_CORE_MODE_NODE_MASK) >> 11)
+#define P9_NORMAL_CORE_MODE_GET_CHIP(_PIR_)   ((_PIR_ & P9_NORMAL_CORE_MODE_CHIP_MASK) >> 8)
+#define P9_NORMAL_CORE_MODE_GET_CORE(_PIR_)   ((_PIR_ & P9_NORMAL_CORE_MODE_CORE_MASK) >> 2)
 
 #define P8_GET_NODE(_PIR_)   ((_PIR_ & P8_NODE_MASK) >> 10)
 #define P8_GET_CHIP(_PIR_)   ((_PIR_ & P8_CHIP_MASK) >> 7)
@@ -93,7 +94,7 @@
 
 /*type of virtualization*/
 #define PVM_GUEST		-1
-#define KVM_GUEST		0 
+#define KVM_GUEST		0
 #define NV			1
 #define BML				2
 #define PVM_PROC_SHARED_GUEST	3
@@ -293,11 +294,15 @@
 #define PV_POWER6               0x3E  /* ECLIPZ */
 #define PV_POWER7               0x3F  /* P7 */
 #define PV_POWER7PLUS           0x4A  /* P7+ */
-#define PV_POWER8_MURANO		0x4B  /* P8 */	
+#define PV_POWER8_MURANO		0x4B  /* P8 */
 #define PV_POWER8_VENICE		0x4D  /* P8 */
 #define PV_POWER8_PRIME			0x4C
 #define PV_POWER9_NIMBUS		0x4E  /* P9 */
 #define PV_POWER9_CUMULUS		0x4F  /* P9 */
+#define PV_POWER9_FUSED_CORE		0x0100 /*P9*/
+#define PV_POWER9_NORMAL_CORE            0x1100 /*P9*/
+#define DD1_NORMAL_CORE			1 /*P9*/	
+#define DD1_FUSED_CORE                 0 /*P9*/
 #define PV_CellBE               0x70  /* STI */
 
 /* Possible values of the structure_status member of SYS_CONF structure */
@@ -319,7 +324,7 @@
 typedef struct {
     unsigned int num_procs;
     unsigned int lprocs[MAX_CPUS_PER_CORE];
-	unsigned int pprocs[MAX_CPUS_PER_CORE];	
+	unsigned int pprocs[MAX_CPUS_PER_CORE];
 } CORE;
 
 typedef struct {
@@ -512,7 +517,7 @@ typedef struct
 } htxsyscfg_cache_t;
 
 typedef struct {
-	unsigned int global_pvr; 
+	unsigned int global_pvr;
 	SYS_CONF syscfg;
 	SYSTEM_CPU_MAP system_cpu_map;
     htxsyscfg_lpar_t global_lpar;
@@ -523,7 +528,7 @@ typedef struct {
 	int get_chip_value;
 	int get_core_value;
 }GLOBAL_SYSCFG;
-	
+
 extern GLOBAL_SYSCFG *global_ptr;
 
 /* Below structures are used for filtering and storing info about enabled
@@ -555,6 +560,7 @@ struct resource_filter_info {
     int num_nodes;
 };
 
+
 /********************     Function Declarations     ********************/
 
 
@@ -564,7 +570,7 @@ int  pthread_rwlock_rdlock(pthread_rwlock_t *rwlock );
 
 int  pthread_rwlock_wrlock(pthread_rwlock_t *rwlock );
 
-int pthread_rwlock_unlock(pthread_rwlock_t *rwlock); 
+int pthread_rwlock_unlock(pthread_rwlock_t *rwlock);
 
 /*for initialising shared memory*/
 int init_syscfg(void);
@@ -681,6 +687,9 @@ void get_location_codes(void);
 
 /*Retrieves timebase details*/
 long long get_timebase(void);
+
+/* Get the DD1 bit */
+int get_p9_core_type(void);
 
 /*Retrieves L2 & L3 details*/
 int L2L3cache(htxsyscfg_cache_t *t);
