@@ -69,27 +69,25 @@ struct instruction_masks vsx_instructions_array[] = {
 /* xvnegsp */	{0xF00006E4, 0,DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0,  "xvnegsp",  (sim_fptr)&simulate_xvnegsp, VSX_VECTOR_SP_MOVE_ONLY, FORM_XX2_XT_XB},
 
 /* VSX  Scalar Floating-Point Elementary Arithmetic instructions */
-/* xsadddp */   {0xF0000100, F_XSASDP,  SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsadddp",  (sim_fptr)&simulate_xsadddp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
-/* xsdivdp */	{0xF00001C0, F_XSDIVDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsdivdp",  (sim_fptr)&simulate_xsdivdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
-/* xsmuldp */	{0xF0000180, F_XSMULDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsmuldp",  (sim_fptr)&simulate_xsmuldp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
-/* xsredp 		{ 0xF0000168, 0,DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP,  21, 0x0,  "xsredp",   (sim_fptr)&simulate_xsredp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB}, */
-/* xsrsqrtedp   {0xF0000128,0,DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP,  21, 0x0,  "xsrsqrtedp",  (sim_fptr)&simulate_xsrsqrtedp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB}, */
-/* xssqrtdp */	{0xF000012C, F_XSSQRTDP, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP,  21, 0x0,  "xssqrtdp",  	(sim_fptr)&simulate_xssqrtdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB},
-/* xssubdp */	{0xF0000140, F_XSASDP,  SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xssubdp",  (sim_fptr)&simulate_xssubdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
+/* xsadddp */   {0xF0000100, F_XSASDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0, "xsadddp",  (sim_fptr)&simulate_xsadddp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
+/* xsdivdp */	{0xF00001C0, F_XSDIVDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0, "xsdivdp", (sim_fptr)&simulate_xsdivdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
+/* xsmuldp */	{0xF0000180, F_XSMULDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0, "xsmuldp", (sim_fptr)&simulate_xsmuldp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
+/* xsredp */ 	{0xF0000168, 0, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP,  21, 0x0,  "xsredp",   (sim_fptr)&simulate_xsredp, (VSX_SCALAR_DP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB}, 
+/* xsrsqrtedp */{0xF0000128, 0, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP,  21, 0x0,  "xsrsqrtedp",  (sim_fptr)&simulate_xsrsqrtedp, (VSX_SCALAR_DP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB},
+/* xssqrtdp */	{0xF000012C, F_XSSQRTDP, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0, "xssqrtdp", (sim_fptr)&simulate_xssqrtdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB},
+/* xssubdp */	{0xF0000140, F_XSASDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0, "xssubdp", (sim_fptr)&simulate_xssubdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
 /* xstdivdp */	{0xF00001E8,0,SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, CR_T	 , 23, 0x4,  "xstdivdp", (sim_fptr)&simulate_xstdivdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_BF_XA_XB},
 /* xstsqrtdp */	{0xF00001A8,0,DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY,  CR_T	 , 23, 0x4,  "xstsqrtdp",(sim_fptr)&simulate_xstsqrtdp, VSX_SCALAR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_BF_XB},
 
 /* VSX  Vector Floating-Point Elementary ARITHMETIC instructions */
-/* xvadddp */	{0xF0000300, F_XVADDSUB,VECTOR_DP, 16, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xvadddp",  (sim_fptr)&simulate_xvadddp, VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
-/* xvaddsp */	{0xF0000200, F_XVADDSUB,VECTOR_SP, 16, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0,  "xvaddsp",  (sim_fptr)&simulate_xvaddsp, VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
+/* xvadddp */	{0xF0000300, F_XVADDSUB,VECTOR_DP, 16, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0, "xvadddp", (sim_fptr)&simulate_xvadddp, VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
+/* xvaddsp */	{0xF0000200, F_XVADDSUB,VECTOR_SP, 16, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0, "xvaddsp", (sim_fptr)&simulate_xvaddsp, VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
 /* xvdivdp */	{0xF00003C0, F_XVDIV,VECTOR_DP, 16, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xvdivdp",  (sim_fptr)&simulate_xvdivdp, VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
 /* xvdivsp */	{0xF00002C0, F_XVDIV,VECTOR_SP, 16, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0,  "xvdivsp",  (sim_fptr)&simulate_xvdivsp, VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
 /* xvmuldp */	{0xF0000380, F_XVMUL,VECTOR_DP, 16, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xvmuldp",  (sim_fptr)&simulate_xvmuldp, VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
 /* xvmulsp */	{0xF0000280, F_XVMUL,VECTOR_SP, 16, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0,  "xvmulsp",  (sim_fptr)&simulate_xvmulsp, VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
-/* xvredp 	 	{0xF0000368, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP,  21, 0x0,  "xvredp",  (sim_fptr)&simulate_xvredp,  VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB},  */
-/* xvresp 	    {0xF0000268, 0,DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP,  21, 0x0,  "xvresp",  (sim_fptr)&simulate_xvresp,  VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB}, */
-/* xvrsqrtedp   { 0xF0000328, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP,  21, 0x0,  "xvrsqrtedp",(sim_fptr)&simulate_xvrsqrtedp,VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB}, */
-/* xvrsqrtesp   {0xF0000228, 0,DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP,  21, 0x0,  "xvrsqrtesp",(sim_fptr)&simulate_xvrsqrtesp,VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB}, */
+/* xvredp */	{0xF0000368, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP,  21, 0x0,  "xvredp",  (sim_fptr)&simulate_xvredp,  (VSX_VECTOR_DP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB}, 
+/* xvrsqrtedp */{0xF0000328, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP,  21, 0x0,  "xvrsqrtedp",(sim_fptr)&simulate_xvrsqrtedp,(VSX_VECTOR_DP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB},
 /* xvsqrtdp */	{0xF000032C, F_XVSQRT,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP,  21, 0x0,  "xvsqrtdp",  (sim_fptr)&simulate_xvsqrtdp,VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB},
 /* xvsqrtsp */	{0xF000022C, F_XVSQRT,DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP,  21, 0x0,  "xvsqrtsp",  (sim_fptr)&simulate_xvsqrtsp,VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX2_XT_XB},
 /* xvsubdp */	{0xF0000340, F_XVADDSUB,VECTOR_DP, 16, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xvsubdp",  (sim_fptr)&simulate_xvsubdp, VSX_VECTOR_DP_FP_ARITHMETIC_ONLY, FORM_XX3_XT_XA_XB},
@@ -100,7 +98,7 @@ struct instruction_masks vsx_instructions_array[] = {
 /* xvtsqrtsp */	{0xF00002A8, 0,DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, CR_T	  ,  23, 0x4,  "xvtsqrtsp",  (sim_fptr)&simulate_xvtsqrtsp, VSX_VECTOR_SP_FP_ARITHMETIC_ONLY, FORM_XX2_BF_XB},
 
 /* VSX  Scalar Floating-Point Multiply-Add Arithmetic Instructions */
-/* xsmaddadp */	{0xF0000108, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_DP, 21, 0x3,  "xsmaddadp",  (sim_fptr)&simulate_xsmaddadp, VSX_SCALAR_DP_FP_MUL_ADD_ONLY, FORM_XX3_XT_XA_XB},
+/* xsmaddadp */	{0xF0000108, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_DP, 21, 0x3, "xsmaddadp", (sim_fptr)&simulate_xsmaddadp, VSX_SCALAR_DP_FP_MUL_ADD_ONLY, FORM_XX3_XT_XA_XB},
 /* xsmaddmdp  */{0xF0000148, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_DP, 21, 0x3,  "xsmaddmdp",  (sim_fptr)&simulate_xsmaddmdp, VSX_SCALAR_DP_FP_MUL_ADD_ONLY, FORM_XX3_XT_XA_XB},
 /* xsmsubadp  */{0xF0000188, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_DP, 21, 0x3,  "xsmsubadp",  (sim_fptr)&simulate_xsmsubadp, VSX_SCALAR_DP_FP_MUL_ADD_ONLY, FORM_XX3_XT_XA_XB},
 /* xsmsubmdp  */{0xF00001C8, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_DP, 21, 0x3,  "xsmsubmdp",  (sim_fptr)&simulate_xsmsubmdp, VSX_SCALAR_DP_FP_MUL_ADD_ONLY, FORM_XX3_XT_XA_XB},
@@ -217,7 +215,7 @@ struct instruction_masks vsx_instructions_array[] = {
 
 /* VSX  Scalar Round to Floating-Point Integer Instructions */
 /* xsrdpi  */	{0xF0000124, F_XSRD, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsrdpi",  (sim_fptr)&simulate_xsrdpi, VSX_SCALAR_DP_RND_2_FPINT_ONLY,  FORM_XX2_XT_XB},
-/* xsrdpic */	{0xF00001AC,F_XSRDPIC , DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsrdpic",  (sim_fptr)&simulate_xsrdpic, VSX_SCALAR_DP_RND_2_FPINT_ONLY, FORM_XX2_XT_XB},
+/* xsrdpic */	{0xF00001AC, F_XSRDPIC, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0, "xsrdpic",  (sim_fptr)&simulate_xsrdpic, VSX_SCALAR_DP_RND_2_FPINT_ONLY, FORM_XX2_XT_XB},
 /* xsrdpim */	{0xF00001E4, F_XSRD, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsrdpim",  (sim_fptr)&simulate_xsrdpim, VSX_SCALAR_DP_RND_2_FPINT_ONLY, FORM_XX2_XT_XB},
 /* xsrdpip */	{0xF00001A4, F_XSRD, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsrdpip",  (sim_fptr)&simulate_xsrdpip, VSX_SCALAR_DP_RND_2_FPINT_ONLY, FORM_XX2_XT_XB},
 /* xsrdpiz */	{0xF0000164, F_XSRD, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xsrdpiz",  (sim_fptr)&simulate_xsrdpiz, VSX_SCALAR_DP_RND_2_FPINT_ONLY, FORM_XX2_XT_XB},
@@ -269,7 +267,30 @@ struct instruction_masks vsx_instructions_array[] = {
 };
 
 struct instruction_masks vsx_p8_instructions_array[] = {
-	/* All VSX p8 specific instructions */
+
+/* instructions moved to P8 table, sp versions results as illegal instruction on P7 test machine: skyp03 */
+/* xsaddsp */   {0xF0000000, F_XSASDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0, "xsaddsp",  (sim_fptr)&simulate_xsaddsp, (VSX_SCALAR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsdivsp */	{0xF00000C0, F_XSDIVDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0, "xsdivsp", (sim_fptr)&simulate_xsdivsp, (VSX_SCALAR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsmulsp */	{0xF0000080, F_XSMULDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0, "xsmulsp", (sim_fptr)&simulate_xsmulsp, (VSX_SCALAR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsresp */ 	{0xF0000068, 0, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP,  21, 0x0,  "xsresp",   (sim_fptr)&simulate_xsresp, (VSX_SCALAR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB}, 
+/* xsrsqrtesp */{0xF0000028, 0, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP,  21, 0x0,  "xsrsqrtesp",  (sim_fptr)&simulate_xsrsqrtesp, (VSX_SCALAR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB},
+/* xssqrtsp */	{0xF000002C, F_XSSQRTDP, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0, "xssqrtsp", (sim_fptr)&simulate_xssqrtsp, (VSX_SCALAR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB},
+/* xssubsp */	{0xF0000040, F_XSASDP, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0, "xssubsp", (sim_fptr)&simulate_xssubsp, (VSX_SCALAR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xvresp */	{0xF0000268, 0,DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP,  21, 0x0,  "xvresp",  (sim_fptr)&simulate_xvresp,  (VSX_VECTOR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB},
+/* xvrsqrtesp */{0xF0000228, 0,DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP,  21, 0x0,  "xvrsqrtesp",(sim_fptr)&simulate_xvrsqrtesp,(VSX_VECTOR_SP_FP_ARITHMETIC_ONLY | HW_ONLY), FORM_XX2_XT_XB},
+/* xsmaddasp */	{0xF0000008, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3, "xsmaddasp", (sim_fptr)&simulate_xsmaddasp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsmaddmsp  */{0xF0000048, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3,  "xsmaddmsp",  (sim_fptr)&simulate_xsmaddmsp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsmsubasp  */{0xF0000088, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3,  "xsmsubasp",  (sim_fptr)&simulate_xsmsubasp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsmsubmsp  */{0xF00000C8, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3,  "xsmsubmsp",  (sim_fptr)&simulate_xsmsubmsp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsnmaddasp */{0xF0000408, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3,  "xsnmaddasp", (sim_fptr)&simulate_xsnmaddasp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsnmaddmsp */{0xF0000448, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3,  "xsnmaddmsp", (sim_fptr)&simulate_xsnmaddmsp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsnmsubasp */{0xF0000488, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3,  "xsnmsubasp", (sim_fptr)&simulate_xsnmsubasp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xsnmsubmsp */{0xF00004C8, F_XSMADDSUB,SCALAR_DP, 16, SCALAR_DP, 11, SCALAR_DP, 21, SCALAR_SP, 21, 0x3,  "xsnmsubmsp", (sim_fptr)&simulate_xsnmsubmsp, (VSX_SCALAR_DP_FP_MUL_ADD_ONLY | HW_ONLY), FORM_XX3_XT_XA_XB},
+/* xscvsxdsp */	{0xF00004E0, F_XSCVI2F,DUMMY, DUMMY, GPR_T,   11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0,  "xscvsxdsp",  (sim_fptr)&simulate_xscvsxdsp, (VSX_SCALAR_SP_CONV_INT2FP_ONLY| HW_ONLY), FORM_XX2_XT_XB},
+/* xscvuxdsp */	{0xF00004A0, F_XSCVI2F,DUMMY, DUMMY, GPR_T,   11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0,  "xscvuxdsp",  (sim_fptr)&simulate_xscvuxdsp, (VSX_SCALAR_SP_CONV_INT2FP_ONLY | HW_ONLY), FORM_XX2_XT_XB},
+/* xsrsp  */	{0xF0000464, F_XSRD, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_SP, 21, 0x0,  "xsrsp",  (sim_fptr)&simulate_xsrsp, (VSX_SCALAR_DP_RND_2_FPINT_ONLY | HW_ONLY), FORM_XX2_XT_XB},
+
+/* All VSX p8 specific instructions */
 
 /* Vector Move Instructions */
 /* mfvsrd*/   {0x7C000066, 0, SCALAR_DP, 21 ,DUMMY ,DUMMY , DUMMY, DUMMY, GR, 16  , 0x7, "mfvsrd",  (sim_fptr)&simulate_mfvsrd, VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_RA_XS},
@@ -303,8 +324,8 @@ struct instruction_masks vsx_p8_instructions_array[] = {
 
 struct instruction_masks vsx_p9_instructions_array[] = {
 /* RFC02462 - Decimal integer support operation */
-/* lxvll	*/	{0x7C00025A, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxvll",	(sim_fptr)&simulate_lxvll, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* stxvll	*/	{0x7C00035A, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x2, "stxvll",	(sim_fptr)&simulate_stxvll,VSX_VECTOR_LENGTH_STORE_ONLY,FORM_XX1_XT_RA_RB},
+/* lxvll	*/	{0x7C00025A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvll",	(sim_fptr)&simulate_lxvll, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
+/* stxvll	*/	{0x7C00035A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvll",	(sim_fptr)&simulate_stxvll,VSX_VECTOR_LENGTH_STORE_ONLY,FORM_XX1_XT_RA_RB},
 
 /* VSX half precision - RFC02468 */
 /* xscvhpdp	*/	{0xF010056C, 0, DUMMY, DUMMY, SCALAR_HP, 11, DUMMY, DUMMY, SCALAR_HP, 21, 0x0, "xscvhpdp", (sim_fptr)&simulate_xscvhpdp, VSX_SCALAR_CONV_HP_DP_ONLY, FORM_XX2_XT_XB},
@@ -318,8 +339,8 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 
 /* RFC02467.r10: String Operations (VSU Option) */ 
 /************************************************/
-/* lxvl	*/	{0x7C00021A, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxvl",	(sim_fptr)&simulate_lxvll, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* stxvl*/	{0x7C00031A, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x2, "stxvl",	(sim_fptr)&simulate_stxvll, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
+/* lxvl	*/	{0x7C00021A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvl",	(sim_fptr)&simulate_lxvll, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
+/* stxvl*/	{0x7C00031A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvl",	(sim_fptr)&simulate_stxvll, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
 /* RFC02470 128-bit SIMD FXU Operations */
 /************************************************/
 /* lxsibzx */{0x7C00061A, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxsibzx",(sim_fptr)&simulate_lxsibzx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
@@ -328,24 +349,24 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 /* stxsihx */{0x7C00075A, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x2, "stxsihx",(sim_fptr)&simulate_stxsihx, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
 /* RFC02471.r13: 128-bit SIMD Miscellaneous Operations */ 
 /*******************************************************/
-/* lxvb16x */{0x7C0006D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxvb16x",(sim_fptr)&simulate_lxvb16x, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* lxvh8x */{0x7C000658, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxvh8x",(sim_fptr)&simulate_lxvh8x, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* lxvx */{0x7C000218, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxvx",(sim_fptr)&simulate_lxvx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* lxvx */{0x7C000258, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxvx",(sim_fptr)&simulate_lxvx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* lxvwsx */{0x7C0002D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxvwsx",(sim_fptr)&simulate_lxvwsx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* mfvsrld*/{0x7C000266, 0, SCALAR_DP, 21, DUMMY, DUMMY, DUMMY, DUMMY, GR, 16, 0x7, "mfvsrld",(sim_fptr)&simulate_mfvsrld, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA},
-/* mtvsrdd */{0x7C000366, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x7, "mtvsrdd",(sim_fptr)&simulate_mtvsrdd, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA_RB},
-/* mtvsrws*/{0x7C000326, 0, GR, 16, DUMMY, DUMMY, DUMMY, DUMMY, SCALAR_DP, 21, 0x7, "mtvsrws",(sim_fptr)&simulate_mtvsrws, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA},
-/* stxvb16x*/{0x7C0007D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x2, "stxvb16x",(sim_fptr)&simulate_stxvb16x, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
-/* stxvh8x */{0x7C000758, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x2, "stxvh8x",(sim_fptr)&simulate_stxvh8x, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
-/* stxvx */{0x7C000318, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x2, "stxvx",(sim_fptr)&simulate_stxvx, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
-/* xxbrd */	{0xF017076C, 0,DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xxbrd", (sim_fptr)&simulate_xxbrd, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
-/* xxbrh */	{0xF007076C, 0,DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xxbrh", (sim_fptr)&simulate_xxbrh, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
-/* xxbrq */	{0xF01F076C, 0,DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xxbrq", (sim_fptr)&simulate_xxbrq, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
-/* xxbrw */	{0xF00F076C, 0,DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x0,  "xxbrw", (sim_fptr)&simulate_xxbrw, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
-/* xxextractuw*/{0xF0000294, 0, IMM_DATA_4BIT, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x8,  "xxextractuw", (sim_fptr)&simulate_xxextractuw, P9_VSX_MISC_ONLY, FORM_XX2_XT_UIM4_XB},
-/* xxinsertw*/{0xF00002D4, 0,IMM_DATA_4BIT, 16, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x8,  "xxinsertw", (sim_fptr)&simulate_xxinsertw, P9_VSX_MISC_ONLY, FORM_XX2_XT_UIM4_XB},
-/*xxspltib*/{0xF00002D0, 0, IMM_DATA_8BIT, 11, DUMMY, DUMMY, DUMMY, DUMMY, SCALAR_DP, 21, 0x8, "xxspltib",(sim_fptr)&simulate_xxspltib, P9_VSX_MISC_ONLY, FORM_XX1_IMM8},
+/* lxvb16x 	*/{0x7C0006D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvb16x",(sim_fptr)&simulate_lxvb16x, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
+/* lxvh8x  	*/{0x7C000658, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvh8x",(sim_fptr)&simulate_lxvh8x, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
+/* lxvx 	*/{0x7C000218, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvx",(sim_fptr)&simulate_lxvx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
+/* lxvx {0x7C000258, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvx",(sim_fptr)&simulate_lxvx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},*/
+/* lxvwsx */{0x7C0002D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvwsx",(sim_fptr)&simulate_lxvwsx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
+/* mfvsrld*/{0x7C000266, 0, VECTOR_DP, 21, DUMMY, DUMMY, DUMMY, DUMMY, GR, 16, 0x7, "mfvsrld",(sim_fptr)&simulate_mfvsrld, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA},
+/* mtvsrdd */{0x7C000366, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x7, "mtvsrdd",(sim_fptr)&simulate_mtvsrdd, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA_RB},
+/* mtvsrws*/{0x7C000326, 0, GR, 16, DUMMY, DUMMY, DUMMY, DUMMY, VECTOR_DP, 21, 0x7, "mtvsrws",(sim_fptr)&simulate_mtvsrws, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA},
+/* stxvb16x*/{0x7C0007D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvb16x",(sim_fptr)&simulate_stxvb16x, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
+/* stxvh8x */{0x7C000758, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvh8x",(sim_fptr)&simulate_stxvh8x, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
+/* stxvx */{0x7C000318, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvx",(sim_fptr)&simulate_stxvx, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
+/* xxbrd */	{0xF017076C, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xxbrd", (sim_fptr)&simulate_xxbrd, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
+/* xxbrh */	{0xF007076C, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xxbrh", (sim_fptr)&simulate_xxbrh, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
+/* xxbrq */	{0xF01F076C, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xxbrq", (sim_fptr)&simulate_xxbrq, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
+/* xxbrw */	{0xF00F076C, 0,DUMMY, DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xxbrw", (sim_fptr)&simulate_xxbrw, P9_VSX_MISC_ONLY, FORM_XX2_XT_XB},
+/* xxextractuw*/{0xF0000294, 0, IMM_DATA_4BIT, 16, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x8,  "xxextractuw", (sim_fptr)&simulate_xxextractuw, P9_VSX_MISC_ONLY, FORM_XX2_XT_UIM4_XB},
+/* xxinsertw*/{0xF00002D4, 0,IMM_DATA_4BIT, 16, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x8,  "xxinsertw", (sim_fptr)&simulate_xxinsertw, P9_VSX_MISC_ONLY, FORM_XX2_XT_UIM4_XB},
+/* xxspltib*/{0xF00002D0, 0, IMM_DATA_8BIT, 11, DUMMY, DUMMY, DUMMY, DUMMY, VECTOR_DP, 21, 0x8, "xxspltib",(sim_fptr)&simulate_xxspltib, P9_VSX_MISC_ONLY, FORM_XX1_IMM8},
 /* RFC 2464 - Binary Floating-Point Support Operations */
 /***********using VSX instructions for BFP **************************/
 /* xscmpexpdp */ {0xF00001D8, 0, SCALAR_DP,     16,    SCALAR_DP, 11, DUMMY, DUMMY, CR_T,      23, 0x4,  "xscmpexpdp", (sim_fptr)&simulate_xscmpexpdp, VSX_SCALAR_DP_FP_COMP_ONLY, FORM_XX3_BF_XA_XB},
@@ -363,12 +384,12 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 /* xvxsigdp */   {0xF001076C, 0, DUMMY,         DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xvxsigdp",   (sim_fptr)&simulate_xvxsigdp,   P9_VSX_MISC_ONLY,           FORM_XX2_XT_XB},
 /* xvxsigsp */   {0xF009076C, 0, DUMMY,         DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0,  "xvxsigsp",   (sim_fptr)&simulate_xvxsigsp,   P9_VSX_MISC_ONLY,           FORM_XX2_XT_XB},
 /* RFC02493.r3: D-form VSX Floating-Point Storage Access Instructions */
-/* lxsd   */  {0xE4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0x9, "lxsd",  (sim_fptr)&simulate_lxsd,  VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
-/* stxsd  */  {0xF4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0xa, "stxsd", (sim_fptr)&simulate_stxsd, VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
-/* lxssp  */  {0xE4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0x9, "lxssp",  (sim_fptr)&simulate_lxssp, VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
-/* stxssp */  {0xF4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0xa, "stxssp", (sim_fptr)&simulate_stxssp,VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
-/* lxv    */  {0xF4000001, 0, GR, 16, IMM_DATA_12BIT, 4, DUMMY, DUMMY, VECTOR_DP, 21, 0x9, "lxv",  (sim_fptr)&simulate_lxv,   VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
-/* stxv   */  {0xF4000005, 0, GR, 16, IMM_DATA_12BIT, 4, DUMMY, DUMMY, VECTOR_DP, 21, 0xa, "stxv", (sim_fptr)&simulate_stxv,  VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
+/* lxsd  */  {0xE4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0x9, "lxsd",  (sim_fptr)&simulate_lxsd,    VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
+/* stxsd */  {0xF4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0xa, "stxsd", (sim_fptr)&simulate_stxsd,   VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
+/* lxssp */  {0xE4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0x9, "lxssp",  (sim_fptr)&simulate_lxssp,  VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
+/* stxssp*/  {0xF4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0xa, "stxssp", (sim_fptr)&simulate_stxssp, VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
+/* lxv   */  {0xF4000001, 0, GR, 16, IMM_DATA_12BIT, 4, DUMMY, DUMMY, VECTOR_DP, 21, 0x9, "lxv",    (sim_fptr)&simulate_lxv,    VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
+/* stxv  */  {0xF4000005, 0, GR, 16, IMM_DATA_12BIT, 4, DUMMY, DUMMY, VECTOR_DP, 21, 0xa, "stxv",   (sim_fptr)&simulate_stxv,   VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
 
 /* last ins indicator */ {0xDEADBEEF, 0, DUMMY, 0, DUMMY, 0, DUMMY, DUMMY, DUMMY, 0, 0x0, "last_instruction", 0, 0, 0}
 
@@ -1000,6 +1021,7 @@ void class_vsx_load_gen2(uint32 client_no, uint32 random_no, struct instruction_
     struct vsr_list *vsrs;
     struct server_data *sdata = &global_sdata[INITIAL_BUF];
     struct client_data *cptr = sdata->cdata_ptr[client_no];
+	uint16 backup_bdy;
 
     prolog_size = cptr->prolog_size;
     num_ins_built = cptr->num_ins_built;
@@ -1026,23 +1048,31 @@ void class_vsx_load_gen2(uint32 client_no, uint32 random_no, struct instruction_
         num_ins_built++;
     }
     
-	if (temp->op2_dtype == IMM_DATA_12BIT) {
-		tgt = (vsr4 & 0x1f) << (temp->tgt_pos) | ((vsr4 & 0x20) >> 5);
-	} else {
-    	tgt = (vsr4 & 0x1f) << (temp->tgt_pos); /* instruction would use register vsr4 + 32 */
-    }
-
     op1 = (LOAD_RA) << (temp->op1_pos);
-    
-    /* find out load ptr and initialize the data pattern at that address */
-    load_off = init_mem_for_vsx_load(client_no, temp->tgt_dtype);    
-	if ((temp->op2_dtype == IMM_DATA_12BIT) || (temp->op2_dtype == IMM_DATA_14BIT)) {
-    	op2 = (load_off & 0xfff) << (temp->op2_pos);
+
+	backup_bdy = cptr->bdy_req;
+	if (temp->op2_dtype == IMM_DATA_12BIT) {
+		tgt = (vsr4 & 0x1f) << (temp->tgt_pos) | (((vsr4 & 0x20) >> 5) << 3);
+		/* reserve memory for load */
+        cptr->bdy_req = ALIGN_QW;
+    	/* find out load ptr and initialize the data pattern at that address */
+    	load_off = init_mem_for_vsx_load(client_no, temp->tgt_dtype);    
+        op2 = ((load_off >> 4) & 0xFFF) << (temp->op2_pos); /* immidiate data 12 bits */
 	}
+	else if (temp->op2_dtype == IMM_DATA_14BIT) {
+		vsr4 = (vsr4 >= 32)? vsr4 - 32: vsr4;
+    	tgt = (vsr4 & 0x1f) << (temp->tgt_pos); /* instruction would use register vsr4 + 32 */
+		backup_bdy = cptr->bdy_req;
+    	cptr->bdy_req = ALIGN_W;
+    	load_off = init_mem_for_vsx_load(client_no, temp->tgt_dtype);    
+    	op2 = ((load_off >> 2) & 0x3fff) << (temp->op2_pos);
+    }
 	else if (temp->op2_dtype == GR) {
-		 gpr_num = get_random_gpr(client_no, GR, 0);
+		gpr_num = get_random_gpr(client_no, GR, 0);
 		op2 = (gpr_num  & 0x1f) << temp->op2_pos;
 	}
+
+	cptr->bdy_req = backup_bdy;
 
     /* Form machine code for load instruction */
     mcode = (temp->op_eop_mask | op1 | op2 | tgt);
@@ -1072,6 +1102,7 @@ void class_vsx_store_gen2(uint32 client_no, uint32 random_no, struct instruction
     struct vsr_list *vsrs;
     struct server_data *sdata = &global_sdata[INITIAL_BUF];
     struct client_data *cptr = sdata->cdata_ptr[client_no];
+	uint16 backup_bdy;
 
     prolog_size = cptr->prolog_size;
     num_ins_built = cptr->num_ins_built;
@@ -1088,17 +1119,26 @@ void class_vsx_store_gen2(uint32 client_no, uint32 random_no, struct instruction
     
     op1 = (STORE_RA & 0x1f) << (temp->op1_pos);
     
-    /* reserve memory for store */
-    store_off = init_mem_for_vsx_store(client_no, temp->tgt_dtype);
+	backup_bdy = cptr->bdy_req;
 	if (temp->op2_dtype == IMM_DATA_12BIT) {
-    	op2 = (store_off & 0xfff) << (temp->op2_pos); /* immidiate data 14 bits */
-	}else {
-    	op2 = (store_off & 0x3fff) << (temp->op2_pos); /* immidiate data 14 bits */
+    	/* reserve memory for store */
+    	cptr->bdy_req = ALIGN_QW;
+    	store_off = init_mem_for_vsx_store(client_no, temp->tgt_dtype);
+    	op2 = ((store_off >> 4) & 0xFFF) << (temp->op2_pos); /* immidiate data 12 bits */
 	}
+	else if (temp->op2_dtype == IMM_DATA_14BIT) {
+    	/* reserve memory for store */
+		backup_bdy = cptr->bdy_req;
+    	cptr->bdy_req = ALIGN_W;
+    	store_off = init_mem_for_vsx_store(client_no, temp->tgt_dtype);
+    	op2 = ((store_off >> 2) & 0x3fff) << (temp->op2_pos); /* immidiate data 14 bits */
+	}
+	cptr->bdy_req = backup_bdy;
     
 	if (temp->op2_dtype == IMM_DATA_12BIT) {
 		tgt = (vsr4 & 0x1f) << (temp->tgt_pos) | (((vsr4 & 0x20) >> 5) << 3);
-	} else {
+	} else if (temp->op2_dtype == IMM_DATA_14BIT) {
+		vsr4 = (vsr4 >= 32)? vsr4 - 32: vsr4;
     	tgt = ((vsr4 & 0x1f) << (temp->tgt_pos)); 
 	}
     

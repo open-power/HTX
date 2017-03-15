@@ -27,7 +27,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/shm.h>
-#include <strings.h>
+#include <string.h>
 #include <memory.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -122,14 +122,16 @@ struct enabled_instruction {
 
 #define MAX_SRC_OPRS	(3)
 struct decoded_instruction {
-	int instr_type;					/* Load, store or other instruction type					*/
-	int marked;						/* flag, indicating instruction influencing miscompare 		*/ 
-	char mnemonic[50];				/* complete instruction in string format 					*/
-    int ea_offset;					/* offset of load/store area in case of LS  instruction 	*/
-	uint16 tgt_dtype;				/* target type 												*/
-    uint16 tgt_val;					/* target value as updated by build routine 				*/
-	uint16 op_dtype[MAX_SRC_OPRS];	/* source operand data type 								*/	
-    uint16 op_val[MAX_SRC_OPRS];	/* source operand value 									*/
+	uint64 instr_cat_type;          /* VSX, BFP, DFP, VMX or CPU                                		*/
+	int instr_type;					/* Load, store or other instruction type							*/
+	int marked;						/* flag, indicating instruction influencing miscompare 				*/ 
+	char mnemonic[50];				/* complete instruction in string format 							*/
+    int ea_offset;					/* offset of load/store area in case of LS  instruction 			*/
+	uint16 tgt_dtype;				/* target type 														*/
+    uint16 tgt_val;					/* target value as updated by build routine 						*/
+	uint16 op_dtype[MAX_SRC_OPRS];	/* source operand data type 										*/	
+    uint16 op_val[MAX_SRC_OPRS];	/* source operand value 											*/
+	struct miscmp_node *miscmp;		/* address of miscompare node which touch this index during analysis*/
 };
 typedef struct decoded_instructions dc_instr_t;
 
@@ -143,6 +145,40 @@ struct reguse_list {
 	int num_entries;
 	struct reguse *head;
 };
+
+#define NUM_CMP_TYPES       (6)
+#define CMP_TYPE_VSR  		(0x1)
+#define CMP_TYPE_GPR  		(0x2)
+#define CMP_TYPE_FPSCR    	(0x4)
+#define CMP_TYPE_VSCR		(0x8)
+#define CMP_TYPE_CR			(0x10)
+#define CMP_TYPE_LS			(0x20)
+
+
+struct miscmp_node {
+	int type;						/* six miscompare types as defined above */
+	union {
+		uint8 reg_num;				/* VSR or GPR number */
+		uint16 offset;				/* load store offset */
+	};
+	struct reguse_list instr_tree; 	/* head of the miscompare analysis tree */
+	struct miscmp_node *next;
+};
+
+struct miscmp_list {
+	int num_miscmp;
+	struct miscmp_node *head;
+};
+
+/*struct relate_miscmp {
+	uint16 	dc_instr_index;
+	unsigned int is_gpr:1;
+	unsigned int is_vsr:1;
+	unsigned int is_ls:1;
+	uint8	gpr_num;
+	uint8 	vsr_num;
+	uint16 	offset;
+};*/
 
 #define OP_EOP_MASK_INDEX	0
 #define OPERANDS_MASK_INDEX	1
@@ -612,9 +648,7 @@ struct client_data {
 	/* ptr to enabled instruction table which is derived after applying masks */
 	struct enabled_instruction enabled_ins_table[MAX_INSTRUCTIONS];
 	struct decoded_instruction dc_instr[MAX_INS_STREAM_DEPTH];
-	struct reguse_list  vsr_usage;
-	struct reguse_list  gpr_usage;
-	struct reguse_list  ls_usage;
+	struct miscmp_list 	miscmp_info;
 	int 				instr_index[MAX_INS_STREAM_DEPTH];
 	/* Instructions masks list as read from rule file */
 	/* Instructions bias list */
@@ -751,6 +785,10 @@ extern struct server_data global_sdata[];
  * Following are categories for Instructions masking
  */
 #define P9_ONLY								0x0010000000000000ULL
+
+/* Instruction which does not have simulation support, or the simulation routines yet to be verified or fixed */
+#define HW_ONLY								0x0020000000000000ULL
+
 #define VSX_CAT								0x0100000000000000ULL
 #define BFP_ONLY							0x0200000000000000ULL
 #define DFP_ONLY							0x0300000000000000ULL
@@ -762,6 +800,7 @@ extern struct server_data global_sdata[];
 #define VSX_SCALAR_DP_STORE_ONLY			0x2				|VSX_CAT
 #define VSX_SCALAR_DP_MOVE_ONLY				0x4				|VSX_CAT
 #define VSX_SCALAR_DP_FP_ARITHMETIC_ONLY	0x8				|VSX_CAT
+#define VSX_SCALAR_SP_FP_ARITHMETIC_ONLY	0x20000000000	|VSX_CAT
 #define VSX_SCALAR_DP_FP_MUL_ADD_ONLY		0x10			|VSX_CAT
 #define VSX_SCALAR_DP_FP_COMP_ONLY			0x20			|VSX_CAT
 #define VSX_SCALAR_DP_FP_MAX_MIN_ONLY		0x40			|VSX_CAT
@@ -769,7 +808,9 @@ extern struct server_data global_sdata[];
 #define VSX_SCALAR_DP_CONV_SP_ONLY			0x100			|VSX_CAT
 #define VSX_SCALAR_DP_CONV_FP2INT_ONLY		0x200			|VSX_CAT
 #define VSX_SCALAR_DP_CONV_INT2FP_ONLY		0x400			|VSX_CAT
+#define VSX_SCALAR_SP_CONV_INT2FP_ONLY	0x40000000000	|VSX_CAT
 #define VSX_SCALAR_DP_RND_2_FPINT_ONLY		0x800			|VSX_CAT
+
 
 #define VSX_VECTOR_SP_LOAD_ONLY				0x1000			|VSX_CAT
 #define VSX_VECTOR_DP_LOAD_ONLY				0x2000			|VSX_CAT
@@ -859,6 +900,8 @@ extern struct server_data global_sdata[];
 #define			P9_BFP_ADD_MUL_QP		0x200000				|BFP_ONLY   |P9_ONLY
 #define			P9_BFP_ROUND_2_INT		BFP_ROUND_2_INT			|BFP_ONLY   |P9_ONLY
 #define			P9_BFP_TEST_ONLY		BFP_TEST_ONLY			|BFP_ONLY   |P9_ONLY
+#define			BFP_RECIPR_ARITH_SP		0x400000				|BFP_ONLY
+#define			BFP_RECIPR_ARITH_DP		0x800000				|BFP_ONLY
 
 #define			BFP_LOAD_ALL			0x7						|BFP_ONLY
 #define			BFP_STORE_ALL			0x38					|BFP_ONLY
@@ -1149,7 +1192,7 @@ void gen_i32(int, char *, int);
 void gen_i64(int, char *, int);
 void gen_i128(int, char *, int);
 void set_seed(int, int32);
-void dump_testcase_p7(int, int, int, int);
+void dump_testcase_p7(int, int, int);
 void dump_testcase_p6(int, int, int, int);
 void dump_instructions_p7(int, FILE *);
 void dump_instructions_p6(int, FILE *);
@@ -1166,6 +1209,7 @@ int build_testcase(uint32);
 int impart_context_in_memory(int);
 int execute_testcase(int, int);
 int compare_results(int, int *);
+int compare_results_all(int cno);
 int allocate_mem(struct shm_buf *);
 int cleanup_mem(int);
 void cleanup_mem_atexit(void);

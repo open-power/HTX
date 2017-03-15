@@ -84,9 +84,9 @@ struct instruction_masks dfp_instructions_array[] = {
 
 
 /* DFP Quantum Adjustment Instructions */
-#if 0
-/* dquai 	*/{0xEC000086 , 0xffffffff , DFP_LONG ,16 , DFP_LONG , 11 , DUMMY , DUMMY , DFP_LONG ,21 , 0x23 , "dquai ", (sim_fptr)&simulate_dquai  ,DFP_QUAN_LONG, Z_FORM_RT_D_RB_RMC_eop_rc},
-/* dquai.	*/{0xEC000087 , 0xffffffff , DFP_LONG ,16 , DFP_LONG , 11 , DUMMY , DUMMY , DFP_LONG ,21 , 0x23 , "dquai. ", (sim_fptr)&simulate_dquai_dot  ,DFP_QUAN_LONG, Z_FORM_RT_D_RB_RMC_eop_rc},
+#if 1
+/* dquai 	*/{0xEC000086 , 0xffffffff , DFP_LONG ,16 , DFP_LONG , 11 , DUMMY , DUMMY , DFP_LONG ,21 , 0x23 , "dquai ", (sim_fptr)&simulate_dquai, (DFP_QUAN_LONG | HW_ONLY), Z_FORM_RT_D_RB_RMC_eop_rc},
+/* dquai.	*/{0xEC000087 , 0xffffffff , DFP_LONG ,16 , DFP_LONG , 11 , DUMMY , DUMMY , DFP_LONG ,21 , 0x23 , "dquai. ", (sim_fptr)&simulate_dquai_dot, (DFP_QUAN_LONG | HW_ONLY), Z_FORM_RT_D_RB_RMC_eop_rc},
 #endif
 /* dquaiq	*/{0xFC000086 , 0xffffffff , DFP_QUAD ,16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD ,21 , 0x23 , "dquaiq ", (sim_fptr)&simulate_dquaiq  ,DFP_QUAN_QUAD, Z_FORM_RT_D_RB_RMC_eop_rc},
 /* dquaiq.	*/{0xFC000087 , 0xffffffff , DFP_QUAD ,16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD ,21 , 0x23 , "dquaiq.", (sim_fptr)&simulate_dquaiq_dot ,DFP_QUAN_QUAD, Z_FORM_RT_D_RB_RMC_eop_rc},
@@ -145,10 +145,10 @@ struct instruction_masks dfp_instructions_array[] = {
 
 /* DFP Convert  Instructions */
 
-#if 0
+#if 1
 /* dctdp Rc bit varied */
-		   {0xEC000204 , 0xffffffff , DUMMY , DUMMY , DFP_SHORT , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctdp", (sim_fptr)&simulate_dctdp ,DFP_CONV_S2LONG, X_FORM_RT_RA_RB_eop_rc},
-		   {0xEC000205 , 0xffffffff , DUMMY , DUMMY , DFP_SHORT , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctdp.", (sim_fptr)&simulate_dctdp_dot ,DFP_CONV_S2LONG, X_FORM_RT_RA_RB_eop_rc},
+		   {0xEC000204 , 0xffffffff , DUMMY , DUMMY , DFP_SHORT , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctdp", (sim_fptr)&simulate_dctdp ,(DFP_CONV_S2LONG | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
+		   {0xEC000205 , 0xffffffff , DUMMY , DUMMY , DFP_SHORT , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctdp.", (sim_fptr)&simulate_dctdp_dot ,(DFP_CONV_S2LONG | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
 #endif
 
 /* dctqpq */
@@ -162,26 +162,26 @@ struct instruction_masks dfp_instructions_array[] = {
 		   {0xEC000604 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_SHORT ,21 ,0x20 , "drsp", (sim_fptr)&simulate_drsp ,DFP_CONV_L2SRT, X_FORM_RT_RA_RB_eop_rc},
 		   {0xEC000605 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_SHORT ,21 ,0x20 , "drsp.", (sim_fptr)&simulate_drsp_dot ,DFP_CONV_L2SRT, X_FORM_RT_RA_RB_eop_rc},
 
-#if 0
+#if 1
 /* drdpq  */
-		   {0xFC000604 , 0xffffffff , DUMMY , DUMMY , DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "drdpq", (sim_fptr)&simulate_drdpq ,DFP_CONV_Q2LNG, X_FORM_RT_RA_RB_eop_rc},
-		   {0xFC000605 , 0xffffffff , DUMMY , DUMMY , DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "drdpq.", (sim_fptr)&simulate_drdpq_dot ,DFP_CONV_Q2LNG, X_FORM_RT_RA_RB_eop_rc},
+		   {0xFC000604 , 0xffffffff , DUMMY , DUMMY , DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "drdpq", (sim_fptr)&simulate_drdpq ,(DFP_CONV_Q2LNG | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
+		   {0xFC000605 , 0xffffffff , DUMMY , DUMMY , DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "drdpq.", (sim_fptr)&simulate_drdpq_dot ,(DFP_CONV_Q2LNG  | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
 
 
 /* dcffixq */
-		   {0xFC000644 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "dcffixq", (sim_fptr)&simulate_dcffixq , DFP_CONV_FIXED_FROM_QUAD, X_FORM_RT_RA_RB_eop_rc},
-		   {0xFC000645 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "dcffixq.", (sim_fptr)&simulate_dcffixq_dot ,DFP_CONV_FIXED_FROM_QUAD, X_FORM_RT_RA_RB_eop_rc},
+		   {0xFC000644 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "dcffixq", (sim_fptr)&simulate_dcffixq , (DFP_CONV_FIXED_FROM_QUAD | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
+		   {0xFC000645 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_QUAD ,21 ,0x20 , "dcffixq.", (sim_fptr)&simulate_dcffixq_dot ,(DFP_CONV_FIXED_FROM_QUAD | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
 #endif
 
 
-#if 0
+#if 1
 /* dctfix  */
-		   {0xEC000244 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctfix", (sim_fptr)&simulate_dctfix ,DFP_CONV_2FIXED_LONG, X_FORM_RT_RA_RB_eop_rc},
-		   {0xEC000245 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_LONG , 21 ,0x20 , "dctfix.", (sim_fptr)&simulate_dctfix_dot ,DFP_CONV_2FIXED_LONG, X_FORM_RT_RA_RB_eop_rc},
+		   {0xEC000244 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctfix", (sim_fptr)&simulate_dctfix ,(DFP_CONV_2FIXED_LONG | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
+		   {0xEC000245 , 0xffffffff , DUMMY , DUMMY , DFP_LONG , 11 ,DUMMY , DUMMY , DFP_LONG , 21 ,0x20 , "dctfix.", (sim_fptr)&simulate_dctfix_dot ,(DFP_CONV_2FIXED_LONG | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
 
 /* dctfixq */
-		   {0xFC000244 , 0xffffffff , DUMMY , DUMMY ,DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctfixq", (sim_fptr)&simulate_dctfixq ,DFP_CONV_2FIXED_QUAD, X_FORM_RT_RA_RB_eop_rc},
-		   {0xFC000245 , 0xffffffff , DUMMY , DUMMY ,DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctfixq.", (sim_fptr)&simulate_dctfixq_dot ,DFP_CONV_2FIXED_QUAD, X_FORM_RT_RA_RB_eop_rc},
+		   {0xFC000244 , 0xffffffff , DUMMY , DUMMY ,DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctfixq", (sim_fptr)&simulate_dctfixq ,(DFP_CONV_2FIXED_QUAD | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
+		   {0xFC000245 , 0xffffffff , DUMMY , DUMMY ,DFP_QUAD , 11 ,DUMMY , DUMMY , DFP_LONG ,21 ,0x20 , "dctfixq.", (sim_fptr)&simulate_dctfixq_dot ,(DFP_CONV_2FIXED_QUAD | HW_ONLY), X_FORM_RT_RA_RB_eop_rc},
 #endif
 
 /* ddedpd	*/
@@ -809,7 +809,7 @@ void class_dfp_shift_gen(uint32 client_no, uint32 random_no, struct instruction_
 
 int DFPGENE(unsigned long long *Operand,int class,int Type , int cno)
 {
-	int retc=0,k ;
+	int retc=0;
 	unsigned long long DecodedOp[3], EncodedOp[2];
 
 	DFPType[cno]  =  Type;                          /* operand type */

@@ -4551,3 +4551,10 @@ void simulate_mffscrn(uint32 *machine_code, struct testcase *test_case) {}
 void simulate_mffscrni(uint32 *machine_code, struct testcase *test_case) {}
 void simulate_mffsl(uint32 *machine_code, struct testcase *test_case) {}
 
+/* Old BFP reciprocal arithmatic instructions, enabled in P9 */
+void simulate_fre(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_fres(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_frsqrte(uint32 *machine_code, struct testcase *test_case) {}
+void simulate_frsqrtes(uint32 *machine_code, struct testcase *test_case) {}
+
+int simulate_xsrsp(uint32 * machine_code , struct testcase *test_case) { return 0;}

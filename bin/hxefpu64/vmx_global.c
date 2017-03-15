@@ -238,13 +238,13 @@ struct instruction_masks vmx_instructions_array[] = {
 /*  vcmpgtfp.  	*/  {0x100006C6, 0, VECTOR_SP, 16, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vcmpgtfp.", (sim_fptr)&simulate_vcmpgtfp_dot, VMX_FP_CMP_ONLY, FORM_VT_VA_VB},
 
 
-#if 0 /* Estimate instructions not supported yet */
+#if 1 /* Estimate instructions not supported yet */
 /*  Vector Floating Pt. Estimate  */
 
-/*  vexptefp 	*/  {0x1000018A, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vexptefp", (sim_fptr)&simulate_vexptefp, VMX_FP_ESTIMATE_ONLY},
-/*  vlogefp		*/  {0x100001CA, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vlogefp", (sim_fptr)&simulate_vlogefp, VMX_FP_ESTIMATE_ONLY, FORM_VT_VA_VB},
-/*  vrefp		*/  {0x1000010A, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vrefp", (sim_fptr)&simulate_vrefp, VMX_FP_ESTIMATE_ONLY, FORM_VT_VA_VB},
-/*  vrsqrtefp	*/  {0x1000014A, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vrsqrtefp", (sim_fptr)&simulate_vrsqrtefp, VMX_FP_ESTIMATE_ONLY, FORM_VT_VA_VB},
+/*  vexptefp 	*/  {0x1000018A, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vexptefp", (sim_fptr)&simulate_vexptefp, (VMX_FP_ESTIMATE_ONLY | HW_ONLY), FORM_VT_VA_VB},
+/*  vlogefp		*/  {0x100001CA, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vlogefp", (sim_fptr)&simulate_vlogefp, (VMX_FP_ESTIMATE_ONLY | HW_ONLY), FORM_VT_VA_VB},
+/*  vrefp		*/  {0x1000010A, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vrefp", (sim_fptr)&simulate_vrefp, (VMX_FP_ESTIMATE_ONLY | HW_ONLY), FORM_VT_VA_VB},
+/*  vrsqrtefp	*/  {0x1000014A, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x32, "vrsqrtefp", (sim_fptr)&simulate_vrsqrtefp, (VMX_FP_ESTIMATE_ONLY | HW_ONLY), FORM_VT_VA_VB},
 #endif
 
 
@@ -583,7 +583,7 @@ void class_vmx_normal_gen(uint32 client_no, uint32 random_no, struct instruction
 {
     uint32 vsr1, vsr2, vsr3, vsr4;
     uint32 op1 = 0, op2 = 0, op3 = 0, tgt = 0, tgt_reg_no = 0;
-    uint32 vmx_vsr1, vmx_vsr2, vmx_vsr3, vmx_vsr4;
+    uint32 vmx_vsr1 = 0, vmx_vsr2 = 0, vmx_vsr3 = 0, vmx_vsr4 = 0;
 	uint32 mcode, store_off, addi_mcode;
     uint32 prolog_size, *tc_memory, num_ins_built;
     struct vsr_list *vsrs;

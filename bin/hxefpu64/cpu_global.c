@@ -3441,13 +3441,13 @@ void class_cpu_store_atomic_gen(uint32 client_no, uint32 random_no, struct instr
     uint32 offset = 0, mcode = 0;
     uint32 num_ins_built, prolog_size, *tc_memory;
 	uint16 backup_bdy;	
-	struct vsr_list *vsrs;
+	/* struct vsr_list *vsrs; */
 
     struct server_data *sdata = &global_sdata[INITIAL_BUF];
     struct client_data *cptr = sdata->cdata_ptr[client_no];
 
-	/*DPRINT(log, "Entry: %s\n", __FUNCTION__);*/
-    vsrs = &cptr->vsrs[GR];
+	/*DPRINT(log, "Entry: %s\n", __FUNCTION__);
+    vsrs = &cptr->vsrs[GR];*/
 	prolog_size = cptr->prolog_size;
     num_ins_built = cptr->num_ins_built;
 	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
