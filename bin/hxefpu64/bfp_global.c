@@ -144,24 +144,23 @@ struct instruction_masks bfp_instructions_array[] = {
 	/* fsel.	*/	{0xFC00002F, 0, BFP_DP, 16, BFP_DP, 11, BFP_DP, 6, BFP_DP, 21, 0x14, "fsel.", &simulate_fsel_dot, BFP_SELECT_ONLY, A_FORM_RT_RA_RB_RC_eop_rc},
 
 	/* Floating Reciprocal Estimate instructions */
-	/* fre(L0)		{0xFC000030, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre", &simulate_fre, A_FORM_RT_RA_RB_RC_eop_rc},
-	 fre.(L0)		{0xFC000031, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre.", &simulate_fre, A_FORM_RT_RA_RB_RC_eop_rc},
-	 fre(L1)		{0xFC010030, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre", &simulate_fre, A_FORM_RT_RA_RB_RC_eop_rc},
-	 fre.(L1)		{0xFC010031, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre.", &simulate_fre, A_FORM_RT_RA_RB_RC_eop_rc},
-	 fres(L0)		{0xEC000030, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres", &simulate_fres, A_FORM_RT_RA_RB_RC_eop_rc},
-	 fres.(L0)	{0xEC000031, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres.", &simulate_fres, A_FORM_RT_RA_RB_RC_eop_rc},
-	 fres(L1)		{0xEC010030, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres", &simulate_fres, A_FORM_RT_RA_RB_RC_eop_rc},
-	 fres.(L1)	{0xEC010031, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres.", &simulate_fres, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrte		{0xFC000034, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte", &simulate_frsqrte, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrte.		{0xFC000035, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte.", &simulate_frsqrte, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrte		{0xFC010034, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte", &simulate_frsqrte, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrte.		{0xFC010035, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte.", &simulate_frsqrte, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrtes		{0xEC000034, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes", &simulate_frsqrtes, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrtes.	{0xEC000035, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes.", &simulate_frsqrtes, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrtes		{0xEC010034, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes", &simulate_frsqrtes, A_FORM_RT_RA_RB_RC_eop_rc},
-	 frsqrtes.	{0xEC010035, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes.", &simulate_frsqrtes, A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fre(L0)	*/	{0xFC000030, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre", &simulate_fre, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fre.(L0)	*/	{0xFC000031, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre.", &simulate_fre, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fre(L1)	*/	{0xFC010030, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre", &simulate_fre, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fre.(L1)	*/	{0xFC010031, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "fre.", &simulate_fre, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fres(L0)	*/	{0xEC000030, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres", &simulate_fres, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fres.(L0)*/  {0xEC000031, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres.", &simulate_fres, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fres(L1)	*/	{0xEC010030, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres", &simulate_fres, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* fres.(L1)*/	{0xEC010031, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "fres.", &simulate_fres, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrte	*/	{0xFC000034, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte", &simulate_frsqrte, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrte.	*/	{0xFC000035, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte.", &simulate_frsqrte, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrte	*/	{0xFC010034, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte", &simulate_frsqrte, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrte.	*/	{0xFC010035, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "frsqrte.", &simulate_frsqrte, (BFP_RECIPR_ARITH_DP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrtes	*/	{0xEC000034, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes", &simulate_frsqrtes, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrtes.*/	{0xEC000035, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes.", &simulate_frsqrtes, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrtes	*/	{0xEC010034, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes", &simulate_frsqrtes, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
+	/* frsqrtes.*/	{0xEC010035, 0, DUMMY, DUMMY, BFP_SP, 11, DUMMY, DUMMY, BFP_SP, 21, 0x14, "frsqrtes.", &simulate_frsqrtes, (BFP_RECIPR_ARITH_SP | HW_ONLY), A_FORM_RT_RA_RB_RC_eop_rc},
 
-*/
 
 	/* Floating-point Status and Control Register(FPSCR) instructions */
 	/* mffs		*/	{0xFC00048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffs", &simulate_mffs, BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
@@ -272,12 +271,12 @@ struct instruction_masks bfp_p9_instructions_array[] = {
 /* xsnmsubqp*/	{0xFC0003C8, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnmsubqp",(sim_fptr)&simulate_xsnmsubqp,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
 /* xsnmsubqpo*/	{0xFC0003C9, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14,"xsnmsubqpo",(sim_fptr)&simulate_xsnmsubqpo,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
 
-/* xsrqpi	*/	{0xFC00000A, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x1A, "xsrqpi",  (sim_fptr)&simulate_xsrqpi, P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
-/* xsrqpix	*/	{0xFC00000B, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x1A, "xsrqpix", (sim_fptr)&simulate_xsrqpix,P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
-/* xsrqpxp	*/	{0xFC00004A, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x1A, "xsrqpxp", (sim_fptr)&simulate_xsrqpxp,P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
+/* xsrqpi	*/	{0xFC00000A, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpi",  (sim_fptr)&simulate_xsrqpi, P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
+/* xsrqpix	*/	{0xFC00000B, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpix", (sim_fptr)&simulate_xsrqpix,P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
+/* xsrqpxp	*/	{0xFC00004A, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpxp", (sim_fptr)&simulate_xsrqpxp,P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
 
-/* xssqrtqp	*/	{0xFC1B0648, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xssqrtqp", (sim_fptr)&simulate_xssqrtqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xssqrtqpo*/	{0xFC1B0649, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xssqrtqpo",(sim_fptr)&simulate_xssqrtqpo,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
+/* xssqrtqp	*/	{0xFC1B0648, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssqrtqp", (sim_fptr)&simulate_xssqrtqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
+/* xssqrtqpo*/	{0xFC1B0649, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssqrtqpo",(sim_fptr)&simulate_xssqrtqpo,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
 
 /* xststdcqp*/	{0xFC000588, 0,IMM_DATA_7BIT, 16, BFP_QP,11, DUMMY,DUMMY, CR_T, 23, 0x1B,"xststdcqp",(sim_fptr)&simulate_xststdcqp,P9_BFP_TEST_ONLY,X_FORM_BF_DCMX_vrb_eop_rc},
 
@@ -320,7 +319,7 @@ void class_bfp_normal_gen(uint32 client_no, uint32 random_no, struct instruction
 	else if (temp->op1_dtype == IMM_DATA_2BIT) {
 		op1 = (0x00000003) & (random_no % 3);
 	}
-	else {
+	else if (temp->op1_dtype != DUMMY) {
 		vsrs = &(cptr->vsrs[temp->op1_dtype]);
 		vsr1 = vsrs->head[BFP]->vsr_no;
 		MOVE_VSR_TO_END(client_no, temp->op1_dtype, BFP); /* Move this to the end of list */
@@ -331,6 +330,7 @@ void class_bfp_normal_gen(uint32 client_no, uint32 random_no, struct instruction
 	}
 	op1 = op1 << (temp->op1_pos);
 
+	if (temp->op2_dtype != DUMMY) {
 	vsrs = &cptr->vsrs[temp->op2_dtype];
 	vsr2 = vsrs->head[BFP]->vsr_no;
 	MOVE_VSR_TO_END(client_no, temp->op2_dtype, BFP); /* Move this to the end of list */
@@ -338,7 +338,9 @@ void class_bfp_normal_gen(uint32 client_no, uint32 random_no, struct instruction
 #ifdef REUSE
 	vsrs->dirty_mask &= (~(0x1ULL << vsr2));
 #endif
+	}
 
+	if (temp->op3_dtype != DUMMY) {
 	vsrs = &cptr->vsrs[temp->op3_dtype];
 	vsr3 = vsrs->head[BFP]->vsr_no;
 	MOVE_VSR_TO_END(client_no, temp->op3_dtype, BFP); /* Move this to the end of list */
@@ -346,6 +348,7 @@ void class_bfp_normal_gen(uint32 client_no, uint32 random_no, struct instruction
 #ifdef REUSE
 	vsrs->dirty_mask &= (~(0x1ULL << vsr3));
 #endif
+	}
 
 	vsrs = &cptr->vsrs[temp->tgt_dtype];
 	vsr4 = vsrs->head[BFP]->vsr_no;

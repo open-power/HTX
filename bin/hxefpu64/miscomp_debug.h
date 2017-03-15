@@ -24,13 +24,6 @@
 
 #include "framework.h"
 
-#define MISCMP_TYPE_VSR     (1)
-#define MISCMP_TYPE_GPR 	(2)
-#define MISCMP_TYPE_FPSCR   (3)
-#define MISCMP_TYPE_VSCR    (4)
-#define MISCMP_TYPE_CR      (5)
-#define MISCMP_TYPE_LS      (6)
-
 
 #define INSTR_TYPE_LOAD 	(1)
 #define INSTR_TYPE_STORE 	(2)
@@ -42,9 +35,9 @@
 
 void decode_tc_instructions(int cno);
 
-struct reguse *prepare_ls_call_list(FILE *dump, int cno, int cmp_offset);
+struct reguse *prepare_ls_call_list(FILE *dump, int cno, int cmp_offset, struct miscmp_node **head);
 
-struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype, int start_index);
+struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype, int start_index, struct miscmp_node **head);
 
 void delete_reg_use_list(struct reguse *reg_node);
 

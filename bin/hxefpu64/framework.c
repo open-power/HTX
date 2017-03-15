@@ -218,7 +218,7 @@ db_fptr fp_value_gen_fptr_array[VSR_OP_TYPES][BFP_DATA_BIAS_TYPES] = {
 
 
 store_macro_fptr st_fptrs[VSR_OP_TYPES];
-uint32 sizes_for_types[VSR_OP_TYPES] = {0, 8, 8, 16, 16, 16, 8, 8, 16, 16, 16, 16};
+uint32 sizes_for_types[VSR_OP_TYPES] = {0, 8, 8, 16, 16, 16, 16, 16, 8, 8, 16, 8, 8, 8, 16};
 #ifndef __HTX_LINUX__
 	uint64 read_tb(void);
 	#pragma mc_func read_tb {"7c6c42a6"}
@@ -1406,6 +1406,16 @@ void SIGRECONFIG_handler(int sig, int code, struct sigcontext *scp)
         }
 	}
 
+	/* No further action needed for any other type of RECONFIG signal.
+	 * Just ack all others kinds of signals so that any higher level commands (DR/LPM)
+	 * does not timeout due to unack'd signals. 
+	 *
+	 * Avoiding dr_reconfig(DR_DONE...) failure check because it might not
+	 * be expected in all cases. 
+	 */
+	
+	dr_reconfig(DR_RECONFIG_DONE,&dr_info);
+
 	return;
 }
 #endif
@@ -1868,7 +1878,12 @@ client_func(void *cinfo)
 		 */
 		rc = 0;
 		if (rule.compare_flag) {
-			rc = compare_results(client_no, &miscomparing_num);
+			if (shifted_pvr_os <= 0x3e) {
+				rc = compare_results(client_no, &miscomparing_num);
+			}
+			else {
+				rc = compare_results_all(client_no);
+			}
 			DPRINT(cptr->clog,"Comparison result = %d\n",rc);
 			FFLUSH(cptr->clog);
 		}
@@ -1890,7 +1905,12 @@ client_func(void *cinfo)
 		 			 */
 					rc = 0;
 					if (rule.compare_flag) {
-						rc = compare_results(client_no, &miscomparing_num);
+						if (shifted_pvr_os <= 0x3e) {
+							rc = compare_results(client_no, &miscomparing_num);
+						}
+						else {
+							rc = compare_results_all(client_no);
+						}
 						DPRINT(cptr->clog,"Comparison result = %d\n",rc);
 						FFLUSH(cptr->clog);
 					}
@@ -1934,7 +1954,12 @@ client_func(void *cinfo)
 		 		 */
 				rc = 0;
 				if (rule.compare_flag) {
-					rc = compare_results(client_no, &miscomparing_num);
+					if (shifted_pvr_os <= 0x3e) {
+						rc = compare_results(client_no, &miscomparing_num);
+					}
+					else {
+						rc = compare_results_all(client_no);
+					}
 					DPRINT(cptr->clog,"Comparison result = %d\n",rc);
 					FFLUSH(cptr->clog);
 				}
@@ -1972,7 +1997,12 @@ client_func(void *cinfo)
 		 			 */
 					rc = 0;
 					if (rule.compare_flag) {
-						rc = compare_results(client_no, &miscomparing_num);
+						if (shifted_pvr_os <= 0x3e) {
+							rc = compare_results(client_no, &miscomparing_num);
+						}
+						else {
+							rc = compare_results_all(client_no);
+						}
 						DPRINT(cptr->clog,"Comparison result = %d\n",rc);
 						FFLUSH(cptr->clog);
 					}
@@ -1999,28 +2029,36 @@ client_func(void *cinfo)
 				trap(0xBEEFDEAD,rc, ptr1->tcc, ptr2->tcc, ptr1->tc_ins, cptr->ls_base[PASS1_BUF], cptr->ls_base[PASS2_BUF]);
 			}
 #endif
-			char miscomp_name[50];
 
 			if(shifted_pvr_os <= 0x3e) {
 				dump_testcase_p6(client_no, num_oper, rc, miscomparing_num);
 			}
 			else {
-				dump_testcase_p7(client_no, num_oper, rc, miscomparing_num);
+				dump_testcase_p7(client_no, num_oper, rc);
 			}
-			switch (rc) {
-				case 1: sprintf(miscomp_name,"VSR");
-						break;
-				case 2: sprintf(miscomp_name,"GPR");
-						break;
-				case 3: sprintf(miscomp_name,"FPSCR");
-						break;
-				case 4: sprintf(miscomp_name,"VSCR");
-						break;
-				case 5: sprintf(miscomp_name,"CR");
-						break;
-				case 6: sprintf(miscomp_name,"Load/Store region");
-						break;
+
+			char miscomp_name[50];
+			memset(miscomp_name, 0, 50);
+			if (rc & CMP_TYPE_VSR) {
+				sprintf(miscomp_name,"VSR ");
 			}
+			if (rc & CMP_TYPE_GPR) {
+				sprintf(miscomp_name, "%sGPR ", miscomp_name);
+			}
+			if (rc & CMP_TYPE_FPSCR) {
+				sprintf(miscomp_name, "%sFPSCR ", miscomp_name);
+			}
+			if (rc & CMP_TYPE_VSCR) {
+				sprintf(miscomp_name, "%sVSCR ", miscomp_name);
+			}
+			if (rc & CMP_TYPE_CR) {
+				sprintf(miscomp_name, "%sCR ", miscomp_name);
+			}
+			if (rc & CMP_TYPE_LS) {
+				sprintf(miscomp_name, "%sLoad Store ", miscomp_name);
+			}
+
+
 #ifndef __HTX_LINUX__
 			{
 				/* Location code currently supported in AIX only */
@@ -2091,7 +2129,7 @@ client_func(void *cinfo)
 					dump_testcase_p6(client_no, num_oper, rc, miscomparing_num);
 				}
 				else {
-					dump_testcase_p7(client_no, num_oper, rc, miscomparing_num);
+					dump_testcase_p7(client_no, num_oper, rc);
 				}
 #ifndef __HTX_LINUX__
 				{
@@ -2280,21 +2318,23 @@ client_func(void *cinfo)
 	#endif
 }
 
-void dump_testcase_p7(int cno, int num_oper, int type, int num)
+void dump_testcase_p7(int cno, int num_oper, int type)
 {
 	struct testcase *tc1, *tc2, *tci;
-	uint64 *ptr1, *ptr2, *ptri, vsr1_h, vsr1_l, vsr2_h, vsr2_l /*temp_vsr1, temp_vsr2*/;
-	/*uint32 *insti, *offseti, *offset1, *offset2;*/
+	uint64 *ptr1, *ptr2, *ptri, vsr1_h, vsr1_l, vsr2_h, vsr2_l, offset; 
 	uint32 seed, miscom_index = 0, type_list, ins_cat;
 	char  *basei, *base1, *base2;
 	struct vsr_node *list_h, *list_t, *tmp_vsrs_list;
-	int i, j/*, total_ins*/;
+	int i, j, num;
 	int thread_start_index, thread_end_index;
 	char dump_file[128], temp_val1[35], temp_val2[35], host_name[50];
 	FILE *dump;
 	time_t timer;
 	struct tm current_time;
 	struct client_data *tmp_cptr, *cptr = global_sdata[INITIAL_BUF].cdata_ptr[cno];
+
+	struct miscmp_node *miscmp_head = cptr->miscmp_info.head;
+
 #ifdef SCTU
 	uint64 max_ls_off;
 #endif
@@ -2373,207 +2413,211 @@ void dump_testcase_p7(int cno, int num_oper, int type, int num)
 	fprintf(dump, "File creation time : %s\n\n", temp_val1);
 	fprintf(dump, "==========================Miscompare Summary===================================\n");
 	fflush(dump);
-	switch (type) {
-		case 1:
-			fprintf(dump, "Miscompare Type    : VSR Miscompare.\n");
-			fprintf(dump, "Mismatching VSR no : %d\n", num);
-			vsr1_h = *(ptr1+(num*2)); vsr1_l = *(ptr1+(num*2)+1);
-			vsr2_h = *(ptr2+(num*2)); vsr2_l = *(ptr2+(num*2)+1);
 
-			fprintf(dump, "                       VSR[%d]\n", num);
-			fprintf(dump, "          --------------------------------\n");
-			fprintf(dump, "Initial : 0x%016llx%016llx\n", *(ptri+(num*2)), *(ptri+(num*2)+1));
-			fprintf(dump, "Pass1   : 0x%016llx%016llx\n", vsr1_h, vsr1_l);
-			fprintf(dump, "Pass2   : 0x%016llx%016llx\n", vsr2_h, vsr2_l);
-			for ( i = 0; i < 16; i++) {
-				temp_val1[i] = ((vsr1_l & 0xfULL) + '0');
-				temp_val1[i+16] = ((vsr1_h & 0xfULL) + '0');
-				temp_val2[i] = ((vsr2_l & 0xfULL) + '0');
-				temp_val2[i+16] = ((vsr2_h & 0xfULL) + '0');
-				vsr1_l >>= 4;
-				vsr1_h >>= 4;
-				vsr2_l >>= 4;
-				vsr2_h >>= 4;
-			}
-			temp_val1[i+16]='\0';
-			temp_val2[i+16]='\0';
+	while (miscmp_head != NULL) {
+		switch (miscmp_head->type) {
+			case CMP_TYPE_VSR:
+				num = miscmp_head->reg_num;
+				fprintf(dump, "Miscompare Type    : VSR Miscompare.\n");
+				fprintf(dump, "Mismatching VSR no : %d\n", num);
+				vsr1_h = *(ptr1+(num*2)); vsr1_l = *(ptr1+(num*2)+1);
+				vsr2_h = *(ptr2+(num*2)); vsr2_l = *(ptr2+(num*2)+1);
 
-			fprintf(dump, "            ");
-			for ( i = 31; i >= 0; i-- ) {
-				if ( temp_val1[i] != temp_val2[i] ) {
-					fprintf(dump, "^");
+				fprintf(dump, "                       VSR[%d]\n", num);
+				fprintf(dump, "          --------------------------------\n");
+				fprintf(dump, "Initial : 0x%016llx%016llx\n", *(ptri+(num*2)), *(ptri+(num*2)+1));
+				fprintf(dump, "Pass1   : 0x%016llx%016llx\n", vsr1_h, vsr1_l);
+				fprintf(dump, "Pass2   : 0x%016llx%016llx\n", vsr2_h, vsr2_l);
+				for ( i = 0; i < 16; i++) {
+					temp_val1[i] = ((vsr1_l & 0xfULL) + '0');
+					temp_val1[i+16] = ((vsr1_h & 0xfULL) + '0');
+					temp_val2[i] = ((vsr2_l & 0xfULL) + '0');
+					temp_val2[i+16] = ((vsr2_h & 0xfULL) + '0');
+					vsr1_l >>= 4;
+					vsr1_h >>= 4;
+					vsr2_l >>= 4;
+					vsr2_h >>= 4;
 				}
-				else {
-					fprintf(dump, " ");
-				}
-			}
-			fprintf(dump, "\n");
-			break;
+				temp_val1[i+16]='\0';
+				temp_val2[i+16]='\0';
 
-		case 2:
-			vsr1_h = tc1->tcc.gprs[num];
-			vsr2_h = tc2->tcc.gprs[num];
-			fprintf(dump, "Miscompare Type    : GPR Miscompare.\n");
-			fprintf(dump, "Mismatching GPR no : %d\n", num);
-			fprintf(dump, "              GPR[%d]\n", num);
-			fprintf(dump, "          ----------------\n");
-			fprintf(dump, "Initial : 0x%016llx\n", tci->tcc.gprs[num]);
-			fprintf(dump, "Pass1   : 0x%016llx\n", vsr1_h);
-			fprintf(dump, "Pass2   : 0x%016llx\n", vsr2_h);
-			for ( i = 0; i < 16; i++ ) {
-				temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
-				temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
-				vsr1_h >>= 4;
-				vsr2_h >>= 4;
-			}
-			temp_val1[i]='\0';
-			temp_val2[i]='\0';
+				fprintf(dump, "            ");
+				for (i = 31; i >= 0; i--) {
+					if ( temp_val1[i] != temp_val2[i] ) {
+						fprintf(dump, "^");
+					}
+					else {
+						fprintf(dump, " ");
+					}
+				}
+				fprintf(dump, "\n");
+				break;
+			case CMP_TYPE_GPR:
+				num = miscmp_head->reg_num;
+				vsr1_h = tc1->tcc.gprs[num];
+				vsr2_h = tc2->tcc.gprs[num];
+				fprintf(dump, "Miscompare Type    : GPR Miscompare.\n");
+				fprintf(dump, "Mismatching GPR no : %d\n", num);
+				fprintf(dump, "              GPR[%d]\n", num);
+				fprintf(dump, "          ----------------\n");
+				fprintf(dump, "Initial : 0x%016llx\n", tci->tcc.gprs[num]);
+				fprintf(dump, "Pass1   : 0x%016llx\n", vsr1_h);
+				fprintf(dump, "Pass2   : 0x%016llx\n", vsr2_h);
+				for ( i = 0; i < 16; i++ ) {
+					temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
+					temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
+					vsr1_h >>= 4;
+					vsr2_h >>= 4;
+				}
+				temp_val1[i]='\0';
+				temp_val2[i]='\0';
 
-			fprintf(dump, "            ");
-			for ( i = 15; i >= 0; i-- ) {
-				if ( temp_val1[i] != temp_val2[i] ) {
-					fprintf(dump, "^");
+				fprintf(dump, "            ");
+				for ( i = 15; i >= 0; i-- ) {
+					if ( temp_val1[i] != temp_val2[i] ) {
+						fprintf(dump, "^");
+					}
+					else {
+						fprintf(dump, " ");
+					}
 				}
-				else {
-					fprintf(dump, " ");
+				fprintf(dump, "\n");
+				break;
+			case CMP_TYPE_FPSCR:
+				vsr1_h = tc1->tcc.sprs.fpscr;
+				vsr2_h = tc2->tcc.sprs.fpscr;
+				fprintf(dump, "Miscompare Type    : FPSCR Miscompare.\n");
+				fprintf(dump, "                FPSCR\n");
+				fprintf(dump, "          ------------------\n");
+				fprintf(dump, "Initial : 0x%016llx\n",tci->tcc.sprs.fpscr);
+				fprintf(dump, "Pass1   : 0x%016llx\n",vsr1_h);
+				fprintf(dump, "Pass2   : 0x%016llx\n",vsr2_h);
+				for ( i = 0; i < 16; i++ ) {
+					temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
+					temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
+					vsr1_h >>= 4;
+					vsr2_h >>= 4;
 				}
-			}
-			fprintf(dump, "\n");
-			break;
+				temp_val1[i]='\0';
+				temp_val2[i]='\0';
 
-		case 3:
-			vsr1_h = tc1->tcc.sprs.fpscr;
-			vsr2_h = tc2->tcc.sprs.fpscr;
-			fprintf(dump, "Miscompare Type    : FPSCR Miscompare.\n");
-			fprintf(dump, "                FPSCR\n");
-			fprintf(dump, "          ------------------\n");
-			fprintf(dump, "Initial : 0x%016llx\n",tci->tcc.sprs.fpscr);
-			fprintf(dump, "Pass1   : 0x%016llx\n",vsr1_h);
-			fprintf(dump, "Pass2   : 0x%016llx\n",vsr2_h);
-			for ( i = 0; i < 16; i++ ) {
-				temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
-				temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
-				vsr1_h >>= 4;
-				vsr2_h >>= 4;
-			}
-			temp_val1[i]='\0';
-			temp_val2[i]='\0';
-
-			fprintf(dump, "            ");
-			for ( i = 15; i >= 0; i-- ) {
-				if ( temp_val1[i] != temp_val2[i] ) {
-					fprintf(dump, "^");
+				fprintf(dump, "            ");
+				for ( i = 15; i >= 0; i-- ) {
+					if ( temp_val1[i] != temp_val2[i] ) {
+						fprintf(dump, "^");
+					}
+					else {
+						fprintf(dump, " ");
+					}
 				}
-				else {
-					fprintf(dump, " ");
+				fprintf(dump, "\n");
+				break;
+			case CMP_TYPE_VSCR: 
+				fprintf(dump, "Miscompare Type    : VSCR Miscompare.\n");
+				fprintf(dump, "                        VSCR\n");
+				fprintf(dump, "          ----------------------------------\n");
+				fprintf(dump, "Initial : 0x%016llx%016llx\n",tci->tcc.sprs.vscr[0], tci->tcc.sprs.vscr[1]);
+				fprintf(dump, "Pass1   : 0x%016llx%016llx\n",tc1->tcc.sprs.vscr[0], tc1->tcc.sprs.vscr[1]);
+				fprintf(dump, "Pass2   : 0x%016llx%016llx\n",tc2->tcc.sprs.vscr[0], tc2->tcc.sprs.vscr[1]);
+				vsr1_h = tc1->tcc.sprs.vscr[0];
+				vsr2_h = tc2->tcc.sprs.vscr[0];
+				for ( i = 0; i < 16; i++ ) {
+					temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
+					temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
+					vsr1_h >>= 4;
+					vsr2_h >>= 4;
 				}
-			}
-			fprintf(dump, "\n");
-			break;
-
-		case 4:
-			fprintf(dump, "Miscompare Type    : VSCR Miscompare.\n");
-			fprintf(dump, "                        VSCR\n");
-			fprintf(dump, "          ----------------------------------\n");
-			fprintf(dump, "Initial : 0x%016llx%016llx\n",tci->tcc.sprs.vscr[0], tci->tcc.sprs.vscr[1]);
-			fprintf(dump, "Pass1   : 0x%016llx%016llx\n",tc1->tcc.sprs.vscr[0], tc1->tcc.sprs.vscr[1]);
-			fprintf(dump, "Pass2   : 0x%016llx%016llx\n",tc2->tcc.sprs.vscr[0], tc2->tcc.sprs.vscr[1]);
-			vsr1_h = tc1->tcc.sprs.vscr[0];
-			vsr2_h = tc2->tcc.sprs.vscr[0];
-			for ( i = 0; i < 16; i++ ) {
-				temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
-				temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
-				vsr1_h >>= 4;
-				vsr2_h >>= 4;
-			}
-			vsr1_h = tc1->tcc.sprs.vscr[1];
-			vsr2_h = tc2->tcc.sprs.vscr[1];
-			for ( i = 16; i < 32; i++ ) {
-				temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
-				temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
-				vsr1_h >>= 4;
-				vsr2_h >>= 4;
-			}
-			temp_val1[i]='\0';
-			temp_val2[i]='\0';
-
-			fprintf(dump, "            ");
-			for ( i = 31; i >= 0; i-- ) {
-				if ( temp_val1[i] != temp_val2[i] ) {
-					fprintf(dump, "^");
+				vsr1_h = tc1->tcc.sprs.vscr[1];
+				vsr2_h = tc2->tcc.sprs.vscr[1];
+				for ( i = 16; i < 32; i++ ) {
+					temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
+					temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
+					vsr1_h >>= 4;
+					vsr2_h >>= 4;
 				}
-				else {
-					fprintf(dump, " ");
+				temp_val1[i]='\0';
+				temp_val2[i]='\0';
+	
+				fprintf(dump, "            ");
+				for ( i = 31; i >= 0; i-- ) {
+					if ( temp_val1[i] != temp_val2[i] ) {
+						fprintf(dump, "^");
+					}
+					else {
+						fprintf(dump, " ");
+					}
 				}
-			}
-			fprintf(dump, "\n");
-			break;
-
-		case 5:
-			vsr1_h = tc1->tcc.sprs.cr;
-			vsr2_h = tc2->tcc.sprs.cr;
-			fprintf(dump, "Miscompare Type    : CR Miscompare.\n");
-			fprintf(dump, "                 CR\n");
-			fprintf(dump, "          ------------------\n");
-			fprintf(dump, "Initial : 0x%016llx\n",tci->tcc.sprs.cr);
-			fprintf(dump, "Pass1   : 0x%016llx\n",vsr1_h);
-			fprintf(dump, "Pass2   : 0x%016llx\n",vsr2_h);
-			for ( i = 0; i < 16; i++ ) {
-				temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
-				temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
-				vsr1_h >>= 4;
-				vsr2_h >>= 4;
-			}
-			temp_val1[i]='\0';
-			temp_val2[i]='\0';
-
-			fprintf(dump, "            ");
-			for ( i = 15; i >= 0; i-- ) {
-				if ( temp_val1[i] != temp_val2[i] ) {
-					fprintf(dump, "^");
+				fprintf(dump, "\n");
+				break;
+			case CMP_TYPE_CR: 
+				vsr1_h = tc1->tcc.sprs.cr;
+				vsr2_h = tc2->tcc.sprs.cr;
+				fprintf(dump, "Miscompare Type    : CR Miscompare.\n");
+				fprintf(dump, "                 CR\n");
+				fprintf(dump, "          ------------------\n");
+				fprintf(dump, "Initial : 0x%016llx\n",tci->tcc.sprs.cr);
+				fprintf(dump, "Pass1   : 0x%016llx\n",vsr1_h);
+				fprintf(dump, "Pass2   : 0x%016llx\n",vsr2_h);
+				for ( i = 0; i < 16; i++ ) {
+					temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
+					temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
+					vsr1_h >>= 4;
+					vsr2_h >>= 4;
 				}
-				else {
-					fprintf(dump, " ");
+				temp_val1[i]='\0';
+				temp_val2[i]='\0';
+	
+				fprintf(dump, "            ");
+				for ( i = 15; i >= 0; i-- ) {
+					if ( temp_val1[i] != temp_val2[i] ) {
+						fprintf(dump, "^");
+					}
+					else {
+						fprintf(dump, " ");
+					}
 				}
-			}
-			fprintf(dump, "\n");
-			break;
-
-		case 6:
-			vsr1_h=*(uint64 *)(base1+num);
-			vsr2_h=*(uint64 *)(base2+num);
-			fprintf(dump, "Miscompare Type    : Load/Store Area Miscompare.\n");
-			fprintf(dump, "Mismatching Offset : 0x%x bytes\n", num);
-			fprintf(dump, "Mismatching Address: 0x%llx\n", (uint64)(base1 + num));
-			fprintf(dump, "            0x%-16llx 0x%-16llx 0x%-16llx\n", (uint64)(base1 + num - 8),
-					(uint64)(base1 + num), (uint64)(base1 + num + 8));
-			fprintf(dump, "          ------------------ ------------------ ------------------\n");
-			fprintf(dump, "Initial : 0x%016llx 0x%016llx 0x%016llx\n", *((uint64 *)(basei+num-8)),
- 					*((uint64 *)(basei+num)), *((uint64 *)(basei+num+8)));
-			fprintf(dump, "Pass1   : 0x%016llx 0x%016llx 0x%016llx\n", *((uint64 *)(base1+num-8)),
- 					vsr1_h, *((uint64 *)(base1+num+8)));
-			fprintf(dump, "Pass2   : 0x%016llx 0x%016llx 0x%016llx\n", *((uint64 *)(base2+num-8)),
- 					vsr2_h, *((uint64 *)(base2+num+8)));
-			for ( i = 0; i < 16; i++ ) {
-				temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
-				temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
-				vsr1_h >>= 4;
-				vsr2_h >>= 4;
-			}
-			temp_val1[i]='\0';
-			temp_val2[i]='\0';
-
-			fprintf(dump, "                               ");
-			for ( i = 15; i >= 0; i-- ) {
-				if ( temp_val1[i] != temp_val2[i] ) {
-					fprintf(dump, "^");
+				fprintf(dump, "\n");
+				break;
+			case CMP_TYPE_LS: 
+				offset = miscmp_head->offset;
+				vsr1_h=*(uint64 *)(base1+offset);
+				vsr2_h=*(uint64 *)(base2+offset);
+				fprintf(dump, "Miscompare Type    : Load/Store Area Miscompare.\n");
+				fprintf(dump, "Mismatching Offset : 0x%llx bytes\n", offset);
+				fprintf(dump, "Mismatching Address: 0x%llx\n", (uint64)(base1 + offset));
+				fprintf(dump, "            0x%-16llx 0x%-16llx 0x%-16llx\n", (uint64)(base1 + offset - 8),
+						(uint64)(base1 + offset), (uint64)(base1 + offset + 8));
+				fprintf(dump, "          ------------------ ------------------ ------------------\n");
+				fprintf(dump, "Initial : 0x%016llx 0x%016llx 0x%016llx\n", *((uint64 *)(basei+offset-8)),
+ 						*((uint64 *)(basei+offset)), *((uint64 *)(basei+offset+8)));
+				fprintf(dump, "Pass1   : 0x%016llx 0x%016llx 0x%016llx\n", *((uint64 *)(base1+offset-8)),
+ 						vsr1_h, *((uint64 *)(base1+offset+8)));
+				fprintf(dump, "Pass2   : 0x%016llx 0x%016llx 0x%016llx\n", *((uint64 *)(base2+offset-8)),
+ 						vsr2_h, *((uint64 *)(base2+offset+8)));
+				for ( i = 0; i < 16; i++ ) {
+					temp_val1[i] = ((vsr1_h & 0xfULL) + '0');
+					temp_val2[i] = ((vsr2_h & 0xfULL) + '0');
+					vsr1_h >>= 4;
+					vsr2_h >>= 4;
 				}
-				else {
-					fprintf(dump, " ");
+				temp_val1[i]='\0';
+				temp_val2[i]='\0';
+		
+				fprintf(dump, "                               ");
+				for ( i = 15; i >= 0; i-- ) {
+					if ( temp_val1[i] != temp_val2[i] ) {
+						fprintf(dump, "^");
+					}
+					else {
+						fprintf(dump, " ");
+					}
 				}
-			}
-			fprintf(dump, "\n");
-			break;
+				fprintf(dump, "\n");
+				break;
+			/*default:*/
+				/* error, should not reach here */
+		}
+		miscmp_head = miscmp_head->next;
 	}
 	fflush(dump);
 
@@ -2633,7 +2677,10 @@ void dump_testcase_p7(int cno, int num_oper, int type, int num)
 				fprintf(dump, "[%02d]:  0x%016llx%016llx 0x%016llx%016llx 0x%016llx%016llx\n", i, *ptri, *(ptri+1),
 					*ptr1, *(ptr1+1), *ptr2, *(ptr2+1));
 			}
-			ptri++; ptr1++; ptr2++;
+			/* ptri++; ptr1++; ptr2++; */
+			ptri+=2;
+			ptr1+=2;
+			ptr2+=2;
 		}
 
 		ptri = (uint64 *)&tci->tcc.gprs;
@@ -2711,33 +2758,105 @@ void dump_testcase_p7(int cno, int num_oper, int type, int num)
 		}
 #endif
 		dump_instructions_p7(j, dump);
-		/* Append miscompare analysis into dump file */
-		if (type) {
-			fprintf(dump, "==========================Miscompare Analysis===================================\n");
-		}
-		switch (type) {
-        	case 1:
-            	fprintf(dump, "Miscompare Type    : VSR Miscompare.\n");
-            	fprintf(dump, "Mismatching VSR no : %d\n", num);
-				cptr->vsr_usage.head = create_instr_tree(dump, j, num, VSR_DTYPE, -1);
-				delete_reg_use_list(cptr->vsr_usage.head);
+		fflush(dump);
+	} /* end of per thread detailed dump loop */
+
+	/* Append miscompare analysis into dump file for the miscomparing client #cno passed as parameter */
+	if (type) {
+		fprintf(dump, "==========================Miscompare Analysis===================================\n");
+	}
+	else {
+		return;
+	}
+
+	/*cptr->total_miscmp = cptr->cmp_data.num_vsr_miscmp + cptr->cmp_data.num_gpr_miscmp +  cptr->cmp_data.num_ls_miscmp;
+	cptr->related_miscmp = (struct relate_miscmp *)malloc(sizeof(struct relate_miscmp) * cptr->total_miscmp);
+	memset(cptr->related_miscmp, 0, sizeof(struct relate_miscmp) * cptr->total_miscmp);*/
+
+	/* reassign head pointer and walk trough miscompare list for analysis */
+	miscmp_head = cptr->miscmp_info.head;
+
+	while (miscmp_head != NULL) {
+		switch (miscmp_head->type) {
+			case CMP_TYPE_VSR:
+				num = miscmp_head->reg_num;
+				fprintf(dump, "================================================\n");
+           		fprintf(dump, "Miscompare Type    : VSR Miscompare.\n");
+           		fprintf(dump, "Mismatching VSR no : %d\n", num);
+
+				miscmp_head->instr_tree.head = create_instr_tree(dump, cno, num, VSR_DTYPE, -1, &miscmp_head);
+
+				if ((num > 31) && (miscmp_head->instr_tree.head == NULL)) {
+					/* VMX special case where registers are mapped VR + 31 */
+           			int i, found_index = -1;
+					for (i = cptr->num_ins_built; i < 0; i--) {
+       					int tgt_type = cptr->dc_instr[i].tgt_dtype;
+       					uint64 cat_type = cptr->dc_instr[j].instr_cat_type;
+       					if ((tgt_type == OTHER_DTYPE) || (cptr->dc_instr[i].instr_type == INSTR_TYPE_STORE)) {
+           					continue;
+       					}
+       					if ((cptr->dc_instr[i].tgt_val == (num - 32)) && (tgt_type == VSR_DTYPE) && (cat_type == (VMX_ONLY))) {
+           					found_index =  i;
+							break;
+						}
+					}
+					if (found_index != -1) {
+						miscmp_head->instr_tree.head  = create_instr_tree(dump, cno, num - 32, VSR_DTYPE, found_index, &miscmp_head);
+					}
+				}
+				fprintf(dump, "================================================\n");
+				delete_reg_use_list(miscmp_head->instr_tree.head);
 				break;
-        	case 2:
+
+			case CMP_TYPE_GPR:
+				num = miscmp_head->reg_num;
+				fprintf(dump, "================================================\n");
 				fprintf(dump, "Miscompare Type    : GPR Miscompare.\n");
 				fprintf(dump, "Mismatching GPR no : %d\n", num);
-				cptr->gpr_usage.head = create_instr_tree(dump, j, num, GPR_DTYPE, -1);
-				delete_reg_use_list(cptr->gpr_usage.head);
+				miscmp_head->instr_tree.head = create_instr_tree(dump, cno, num, GPR_DTYPE, -1, &miscmp_head);
+				fprintf(dump, "================================================\n");
+				delete_reg_use_list(miscmp_head->instr_tree.head);
 				break;
-        	case 6:
+
+			case CMP_TYPE_LS:
+				offset = miscmp_head->offset;
+				fprintf(dump, "================================================\n");
 				fprintf(dump, "Miscompare Type    : Load/Store Area Miscompare.\n");
-				fprintf(dump, "Mismatching Offset : 0x%x bytes\n", num);
-				cptr->ls_usage.head = prepare_ls_call_list(dump, j, num);
-				delete_reg_use_list(cptr->ls_usage.head);
+				fprintf(dump, "Mismatching Offset : 0x%llx bytes\n", offset);
+				miscmp_head->instr_tree.head = prepare_ls_call_list(dump, cno, offset, &miscmp_head);
+				fprintf(dump, "================================================\n");
+				delete_reg_use_list(miscmp_head->instr_tree.head);
 				break;
 		}
-		fflush(dump);
+		miscmp_head = miscmp_head->next;
 	}
 	fflush(dump);
+
+	miscmp_head = cptr->miscmp_info.head;
+
+	while (miscmp_head != NULL) {
+		struct miscmp_node *temp = miscmp_head;		
+		miscmp_head = miscmp_head->next;
+		free(temp);
+	}
+	/*fprintf(dump, "==========================Miscompare Associativity===================================\n");
+	for (i = 0; i < cptr->total_miscmp; i++) {
+		if (cptr->related_miscmp[i].is_gpr && cptr->related_miscmp[i].is_vsr) {
+			fprintf(dump, "GPR miscompare for GPR # %d is same as VSR Miacompare for VSR # %d\n", cptr->related_miscmp[i].gpr_num, cptr->related_miscmp[i].vsr_num);
+		}
+		if (cptr->related_miscmp[i].is_gpr && cptr->related_miscmp[i].is_ls) {
+			fprintf(dump, "GPR miscompare for GPR # %d is same as Load/Store Area Miscompare offset # 0x%x\n", cptr->related_miscmp[i].gpr_num, cptr->related_miscmp[i].offset);
+		}
+		if (cptr->related_miscmp[i].is_vsr && cptr->related_miscmp[i].is_ls) {
+			fprintf(dump, "VSR miscompare for VSR # %d is same as Load/Store Area Miscompare offset # 0x%x\n", cptr->related_miscmp[i].vsr_num, cptr->related_miscmp[i].offset);
+		}
+	}*/
+
+	/*if (cptr->related_miscmp != NULL) {
+		free(cptr->related_miscmp);
+		cptr->related_miscmp = NULL;
+	}*/
+
 #ifdef AWAN
 	exit(-1);
 #endif
@@ -4072,8 +4191,8 @@ init_mem_for_gpr(int client_no, int memsize)
 	uint64 alignment, BASE_ADDR;
 	char *ptr, *updated_ptr;
 	char last_byte=0,offset_ref = 0x10;
-	struct tc_context	*tcc;
-	tcc =  &(cptr->tc_ptr[INITIAL_BUF]->tcc);
+	/*struct tc_context	*tcc;
+	tcc =  &(cptr->tc_ptr[INITIAL_BUF]->tcc);*/
 	/*
 	 * Reserve memory for load op depending upon data type and initialize the same.
 	 */
@@ -4388,7 +4507,7 @@ free_bfp_mem(int client_no)
 int
 impart_context_in_memory(int cno)
 {
-	int i ;
+	int i;
 	uint8 j;
 	struct vsr_list 	*vrl;
 	struct vsr_node 	*vsn;
@@ -4403,7 +4522,7 @@ impart_context_in_memory(int cno)
 	/* BFP_QP registers are not shared with VSX. That is why need to update memory for them separately.
 	 * Rest BFP_SP and BFP_DP will get updated with SCALAR_SP and SCALAR_DP types respectively.
 	 */
-	
+	i = BFP_QP;	
 	vrl = &(cptr->vsrs[BFP_QP]);
 	vsn = vrl->head[BFP];
 	j = vrl->num_vsrs;
@@ -6235,6 +6354,286 @@ gen_i128(int cno, char *ptr, int tgt_dtype)
 	get_random_no_128(cno, lptr);
 }
 
+/*
+ * Record all miscompares of VSR, GPR and Load / Store types
+ *
+ */
+int compare_results_all(int cno)
+{
+	int i, rc = 0, max_ls_off;
+	uint64 *ptr1, *ptr2, *save_ptr;
+
+#ifdef COMPARE_METHOD_CRC
+	uint64 crc1, crc2;
+#endif
+
+	struct testcase *tc1, *tc2;
+	struct client_data *cptr = global_sdata[INITIAL_BUF].cdata_ptr[cno];
+
+	tc1 = global_sdata[PASS1_BUF].cdata_ptr[cno]->tc_ptr[PASS1_BUF];
+	tc2 = global_sdata[PASS2_BUF].cdata_ptr[cno]->tc_ptr[PASS2_BUF];
+	DPRINT(cptr->clog,"Thread[%d]: Testxase Addr1: %llx, Testcase Addr2: %llx\n", cno, (uint64)tc1,  (uint64)tc2);
+
+	ptr1 = (uint64 *)tc1->tcc.vsrs;
+	ptr2 = (uint64 *)tc2->tcc.vsrs;
+
+	cptr->miscmp_info.num_miscmp = 0;
+	cptr->miscmp_info.head = NULL;
+	struct miscmp_node *cmp_node = NULL;
+
+	/***********Validate VSRs********/
+	for(i = 0; i < NUM_VSRS*2; i++) {
+		DPRINT(cptr->clog,"Thread[%d], Pass1 VSR[%d/%d] Addr: %llx, Pass1Value64: %llx, Pass2 VSR[%d] Addr: %llx, Pass2Value64: %llx\n", cno, i%2, i/2, (uint64)ptr1, *ptr1, i, (uint64)ptr2, *ptr2);
+		if(*ptr1 != *ptr2) {
+			/* Miscompare */
+			sprintf(msg, "Miscompare in VSR[%d]: %llx %llx\n", i/2, *ptr1, *ptr2);
+			hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+			if (!(rc & CMP_TYPE_VSR)) {
+				rc |= CMP_TYPE_VSR;
+			}
+			/* create and insert node at begining of link list */
+			cmp_node = (struct miscmp_node *)malloc(sizeof(struct miscmp_node));
+			if (cmp_node == NULL) {
+				/* log mem allocation error */
+				sprintf(msg, "Memory allocation error for miscompare node: %s\n", strerror(errno));
+				hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+				return (rc);
+			}
+			cmp_node->type = CMP_TYPE_VSR;
+			cmp_node->reg_num = i/2;
+			cmp_node->instr_tree.head = NULL;
+			cmp_node->next = NULL;
+			if (cptr->miscmp_info.head == NULL) {
+				cptr->miscmp_info.head = cmp_node;
+			}	
+			else {
+				cmp_node->next = cptr->miscmp_info.head;
+				cptr->miscmp_info.head = cmp_node;
+			}
+			cptr->miscmp_info.num_miscmp += 1;
+			if (rule.enable_attn) {
+				attn(0xBEEFDEAD, 1, *ptr1, *ptr2, i, (uint64)ptr1, (uint64)ptr2, (uint64)cptr);
+			}
+		}
+		ptr1++; ptr2++;
+	}
+
+	/***********Validate GPRs********/
+	for(i = 11; i < NUM_GPRS; i++) {
+		if (tc1->tcc.gprs[i] != tc2->tcc.gprs[i]) {
+			/* Miscompare */
+			sprintf(msg, "Miscompare in GPR[%d]: %llx %llx \n", i, tc1->tcc.gprs[i], tc2->tcc.gprs[i]);
+			hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+			if (!(rc & CMP_TYPE_GPR)) {
+				rc |= CMP_TYPE_GPR;
+			}
+			/* create and insert node at begining of link list */
+			cmp_node = (struct miscmp_node *)malloc(sizeof(struct miscmp_node));
+			if (cmp_node == NULL) {
+				/* log mem allocation error */
+				sprintf(msg, "Memory allocation error for miscompare node: %s\n", strerror(errno));
+				hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+				return (rc);
+			}
+			cmp_node->type = CMP_TYPE_GPR;
+			cmp_node->reg_num = i;
+			cmp_node->instr_tree.head = NULL;
+			cmp_node->next = NULL;
+			if (cptr->miscmp_info.head == NULL) {
+				cptr->miscmp_info.head = cmp_node;
+			}	
+			else {
+				cmp_node->next = cptr->miscmp_info.head;
+				cptr->miscmp_info.head = cmp_node;
+			}
+			cptr->miscmp_info.num_miscmp += 1;
+			if (rule.enable_attn) {
+				attn(0xBEEFDEAD, 2, tc1->tcc.gprs[i], tc2->tcc.gprs[i], i, (uint64)&(tc1->tcc.gprs[0]), (uint64)&(tc2->tcc.gprs[0]), (uint64)cptr);
+			}
+		}
+	}
+
+	/***********Validate FPSCRs********/
+	if ((tc1->tcc.sprs.fpscr != tc2->tcc.sprs.fpscr) && tc1->tcc.sprs.comp_fpscr) {
+		/* Miscompare */
+		sprintf(msg, "Miscompare in FPSCR: 0x%llx Vs 0x%llx\n", tc1->tcc.sprs.fpscr, tc2->tcc.sprs.fpscr);
+		hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+		rc |= CMP_TYPE_FPSCR;
+		/* create and insert node at begining of link list */
+        cmp_node = (struct miscmp_node *)malloc(sizeof(struct miscmp_node));
+        if (cmp_node == NULL) {
+            /* log mem allocation error */
+            sprintf(msg, "Memory allocation error for miscompare node: %s\n", strerror(errno));
+            hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+            return (rc);
+        }
+        cmp_node->type = CMP_TYPE_FPSCR;
+        cmp_node->instr_tree.head = NULL;
+        cmp_node->next = NULL;
+        if (cptr->miscmp_info.head == NULL) {
+            cptr->miscmp_info.head = cmp_node;
+        }
+        else {
+        	cmp_node->next = cptr->miscmp_info.head;
+            cptr->miscmp_info.head = cmp_node;
+        }
+        cptr->miscmp_info.num_miscmp += 1;
+
+		if (rule.enable_attn) {
+			attn(0xBEEFDEAD, 3, tc1->tcc.sprs.fpscr, tc2->tcc.sprs.fpscr, i, (uint64)&(tc1->tcc.sprs.fpscr), (uint64)&(tc2->tcc.sprs.fpscr), (uint64)cptr);
+		}
+	}
+
+	/***********Validate VSCRs********/
+	if( tc1->tcc.sprs.vscr[0] != tc2->tcc.sprs.vscr[0] || tc1->tcc.sprs.vscr[1] != tc2->tcc.sprs.vscr[1] ) {
+		/* Miscompare */
+		sprintf(msg, "Miscompare in VSCR: 0x%016llx%016llx Vs 0x%016llx%016llx\n", tc1->tcc.sprs.vscr[0], tc1->tcc.sprs.vscr[1], tc2->tcc.sprs.vscr[0], tc2->tcc.sprs.vscr[1]);
+		hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+		rc |= CMP_TYPE_VSCR;
+		/* create and insert node at begining of link list */
+        cmp_node = (struct miscmp_node *)malloc(sizeof(struct miscmp_node));
+        if (cmp_node == NULL) {
+            /* log mem allocation error */
+            sprintf(msg, "Memory allocation error for miscompare node: %s\n", strerror(errno));
+            hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+            return (rc);
+        }
+        cmp_node->type = CMP_TYPE_VSCR;
+        cmp_node->instr_tree.head = NULL;
+        cmp_node->next = NULL;
+        if (cptr->miscmp_info.head == NULL) {
+            cptr->miscmp_info.head = cmp_node;
+        }
+        else {
+        	cmp_node->next = cptr->miscmp_info.head;
+            cptr->miscmp_info.head = cmp_node;
+        }
+        cptr->miscmp_info.num_miscmp += 1;
+
+		if (rule.enable_attn) {
+			attn(0xBEEFDEAD, 4, tc1->tcc.sprs.vscr[0], tc2->tcc.sprs.vscr[0], i, (uint64)&(tc1->tcc.sprs.vscr[0]), (uint64)&(tc2->tcc.sprs.vscr[0]), (uint64)cptr);
+		}
+	}
+
+	/***********Validate CRs********/
+	if( (tc1->tcc.sprs.cr & 0xffffff) != (tc2->tcc.sprs.cr & 0xffffff) ) {
+		/* Miscompare */
+		sprintf(msg, "Miscompare in CR: 0x%llx Vs 0x%llx\n", tc1->tcc.sprs.cr, tc2->tcc.sprs.cr);
+		hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+		rc |= CMP_TYPE_CR;
+		/* create and insert node at begining of link list */
+        cmp_node = (struct miscmp_node *)malloc(sizeof(struct miscmp_node));
+        if (cmp_node == NULL) {
+            /* log mem allocation error */
+            sprintf(msg, "Memory allocation error for miscompare node: %s\n", strerror(errno));
+            hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+            return (rc);
+        }
+        cmp_node->type = CMP_TYPE_CR;
+        cmp_node->instr_tree.head = NULL;
+        cmp_node->next = NULL;
+        if (cptr->miscmp_info.head == NULL) {
+            cptr->miscmp_info.head = cmp_node;
+        }
+        else {
+        	cmp_node->next = cptr->miscmp_info.head;
+            cptr->miscmp_info.head = cmp_node;
+        }
+        cptr->miscmp_info.num_miscmp += 1;
+
+		if (rule.enable_attn) {
+			attn(0xBEEFDEAD, 5, tc1->tcc.sprs.cr, tc2->tcc.sprs.cr, i, (uint64)&(tc1->tcc.sprs.cr), (uint64)&(tc2->tcc.sprs.cr), (uint64)cptr);
+		}
+	}
+
+	max_ls_off = global_sdata[PASS1_BUF].cdata_ptr[cno]->last_ls_off;
+#ifdef SCTU
+	pthread_mutex_lock(&compare_ls_lock);
+	compare_ls_threads++;
+	if(compare_ls_threads == rule.num_threads){
+		int cnt,client_num;
+		max_ls_off = global_sdata[PASS1_BUF].cdata_ptr[0]->last_ls_off;
+		for( cnt=1; cnt<rule.num_threads; cnt++){
+			if( max_ls_off < global_sdata[PASS1_BUF].cdata_ptr[cnt]->last_ls_off ){
+				max_ls_off = global_sdata[PASS1_BUF].cdata_ptr[cnt]->last_ls_off;
+				client_num = cnt;
+			}
+		}
+#endif
+	/*cmp_data->max_ls_size = max_ls_off + 8;
+	cmp_data->miscmp_offset = (uint64 *)malloc(cmp_data->max_ls_size);
+	memset(cmp_data->miscmp_offset, 0, cmp_data->max_ls_size);*/
+
+#ifndef COMPARE_METHOD_CRC
+	/***********Validate Load / Store area********/
+	ptr1 = (uint64 *)global_sdata[PASS1_BUF].cdata_ptr[cno]->ls_base[PASS1_BUF];
+	save_ptr = ptr2 = (uint64 *)global_sdata[PASS2_BUF].cdata_ptr[cno]->ls_base[PASS2_BUF];
+	DPRINT(cptr->clog,"LS PASS1 Base Address = %llx, LS PASS2 Base Address = %llx\n", (uint64)global_sdata[PASS1_BUF].cdata_ptr[cno]->ls_base[PASS1_BUF],
+																					  (uint64)global_sdata[PASS1_BUF].cdata_ptr[cno]->ls_base[PASS2_BUF]);
+	/*j = cmp_data->num_ls_miscmp = 0;*/
+	for(i = 0; i < (max_ls_off + 8); i += 8) {
+		DPRINT(cptr->clog, "Pass1 LS Addr: %llx, Pass1Value: %llx, Pass2 LS Addr: %llx, Pass2Value: %llx\n",(uint64)ptr1, *ptr1, (uint64)ptr2, *ptr2);
+		if (*ptr1 != *ptr2) {
+			/* Miscompare */
+			sprintf(msg, "Miscompare in Load/Store area. index[%x]:offset: %llx, Pass1: 0x%016llx, Pass2: 0x%016llx\n", i, ((uint64)ptr2 - (uint64)save_ptr), *ptr1, *ptr2);
+			hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+			DPRINT(cptr->clog,"LS Miscompare: Off = %llx, Pass1 Value = %llx, Pass2 Value = %llx\n", ((uint64)ptr2 - (uint64)save_ptr), *ptr1, *ptr2);
+			if (!(rc & CMP_TYPE_LS)) {
+				rc |= CMP_TYPE_LS;
+			}
+			/* create and insert node at begining of link list */
+			cmp_node = (struct miscmp_node *)malloc(sizeof(struct miscmp_node));
+			if (cmp_node == NULL) {
+				/* log mem allocation error */
+				sprintf(msg, "Memory allocation error for miscompare node: %s\n", strerror(errno));
+				hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, msg);
+				return (rc);
+			}
+			cmp_node->type = CMP_TYPE_LS;
+			cmp_node->offset = i;
+			cmp_node->instr_tree.head = NULL;
+			cmp_node->next = NULL;
+			if (cptr->miscmp_info.head == NULL) {
+				cptr->miscmp_info.head = cmp_node;
+			}	
+			else {
+				cmp_node->next = cptr->miscmp_info.head;
+				cptr->miscmp_info.head = cmp_node;
+			}
+			cptr->miscmp_info.num_miscmp += 1;
+			if (rule.enable_attn) {
+				attn(0xBEEFDEAD, 6, *ptr1, *ptr2, i, (uint64)save_ptr, (uint64)ptr1, (uint64)ptr2);
+			}
+		}
+		ptr1++; ptr2++;
+	}
+#else
+	/***********Validate CRC********/
+	ptr1 = (uint64 *)global_sdata[PASS1_BUF].cdata_ptr[cno]->ls_base[PASS1_BUF];
+	save_ptr = ptr2 = (uint64 *)global_sdata[PASS2_BUF].cdata_ptr[cno]->ls_base[PASS2_BUF];
+	crc1 = 0; crc2 = 0;
+	for(i = 0; i < (max_ls_off + 8); i += 8) {
+		crc1 = add_logical(crc1, *ptr1); ptr1++;
+		crc2 = add_logical(crc2, *ptr2); ptr2++;
+	}
+	if(crc1 != crc2) {
+		DPRINT(cptr->clog, "\n Miscompare (CRC)");
+		if (rule.enable_attn) {
+			attn(0xBEEFDEAD, 7, crc1, crc2, ptr1, save_ptr, cptr);
+		}
+	}
+	if((crc1 != crc2) && (data_miscom == 0) || (data_miscom == 1) && (crc1 == crc2)) {
+		DPRINT(cptr->clog,"\n CRC logic bug: crc1 = 0x%llx crc2 = 0x%llx data_miscom = %d \n", crc1, crc2, data_miscom);
+	}
+#endif
+#ifdef SCTU
+	compare_ls_threads=0;
+	}
+	pthread_mutex_unlock(&compare_ls_lock);
+#endif
+
+	return(rc);
+}
 
 int compare_results(int cno, int *num)
 {
@@ -7633,7 +8032,7 @@ merge_instruction_tables()
 	int i = 0, j = 0;
 	char str[1024];
 	char local_str[1024];
-	uint16 proc_rev_num = (pvr & 0xFFFF);
+	uint16 proc_rev_num = (pvr & 0x0FFF);
 
 	i = 0;
 	while(j < MAX_INSTRUCTIONS && bfp_instructions_array[i].op_eop_mask != 0xDEADBEEF) {
@@ -7853,6 +8252,10 @@ int filter_masked_instruction_categories(int cno, uint64 mask, struct instructio
 		    	if ((table[i].ins_cat_mask & 0x00ffffffffffffffULL) & (mask & 0x00ffffffffffffffULL)) {
 					/* check for P9 only instructions */
 					
+					if (((table[i].ins_cat_mask & 0x00ffffffffffffffULL) & HW_ONLY) && (rule.test_method == CORRECTNESS_CHECK)) {
+						/* do not select instructions */
+						continue;
+					}
 					if (mask & P9_ONLY) {
 						/* only select P9 instructions */
 						if ((table[i].ins_cat_mask & P9_ONLY) && (((table[i].ins_cat_mask & ~(P9_ONLY)) & ~(INS_CAT)) & sub_mask)) {
@@ -8751,7 +9154,7 @@ void dump_testcase_sctu(int client_num, int num_oper, int rc, int miscomparing_n
 				dump_testcase_p6(client_no, num_oper, rc, miscomparing_num);
 			}
 			else {
-				dump_testcase_p7(client_no, num_oper, rc, miscomparing_num);
+				dump_testcase_p7(client_no, num_oper, rc);
 			}
 #ifndef __HTX_LINUX__
 			{
@@ -9054,7 +9457,12 @@ int node_testcase(void)
 		}
 	} 
 #endif
+
+#ifndef __HTX_LINUX__
+	rc1 = syscfg_lock_sem(SYSCFG_LOCK);
+#else
 	rc1 = pthread_rwlock_rdlock(&(global_ptr->syscfg.rw));
+#endif
 	if (rc1 != 0) {
 		sprintf(msg,"lock inside framework.c failed with errno=%d,in function: %s at line :[%d]\n",rc1, __FUNCTION__, __LINE__);
 		hxfmsg(&hd, 0, HTX_HE_INFO, msg);
@@ -9084,7 +9492,11 @@ int node_testcase(void)
 			}
 		}
 	}
+#ifndef __HTX_LINUX__
+	rc2 = syscfg_unlock_sem(SYSCFG_LOCK);
+#else
 	rc2 = pthread_rwlock_unlock(&(global_ptr->syscfg.rw));
+#endif
 	if (rc2 != 0) {
 		sprintf(msg,"unlock inside framework.c failed with errno=%d,in function: %s at line :[%d]\n",rc2, __FUNCTION__, __LINE__);
 		hxfmsg(&hd, 0, HTX_HE_INFO, msg);

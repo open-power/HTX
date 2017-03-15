@@ -29,7 +29,7 @@ extern struct htx_data hd;
 static struct instruction_masks dep_instructions_array[] = {
 /* addi    */ {0x38000000, 0, IMM_DATA, 0 , GR, 16, DUMMY, DUMMY , GR , 21 , 0x57, "addi",  DUMMY, CPU_FIXED_ARTH, D_FORM_RT_RA_SI},
 /* addis   */ {0x3C000000, 0, IMM_DATA, 0 , GR, 16, DUMMY, DUMMY , GR , 21 , 0x57, "addis",  DUMMY, CPU_FIXED_ARTH, D_FORM_RT_RA_SI},
-/* mfcr    */ {0x7C000026, 0, DUMMY, 0, DUMMY, 0, DUMMY, 0, GR, 21, 0, "mfcr", DUMMY, 0, XFX_FORM_RT_FXM_EOP_RC},
+/* mfcr    */ {0x7C000026, 0, DUMMY, 0, DUMMY, 0, DUMMY, 0, GR, 21, 0, "mfcr", DUMMY, CPU_FIXED_SPR, XFX_FORM_RT_FXM_EOP_RC},
 /* or      */ {0x7C000378, 0, GR, 21, GR, 11, DUMMY, DUMMY, GR, 16, 0x44, "or", DUMMY, CPU_FIXED_LOGIC, X_FORM_RS_RA_RB_eop_rc},
 /* ori     */ {0x60000000, 0, GR, 21, IMM_DATA, 0, DUMMY, DUMMY, GR, 16, 0x43, "ori", DUMMY, CPU_FIXED_LOGIC, D_FORM_RS_RA_UIM},
 /* and     */ {0x7C000038, 0, GR, 21, GR, 11, DUMMY, DUMMY, GR, 16, 0x44, "and", DUMMY, CPU_FIXED_LOGIC, X_FORM_RS_RA_RB_eop_rc},
@@ -70,7 +70,7 @@ void decode_tc_instructions(int cno)
 {
 	int i, j, table_index = 0;
 	uint32 *instr = NULL; 
-	instruction_masks *ins_tuple;
+	instruction_masks *ins_tuple = NULL;
 	client_data *cptr;
 	int prolog_ins, stream_ins; 
 	unsigned short imm_data = 0, imm_data_flag;
@@ -85,7 +85,7 @@ void decode_tc_instructions(int cno)
 	#ifdef DBG_INSTR
 	FILE * instr_fp = NULL;
 	char instr_fname[128];
-	sprintf(instr_fname, "%s/instr_list", hd.htx_exer_log_dir);
+	sprintf(instr_fname, "%s/instr_list_%d", hd.htx_exer_log_dir, cno);
 	instr_fp = fopen(instr_fname, "w");
 	if (instr_fp == NULL) {
 		printf("fopen failed for %s: %s\n", instr_fname, strerror(errno));
@@ -1433,7 +1433,8 @@ void decode_tc_instructions(int cno)
 		fprintf(instr_fp, "table index: %d, addr: %p, mcode: 0x%x, mnemonic: %s\n", j, instr, *instr, mnemonic);
 		fflush(instr_fp);
 		#endif
-
+		/* update instr category type */
+		cptr->dc_instr[j].instr_cat_type = (ins_tuple->ins_cat_mask & INS_CAT);
 		/* target data type */
 		if ((ins_tuple->tgt_dtype == DUMMY) || (ins_tuple->tgt_dtype == CR_T) || ((ins_tuple->tgt_dtype >= IMM_DATA) && (ins_tuple->tgt_dtype <= IMM_DATA_14BIT))) {
 			cptr->dc_instr[j].tgt_dtype = OTHER_DTYPE; 
@@ -1508,6 +1509,7 @@ void delete_reg_use_list(struct reguse *reg_node)
 	}
 	DPRINT(hlog, "freeing node: %p, reg_num: %d, index: %d\n", reg_node, reg_node->tgt_reg, reg_node->dc_index);
 	free(reg_node);
+	reg_node = NULL;
 }
 
 /*
@@ -1515,7 +1517,7 @@ void delete_reg_use_list(struct reguse *reg_node)
  * and pass to create dependent instructions call
  * for further analysis
  */
-struct reguse *prepare_ls_call_list(FILE *dump, int cno, int cmp_offset) 
+struct reguse *prepare_ls_call_list(FILE *dump, int cno, int cmp_offset, struct miscmp_node **head) 
 {
 	uint16 tgt_type;
 	int i, k, tc_index = -1, index_found = -1;
@@ -1581,7 +1583,7 @@ struct reguse *prepare_ls_call_list(FILE *dump, int cno, int cmp_offset)
 		}
 		DPRINT(hlog, "index found: %d, instr: %s\n", index_found, cptr->dc_instr[index_found].mnemonic);
 		/* create instruction lists */
-		return (create_instr_tree(dump, cno, cptr->dc_instr[index_found].tgt_val, cptr->dc_instr[index_found].tgt_dtype, index_found));
+		return (create_instr_tree(dump, cno, cptr->dc_instr[index_found].tgt_val, cptr->dc_instr[index_found].tgt_dtype, index_found, head));
 	}
 }
 
@@ -1590,13 +1592,14 @@ struct reguse *prepare_ls_call_list(FILE *dump, int cno, int cmp_offset)
  * input arguments:- 
  * cno: client number
  * reg_num:  miscomparing register number
- * reg_type: gpr, vsr, fpscr, vscr, cr
+ * miscmp_type: data type gpr, vsr, fpscr, vscr and cr bitwise ored with miscompare type
  * start_index: start looking for instruction backward in instruction execution queue
  * output argument:- 
  * reg_node: intermediate nodes being created during the dependency search
  */
-struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype, int start_index) 
+struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype, int start_index, struct miscmp_node **head) 
 {
+	char msg_text[256];
 	int i, index_found = -1;
 	uint16 tgt_type, op_type;
 	struct reguse *reg_node = NULL;
@@ -1624,11 +1627,22 @@ struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype
 	        continue;
 		}
 	    if ((cptr->dc_instr[i].tgt_val == reg_num) && (tgt_type == tgt_dtype)) {
+			if (cptr->dc_instr[i].miscmp == NULL) {
+				cptr->dc_instr[i].miscmp = *head;
+			}else {
+				if (cptr->dc_instr[i].miscmp->type && CMP_TYPE_VSR) {
+					fprintf(dump, "Merged with VSR Miscompare: VSR# %d\n", cptr->dc_instr[i].miscmp->reg_num);
+				} else if (cptr->dc_instr[i].miscmp->type && CMP_TYPE_GPR) {
+					fprintf(dump, "Merged with GPR Miscompare: GPR# %d\n", cptr->dc_instr[i].miscmp->reg_num);
+				} else if (cptr->dc_instr[i].miscmp->type && CMP_TYPE_LS) {
+					fprintf(dump, "Merged with Load Store Miscompare: Offset# 0x%x\n", cptr->dc_instr[i].miscmp->offset);
+				}
+	            return NULL;
+			}
 			reg_node = (struct reguse *)malloc(sizeof(struct reguse));
 	        if (reg_node == NULL) {
-				char err_msg[256];
-				sprintf(err_msg, "Error allocating memory for node, %s, %d, %s\n", __FILE__, __LINE__, strerror(errno));
-				hxfmsg(&hd, errno, HTX_HE_SOFT_ERROR, err_msg);
+				sprintf(msg_text, "Error allocating memory for node, %s, %d, %s\n", __FILE__, __LINE__, strerror(errno));
+				hxfmsg(&hd, errno, HTX_HE_SOFT_ERROR, msg_text);
 	            return NULL;
  	        }
 	        reg_node->src[0] = reg_node->src[1] = reg_node->src[2] = NULL;
@@ -1660,7 +1674,7 @@ struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype
 				continue;
 			}
 
-            reg_node->src[i] = create_instr_tree(dump, cno, cptr->dc_instr[index_found].op_val[i], op_type, index_found - 1);
+            reg_node->src[i] = create_instr_tree(dump, cno, cptr->dc_instr[index_found].op_val[i], op_type, index_found - 1, head);
         }
     }
     DPRINT(hlog, "Exit: %s\n", __FUNCTION__);

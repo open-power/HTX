@@ -1007,6 +1007,17 @@ int simulate_vrsqrtefp (uint32 * machine_code , struct testcase *test_case);
 int simulate_mtvscr (uint32 * machine_code , struct testcase *test_case);
 int simulate_mfvscr (uint32 * machine_code , struct testcase *test_case);
 
+/* Missed instructions */
+/* VSX */
+int simulate_xsrsp(uint32 * machine_code , struct testcase *test_case);
+
+/* VMX */
+int simulate_vexptefp(uint32 * machine_code , struct testcase *test_case);
+int simulate_vlogefp(uint32 * machine_code , struct testcase *test_case);
+int simulate_vrefp(uint32 * machine_code , struct testcase *test_case);
+int simulate_vrsqrtefp(uint32 * machine_code , struct testcase *test_case);
+
+
 /* P9 : RFC02462 */
 int simulate_lxvll(uint32 * machine_code , struct testcase *test_case);
 int simulate_stxvll(uint32 * machine_code , struct testcase *test_case);
@@ -1277,7 +1288,7 @@ int veqv(VRegValue *VT, VRegValue VA, VRegValue VB);
 int vorc(VRegValue *VT, VRegValue VA, VRegValue VB);
 int vnand(VRegValue *VT, VRegValue VA, VRegValue VB);
 
-#if 0 /* Estimate instructions */
+#if 1 /* Estimate instructions */
 int vexptefp(VRegValue *VT, VRegValue VB, uint64* vscr);
 int vlogefp(VRegValue *VT, VRegValue VB, uint64* vscr);
 int vrefp(VRegValue *VT, VRegValue VB, uint64* vscr);
