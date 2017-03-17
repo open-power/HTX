@@ -16,8 +16,6 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)79       1.10  src/htx/usr/lpp/htx/bin/hxecache/hxecache.h, exer_cache, htxubuntu 4/20/15 00:01:18  */
-
 #include <pthread.h>
 #include "htxsyscfg64.h"
 
@@ -350,6 +348,7 @@ struct sys_info {
 	CPU_MAP		   		cpu_in_chip_map;					   						/* Map containing range of CPUS in instance 		*/
 	int					core_smt_array[MAX_CORES_PER_CHIP];							/* Array containing SMT of each core in instance.	*/
 	int					cpus_in_core_array[MAX_CORES_PER_CHIP][MAX_CPUS_PER_CORE];	/* Array containing CPU list in each core. */
+	int 				p9_dd1_bit;
 	struct cache_info 	cinfo[2];							  						/* Contains cache info for L2 and L3				*/
 };
 
@@ -449,6 +448,7 @@ int				update_hxecache_stats(int current_test_case);
 int 			calculate_mem_requirement_for_p7p(struct ruleinfo *rule_ptr);
 int 			calculate_mem_requirement_for_p7(struct ruleinfo *rule_ptr);
 int 			calculate_mem_requirement_for_p8(struct ruleinfo *rule_ptr);
+int             calculate_mem_requirement_for_p9(struct ruleinfo *);
 unsigned int 	get_max_total_mem_req(void);
 unsigned int 	get_max_cache_mem_req(void);
 int 			wait_for_threads_termination(int current_test_case);

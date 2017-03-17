@@ -191,7 +191,7 @@ int mem_operation_comp_addr(int num_operations,void *seg_address,void *pattern_p
             break;
         }
         ptr = ptr + 1;
-        address = ptr;
+        address = (unsigned long)ptr;
         rc = 0;
     }
     return rc;
@@ -250,7 +250,7 @@ int  mem_operation_rim_word(int num_operations,void *seg_address,void *pattern_p
 
 int  mem_operation_rim_byte(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed){
     int i=0,rc=0;
-    char *w_ptr = (unsigned char*)seg_address;
+    char *w_ptr = (char*)seg_address;
     char read_data;
     for (i=0; i < num_operations; i++) {
         *w_ptr = *(char*)pattern_ptr;
@@ -296,7 +296,7 @@ int mem_operation_write_addr_comp(int num_operations,void *seg_address,void *pat
             break;
         }
         rw_ptr  = rw_ptr + 1;
-        address = rw_ptr;
+        address = (unsigned long)rw_ptr;
         rc = 0;
     }
     return rc;

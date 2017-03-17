@@ -1,5 +1,4 @@
 #!/bin/ksh
-
 proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
 proc_ver_dec=`printf %d $proc_ver`
 
@@ -7,6 +6,7 @@ proc_ver_dec=`printf %d $proc_ver`
 # it will exit.
 if [[ $proc_ver_dec -lt 78 ]]
 then
+	echo "mem.runsetup:runsetup is not needed for P8 and less, exiting..." >> $HTXNoise
     exit
 fi
 
@@ -14,7 +14,7 @@ cur_mdt=`echo ${HTXMDT}mdt`
 
 if [ ! -f $cur_mdt ]
 then
-    echo "$cur_mdt doesnt exists. Exiting...."
+    echo "mem.runsetup:$cur_mdt doesnt exists. Exiting...." | tee -a $HTXNoise
         exit
 fi
 
@@ -31,6 +31,7 @@ fi
 num_mem_instances=`cat $cur_mdt | grep mem | grep : | wc -l`
 if [[ $num_mem_instances == "0" ]]
 then
+	echo "mem.runsetup:No memory instances found in selected mdt:$cur_mdt,exiting..." | tee -a $HTXNoise 		
     exit
 fi
 
@@ -40,7 +41,7 @@ memory_usage_per_instance=$((total_mem_usage/$num_mem_instances))
 cfg_file=`cat $cur_mdt | grep cfg_file | awk '{print $3}'`
 cfg_file="${cfg_file%\"}"
 cfg_file="${cfg_file#\"}"
-#echo "num_mem_instances: $num_mem_instances, memory_usage_per_instance: $memory_usage_per_instance, cfg_file: $cfg_file"
+echo "mem.runsetup:num_mem_instances: $num_mem_instances, memory_usage_per_instance: $memory_usage_per_instance, cfg_file: $cfg_file" >> $HTXNoise
 
 rm ${HTXREGRULES}/hxemem64/default.eq.mem* 2> /dev/null
 
@@ -60,5 +61,6 @@ do
          let mem_instance=mem_instance+1
          let num_mem_dev_entry=num_mem_dev_entry-1
     done
-done
+done 
+
 

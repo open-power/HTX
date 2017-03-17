@@ -186,7 +186,7 @@ void prefetch_irritator(void *arg)
             if ( (PREFETCH_IRRITATOR & current_rule->pf_conf) == PREFETCH_IRRITATOR ) {
 				rc = do_prefetch( starting_address , memory_fetch_size , random_no, thread_no, loop_count, th_array[thread_no].pattern);
 				if ( rc != 0 ) {
-					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%x Actual data = 0x%x thread_index : 0x%x Start of memory = %p, memory size = 0x%x\n"
+					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%llx Actual data = 0x%llx thread_index :0x%x Start of memory = %llx, memory size = 0x%llx\n"
 								,__LINE__,th_array[thread_no].pattern, *(unsigned long long *)((unsigned char *)starting_address + 128*(loop_count-rc)), thread_no, starting_address, memory_fetch_size);
 					hxfmsg(&h_d, 0, HTX_HE_MISCOMPARE, msg);
 					dump_miscompare_data(thread_no, (unsigned char *)starting_address);
@@ -207,7 +207,7 @@ void prefetch_irritator(void *arg)
 				start_addr = (unsigned char *)starting_address + offset;
 				rc = transient_dcbt((unsigned long long)start_addr, loop_count, th_array[thread_no].pattern );
 				if ( rc != 0 ) {
-					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%x Actual data = 0x%x thread_index : 0x%x Start of memory = %p, memory size = 0x%x\n"
+					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%llx Actual data = 0x%llx thread_index : 0x%x Start of memory = %llx, memory size = 0x%llx\n"
 								,__LINE__,th_array[thread_no].pattern, *(unsigned long long *)((unsigned char *)starting_address + 128*(loop_count-rc)), thread_no, starting_address, memory_fetch_size);
 					hxfmsg(&h_d, 0, HTX_HE_MISCOMPARE, msg);
 					dump_miscompare_data(thread_no, (unsigned char *)starting_address);
@@ -227,7 +227,7 @@ void prefetch_irritator(void *arg)
 				start_addr = (unsigned char *)starting_address + offset;
 				rc = prefetch_dcbtna((unsigned long long)start_addr, loop_count, th_array[thread_no].pattern,&temp_storage,&temp_pattern);
 				if ( rc != 0 ) {
-					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%x Actual data = 0x%x copied data = %x0x, copied pattern = %x0x, thread_index : 0x%x Start of memory = %p, memory size = 0x%x\n"
+					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%llx Actual data = 0x%llx copied data = %llx0x, copied pattern = %llx0x, thread_index : 0x%x Start of memory = %llx, memory size = 0x%llx\n"
 								,__LINE__,th_array[thread_no].pattern, *(unsigned long long *)((unsigned char *)starting_address + 128*(loop_count-rc)), temp_storage, temp_pattern, thread_no, starting_address, memory_fetch_size);
 					hxfmsg(&h_d, 0, HTX_HE_MISCOMPARE, msg);
 					dump_miscompare_data(thread_no, (unsigned char *)starting_address);
@@ -257,7 +257,7 @@ void prefetch_irritator(void *arg)
 
 				rc = transient_dcbt((unsigned long long)start_addr, loop_count, th_array[thread_no].pattern );
 				if ( rc != 0 ) {
-					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%x Actual data = 0x%x thread_index : 0x%x Start of memory = %p, memory size = 0x%x\n"
+					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%llx Actual data = 0x%llx thread_index : 0x%x Start of memory = %llx, memory size = 0x%llx\n"
 								,__LINE__,th_array[thread_no].pattern, *(unsigned long long *)((unsigned char *)starting_address + 128*(loop_count-rc)), thread_no, starting_address, memory_fetch_size);
 					hxfmsg(&h_d, 0, HTX_HE_MISCOMPARE, msg);
 					dump_miscompare_data(thread_no, (unsigned char *)starting_address);
@@ -267,7 +267,7 @@ void prefetch_irritator(void *arg)
             else if(th_array[thread_no].prefetch_algorithm == PREFETCH_IRRITATOR) {
 				rc = do_prefetch( starting_address , memory_fetch_size , random_no, thread_no, loop_count, th_array[thread_no].pattern);
 				if ( rc != 0 ) {
-					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%x Actual data = 0x%x thread_index : 0x%x Start of memory = %p, memory size = 0x%x\n"
+					sprintf(msg,"[%d] Miscompare in Prefetch!! Expected data = 0x%llx Actual data = 0x%llx thread_index : 0x%x Start of memory = %llx, memory size = 0x%llx\n"
 								,__LINE__,th_array[thread_no].pattern, *(unsigned long long *)((unsigned char *)starting_address + 128*(loop_count-rc)), thread_no, starting_address, memory_fetch_size);
 					hxfmsg(&h_d, 0, HTX_HE_MISCOMPARE, msg);
 					dump_miscompare_data(thread_no, (unsigned char *)starting_address);
@@ -280,7 +280,7 @@ void prefetch_irritator(void *arg)
 				start_addr = (unsigned char *)starting_address + offset;
 				rc = prefetch_dcbtna((unsigned long long)start_addr, loop_count, th_array[thread_no].pattern,&temp_storage, &temp_pattern);
 				if ( rc != 0 ) {
-					sprintf(msg,"[%d] Miscompare in Prefetch ( returned %d)!! Expected data = 0x%x Actual data = 0x%x copied data = 0x%x, copied pattern = 0x%x, thread_index : 0x%x Start of memory = %p, offset = %d\n"
+					sprintf(msg,"[%d] Miscompare in Prefetch ( returned %d)!! Expected data = 0x%llx Actual data = 0x%llx copied data = 0x%llx, copied pattern = 0x%llx, thread_index : 0x%x Start of memory = %llx, offset = %ld\n"
 								,__LINE__, rc, th_array[thread_no].pattern, *(unsigned long long *)((unsigned char *)start_addr + 128*(loop_count-rc)), temp_storage, temp_pattern, thread_no, starting_address, offset);
 					hxfmsg(&h_d, 0, HTX_HE_MISCOMPARE, msg);
 					dump_miscompare_data(thread_no, (unsigned char *)starting_address);

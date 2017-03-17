@@ -264,7 +264,7 @@ void get_test_type()
 	else if ((strncmp ((char*)(DEVICE_NAME+5),"cach",4)) == 0){
 		g_data.test_type = CACHE;
 	}
-	else if (	((strncmp ((char*)(DEVICE_NAME+5),"ab",2)) == 0) || (strncmp ((char*)(DEVICE_NAME+5),"xyz",3)== 0)	){
+	else if (	((strncmp ((char*)(DEVICE_NAME+5),"fabn",4)) == 0) || (strncmp ((char*)(DEVICE_NAME+5),"fabc",4)== 0)	){
 		g_data.test_type = FABRICB;
 	}
 	else if ((strncmp ((char*)(DEVICE_NAME+5),"tlb",3)) == 0){
@@ -365,6 +365,7 @@ int get_system_details() {
     sysptr->os_pvr = (sysptr->os_pvr)>>16 ;
 	/*####*** add true pvr details*/
 #endif
+    if(g_data.test_type == MEM){/*collect mem details once all exerciser are started*/
 	/*REV:below calls need to be replaced with single lib call*/
 	rc=get_memory_size_update();
     if ( rc ) {
@@ -388,18 +389,19 @@ int get_system_details() {
     #ifdef __HTX_LINUX__
     rc = get_memory_pools();
     if(rc < 0){
-		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:get_memory_pools() failed with rc = %d\n",
+		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:syscfg fun get_memory_pools() failed with rc = %d\n",
 			__LINE__,__FUNCTION__,rc);
 			return (rc);
     }
     #else
 	rc = get_memory_pools_update();
 	if(rc < 0){
-		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:get_memory_pools_update() failed with rc = %d\n",
+		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:syscfg fun get_memory_pools_update() failed with rc = %d\n",
 			__LINE__,__FUNCTION__,rc);
 			return (rc);
 	}
     #endif
+    }
 	rc = get_memory_details(&sys_mem_info);
 	if(rc < 0){
         displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:get_memory_details() returned rc = %d\n",__LINE__,__FUNCTION__,rc);
@@ -546,7 +548,7 @@ int apply_process_settings() {
     int num_policies = VM_NUM_POLICIES;
     int policies[VM_NUM_POLICIES] = {/* -1 = don't change policy */
     -1, /* VM_POLICY_TEXT */
-    -1, /* VM_POLICY_STACK */
+    P_FIRST_TOUCH, /* VM_POLICY_STACK */
     P_FIRST_TOUCH, /* VM_POLICY_DATA */
     P_FIRST_TOUCH, /* VM_POLICY_SHM_NAMED */
     P_FIRST_TOUCH, /* VM_POLICY_SHM_ANON */
@@ -685,7 +687,6 @@ int main(int argc, char *argv[])
         displaym(HTX_HE_INFO, DBG_MUST_PRINT, "Waiting %d second(s), "
                  "while other exercisers allocate their memory.\n",
                 g_data.gstanza.global_startup_delay);
-        sleep(g_data.gstanza.global_startup_delay);
 		sleep(g_data.gstanza.global_startup_delay);
     }	
 	/* Collect system details */
@@ -694,7 +695,7 @@ int main(int argc, char *argv[])
 		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:get_system_details() failed with ret_code = %d\n",__LINE__,__FUNCTION__,ret_code);
 		exit(1);
 	}
-    print_partition_config();
+    print_partition_config(HTX_HE_INFO);
 
     if (g_data.exit_flag == 1) {
         return(-1);
@@ -732,6 +733,19 @@ int main(int argc, char *argv[])
 			break;
 
 		case FABRICB:
+            if(g_data.sys_details.shared_proc_mode == 1){
+                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s: Fabricbus exerciser does not support shared processor configured systems, exiting..\n",
+                    __LINE__,__FUNCTION__);
+                exit(1);
+            }
+            ret_code = memory_segments_calculation();
+			if(ret_code != SUCCESS){
+					exit(1);
+			}
+			ret_code = mem_exer_opearation();
+			if(ret_code != SUCCESS){
+					exit(1);
+			}
 			break;
 
 		default:
@@ -744,7 +758,7 @@ int main(int argc, char *argv[])
 }/*end of main*/
 
 
-void print_partition_config(){
+void print_partition_config(int msg_type){
     int i=0,pi=0;
     char msg[4096],msg_temp[2048];
     struct mem_info* memptr = &g_data.sys_details.memory_details;
@@ -764,7 +778,7 @@ void print_partition_config(){
             strcat(msg,msg_temp);
         }
     }
-    displaym(HTX_HE_INFO,DBG_MUST_PRINT,"%s",msg);
+    displaym(msg_type,DBG_MUST_PRINT,"%s",msg);
     sprintf(msg,"Chip level mem details:\n\nCHIP\tCPU\tMEM\n-----------------------\n");
     for(i=0;i<sysptr->num_chip_mem_pools;i++){
         if(mem_details_per_chip[i].num_cpus > 0){
@@ -801,7 +815,7 @@ void print_partition_config(){
             }
         }
     }
-    displaym(HTX_HE_INFO,DBG_MUST_PRINT,"%s\n",msg);
+    displaym(msg_type,DBG_MUST_PRINT,"%s\n",msg);
 }
 	
 int fill_exer_huge_page_requirement(){
@@ -834,15 +848,16 @@ int fill_exer_huge_page_requirement(){
 			memptr->pdata[PAGE_INDEX_16M].supported = FALSE;
 			memptr->pdata[PAGE_INDEX_16G].supported = FALSE;
 		}else{
+
+            if(g_data.gstanza.global_alloc_huge_page == 0){
+                memptr->pdata[PAGE_INDEX_16M].supported = FALSE;
+                memptr->pdata[PAGE_INDEX_2M].supported = FALSE;
+                memptr->pdata[PAGE_INDEX_16G].supported = FALSE;
+            }
 			
 			switch(g_data.test_type) {
 			
 				case MEM:
-                        if(g_data.gstanza.global_alloc_huge_page == 0){
-                            memptr->pdata[PAGE_INDEX_16M].supported = FALSE;
-                            memptr->pdata[PAGE_INDEX_2M].supported = FALSE;
-                            memptr->pdata[PAGE_INDEX_16G].supported = FALSE;
-                        }
 						if(memptr->pdata[PAGE_INDEX_16M].supported || memptr->pdata[PAGE_INDEX_2M].supported){
 							 memptr->pdata[huge_page_index].avail = (avail_16m * huge_page_size);
 							 memptr->pdata[huge_page_index].free	= (free_16m * huge_page_size);
@@ -852,6 +867,10 @@ int fill_exer_huge_page_requirement(){
 						 break;
 
 				/* Add cache,fabric,tlbie,L4 */
+                case FABRICB:
+                        rc = set_fabricb_exer_page_preferances(); 
+                    break;
+                        
 				default:
 					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]wrong test type arg is passed to fun %s for filling huge page deatils from %s\n",
 							__LINE__,__FUNCTION__,log_dir);			

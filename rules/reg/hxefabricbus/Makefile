@@ -2,7 +2,9 @@ include ../../../htx.mk
 TARGET = \
             hxefabricbus.readme \
             default.ab \
-            default.xyz
+            default.xyz \
+            default.inter_chip \
+            default.inter_node
 
 .PHONY: all clean
 

@@ -93,6 +93,7 @@ void get_enabled_prefetch_algos ( unsigned int prefetch_conf , char enabled_algo
 void populate_cores_to_disable(struct ruleinfo *ruleptr, int disable_cores[], int num_cores_disabled);
 void SIGUSR2_hdl(int, int, struct sigcontext *);
 int find_EA_to_RA(unsigned long ea,unsigned long long* ra);
+int get_update_syschanges_hotplug(void);
 /* Now the main function */
 
 int main(int argc, char **argv) {
@@ -108,7 +109,7 @@ int main(int argc, char **argv) {
 #ifdef __HTX_LINUX__
 	h_d.hotplug_cpu = 1; /* Flag used to registering pid so that can receive sigusr2 from supervisor*/
 #endif
-	retcode = atexit(memory_set_cleanup);
+	retcode = atexit((void*)memory_set_cleanup);
 	if(retcode != SUCCESS ) {
 		sprintf(msg,"[%d] Error: Could not register for atexit!\n",__LINE__);
 		hxfmsg(&h_d, retcode, HTX_HE_HARD_ERROR, msg);
@@ -454,6 +455,7 @@ int get_system_hardware_details(void) {
 	system_information.pvr = (unsigned int ) getPvr();
 	system_information.pvr = (system_information.pvr)>>16 ;
 #endif
+	system_information.p9_dd1_bit = get_p9_core_type();
 
 	/*
 	 * Collect cache releated information like:
@@ -764,9 +766,9 @@ int get_shared_memory(int shm_size, uint32_t memflg, int page_size) {
 	if ( page_size == huge_page_size ) {
 		for(p=addr; p < addr+shm_size; p+=huge_page_size) {
 			mem.ea[i] = p;
-            *p=0xBBBBBBBB;
+            *(unsigned int*)p=0xBBBBBBBB;
 #ifdef __HTX_LINUX__
-            find_EA_to_RA(mem.ea[i],&mem.real_addr[i]);
+            find_EA_to_RA((unsigned long)mem.ea[i],&mem.real_addr[i]);
 #else
 			getRealAddress(p, 0, &mem.real_addr[i]);
 #endif
@@ -1281,7 +1283,14 @@ int set_shmmax_val(unsigned long long shm_size) {
 		hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
 		return (E_NO_FILE);
 	} else {
-		fscanf(fp,"%s",shmval);
+		rc = fscanf(fp,"%s",shmval);
+        if (rc == 0 || rc == EOF) {
+            sprintf(msg,"[%d]%s:fscanf failed for shmmax with rc = %d,errno=%d\n",
+                __LINE__,__FUNCTION__,rc,errno);
+            hxfmsg(&h_d, 0,HTX_HE_SOFT_ERROR,msg);
+        }
+        rc  = SUCCESS;/*reset after fscanf*/
+
 		current_shmmax = strtoull(shmval,NULL,10);
 		DEBUG_LOG("\n[%d]Info: Current SHMMAX val = %llu and shm_size = %llu\n",__LINE__,current_shmmax,shm_size);
 		pclose(fp);
@@ -1309,7 +1318,12 @@ int set_shmmax_val(unsigned long long shm_size) {
 				return (E_NO_FILE);
 			} else {
 				new_shmmax = 0;
-				fscanf(fp,"%s",shmval);
+				rc = fscanf(fp,"%s",shmval);
+                if (rc == 0 || rc == EOF) {
+                    sprintf(msg,"[%d]%s:fscanf failed for shmmax with rc = %d,errno=%d\n",
+                        __LINE__,__FUNCTION__,rc,errno);
+                    hxfmsg(&h_d, 0,HTX_HE_SOFT_ERROR,msg);
+                }
 				new_shmmax = strtoull(shmval,NULL,10);   
 				sprintf(msg,"New SHMMAX val = %llu and shm_size = %llu\n",new_shmmax,shm_size);
 				hxfmsg(&h_d, 0, HTX_HE_INFO, msg);
@@ -1441,7 +1455,7 @@ int find_reqd_cache_mem(unsigned int mem_req, struct ruleinfo *rule, int memory_
 		} else if ( rule->use_contiguous_pages == FALSE ) {
 			rc = find_reqd_pages( mem_req, rule, memory_set );
             if(rc == -1){
-                sprintf(msg,"[%d] find_reqd_pages() failed with -1\n");
+                sprintf(msg,"[%d] find_reqd_pages() failed with -1\n",__LINE__);
                 hxfmsg(&h_d, rc, HTX_HE_HARD_ERROR, msg);
                 exit(1);
 		    }
@@ -3165,14 +3179,17 @@ int setup_cache_thread_context(void) {
 		mem_per_thread 								= line_size/current_rule->num_cache_threads_to_create;
 
         for(core=0,thd=0;thd<total_cache_threads;thd++,core++){
-            if(system_information.pvr == POWER9_CUMULUS){
-                if(core == num_cores){
-                    core = 0;
-                    index = (system_information.core_smt_array[core]/2);
-                }        
-            }
+            if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+				if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+                	if(core == num_cores){
+                    	core = 0;
+                    	index = (system_information.core_smt_array[core]/2);
+                	}        
+            	}
+			}
 			core_num  										= system_information.cores_in_instance[core];
 			if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
+				total_cache_threads++;
 				continue;
 			}
 			/*smt	   											= get_smt_status(system_information.cores_in_instance[core]);*/
@@ -3227,15 +3244,18 @@ int setup_cache_thread_context(void) {
 		current_rule->num_cache_threads_to_create	= total_cache_threads;
 
         for(core=0,thd=0;thd<total_cache_threads;thd++,core++){
-            if(system_information.pvr == POWER9_CUMULUS){
-                if(core == num_cores){
-                    core = 0;
-                    index = (system_information.core_smt_array[core]/2);
-                }
+            if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+				if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+					if(core == num_cores){
+						core = 0;
+						index = (system_information.core_smt_array[core]/2);
+                	}
+				}
             }
 			core_num  										= system_information.cores_in_instance[core];
 			if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
 				DEBUG_LOG("[%d] excluding core index = %d , core number = %d \n",__LINE__,core,core_num);
+				total_cache_threads++;
 				continue;
 			}
 			DEBUG_LOG("[%d] calling get_next_cpu \n",__LINE__);
@@ -3411,14 +3431,17 @@ int cleanup_thread_context_array(int thread_type) {
 	
 				index = 0;
                 for(core=0,thd=0;thd<num_cache_threads;thd++,core++){
-                    if(system_information.pvr == POWER9_CUMULUS){
-                        if(core == system_information.num_cores){
-                            index = (system_information.core_smt_array[core]/2);;
-                            core = 0;
-                        }
+					if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+						if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+                    	    if(core == system_information.num_cores){
+                        	    index = (system_information.core_smt_array[core]/2);;
+                            	core = 0;
+                        	}
+						}
                     }
 					int core_num = system_information.cores_in_instance[core];
 					if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
+						num_cache_threads++;
 						continue;
 					}
 
@@ -3594,13 +3617,16 @@ int create_cache_threads(void) {
 		  
 			if(!exit_flag ) {
                 for(core=0,thd=0;thd<num_cache_threads;thd++,core++){
-                    if(system_information.pvr == POWER9_CUMULUS){
-                       if(core == num_cores){
-                            core = 0;
-                            index = (system_information.core_smt_array[core]/2);
-                        }
+					if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+						if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+                       		if(core == num_cores){
+                            	core = 0;
+                            	index = (system_information.core_smt_array[core]/2);
+                        	}
+						}
                     }
 					if ( core_to_exclude(&(current_rule->exclude_cores[0]), system_information.cores_in_instance[core]) == TRUE ) {
+						num_cache_threads++;
 						continue;
 					}
 					rc = pthread_create(&th_array[index].tid, &th_array[index].thread_attrs_detached,(void *(*)(void *))write_read_and_compare, (void *)&th_array[index]);
@@ -3752,8 +3778,8 @@ int cleanup_threads(int thread_type) {
 #endif
 				rc = pthread_join(th_array[thread_no].tid, &tresult);
 				if (rc != 0) {
-				sprintf(msg,"[%d]cleanup_threads:pthread_join failed ! errno %d :(%d): tnum=%d\n",
-							__LINE__,errno, rc, th_array[thread_no].tid);
+				sprintf(msg,"[%d]cleanup_threads:pthread_join failed ! errno %d :(rc = %d): tnum=%d\n",
+							__LINE__,errno, rc, thread_no);
 					hxfmsg(&h_d,rc, HTX_HE_HARD_ERROR , msg);
 					return (FAILURE);
 				} else {
@@ -3782,8 +3808,8 @@ int cleanup_threads(int thread_type) {
 #endif
 					rc = pthread_join(th_array[thread_no].tid, &tresult);
 					if ((rc != 0) && (rc != ESRCH) ) {
-						sprintf(msg,"[%d] cleanup_threads:pthread_join failed ! errno %d :(%d): tnum=%x\n",
-									__LINE__,errno, rc, th_array[thread_no].tid);
+						sprintf(msg,"[%d] cleanup_threads:pthread_join failed ! errno %d :(%d): tnum=%d\n",
+									__LINE__,errno, rc,thread_no);
 						hxfmsg(&h_d, HTX_HE_HARD_ERROR , rc , msg);
 						return (FAILURE);
 					}
@@ -3867,8 +3893,10 @@ int get_next_cpu(int thread_type, int test_case, int thread_no, int core_no) {
 	static int core_indexi_count[MAX_CORES_PER_CHIP] = {[0 ... (MAX_CORES_PER_CHIP -1)] = 1};
     static int cache_thread_count = 0;
 
-    if(system_information.pvr == POWER9_CUMULUS){
-        p9_cumulus_flag = 1;
+	if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+		if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+    	    p9_cumulus_flag = 1;
+		}
     }
 	core_num									= system_information.cores_in_instance[core_no];
 	if ( core_to_exclude(&(current_rule->exclude_cores[0]), core_num) == TRUE ) {
@@ -3930,8 +3958,10 @@ int get_num_threads(int instance_number, int test_case, int type, struct ruleinf
 	int num_threads = FAILURE;
 	int smt 		= 0;
 
-    if(system_information.pvr == POWER9_CUMULUS){
-        p9_cumulus_flag = 1;
+	if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+		if (system_information.p9_dd1_bit == DD1_FUSED_CORE){
+        	p9_cumulus_flag = 1;
+		}
     }
 	if ( (rule != NULL) || (is_empty_list(&(rule->exclude_cores[0]), MAX_CORES_PER_CHIP) != TRUE) ) {
 		num_threads = get_num_threads_for_rule(instance_number, test_case, type, rule);
@@ -4028,8 +4058,10 @@ int get_num_threads_for_rule(int instance_number, int test_case, int type, struc
 	int num_threads = 0;
 	int smt 		= 0;
   
-    if(system_information.pvr == POWER9_CUMULUS){
-        p9_cumulus_flag=1;
+	if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+		if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+    	    p9_cumulus_flag=1;
+		}
     }
 	if( type == PREFETCH ) {
 		switch ( test_case ) {

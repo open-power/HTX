@@ -48,12 +48,12 @@ int do_mem_operation(int);
 int do_rim_operation(int);
 int do_dma_operation(int);
 int get_mem_access_operation(int);
-int dump_miscompared_buffers(int,unsigned long,int,int,unsigned long *,int,int,int,struct segment_detail*);
 void release_thread_resources(int);
 void print_memory_allocation_seg_details(void);
 void* get_shm(void*);
 void* remove_shm(void*);
 void* mem_thread_function(void *);
+void* stats_update_thread_function(void*);
 int apply_filters(void);
 #ifdef __HTX_LINUX__
 void SIGUSR2_hdl(int, int, struct sigcontext *);
@@ -164,13 +164,15 @@ int mem_exer_opearation(){
 		}
 		/* consider strict local affinity to allocate memory*/
 		#ifndef __HTX_LINUX__
-		rc = system("vmo -o enhanced_affinity_vmpool_limit=-1");    
-		if(rc < 0){
-			displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"vmo -o enhanced_affinity_vmpool_limit=-1"
-			"failed errno %d rc = %d\n",errno,rc);
-			return(FAILURE);
+		 if ( g_data.test_type == MEM){
+			rc = system("vmo -o enhanced_affinity_vmpool_limit=-1");    
+			if(rc < 0){
+				displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"vmo -o enhanced_affinity_vmpool_limit=-1"
+				"failed errno %d rc = %d\n",errno,rc);
+				return(FAILURE);
+			}
+			displaym(HTX_HE_INFO,DBG_IMP_PRINT,"vmo -o enhanced_affinity_vmpool_limit=-1 rc = %d,errno =%d\n",rc,errno);
 		}
-		displaym(HTX_HE_INFO,DBG_IMP_PRINT,"vmo -o enhanced_affinity_vmpool_limit=-1 rc = %d,errno =%d\n",rc,errno);
         #endif
     	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Total threads to be created to get shared memory =%d\n",g_data.sys_details.tot_cpus);
 	}
@@ -209,6 +211,15 @@ int mem_exer_opearation(){
             displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:setpriority() failed with %d,while setting priority back to %d  errno:%d(%s)\n",
                  __LINE__,__FUNCTION__,rc,current_priority,errno,strerror(errno));
         }
+    }
+    pthread_t stats_th_tid;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    rc = pthread_create((pthread_t *)&stats_th_tid,&attr,stats_update_thread_function,NULL);
+    if(rc != 0){
+            displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:pthread_create failed with rc = %d (errno %d):(%s) while creating stats update thread"
+            "\ncontinuing without update of stats\n",__LINE__,__FUNCTION__,rc,errno,strerror(errno));
     }
 	displaym(HTX_HE_INFO,DBG_MUST_PRINT,"segment details logged into %s/mem_segment_details\n",g_data.htx_d.htx_exer_log_dir);
 	do {
@@ -449,7 +460,7 @@ int run_stanza_operation(){
 
     int fill_per_chip_segment_details(){
 
-        int pi,n,count=0;
+        int pi,n,count=0,rc = SUCCESS;
         unsigned long used_mem=0,std_seg_size,rem_seg_size=0;
         struct page_wise_seg_info *seg_details;
         struct mem_info* memptr = &g_data.sys_details.memory_details;
@@ -476,6 +487,16 @@ int run_stanza_operation(){
                     count++;
                     continue;
             }
+            /* Fabricbus exerciser specific path*/
+            if ( g_data.test_type == FABRICB){
+                    rc = fill_fabb_segment_details(n);
+                    if(rc != SUCCESS){
+                        displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:fill_fabb_segment_details() failed with rc = %d\n",__LINE__,__FUNCTION__,rc);
+                        return rc;
+                    }else{
+                        continue;
+                    }
+            } 
             for(pi = 0;pi<MAX_PAGE_SIZES;pi++){
                 if((mem_details_per_chip[n].memory_details.pdata[pi].supported == TRUE) && (mem_details_per_chip[n].memory_details.pdata[pi].free != 0)) {
                     if (pi < PAGE_INDEX_16G) {
@@ -591,9 +612,9 @@ int run_stanza_operation(){
             }
         }
         if(count == num_of_chips){
-            debug(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s:system configuration does't seems to be good, few chips have only cpus and few have only" 
+            print_partition_config(HTX_HE_SOFT_ERROR);
+            displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,"[%d]%s:system configuration does't seems to be good, few chips have only cpus and few have only" 
                 "memory, count=%d, num_of_chips=%d\n",__LINE__,__FUNCTION__,count,num_of_chips);
-            print_partition_config();
             return (FAILURE);
         }
         return (SUCCESS);
@@ -762,13 +783,13 @@ int run_stanza_operation(){
                     }
                 }
             }
-        #ifndef __HTX_LINUX__
-            if (mem_g.affinity == LOCAL ) {
-                rc = system("vmo -d enhanced_affinity_vmpool_limit");
-                displaym(HTX_HE_INFO,DBG_IMP_PRINT,"%s():vmo -d enhanced_affinity_vmpool_limit rc=%d \t errno =%d\n",\
-                __FUNCTION__,rc,errno);
-            }
-        #endif
+			#ifndef __HTX_LINUX__
+			if ( g_data.test_type == MEM){
+				rc = system("vmo -d enhanced_affinity_vmpool_limit");
+				displaym(HTX_HE_INFO,DBG_IMP_PRINT,"%s():vmo -d enhanced_affinity_vmpool_limit rc=%d \t errno =%d\n",\
+				__FUNCTION__,rc,errno);
+			}
+			#endif
         }else{
             tot_sys_threads = g_data.gstanza.global_num_threads;
             for(ti=0;ti<tot_sys_threads;ti++){
@@ -866,6 +887,7 @@ int run_stanza_operation(){
             rc = htx_unbind_thread();
         #endif
         }
+        pthread_exit((void *)0);
     }
     void* remove_shm(void* t){
 
@@ -907,6 +929,7 @@ int run_stanza_operation(){
                 seg_num += seg_inc;
             }
         }
+        pthread_exit((void *)0);
     }
 
     int allocate_buffers(int pi, int seg_num, struct shm_alloc_th_data *th){
@@ -1021,7 +1044,8 @@ int run_stanza_operation(){
             rc = shmctl(seg_details->shmid,IPC_RMID,(struct shmid_ds *) NULL);
             if (rc != 0) {
                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:(th:%d)shmctl failed with err:(%d)%s,for seg_num = %d,shm_id=%lu for page = %s"
-                "and segment_size = %lu \n",__LINE__,__FUNCTION__,th->thread_num,errno,strerror(errno),seg_num,seg_details->shmid,page_size_name[pi],seg_details->shm_size);
+                "and segment_size = %lu belongs to chip:%d\n",__LINE__,__FUNCTION__,th->thread_num,
+				errno,strerror(errno),seg_num,seg_details->shmid,page_size_name[pi],seg_details->shm_size,n);
                 return (FAILURE);
             }
             debug(HTX_HE_INFO,DBG_DEBUG_PRINT,"Released shared memory buffer %d id = %d, shm_memp = 0x%lx page size = %s\n",
@@ -1038,7 +1062,7 @@ int run_stanza_operation(){
         struct chip_mem_pool_info* chp = &g_data.sys_details.chip_mem_pool_data[0];
         struct page_wise_data *page_wise_details=NULL;
         struct page_wise_data *sys_page_wise_details=NULL;
-        int node,chip,core,lcpu,pi,seg,sys_chip_count = 0;
+        int node,chip,core,lcpu,pi,seg,sys_chip_count = 0,rc=SUCCESS;
         long long mem_in_use = 0;
         
         if(g_data.gstanza.global_disable_filters == 0){
@@ -1101,6 +1125,10 @@ int run_stanza_operation(){
                         if(!(page_wise_details[pi].supported) || (mf->node[node].chip[chip].mem_details.pdata[pi].page_wise_usage_mem == 0)){
                             continue;
                         }
+                        /*handling fabricbus case differently,as mem requirement is diffrent*/
+                        if ( g_data.test_type == FABRICB){
+                            continue;
+                        }
                         page_wise_details[pi].page_wise_usage_mem = mf->node[node].chip[chip].mem_details.pdata[pi].page_wise_usage_mem;
                         for(seg=0;seg<page_wise_details[pi].num_of_segments;seg++){
                             /*reset the segment size field with original value,which might have got modified by previous stanza mem filter*/
@@ -1126,6 +1154,19 @@ int run_stanza_operation(){
                     sys_chip_count++;
                 }
             } 
+			if ( g_data.test_type == FABRICB){
+				for(chip =0;chip< g_data.sys_details.num_chip_mem_pools;chip++){
+					for(pi=0;pi<MAX_PAGE_SIZES;pi++){
+						if(!(page_wise_details[pi].supported))continue;
+						rc = modify_fabb_shmsize_based_on_cpufilter(chip,pi);
+						if(rc != SUCCESS){
+							displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:modify_fabb_shmsize_based_on_cpufilter() failed "
+							   "with rc = %d\n",__LINE__,__FUNCTION__,rc);
+							return rc;
+						}	
+					}
+				}
+			}
         }else{
             int dma_mem_percent = g_data.stanza_ptr->mem_percent;
             int dma_cpu_percent = g_data.stanza_ptr->cpu_percent;
@@ -1267,6 +1308,19 @@ int run_stanza_operation(){
                     }
                     break;
 
+                case INTER_NODE:
+				case INTRA_NODE:
+					if ( g_data.test_type != FABRICB){
+						displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s: affinity setting to 'INTER_NODE' or 'INTRA_NODE' is supported only for HTX device names fabn,\nfabc "
+						"test cases respectively,modify rule file:%s and rerun\n",__LINE__,__FUNCTION__,g_data.rules_file_name);
+						return FAILURE;
+					}
+                    rc = fill_fabb_thread_structure(&chp[chip],start_thread_index);
+                    if(rc != SUCCESS){
+                        displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:fill_fabb_internode_thread_structure() returned rc = %d\n",__LINE__,__FUNCTION__,rc);
+                        return rc;
+                    }
+                    break;
                 case FLOATING:
                     g_data.stanza_ptr->disable_cpu_bind = 1;
                     rc = fill_affinity_based_thread_structure(&chp[chip],&chp[chip],start_thread_index);
@@ -1711,7 +1765,7 @@ int run_stanza_operation(){
                     main_misc_count++;
                     misc_detected++ ;
                     STATS_VAR_INC(bad_others, 1)
-                    STATS_HTX_UPDATE(UPDATE)
+                    /*STATS_HTX_UPDATE(UPDATE)*/
                 }
                 if (g_data.exit_flag == 1) {
                     goto update_exit;
@@ -1745,7 +1799,7 @@ int run_stanza_operation(){
                 STATS_VAR_INC(bytes_writ,((g_data.stanza_ptr->num_writes - nw) * sd.seg_size))
                 STATS_VAR_INC(bytes_read,((g_data.stanza_ptr->num_reads - nr) * sd.seg_size))
                 STATS_VAR_INC(bytes_read,((g_data.stanza_ptr->num_compares - nc - misc_detected) * sd.seg_size))
-                STATS_HTX_UPDATE(UPDATE)
+                /*STATS_HTX_UPDATE(UPDATE)*/
                 misc_detected = 0;
                 if (g_data.exit_flag == 1) {
                     return -1;
@@ -1838,7 +1892,7 @@ int run_stanza_operation(){
                     main_misc_count++;
                     misc_detected++ ;
                     STATS_VAR_INC(bad_others, 1)
-                    STATS_HTX_UPDATE(UPDATE)
+                    /*STATS_HTX_UPDATE(UPDATE)*/
                 }
                 if (g_data.exit_flag == 1) {
                     goto update_exit;
@@ -1870,7 +1924,7 @@ int run_stanza_operation(){
 
             update_exit:
                 STATS_VAR_INC(bytes_writ,((g_data.stanza_ptr->num_writes - nw - misc_detected) * WRC * sd.seg_size))
-                STATS_HTX_UPDATE(UPDATE)
+                /*STATS_HTX_UPDATE(UPDATE)*/
                 misc_detected = 0;
                 if (g_data.exit_flag == 1) {
                     return -1;
@@ -1883,7 +1937,7 @@ int run_stanza_operation(){
 
     int do_dma_operation(int t){
         int  num_oper,miscompare_count,seg,pi=0,rc=0,misc_detected = 0; /* pi is pattern index */
-        int  chars_read,fildes,file_size,mode_flag;
+        int  chars_read,fildes,file_size=0,mode_flag;
         static int main_misc_count=0;
         struct segment_detail sd;
         struct thread_data* th = &g_data.thread_ptr[t];
@@ -1996,8 +2050,8 @@ int run_stanza_operation(){
                                 "properly patt_size=%d,file_size =%d, chars_read =%d, err=%d, page size =%s,seg_num=%ld\n", __LINE__,
                                 __FUNCTION__,t,g_data.stanza_ptr->pattern_name[0],pat_size,file_size,chars_read,errno,page_size_name[sd.page_index],seg);
                                 return(FAILURE);
-                            }else{/* If we dont update time stamp of htx, mem may result in hungi(with mdt.bu),due to heavy sys call read() operation*/
-                                STATS_HTX_UPDATE(UPDATE)
+                            }else{/* If we dont update time stamp of htx, mem may result in hung(with mdt.bu),due to heavy sys call read() operation*/
+                                STATS_VAR_INC(bytes_writ,chars_read)
                             }	
                             /* Now we have successfully read chars_read bytes */
                             total_bytes_read += chars_read;
@@ -2047,14 +2101,14 @@ int run_stanza_operation(){
                         main_misc_count++;
                         misc_detected++ ;
                         STATS_VAR_INC(bad_others, 1)
-                        STATS_HTX_UPDATE(UPDATE)
+                        /*STATS_HTX_UPDATE(UPDATE)*/
                     }
                 }/* end of while(nw>0 || nr>0 || nc>0)*/
                 update_exit:
                 STATS_VAR_INC(bytes_writ,((g_data.stanza_ptr->num_writes - nw) * sd.seg_size))
                 STATS_VAR_INC(bytes_read,((g_data.stanza_ptr->num_reads - nr) * sd.seg_size))
                 STATS_VAR_INC(bytes_read,((g_data.stanza_ptr->num_compares - nc - misc_detected) * sd.seg_size))
-                STATS_HTX_UPDATE(UPDATE)
+                /*STATS_HTX_UPDATE(UPDATE)*/
                 misc_detected = 0;
                 if (g_data.exit_flag == 1) {
                     return -1;
@@ -2112,7 +2166,7 @@ int run_stanza_operation(){
             sprintf(msg_text,"MEMORY MISCOMPARE(hxemem64) in stanza %s,num_oper = %d,Rules file=%s\n"
                     "Segment deatils:   seg#:%lu shm  id:%lu\nShared memory Segment Starting EA=0x%p,\n"
                     "size = %lu \nShared memory segment consists of pages of size =%s\n"
-                    "read/write width = %d, Trap_Flag = %d Sub-Segment Number=%d, Thread=%d,num_of_threads=%d\n"
+                    "read/write width = %d, Trap_Flag = %d Sub-Segment Number=%lu, Thread=%d,num_of_threads=%d\n"
                     "(Ignore if affinity=FLOATING)hip  details: cpu:%d belongs to chip:%d, Memory  belongs to chip= %d\n"
                     "Miscompare Offset in the Shared memory segment is (%ld x %d) %ld bytes from the "
                     "starting location,\nData expected = 0x%lx\nData retrieved: ",
@@ -2274,12 +2328,11 @@ int run_stanza_operation(){
         int pi,n,seg;
         struct chip_mem_pool_info *chip = &g_data.sys_details.chip_mem_pool_data[0];
         struct mem_info *sys_mem_details = &g_data.sys_details.memory_details;
-        
         if(g_data.gstanza.global_disable_filters == 0){
             for(n = 0; n <g_data.sys_details.num_chip_mem_pools;n++){
                 if(!chip[n].has_cpu_and_mem)continue;
                 for(pi = 0;pi<MAX_PAGE_SIZES;pi++){
-                    for(seg=0;seg<chip[n].memory_details.pdata[pi].in_use_num_of_segments;seg++){
+                    for(seg=0;seg<chip[n].memory_details.pdata[pi].num_of_segments;seg++){
                         if(chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].in_use){
                             chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].owning_thread = -1;
                             chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].in_use =0;
@@ -2290,7 +2343,7 @@ int run_stanza_operation(){
             }
         }else{
             for(pi = 0;pi<MAX_PAGE_SIZES;pi++){
-                for(seg=0;seg< sys_mem_details->pdata[pi].in_use_num_of_segments;seg++){
+                for(seg=0;seg< sys_mem_details->pdata[pi].num_of_segments;seg++){
                     if(sys_mem_details->pdata[pi].page_wise_seg_data[seg].in_use){
                         sys_mem_details->pdata[pi].page_wise_seg_data[seg].owning_thread = -1;
                         sys_mem_details->pdata[pi].page_wise_seg_data[seg].in_use =0;
@@ -2609,7 +2662,7 @@ int log_mem_seg_details(){
 			fprintf(fp,"========================================================================"
 						"========================================================================\n");
 			for(pi = 0;pi<MAX_PAGE_SIZES;pi++){
-				for(seg=0;seg<chip[n].memory_details.pdata[pi].in_use_num_of_segments;seg++){
+				for(seg=0;seg<chip[n].memory_details.pdata[pi].num_of_segments;seg++){
 					if(!chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].in_use)continue;
 						if(g_data.stanza_ptr->disable_cpu_bind == 0 && chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].owning_thread != -1){
 							bind_cpu = g_data.thread_ptr[chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].owning_thread].bind_proc;
@@ -2621,7 +2674,7 @@ int log_mem_seg_details(){
 							chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].mem_chip_num,
 							chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].shmid,
 							chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].shm_size,
-							chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].shm_mem_ptr);
+							(unsigned long long)chip[n].memory_details.pdata[pi].page_wise_seg_data[seg].shm_mem_ptr);
 				}
 			}
 		}
@@ -2641,7 +2694,7 @@ int log_mem_seg_details(){
 						sys_mem_details->pdata[pi].page_wise_seg_data[seg].mem_chip_num,
 						sys_mem_details->pdata[pi].page_wise_seg_data[seg].shmid,
 						sys_mem_details->pdata[pi].page_wise_seg_data[seg].shm_size,
-						sys_mem_details->pdata[pi].page_wise_seg_data[seg].shm_mem_ptr);
+						(unsigned long long)sys_mem_details->pdata[pi].page_wise_seg_data[seg].shm_mem_ptr);
 			}
 		}
 	}
@@ -2649,4 +2702,35 @@ int log_mem_seg_details(){
                 "****************************************************************************\n");
     fclose(fp);
     return SUCCESS;
+}
+
+void* stats_update_thread_function(void* null_ptr){
+    int t=0;
+    for(;;){
+        while((t++) < STATS_UPDATE_INTERVAL){
+            sleep(1);
+            if (g_data.exit_flag == 1) {
+                break;
+            }
+        }
+
+        pthread_mutex_lock(&g_data.tmutex);
+        g_data.htx_d.bytes_writ = g_data.nest_stats.bytes_writ;
+        g_data.htx_d.bytes_read = g_data.nest_stats.bytes_read;
+        g_data.htx_d.bad_others = g_data.nest_stats.bad_others;
+        /*Reset nest stats variables*/
+        g_data.nest_stats.bytes_writ = 0;
+        g_data.nest_stats.bytes_read = 0;
+        g_data.nest_stats.bad_others = 0;
+        pthread_mutex_unlock(&g_data.tmutex);
+
+        if((g_data.htx_d.bytes_writ > 0) || (g_data.htx_d.bytes_read > 0) || (g_data.htx_d.bad_others > 0)){
+            STATS_HTX_UPDATE(UPDATE);
+        }
+        if (g_data.exit_flag == 1) {
+            pthread_exit((void *)0);
+        }
+        t = 0;
+    }
+
 }

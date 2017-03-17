@@ -73,6 +73,7 @@
 #define MAX_MEM_PERCENT     99          /* Not implemented */
 #define MAX_CPU_PERCENT   	100
 #define DEFAULT_DELAY       90
+#define STATS_UPDATE_INTERVAL 30
 #define ADDR_PAT_SIGNATURE  0x414444525F504154  /* Hex equiv of "ADDR_PAT" */
 #define RAND_PAT_SIGNATURE  0x52414E445F504154  /* Hex equiv of "RAND_PAT" */
 
@@ -83,6 +84,12 @@
 #define KB                  1024
 #define MB                  ((unsigned long long)(1024*KB))
 #define GB                  ((unsigned long long)(1024*MB))
+
+#define POWER8_MURANO        0x4b
+#define POWER8_VENICE        0x4d
+#define POWER9_NIMBUS        0x4e
+#define POWER9_CUMULUS       0x4f
+#define POWER8P_GARRISION    0x4c
 
 /* Page indexes  0 - Index for page size 4k, 1 -Index for page size 64k,
  * 2 - Index for page size 2M,3 - Index for page size 16M,4 - Index for page size 16G
@@ -116,7 +123,7 @@
 
 #define STATS_VAR_INC(var, val) \
     pthread_mutex_lock(&g_data.tmutex);\
-    g_data.htx_d.var += val; \
+    g_data.nest_stats.var += val; \
     pthread_mutex_unlock(&g_data.tmutex);
 
 #define STATS_VAR_INIT(var, val) \
@@ -124,7 +131,8 @@
     g_data.htx_d.var = val; \
     pthread_mutex_unlock(&g_data.tmutex);
 
-#ifndef __HTX_LINUX__
+/*#ifndef __HTX_LINUX__*/
+#if 0
     #define STATS_HTX_UPDATE(stage)\
         pthread_mutex_lock(&g_data.tmutex); \
         hxfupdate(stage,&g_data.htx_d); \
@@ -437,6 +445,27 @@ struct mem_exer_info {
     unsigned long total_segments;
     int shm_cleanup_done;
 };
+
+/*fabric bus exerciser specific structures*/
+struct dest_chip_details{
+	long chip_num;
+	long seg_num;
+};
+
+struct fabb_exer_info {/* RFB1: keep a pointer of this strucure in global str*/
+    unsigned long seg_size;
+    long          fab_chip_L3_sz[MAX_CHIPS];
+    unsigned long segs_per_chip[MAX_CHIPS];
+    struct dest_chip_details dest_chip[MAX_CPUS];
+
+};
+
+struct nest_stats_info {
+    unsigned long bytes_writ;
+    unsigned long bytes_read;
+    unsigned long bad_others;
+
+};
 /*******************************************************
 *GLOBAL structure:									   *
 *******************************************************/
@@ -463,7 +492,8 @@ struct nest_global {
 	struct rule_info *stanza_ptr;				/* current rule staza pointer*/
 	struct htx_data htx_d;
 	struct sys_info sys_details;				/*syscfg library provided system information*/
-    
+
+    struct nest_stats_info nest_stats;    
 
 	void* test_type_ptr;						/* dynamic pointer to any of test function structers*/
 	struct thread_data *thread_ptr;
@@ -484,7 +514,7 @@ struct nest_global {
 int test_var;
 
 int fill_exer_huge_page_requirement(void);
-void print_partition_config(void);
+void print_partition_config(int);
 int displaym(int,int , const char *,...);
 int read_rules(void);
 int mem_exer_opearation(void);
@@ -497,7 +527,9 @@ void get_cache_details(void);
 int get_system_details(void);
 int apply_process_settings(void);
 int modify_shared_mem_limits_linux(unsigned long);
-
+int dump_miscompared_buffers(int,unsigned long,int,int,unsigned long *,int,int,int,struct segment_detail*);
+int parse_cpu_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
+int parse_mem_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
 #ifdef __HTX_LINUX__
 extern void SIGUSR2_hdl(int, int, struct sigcontext *);
 #endif
@@ -550,17 +582,28 @@ int rand_operation_rim_dword(int,void *,void *,int,void *,void *,void *,void*);
 int rand_operation_rim_word(int,void *,void *,int,void *,void *,void *,void*);
 int rand_operation_rim_byte(int,void *,void *,int,void *,void *,void *,void*);
 
+unsigned long get_random_no_64(unsigned long*);
+unsigned int  get_random_no_32(unsigned long*);
+unsigned char get_random_no_8(unsigned long*);
+
 /*nstride operation related functions*/
 int do_stride_operation(int);
-int write_dword(void*, int,int,int, unsigned int*);
+int write_dword(void*, int,int,int, unsigned long*);
 int read_dword(void*,int,int);
-int read_comp_dword(void*,int,int, int, unsigned int*,int,struct segment_detail*);
-int write_word(void*,int,int,int,unsigned int*);
+int read_comp_dword(void*,int,int, int, unsigned long*,int,struct segment_detail*);
+int write_word(void*,int,int,int,unsigned long*);
 int read_word(void*,int,int);
-int read_comp_word(void*,int,int,int,unsigned int*,int,struct segment_detail*);
-int write_byte(void*,int,int,int,unsigned int*);
+int read_comp_word(void*,int,int,int,unsigned long*,int,struct segment_detail*);
+int write_byte(void*,int,int,int,unsigned long*);
 int read_byte(void*,int,int);
-int read_comp_byte(void*,int,int,int,unsigned int*,int,struct segment_detail*);
+int read_comp_byte(void*,int,int,int,unsigned long*,int,struct segment_detail*);
+
+/*fabricbus specific modules*/
+int set_fabricb_exer_page_preferances(void);
+int memory_segments_calculation(void);
+int fill_fabb_segment_details(int);
+int modify_fabb_shmsize_based_on_cpufilter(int,int);
+int fill_fabb_thread_structure(struct chip_mem_pool_info*,int);
 #ifdef __HTX_LINUX__
 int do_trap_htx64 (unsigned long arg1,
                        unsigned long arg2,

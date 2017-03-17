@@ -1,10 +1,24 @@
 #!/bin/bash
+# IBM_PROLOG_BEGIN_TAG 
+# This is an automatically generated prolog. 
+#  
+# htxubuntu src/htx/usr/lpp/htx/setup/mem.setup 1.5.4.36 
+#  
+# Licensed Materials - Property of IBM 
+#  
+# COPYRIGHT International Business Machines Corp. 2010 
+# All Rights Reserved 
+#  
+# US Government Users Restricted Rights - Use, duplication or 
+# disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
+#  
+# IBM_PROLOG_END_TAG 
 ###### This script is used to collect the required memory statistics for hxemem64 exerciser.
 ###### Collect the large and huge page memory required memory statistics 
 ###### into the file ${HTX_LOG_DIR}/freepages
 echo "Entering mem.setup.." >> $HTXNoise
 proc_ver=`grep 'Processor Version' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $4 }'`
-echo "proc_ver=$proc_ver" >> $HTXNoise
+echo "mem.setup:proc_ver=$proc_ver" >> $HTXNoise
 
 if [[ "$proc_ver" != "0x4e" && "$proc_ver" != "0x4f" ]]
 then
@@ -54,6 +68,12 @@ then
         cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxemem64_new
         cp ${HTXBIN}/hxetlbie ${HTXBIN}/hxemem64
     fi
+else
+	if [ ! -x ${HTXBIN}/hxefabricbus.old ]
+	then
+		mv ${HTXBIN}/hxefabricbus ${HTXBIN}/hxefabricbus.old
+		cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxefabricbus
+	fi
 fi
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
 if [[ $Hugepagesize -lt 2048 ]]
@@ -325,7 +345,7 @@ echo "mem_16M=$mem_16M" >>  ${HTX_LOG_DIR}/freepages
 echo "cache_16M=$cache_16M" >>  ${HTX_LOG_DIR}/freepages
 echo "tlbie_16M=$tlbie_16M" >> ${HTX_LOG_DIR}/freepages
 #Increasing /proc/sys/kernel/shmmax value to 1GB,considering cache exer worst case requirement for chip with 16cores.
-echo "Setting /proc/sys/kernel/shmmax to 1GB"
+echo "mem.setup:Setting /proc/sys/kernel/shmmax to 1GB"
 echo 1073741824 > /proc/sys/kernel/shmmax
 
 # Writing $shmall_4K to /proc/sys/kernel/shmall
@@ -336,6 +356,6 @@ total_mem=`cat /proc/meminfo | grep MemTotal | awk '{print $2}'`
 shmall_new=`expr $total_mem \* 9 / 10` # Taking 90% of total memory.
 shmall_4K=`expr $shmall_new / 4`  # in terms of 4K
 
-echo "Writing $shmall_4K to /proc/sys/kernel/shmall"
+echo "mem.setup:Writing $shmall_4K to /proc/sys/kernel/shmall"
 echo $shmall_4K > /proc/sys/kernel/shmall
 echo "Exiting mem.setup.." >> $HTXNoise
