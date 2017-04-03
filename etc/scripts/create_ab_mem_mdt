@@ -2,33 +2,19 @@
 
 proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
 proc_ver_dec=`printf %d $proc_ver`
-P6Compatmode=`cat ${HTX_LOG_DIR}/htx_syscfg | grep -i Power6Compatmode | awk -F: '{print $2}'|sed -e 's/^ *//' `
 
-if [[ $proc_ver_dec -ge 63 && $P6Compatmode = "False" ]] # Shifts for P7 & above
+mdt="mdt.mem_inter_node"
+rule="default.inter_node"
+device="fabn"
+echo "Creating mdt.mem_inter_node"
+
+if [[ $proc_ver_dec -ge 78 ]]
 then
-	if [[ $proc_ver_dec -ge 78 ]]
-	then
-    	create_my_mdt mem:default.mfg 							> ${HTXMDT}/mdt.mem_inter_node
-		rule="default.inter_node"
-		device="fabn"
-        mdt="mdt.mem_inter_node"
-        echo "Creating mdt.mem_inter_node"
-	else
-        # Print the memory configure
-        ${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.ab query_memconf >/dev/null 2>&1
-		create_my_mdt mem:memmfg 								> ${HTXMDT}/mdt.ab_mem
-		rule="default.ab"
-		device="ablink"
-        mdt="mdt.ab_mem"
-        echo "Creating mdt.ab_mem ..."
-	fi
+    create_my_mdt mem:default.mfg 							> ${HTXMDT}/${mdt}
 else
-    cat ${HTXMDT}/mdt.mem  							> ${HTXMDT}/mdt.ab_mem
-	rule="default.ab"
-    device="ablink"
-    mdt="mdt.ab_mem"
-    echo "Creating mdt.ab_mem ..."
+    create_my_mdt mem:memmfg 								> ${HTXMDT}/${mdt}
 fi
+
 echo 											>> ${HTXMDT}/${mdt}
 echo "$device:"										>> ${HTXMDT}/${mdt}
 echo -e "\tHE_name = \"hxefabricbus\"                	"				>> ${HTXMDT}/${mdt}

@@ -18,317 +18,303 @@
 # limitations under the License.
 #
 # IBM_PROLOG_END_TAG
+echo "Entering devconfig..." >> ${HTXNoise}
+proc_ver=`grep Version ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}'`
+proc_ver_dec=`printf %d $proc_ver`
+shared_proc_mode=`grep shared_processor_mode ${HTX_LOG_DIR}/htx_syscfg | awk '{print $3}'`
 
-  proc_ver=`grep Version ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}'`
-  proc_ver_dec=`printf %d $proc_ver`
-  shared_proc_mode=`grep shared_processor_mode ${HTX_LOG_DIR}/htx_syscfg | awk '{print $3}'`
+echo "Creating mdt files. Please wait a moment."
+cat /dev/null | ${HTXSCRIPTS}/htxconf.awk > ${HTXMDT}/mdt.all
+
+# Below logic is to avoid adding any hxediag stanza to any of the shift mdts.
+# For that, hxediag is removed from mdt.all at first place before creating 
+# other mdts out of it. After all shift mdts are created, original mdt.all
+# is restored so that only mdt.all still has hxediag stanzas. 
+cp ${HTXMDT}/mdt.all ${HTXMDT}/mdt.everything
+cat ${HTXMDT}/mdt.everything | create_mdt_without_devices.awk eth > ${HTXMDT}/mdt.all
+
+ln -sf ${HTXMDT}mdt.all ${HTXMDT}mdt.bu
+echo "mdt.bu created ..."
+
+# When BTF_SHIFT_ENV is exported to 1 (which happens from runstx with -x), we
+# call build_net bpt and mdt_net with mdt.bu. This will add all the enabled eth
+# interfaces to mdt.bu. So, when all other shift mdts are created from mdt.bu, 
+# they will have eth devices in them.
+if [[ $BTF_SHIFT_ENV -eq 1 ]];
+then
+    echo "Setting up shift automation for hxecom"
+    /usr/bin/build_net bpt y n ${HTX_LOG_DIR}/networks 2>> ${HTXNoise}
+    ${HTXSCRIPTS}/mdt_net mdt.bu
+fi
+
+cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk  sctu > ${HTXMDT}mdt.sctu
+cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk fpu cache cpu rng tlbie > ${HTXMDT}mdt.cpu
+cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk sctu mem tlbie fpu cache cpu rng > ${HTXMDT}mdt.io
+
+afu_dev=`ls /dev/cxl/ 2>/dev/null | awk '/afu[0-9].[0-9]d/ { print $1 }'`
   
-  echo "Creating mdt files. Please wait a moment."
-  cat /dev/null | ${HTXSCRIPTS}/htxconf.awk > ${HTXMDT}mdt.all
-
-  # Below logic is to avoid adding any hxediag stanza to any of the shift mdts.
-  # For that, hxediag is removed from mdt.all at first place before creating 
-  # other mdts out of it. After all shift mdts are created, original mdt.all
-  # is restored so that only mdt.all still has hxediag stanzas. 
-  cp ${HTXMDT}/mdt.all ${HTXMDT}/mdt.everything
-  cat ${HTXMDT}/mdt.everything | create_mdt_without_devices.awk eth > ${HTXMDT}/mdt.all
-
-  ln -sf ${HTXMDT}mdt.all ${HTXMDT}mdt.bu
-
-  # When BTF_SHIFT_ENV is exported to 1 (which happens from runstx with -x), we
-  # call build_net bpt and mdt_net with mdt.bu. This will add all the enabled eth
-  # interfaces to mdt.bu. So, when all other shift mdts are created from mdt.bu, 
-  # they will have eth devices in them.
-  if [[ $BTF_SHIFT_ENV -eq 1 ]];
-  then
-      echo "Setting up shift automation for hxecom"
-      /usr/bin/build_net bpt y n ${HTX_LOG_DIR}/networks 2> /dev/null
-      ${HTXMDT}/mdt_net mdt.bu
-  fi
-
-
-  cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk  sctu > ${HTXMDT}mdt.sctu
-  cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk  fpu cache cpu rng tlbie > ${HTXMDT}mdt.cpu
-  cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk sctu mem tlbie fpu cache cpu rng > ${HTXMDT}mdt.io
-
-  afu_dev=`ls /dev/cxl/ 2>/dev/null | awk '/afu[0-9].[0-9]d/ { print $1 }'`
-  
-  if [[ "$afu_dev" != "" ]];
-  then
+if [[ "$afu_dev" != "" ]];
+then
     # Create mdt.memcopy stanza for afu dedicated mode
     create_my_mdt afu[0-9].[0-9]d:default > ${HTXMDT}/mdt.memcopy
-  fi	
- 
-  if [ $proc_ver_dec -ge 63  ]; # Shifts for P7 & above
-  then
+fi	
 
-	if [ $proc_ver_dec -ge 74  ]; # RNG Shifts for P7+ and above.
-	then
-		create_my_mdt rng:rules.default > ${HTXMDT}mdt.rng
-		cp ${HTXMDT}mdt.io ${HTXMDT}mdt.ci
-		cat ${HTXMDT}/mdt.rng | create_mdt_without_devices.awk default >> ${HTXMDT}mdt.ci
-	fi
 
-	# Set cache rulefile based on architecture. 
-	if [ $proc_ver_dec -le 74 ];
-	then
-		cache_sw_prefetch_rf="default.sw_prefetch"
-		cache_rf="default.p7"
-	else
-		cache_sw_prefetch_rf="default.sw_prefetch.p8"
-		cache_rf="default.p8"
-	fi
 
-	create_my_mdt cache:rules.noprefetch > ${HTXMDT}/mdt.cache.noprefetch
-	create_my_mdt cache:$cache_sw_prefetch_rf > ${HTXMDT}/mdt.cache.sw_prefetch
-	create_my_mdt cache:rules.l2_and_l3_bounce > ${HTXMDT}/mdt.cache.l2_and_l3_bounce
+# Set cache rulefile based on architecture. 
+if [ $proc_ver_dec -le 74 ];
+then
+	cache_sw_prefetch_rf="default.sw_prefetch"
+	cache_rf="default.p7"
+else
+	cache_sw_prefetch_rf="default.sw_prefetch.p8"
+	cache_rf="default.p8"
+fi
+
+
+if [ -f ${HTX_LOG_DIR}/mpath_parts ]; then
+    hxestorage_default=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+    hxestorage_buster=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+    hxestorage_easytier=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
+    hxestorage_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+    hxestorage_comm_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`
+    hxestorage_comm_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
+    hxestorage_app_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
+    hxestorage_web_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
+    hxestorage_hpc_comp_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
+    hxestorage_hpc_io_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
+    hxestorage_business_int_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
+    hxestorage_business_int_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
+    hxestorage_4K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
+    hxestorage_4K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
+    hxestorage_256K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
+    hxestorage_256K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
+    hxestorage_4K_rand_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
+    hxestorage_4K_rand_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
+    hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
+    hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
+    hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
+else
+    hxestorage_default=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart  2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+    hxestorage_buster=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
+    hxestorage_easytier=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
+    hxestorage_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:hd.cache ",$0)}'`
+    hxestorage_comm_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`
+    hxestorage_comm_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
+    hxestorage_app_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
+    hxestorage_web_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
+    hxestorage_hpc_comp_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
+    hxestorage_hpc_io_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
+    hxestorage_business_int_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
+    hxestorage_business_int_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
+    hxestorage_4K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
+    hxestorage_4K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
+    hxestorage_256K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
+    hxestorage_256K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
+    hxestorage_4K_rand_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
+    hxestorage_4K_rand_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
+    hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
+    hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
+    hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
+fi
+
+#Remove all storage mdts first and then create them fresh
+rm ${HTXMDT}/mdt.hd 2>/dev/null
+rm ${HTXMDT}/mdt.hdbuster 2>/dev/null
+rm ${HTXMDT}/mdt.easytier 2>/dev/null
+rm ${HTXMDT}/mdt.hd.cache 2>/dev/null
+rm ${HTXMDT}/mdt.comm_db_opk 2>/dev/null
+rm ${HTXMDT}/mdt.hpc_io_node 2>/dev/null
+rm ${HTXMDT}/mdt.business_int_db_opk 2>/dev/null
+rm ${HTXMDT}/mdt.storage_4K_seq_write 2>/dev/null
+rm ${HTXMDT}/mdt.storage_4K_seq_read 2>/dev/null
+rm ${HTXMDT}/mdt.storage_256K_seq_write 2>/dev/null
+rm ${HTXMDT}/mdt.storage_256K_seq_read 2>/dev/null
+rm ${HTXMDT}/mdt.storage_4K_rand_write 2>/dev/null
+rm ${HTXMDT}/mdt.storage_4K_rand_read 2>/dev/null
+rm ${HTXMDT}/mdt.camss_cloud 2>/dev/null
+rm ${HTXMDT}/mdt.camss_video_streaming 2>/dev/null
+rm ${HTXMDT}/mdt.camss_med_imaging 2>/dev/null
 	
-  	if [ $proc_ver_dec -ge 78 ]; then
-		create_my_mdt mem:default.mfg.nodelay > ${HTXMDT}/mdt.mem
-		create_my_mdt mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_tlbie
-	else
-		create_my_mdt mem:memmfg.nodelay > ${HTXMDT}/mdt.mem
-		create_my_mdt mem:memmfg.nodelay tlbie: > ${HTXMDT}/mdt.mem_tlbie		
-	fi
-	create_my_mdt mem:mem_16m_hwpf > ${HTXMDT}/mdt.mem.hw_prefetch
-	create_my_mdt mem:rules.dl1_reloads_from_caches > ${HTXMDT}/mdt.mem.dl1_reloads_from_caches
-	create_my_mdt mem:rules.max_cache_hit > ${HTXMDT}/mdt.mem.max_cache_hit
-	create_my_mdt mem:rules.max_cache_miss > ${HTXMDT}/mdt.mem.max_cache_miss
+if [ "$hxestorage_default" != "" ];
+then
+	echo "[devconfig]Creating storage exerciser specific mdts..." >> $HTXNoise
+	create_my_mdt $hxestorage_default> ${HTXMDT}/mdt.hd
+	create_my_mdt $hxestorage_buster> ${HTXMDT}/mdt.tmp
+	cat ${HTXMDT}/mdt.tmp $* | \
+	sed 's/default\.hdd/hdd\.buster/' | sed 's/default\.ssd/ssd\.buster/' > ${HTXMDT}/mdt.hdbuster
+	rm ${HTXMDT}/mdt.tmp
+	create_my_mdt $hxestorage_easytier> ${HTXMDT}/mdt.easytier
+	create_my_mdt $hxestorage_cache> ${HTXMDT}/mdt.hd.cache
+	create_my_mdt $hxestorage_comm_db_opk > ${HTXMDT}/mdt.comm_db_opk
+	create_my_mdt $hxestorage_hpc_io_node > ${HTXMDT}/mdt.hpc_io_node
+	create_my_mdt $hxestorage_business_int_db_opk > ${HTXMDT}/mdt.business_int_db_opk
+	create_my_mdt $hxestorage_4K_seq_write > ${HTXMDT}/mdt.storage_4K_seq_write
+	create_my_mdt $hxestorage_4K_seq_read > ${HTXMDT}/mdt.storage_4K_seq_read
+	create_my_mdt $hxestorage_256K_seq_write > ${HTXMDT}/mdt.storage_256K_seq_write
+	create_my_mdt $hxestorage_256K_seq_read > ${HTXMDT}/mdt.storage_256K_seq_read
+	create_my_mdt $hxestorage_4K_rand_write > ${HTXMDT}/mdt.storage_4K_rand_write
+	create_my_mdt $hxestorage_4K_rand_read > ${HTXMDT}/mdt.storage_4K_rand_read
+fi
 	
-	if [ $proc_ver_dec -ge 78 ]; then	
-		create_my_mdt sctu: cache:$cache_rf mem:default.char tlbie:tlbie > ${HTXMDT}/mdt.nest
-	else
-		create_my_mdt sctu: cache:$cache_rf mem:memmfg tlbie:tlbie > ${HTXMDT}/mdt.nest
-	fi
-	create_my_mdt sctu:rules.CacheBias > ${HTXMDT}/mdt.cachebias
-	create_my_mdt tlbie: > ${HTXMDT}/mdt.tlbie
-	
-	# Create mdt.mem_nest having reduced sctu devices.
-	# sctu devices created are half compared to sctu devices in mdt.bu
-        echo "Creating mdt.mem_nest ..."
-	if [ $proc_ver_dec -ge 78 ]; then
-		create_my_mdt cache:$cache_sw_prefetch_rf mem:default.mfg > ${HTXMDT}/mdt.mem_nest
-	else
-		create_my_mdt cache:$cache_sw_prefetch_rf mem:memmfg > ${HTXMDT}/mdt.mem_nest
-	fi
-	create_my_sctu_stanzas.awk MEM_NEST >> ${HTXMDT}/mdt.mem_nest
-    
-	# Create mdt.bu.characterization having only 1 sctu server per gang.
-	# Number of sctu servers per gang is reduced to get optimum fmax results.
-	if [ $proc_ver_dec -ge 78 ]; then
-		create_my_mdt fpu:fpu_cpu_combo.p8 mem:default.char nvidia:default.char > ${HTXMDT}/mdt.bu_char
-	else
-		create_my_mdt fpu:fpu_cpu_combo.p8 mem:memmfg nvidia:default.char > ${HTXMDT}/mdt.bu_char
-	fi	
-	cat ${HTXMDT}mdt.bu | create_mdt_without_devices.awk default cpu fpu sctu mem >> ${HTXMDT}/mdt.bu_char
-	create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu_char
-
-	cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk sctu > ${HTXMDT}mdt.bu.characterization
-	create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu.characterization
-	echo >> ${HTXMDT}mdt.bu.characterization
-
-	if [[ "$shared_proc_mode" = "no" ]];
-	then
-		num_nodes=`awk -F : '/Number of nodes/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg`
-		if [ $num_nodes -gt 1 ]
-		then
-			echo "Creating mdt.sctu.InterNode ..."
-			cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk > ${HTXMDT}mdt.sctu.InterNode
-			create_my_sctu_stanzas.awk INTERNODE >> ${HTXMDT}mdt.sctu.InterNode
-		fi
-
-		#Background for SCTU chip and node mdts
-		${HTXBIN}/hxesctu SCTU_DEV
-		create_my_mdt default > ${HTXMDT}/mdt.sctu.chip
-		cp ${HTXMDT}/mdt.sctu.chip ${HTXMDT}/mdt.sctu.node
-
-		# Creating sctu devices in chip and node mdts.
-		echo "Creating mdt.sctu.chip ..."
-		create_my_sctu_stanzas.awk CHIP >> ${HTXMDT}/mdt.sctu.chip
-		echo "Creating mdt.sctu.node ..."
-		create_my_sctu_stanzas.awk NODE >> ${HTXMDT}/mdt.sctu.node
-	fi
-
-
-	create_my_mdt fpu: cpu:rules.default > ${HTXMDT}/mdt.core
-	# assuming core.GB (which is derived out of mdt.core_wo_cpu) does not run on P7 system. (hardcoding rulefile to fpu_cpu_combo.p8)
-	create_my_mdt fpu:fpu_cpu_combo.p8 > ${HTXMDT}/mdt.core_wo_cpu
-	
-	if [ -f ${HTX_LOG_DIR}/mpath_parts ]; then
-		hxestorage_default=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_buster=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_easytier=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
-		hxestorage_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_comm_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`
-		hxestorage_comm_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
-		hxestorage_app_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
-		hxestorage_web_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
-		hxestorage_hpc_comp_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
-		hxestorage_hpc_io_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
-		hxestorage_business_int_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
-		hxestorage_business_int_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
-		hxestorage_4K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
-		hxestorage_4K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
-		hxestorage_256K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
-		hxestorage_256K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
-		hxestorage_4K_rand_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
-		hxestorage_4K_rand_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
-		hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
-		hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
-		hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
-	else
-		hxestorage_default=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_buster=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
-		hxestorage_easytier=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:easytier ",$0)}'`
-		hxestorage_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:hd.cache ",$0)}'`
-		hxestorage_comm_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_opk ",$0)}'`		
-		hxestorage_comm_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.comm_db_pk ",$0)}'`
-		hxestorage_app_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.app_server ",$0)}'`
-		hxestorage_web_server=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.web_server ",$0)}'`
-		hxestorage_hpc_comp_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_comp_node ",$0)}'`
-		hxestorage_hpc_io_node=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.hpc_io_node ",$0)}'`
-		hxestorage_business_int_db_pk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_pk ",$0)}'`
-		hxestorage_business_int_db_opk=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.business_int_db_opk ",$0)}'`
-		hxestorage_4K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_write ",$0)}'`
-		hxestorage_4K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.4K_seq_read ",$0)}'`
-		hxestorage_256K_seq_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_write ",$0)}'`
-		hxestorage_256K_seq_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rule.256K_seq_read ",$0)}'`
-		hxestorage_4K_rand_write=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.WR_IOPs ",$0)}'`
-		hxestorage_4K_rand_read=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:ssd.RD_IOPs ",$0)}'`
-		hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
-                hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
-		hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
-	fi
-
-	#Remove all storage mdts first and then create them fresh
-	rm ${HTXMDT}/mdt.hd 2>/dev/null
-	rm ${HTXMDT}/mdt.hdbuster 2>/dev/null
-	rm ${HTXMDT}/mdt.easytier 2>/dev/null
-	rm ${HTXMDT}/mdt.hd.cache 2>/dev/null
-	rm ${HTXMDT}/mdt.comm_db_opk 2>/dev/null
-	rm ${HTXMDT}/mdt.hpc_io_node 2>/dev/null
-	rm ${HTXMDT}/mdt.business_int_db_opk 2>/dev/null
-	rm ${HTXMDT}/mdt.storage_4K_seq_write 2>/dev/null
-	rm ${HTXMDT}/mdt.storage_4K_seq_read 2>/dev/null
-	rm ${HTXMDT}/mdt.storage_256K_seq_write 2>/dev/null
-	rm ${HTXMDT}/mdt.storage_256K_seq_read 2>/dev/null
-	rm ${HTXMDT}/mdt.storage_4K_rand_write 2>/dev/null
-	rm ${HTXMDT}/mdt.storage_4K_rand_read 2>/dev/null
-	rm ${HTXMDT}/mdt.camss_cloud 2>/dev/null
-	rm ${HTXMDT}/mdt.camss_video_streaming 2>/dev/null
-	rm ${HTXMDT}/mdt.camss_med_imaging 2>/dev/null
-	
-	if [ "$hxestorage_default" != "" ];
-	then
-		create_my_mdt $hxestorage_default> ${HTXMDT}/mdt.hd
-		create_my_mdt $hxestorage_buster> ${HTXMDT}/mdt.tmp
-		cat ${HTXMDT}/mdt.tmp $* | \
-		sed 's/default\.hdd/hdd\.buster/' | sed 's/default\.ssd/ssd\.buster/' > ${HTXMDT}/mdt.hdbuster
-		rm ${HTXMDT}/mdt.tmp
-		create_my_mdt $hxestorage_easytier> ${HTXMDT}/mdt.easytier
-		create_my_mdt $hxestorage_cache> ${HTXMDT}/mdt.hd.cache
-		create_my_mdt $hxestorage_comm_db_opk > ${HTXMDT}/mdt.comm_db_opk
-		create_my_mdt $hxestorage_hpc_io_node > ${HTXMDT}/mdt.hpc_io_node
-		create_my_mdt $hxestorage_business_int_db_opk > ${HTXMDT}/mdt.business_int_db_opk
-		create_my_mdt $hxestorage_4K_seq_write > ${HTXMDT}/mdt.storage_4K_seq_write
-		create_my_mdt $hxestorage_4K_seq_read > ${HTXMDT}/mdt.storage_4K_seq_read
-		create_my_mdt $hxestorage_256K_seq_write > ${HTXMDT}/mdt.storage_256K_seq_write
-		create_my_mdt $hxestorage_256K_seq_read > ${HTXMDT}/mdt.storage_256K_seq_read
-		create_my_mdt $hxestorage_4K_rand_write > ${HTXMDT}/mdt.storage_4K_rand_write
-		create_my_mdt $hxestorage_4K_rand_read > ${HTXMDT}/mdt.storage_4K_rand_read
-	fi
-	
-	if [ $proc_ver_dec -ge 78 ]; then
-		create_my_mdt $hxestorage_default mem:default.mfg ven:default > ${HTXMDT}/mdt.mem.io
-		create_my_mdt $hxestorage_default ven:default mem:default.mfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
-	else
-		create_my_mdt $hxestorage_default mem:memmfg ven:default > ${HTXMDT}/mdt.mem.io
-		create_my_mdt $hxestorage_default ven:default mem:memmfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
-	fi
-	create_my_mdt $hxestorage_cache ven:default cache:$cache_rf sctu: > ${HTXMDT}/mdt.cache.io
-	create_my_mdt mem:rules.comm_db_pk $hxestorage_comm_db_pk cpu:rules.comm_db_pk  > ${HTXMDT}/mdt.comm_db_pk
-        create_my_mdt $hxestorage_app_server mem:rules.app_server > ${HTXMDT}/mdt.app_server #mdt for application or middleware server
-        create_my_mdt $hxestorage_web_server mem:rules.web_server > ${HTXMDT}/mdt.web_server #mdt for edge or webserver
-        create_my_mdt mem:rules.hpc_comp_node fpu:rules.hpc_comp_node $hxestorage_hpc_comp_node > ${HTXMDT}/mdt.hpc_comp_node # mdt for HPC compute node
-        create_my_mdt $hxestorage_business_int_db_pk cpu:rules.business_int_db_pk > ${HTXMDT}/mdt.business_int_db_pk
-        
-	create_my_mdt ven:default > ${HTXMDT}/mdt.ventura
+#P9 and above shifts
+if [ $proc_ver_dec -ge 78 ]; then
+	echo "[devconfig]Creating P9(and above) specific mdts..." >> ${HTXNoise}
+	#nest shifts
+	create_my_mdt mem:default.mfg.nodelay > ${HTXMDT}/mdt.mem
+	create_my_mdt mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_tlbie
+	create_my_mdt sctu: cache:$cache_rf mem:default.char tlbie:tlbie > ${HTXMDT}/mdt.nest
+	create_my_mdt cache:$cache_sw_prefetch_rf mem:default.mfg > ${HTXMDT}/mdt.mem_nest
+	create_my_mdt fpu:fpu_cpu_combo.p8 mem:default.char > ${HTXMDT}/mdt.bu_char
+	create_my_mdt $hxestorage_default mem:default.mfg ven:default > ${HTXMDT}/mdt.mem.io
+	create_my_mdt $hxestorage_default ven:default mem:default.mfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
 
 # Core shifts
-	create_my_mdt fpu: > ${HTXMDT}/mdt.fpu
-	create_my_mdt fpu:bypass_mix1 > ${HTXMDT}/mdt.fpu.bypass_mix1
-	create_my_mdt fpu:bypass_mix2 > ${HTXMDT}/mdt.fpu.bypass_mix2
-	create_my_mdt fpu:data_security > ${HTXMDT}/mdt.fpu.data_security
-	create_my_mdt fpu:fpscr_bfu > ${HTXMDT}/mdt.fpu.fpscr_bfu
-	create_my_mdt fpu:fpscr_vsx > ${HTXMDT}/mdt.fpu.fpscr_vsx
-	create_my_mdt fpu:vsx_rounding > ${HTXMDT}/mdt.fpu.vsx_rounding
-	create_my_mdt fpu:rules.multi > ${HTXMDT}/mdt.fpu.multi
-	create_my_mdt fpu:stress > ${HTXMDT}/mdt.fpu.stress
-	create_my_mdt fpu:vscr > ${HTXMDT}/mdt.fpu.vscr
-	if [ $proc_ver_dec -lt 75 ]; #Following shifts should be created till P7+ only. Not in P8.
-	then
-		create_my_mdt fpu:p1_lock > ${HTXMDT}/mdt.fpu.p1_lock
-		create_my_mdt fpu:xs_dfp > ${HTXMDT}/mdt.fpu.xs_dfp
-	fi
 
 
-
+else
+	create_my_mdt mem:memmfg.nodelay > ${HTXMDT}/mdt.mem
+	create_my_mdt mem:memmfg.nodelay tlbie: > ${HTXMDT}/mdt.mem_tlbie
+	create_my_mdt sctu: cache:$cache_rf mem:memmfg tlbie:tlbie > ${HTXMDT}/mdt.nest
+	create_my_mdt cache:$cache_sw_prefetch_rf mem:memmfg > ${HTXMDT}/mdt.mem_nest
+	create_my_mdt fpu:fpu_cpu_combo.p8 mem:memmfg > ${HTXMDT}/mdt.bu_char
+	create_my_mdt $hxestorage_default mem:memmfg ven:default > ${HTXMDT}/mdt.mem.io
+	create_my_mdt $hxestorage_default ven:default mem:memmfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+fi
 
 # P8 specific core, nest and IO workload/shifts
+if [ $proc_ver_dec -ge 75 ]; then
+	#core shifts
+	create_my_mdt cpu:rules.thread_priority > ${HTXMDT}/mdt.thread_priority
+	create_my_mdt cpu:rules.vsx.vmx fpu:rules.vsx.vmx> ${HTXMDT}/mdt.vsx.vmx
+	create_my_mdt cpu:rules.unalign_shl_lhl > ${HTXMDT}/mdt.cpu.unalign_shl_lhl
+	create_my_mdt cpu:rules.unalign > ${HTXMDT}/mdt.cpu.unalign
+	create_my_mdt cpu:rules.branch > ${HTXMDT}/mdt.cpu.branch
+	create_my_mdt cpu:rules.prefetch_n_sync sctu:rules.CacheBias cache:$cache_sw_prefetch_rf > ${HTXMDT}/mdt.prefetch_n_sync
+	create_my_mdt sctu:rules.LwarxStwcx cpu:rules.larx_stcx > ${HTXMDT}/mdt.larx_stcx
+	create_my_mdt cpu:rules.shl_lhl > ${HTXMDT}/mdt.cpu.shl_lhl
+	create_my_mdt fpu:rules.interleaving > ${HTXMDT}/mdt.fpu.interleaving
+	create_my_mdt fpu:rules.sao cpu:rules.sao sctu:rules.64.SAO > ${HTXMDT}/mdt.sao
 
-	if [ $proc_ver_dec -ge 75 ]; then
-		#core shifts
-
-		create_my_mdt cpu:rules.thread_priority > ${HTXMDT}/mdt.thread_priority
-		create_my_mdt cpu:rules.vsx.vmx fpu:rules.vsx.vmx> ${HTXMDT}/mdt.vsx.vmx
-		create_my_mdt cpu:rules.unalign_shl_lhl > ${HTXMDT}/mdt.cpu.unalign_shl_lhl
-		create_my_mdt cpu:rules.unalign > ${HTXMDT}/mdt.cpu.unalign
-		create_my_mdt cpu:rules.branch > ${HTXMDT}/mdt.cpu.branch
-		create_my_mdt cpu:rules.prefetch_n_sync sctu:rules.CacheBias cache:$cache_sw_prefetch_rf > ${HTXMDT}/mdt.prefetch_n_sync
-		create_my_mdt sctu:rules.LwarxStwcx cpu:rules.larx_stcx > ${HTXMDT}/mdt.larx_stcx
-		create_my_mdt cpu:rules.shl_lhl > ${HTXMDT}/mdt.cpu.shl_lhl
-		create_my_mdt fpu:rules.interleaving > ${HTXMDT}/mdt.fpu.interleaving
-		create_my_mdt fpu:rules.sao cpu:rules.sao sctu:rules.64.SAO > ${HTXMDT}/mdt.sao
-
-		#nest shifts
-
-		create_my_mdt cache:rules.l2_bounce.p8 > ${HTXMDT}/mdt.cache.l2_bounce
-		create_my_mdt cache:default.eco.p8 > ${HTXMDT}/mdt.cache.dynamic_eco
-		create_shift_mem_L4test.awk L4 > ${HTXMDT}/mdt.l4
-		create_shift_mem_L4test.awk rules.MBA > ${HTXMDT}/mdt.mba
-		
-		#CAMSS workloads
-		if [ "$hxestorage_default" != "" ];
-		then
-		    create_my_mdt $hxestorage_camss_cloud > ${HTXMDT}/mdt.camss_cloud
-		    create_my_mdt $hxestorage_camss_video_streaming > ${HTXMDT}/mdt.camss_video_streaming
-		    create_my_mdt $hxestorage_camss_med_imaging > ${HTXMDT}/mdt.camss_med_imaging
-		fi
-		
+	#nest shifts
+	create_my_mdt cache:rules.l2_bounce.p8 > ${HTXMDT}/mdt.cache.l2_bounce
+	create_my_mdt cache:default.eco.p8 > ${HTXMDT}/mdt.cache.dynamic_eco
+	create_shift_mem_L4test.awk L4 > ${HTXMDT}/mdt.l4
+	create_shift_mem_L4test.awk rules.MBA > ${HTXMDT}/mdt.mba
+	
+	#CAMSS workloads
+	if [ "$hxestorage_default" != "" ];
+	then
+		create_my_mdt $hxestorage_camss_cloud > ${HTXMDT}/mdt.camss_cloud
+		create_my_mdt $hxestorage_camss_video_streaming > ${HTXMDT}/mdt.camss_video_streaming
+		create_my_mdt $hxestorage_camss_med_imaging > ${HTXMDT}/mdt.camss_med_imaging
 	fi
-  fi
-  
-  # mdt.mem should have been created before create_ab_mem_mdt
-  
-  if [ $proc_ver_dec -le 62 ]; # Shifts for P6 & earlier 
+fi
+ 
+# RNG Shifts for P7+ and above.
+if [ $proc_ver_dec -ge 74  ]; 
+then
+	create_my_mdt rng:rules.default > ${HTXMDT}mdt.rng
+	cp ${HTXMDT}mdt.io ${HTXMDT}mdt.ci
+	cat ${HTXMDT}/mdt.rng | create_mdt_without_devices.awk default >> ${HTXMDT}mdt.ci
+fi
+ 
+#Following shifts should be created till P7+ only. Not in P8.
+if [ $proc_ver_dec -lt 75 ]; 
+then
+    create_my_mdt fpu:p1_lock > ${HTXMDT}/mdt.fpu.p1_lock
+    create_my_mdt fpu:xs_dfp > ${HTXMDT}/mdt.fpu.xs_dfp
+fi
+
+#Shifts for P6 & above
+# mdt.mem should have been created before create_ab_mem_mdt
+if [ $proc_ver_dec -ge 62 ];
+then
+    create_ab_mem_mdt 2>> ${HTXNoise}
+    create_mdt_ab 2>> ${HTXNoise}
+    create_mdt_xyz 2>> ${HTXNoise}
+fi
+#Shifts for P6 & earlier
+if [ $proc_ver_dec -le 62 ];
+then
+    create_my_mdt mem:memmfg.p6 > ${HTXMDT}/mdt.mem
+fi
+
+create_my_mdt $hxestorage_cache ven:default cache:$cache_rf sctu: > ${HTXMDT}/mdt.cache.io
+create_my_mdt mem:rules.comm_db_pk $hxestorage_comm_db_pk cpu:rules.comm_db_pk  > ${HTXMDT}/mdt.comm_db_pk
+create_my_mdt $hxestorage_app_server mem:rules.app_server > ${HTXMDT}/mdt.app_server #mdt for application or middleware server
+create_my_mdt $hxestorage_web_server mem:rules.web_server > ${HTXMDT}/mdt.web_server #mdt for edge or webserver
+create_my_mdt mem:rules.hpc_comp_node fpu:rules.hpc_comp_node $hxestorage_hpc_comp_node > ${HTXMDT}/mdt.hpc_comp_node # mdt for HPC compute node
+create_my_mdt $hxestorage_business_int_db_pk cpu:rules.business_int_db_pk > ${HTXMDT}/mdt.business_int_db_pk
+create_my_mdt ven:default > ${HTXMDT}/mdt.ventura
+#Nest shifts
+create_my_mdt mem:mem_16m_hwpf > ${HTXMDT}/mdt.mem.hw_prefetch
+create_my_mdt cache:rules.noprefetch > ${HTXMDT}/mdt.cache.noprefetch
+create_my_mdt cache:$cache_sw_prefetch_rf > ${HTXMDT}/mdt.cache.sw_prefetch
+create_my_mdt cache:rules.l2_and_l3_bounce > ${HTXMDT}/mdt.cache.l2_and_l3_bounce
+create_my_mdt mem:rules.dl1_reloads_from_caches > ${HTXMDT}/mdt.mem.dl1_reloads_from_caches
+create_my_mdt mem:rules.max_cache_hit > ${HTXMDT}/mdt.mem.max_cache_hit
+create_my_mdt mem:rules.max_cache_miss > ${HTXMDT}/mdt.mem.max_cache_miss
+
+create_my_mdt sctu:rules.CacheBias > ${HTXMDT}/mdt.cachebias
+create_my_mdt tlbie: > ${HTXMDT}/mdt.tlbie
+
+# Create mdt.mem_nest having reduced sctu devices.
+# sctu devices created are half compared to sctu devices in mdt.bu
+echo "Creating mdt.mem_nest ..."
+create_my_sctu_stanzas.awk MEM_NEST >> ${HTXMDT}/mdt.mem_nest
+# Create mdt.bu.characterization having only 1 sctu server per gang.
+# Number of sctu servers per gang is reduced to get optimum fmax results.
+cat ${HTXMDT}mdt.bu | create_mdt_without_devices.awk default cpu fpu sctu mem >> ${HTXMDT}/mdt.bu_char
+create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu_char
+cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk sctu > ${HTXMDT}mdt.bu.characterization
+create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu.characterization
+echo >> ${HTXMDT}mdt.bu.characterization
+if [[ "$shared_proc_mode" = "no" ]];
+then
+    num_nodes=`awk -F : '/Number of nodes/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg`
+    if [ $num_nodes -gt 1 ]
     then
-  	create_my_mdt mem:memmfg.p6 > ${HTXMDT}/mdt.mem
-  fi
-  
-  if [ $proc_ver_dec -ge 62 ]; # Shifts for P6 & above
-  then
-	create_ab_mem_mdt 2>/dev/null
-	create_mdt_ab 2>/dev/null
-	create_mdt_xyz 2>/dev/null
-  fi
-  
-  # Create mdt mdt.eq_cpu_mem_100 for 90% mem and 100% cpu usage.
-  # Naming convention shows that it is a equaliser mdt. But, actually
-  # it is not. name is kept like this so as not to break anything at
-  # custome location. 
-  create_my_mdt mem:mem.eq.90 cpu: > ${HTXMDT}/mdt.eq_cpu_mem_100
-  
-  
+        echo "Creating mdt.sctu.InterNode ..."
+        cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk > ${HTXMDT}mdt.sctu.InterNode
+        create_my_sctu_stanzas.awk INTERNODE >> ${HTXMDT}mdt.sctu.InterNode
+    fi
+
+    #Background for SCTU chip and node mdts
+    ${HTXBIN}/hxesctu SCTU_DEV
+    create_my_mdt default > ${HTXMDT}/mdt.sctu.chip
+    cp ${HTXMDT}/mdt.sctu.chip ${HTXMDT}/mdt.sctu.node
+
+    # Creating sctu devices in chip and node mdts.
+    echo "Creating mdt.sctu.chip ..."
+    create_my_sctu_stanzas.awk CHIP >> ${HTXMDT}/mdt.sctu.chip
+    echo "Creating mdt.sctu.node ..."
+    create_my_sctu_stanzas.awk NODE >> ${HTXMDT}/mdt.sctu.node
+fi
+
+
+create_my_mdt fpu: cpu: > ${HTXMDT}/mdt.core
+# assuming core.GB (which is derived out of mdt.core_wo_cpu) does not run on P7 system. (hardcoding rulefile to fpu_cpu_combo.p8)
+create_my_mdt fpu:fpu_cpu_combo.p8 > ${HTXMDT}/mdt.core_wo_cpu
+
+
+# Core shifts
+create_my_mdt fpu: > ${HTXMDT}/mdt.fpu
+create_my_mdt fpu:bypass_mix1 > ${HTXMDT}/mdt.fpu.bypass_mix1
+create_my_mdt fpu:bypass_mix2 > ${HTXMDT}/mdt.fpu.bypass_mix2
+create_my_mdt fpu:data_security > ${HTXMDT}/mdt.fpu.data_security
+create_my_mdt fpu:fpscr_bfu > ${HTXMDT}/mdt.fpu.fpscr_bfu
+create_my_mdt fpu:fpscr_vsx > ${HTXMDT}/mdt.fpu.fpscr_vsx
+create_my_mdt fpu:vsx_rounding > ${HTXMDT}/mdt.fpu.vsx_rounding
+create_my_mdt fpu:rules.multi > ${HTXMDT}/mdt.fpu.multi
+create_my_mdt fpu:stress > ${HTXMDT}/mdt.fpu.stress
+create_my_mdt fpu:vscr > ${HTXMDT}/mdt.fpu.vscr
+# Create mdt mdt.eq_cpu_mem_100 for 90% mem and 100% cpu usage.
+# Naming convention shows that it is a equaliser mdt. But, actually
+# it is not. name is kept like this so as not to break anything at
+# custome location. 
+create_my_mdt mem:mem.eq.90 cpu: > ${HTXMDT}/mdt.eq_cpu_mem_100
+
 # Append hxecom stanza's if possible to IO mdt's.
 # First Check if Netperf module is present.
 
@@ -382,3 +368,4 @@ fi
 
 # Removing temp mdts created earlier for core.GB
 rm -f ${HTXMDT}/mdt.core_wo_cpu
+echo "exiting devconfig..." >> $HTXNoise

@@ -127,20 +127,6 @@
             fi
   fi  
 
-  if [[ -n $(grep "ablink" $1 2>/dev/null) ]]
-  	then if [[ -e ${HTXRUNSETUP}ablink.runsetup ]]
-  		then echo " Preparing Ablink Enviroment ..."
-  			${HTXRUNSETUP}ablink.runsetup
-  	     fi
-  fi
-  
-  if [[ -n $(grep "xyzlink" $1 2>/dev/null) ]]
-  	then if [[ -e ${HTXRUNSETUP}xyzlink.runsetup ]]
-  		then echo " Preparing xyzlink enviroment ..."
-  			${HTXRUNSETUP}xyzlink.runsetup
-  		fi
-  fi
-  
   if [[ -n $(grep "hxesysben" $1 2>/dev/null) ]]
   	then if [[ -e ${HTXRUNSETUP}sysben.runsetup ]]
   		then echo " Preparing Hxesysben enviroment ..."

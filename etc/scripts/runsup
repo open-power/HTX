@@ -235,20 +235,6 @@ if [[ -n $(grep "hxemem64" ${HTXMDT}$MDTFILE 2>/dev/null) ]]
    }
 fi
 
-if [[ -n $(grep "ablink" ${HTXMDT}$MDTFILE 2>/dev/null) ]]
-	then [ -f ${HTXRUNSETUP}ablink.runsetup ] && {
-	echo "Preparing ablink environment..." 2>&1 | tee -a $HTXNoise
-	${HTXRUNSETUP}ablink.runsetup 2>&1 | tee -a $HTXNoise
-	}
-fi
-
-if [[ -n $(grep "xyzlink" ${HTXMDT}$MDTFILE 2>/dev/null) ]]
-	then [ -f ${HTXRUNSETUP}xyzlink.runsetup ] && {
-	echo "Preparing XYZlink enviroment ..." 2>&1 | tee -a $HTXNoise
-	${HTXRUNSETUP}xyzlink.runsetup 2>&1 | tee -a $HTXNoise
-	}
-fi
-
 if [[ -n $(grep "hxediag" ${HTXMDT}$MDTFILE 2>/dev/null) ]]
         then [ -f ${HTXRUNSETUP}hxediag.runsetup ] && {
         echo "Preparing hxediag environment..." 2>&1 | tee -a $HTXNoise

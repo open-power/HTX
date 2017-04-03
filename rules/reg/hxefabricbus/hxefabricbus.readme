@@ -11,9 +11,8 @@ Features:
 1) Supports testing of inter node fabric buses(popularly know as A,B buses).
 2) Supports testing of intra node fabric buses(popularly know as X, Y Z buses). 
 3) Supports various fixed/random data patterns and various memory operations
-   (WRC, copy, add, daxpy etc)
-4) Supports specifying the machine config for testing specific fabric bus(es) through config file.
-5) Supports data pusher (compare=off) mode.
+   (WRC,stride,rim etc)
+4) Supports data pusher (compare=off) mode.
 		
 Hardware supported & HW test scope:
 -----------------------------------
@@ -23,7 +22,7 @@ Currnetly exerciser aims at intra node and inter node fabric bus stress test.
 Supported OS:
 -------------
 AIX   : y
-Linux : n
+Linux : y
 BML   : y
 
 General info:
@@ -31,14 +30,14 @@ General info:
 HTX fabricbus test program runs as user application on top of OS (AIX and BML).
 In case of miscompare, exerciser traps to KDB.
 HTX setup scripts should create 3 mdt files as described below : 
-1)mdt.ablink : Should be used for Inter Node(A, B) stress test. 
-2)mdt.xyzlink : Should be used for Intra Node(X, Y, Z) bus stress test. 
-3)mdt.ab_mem : Should be used for InterNode bus and memory stress test simultaneouly.  
+1)mdt.inter_node: Should be used for Inter Node(A, B) stress test. 
+2)mdt.inter_chip: Should be used for Intra Node(X, Y, Z) bus stress test. 
+3)mdt.mem_inter_node : Should be used for InterNode bus and memory stress test simultaneouly.  
 
 Prerequisites:
 --------------
 1) Supported on P6 and later hardware.
-2) OS Level : AIX/BML with P6 support and onwards.
+2) OS Level : AIX/LINUX/BML with P6 support and onwards.
 3) For best results ensure that system is configured as a full system lpar. If
    the system is configured with multiple dedicated lpars throughput may be 
    compromised depending on the config of the lpar. 
@@ -63,15 +62,12 @@ remote chip or remote CEC node). To access remote memory consistently exer
 needs to overflow the local L3 cache hence on every access to the memory set
 fabric bus needs to perform a transaction to bring data from remote memory
 to local cache. To achieve the L3 cache overflow, exerciser creates a memory
-set double the size of L3 cache for every thread which performs write/read
-ops. To enable data prefetching on every access to the memory set, exer backs
-memory set with 16 MB pages. Exerciser creates one or more cpu bound threads
+set double the size of total chip L3 cache for all threads from that chip 
+which performs write/read ops.
+Exerciser creates one or more cpu bound threads
 to push data on fabric bus under test. For each such thread exer also creates
 a memory set on the remote end of the fabric bus. Each of such thread performs
-write/read/compare ops num_oper times on the remote memory set. Write/read/
-compare ops are done on portion of each cache line (8 bytes of each cache line)
-and then it jumps to next cache line block. This ensures that on every write or
-read data are fetched from memory and not cache.
+write/read/compare ops num_oper times on the remote memory set.
 
 Creation of threads to perform write/read/compare ops and allocating memory set
 for all such threads is done by exerciser after detecting the hardware
@@ -80,50 +76,15 @@ configuration. It does so by reading PIR register of each available logical
 processor to determine which CEC node/chip it belongs to. Exerciser has a
 capability to control the no of threads per node that pushes data on a given
 inter node (AB bus)fabric bus. This can be controlled using rule file parameters
-memory_allocation and threads_per_node. This is useful to measure how bus
-utilisation varies with no of threads pushing the data.
-
-If the auto detected system configuration is inappropriate then user can also 
-specify the hardware configuration through rule file parameters like cec_nodes, 
-chips_per_node and cores_per_chip (detailed in hxefabricbus rule file readme section below). 
-To know the system configuration details that exerciser detected, follow the
-steps mentioned below: 
-1) su - htx
-2) /usr/lpp/htx/bin/hxefabricbus A B
-/usr/lpp/htx/rules/reg/hxefabricbus/default.ab query_sysconf 
-
-Apart from this, user can also hand code the configuration by picking the logical processor
-nos and associated remote memory location. This hand coded configuration can be input to the
-exerciser through a config file, /tmp/fabricbus_mem_config_<memory_allocation>.
-
-Details about how to write /tmp/fabricbus_mem_config_<memory_allocation> file
-is mentioned below.
-To know exerciser generated memory mapping follow the steps : 
-1) su - htx
-2) /usr/lpp/htx/bin/hxefabricbus A B
-/usr/lpp/htx/rules/reg/hxefabricbus/default.ab query_memconf.
-
-Above 2 steps would dump the memory mapping to file : /tmp/fabricbus_mem_config_<memory_allocation>
-How to edit the file is described in Rules file description for parameter "memory_configure". 
-To enable exerciser to read this memory mapping specify memory_configure = 1 in rules file.
-Exerciser therafter reads the memory mapping from file and starts the test accordingly.
-This could be useful to target a testing of specific fabric bus or a set of fabric buses.
+cpu_filetr, utilisation varies with no of threads pushing the data.
 
 Exerciser supports different algorithms to perform memory ops like a simple
-memory walk over, daxpy, copy, add algorithm etc. Exerciser supports different
+memory walk over, strided memory access, RIM etc. Exerciser supports different
 types of data patterns inlcuding random data pattern, address pattern.
-
-This program requires large amount of memory to be configured in 16MB page pool.
-Memory allocation is done at runtime through HTX runsetup scripts.
-
-Please note : Configuring 16M page pool for exersicer can take long time
-depending upon system configuration. This is one-time operation and usually
-done when exerciser is run first time. Changes persists after subsequent
-system reboots. 
 
 Understanding htxstats:
 -----------------------
-xyzlink:
+fabc:
   cycles                              =                  0
   # good reads                        =                  0
   # bytes read                        =      10322013376512  <-- Date Read from Remote Memory
@@ -143,14 +104,16 @@ xyzlink:
 Log Files Created by exerciser : 
 -------------------------------
 
-1)/tmp/fabricbus_mem_req_*(* - memory_allocation type): Specifies number of 16M pages required by fabricbus. 
-2)/tmp/fabricbus_mem_config_*(* - memory_allocation type): Specifies the exerciser defined memory mapping. 
+1)$HTX_LOG_DIR/htx/hxefabricbus/<dev>/<dev>_cpu_to_mem_map : Contains cpu to memory details derived by exerciser.
+2)$HTX_LOG_DIR/htx/hxefabricbus/<dev>//mem_segment_details : Logs detailed information of threads and associated memory details.
+
+<dev> = fabc(for intra node test)  or fabn(for inter node test case). 
 
 Throughput Nos:
 --------------
-As observed using various performance measurement tools(buz and perfmon) on P7 :
-1)mdt.ablink is able to drive ~72% of max traffic on InterNode fabricbuses
-2)mdt.xyzlink is able to drive ~45% of max traffic on IntraNode fabricbuses.
+As observed using various performance measurement tools(buz and perfmon) on P8 :
+1)mdt.inter_node is able to drive ~95% of max traffic on InterNode fabricbuses
+2)mdt.inter_chip is able to drive ~95% of max traffic on IntraNode fabricbuses.
  
 Limitations:
 ------------
@@ -159,393 +122,16 @@ Limitations:
 
 List of rules:
 --------------
-default.xyz
-default.ab
+default.inter_node
+default.inter_chip
 
 HXEFABRICBUS Rule file Readme
 ==============================
 
-HTX fabricbus sample rules file looks like : 
+hxefabricbus exerciser is derived from htx nest framework , Rule parameters are same as that of hxemem64(memory exerciser).
+please look into the read me of hxemem64 for detailed explaination of rules. 
 
-rule_id = 1				
-compare = 1
-num_oper = 1000
-memory_allocation = 3
-
-
-Rules file parameter description 
---------------------------------
-1)RULE_ID : 
-		This parameter is used to assign unique name to each of the rule stanza in the
-		rule file. The value should be of type character string with a maximum
-		sizt\e of 20 characters. 
-		Default - NULL string
-
-2)NUM_OPER :
-		This parameter indicates number of times the algorithm needs to be run.
-		Input should be positive real number. 
-		Default - 1000
-
-3)COMPARE : 
-		This is a boolean parameter to selectively turn on/off data integrity checks 
-		Possilbe values : 0 - No, i.e. only cache writes/read. 
-				1 - Yes, i.e. write/read/compare the results against
-						what was written. 
-		Default - 1
-
-4)CRASH_ON_MISC :
-		This is a boolean parameter to select whether to crash to kernel
-		debugger incase of miscompare.
-		Possible Values : 0 - No, 
-				  1 - Yes. 
-		Following will be the contents of registers while dropping to kernel
-		debugger:
-		r3 - 0xBEEFDEAD
-		r4 - EA of miscompare location
-		r5 - pointer to 8 byte pattern
-		r6 - thread id (i.e. logical cpu no)
-		r7 - length of operation (i.e. data_width)
-
-5)THREADS_PER_NODE : 
-		This parameter dictates how many threads should be created on each
-		CEC node for performing memory ops. 
-		User Input value should be a positive integer value, less than maximum logical
-		processors per node. Useful if rules parameter memory allocation type is 1 or 2. 
-		Ignored for other memory_allocation types. 
-		Possilbe values : 1, 2, 4, 8, 16 & 32.  
-		Default - 8
- 
-6)MEMORY_ALLOCATION :
-		This parameter can be used to select amongst different memory mapping
-		algorithms in-build in exerciser. 
-		Possible values : 0 - memory is allocated local to node. 
-				  1 - memory is allocated on Remote node.
-				  2 - memory is allocated on all possible Remote nodes. 
-				  3 - same as 2 but all threads on node will try to
-				      allocate memory on all possible remote nodes
-				      in round robin fashion.
-				  4 - memory is allocated on remote chip inside the same node. 
-		Default value - 3 for InterNode fabricbus(A,B) test. 
-				4 for IntraNode fabricbus(X,Y,Z) test. 
-
-		Detailed description of memory mapping algorithms : 
-		Consider a 3 Node box P6-HE box with following h/w configuration,
-			k0:n0:p0:t0, k0:n0:p0:t1, k0:n0:p1:t0, k0:n0:p1:t1, k0:n0:p2:t0, k0:n0:p2:t1, k0:n0:p3:t0, k0:n0:p3:t1
-			k0:n1:p0:t0, k0:n1:p0:t1, k0:n1:p1:t0, k0:n1:p1:t1, k0:n1:p2:t0, k0:n1:p2:t1
-			k0:n2:p0:t0, k0:n2:p0:t1, k0:n2:p1:t0, k0:n2:p1:t1  
-
-			where k = system, n = node, p = chip and t = smt_thread. Number beside each character(k,n,p,t) is a 
-			unique number to distinguish them. System configuration(as above) different algorithms would do 
-			memory mapping as descibed below: 
-		
-			6.1)Memory_allocation = 0 
-					Mapping is done local to each node. 
-					Ex:
-						k0:n0:p0:t0 memory on k0:n0:p0:t0
-						k0:n0:p0:t1 memory on k0:n0:p0:t1
-						k0:n0:p1:t0 memory on k0:n0:p1:t0
-						k0:n0:p1:t1 memory on k0:n0:p1:t1 
-						k0:n0:p2:t0 memory on k0:n0:p2:t0
-						k0:n0:p2:t1 memory on k0:n0:p2:t1
-						k0:n0:p3:t0 memory on k0:n0:p3:t0 
-						k0:n0:p3:t1 memory on k0:n0:p3:t1 
-						k0:n1:p0:t0 memory on k0:n1:p0:t0 
-						k0:n1:p0:t1 memory on k0:n1:p0:t1 
-						k0:n1:p1:t0 memory on k0:n1:p1:t0 
-						k0:n1:p1:t1 memory on k0:n1:p1:t1 
-						k0:n1:p2:t0 memory on k0:n1:p2:t0
-						k0:n1:p2:t1 memory on k0:n1:p2:t1
-						k0:n2:p0:t0 memory on k0:n2:p0:t0
-						k0:n2:p0:t1 memory on k0:n2:p0:t1 
-						k0:n2:p1:t0 memory on k0:n2:p1:t0
-						k0:n2:p1:t1 memory on k0:n2:p1:t1
-
-			6.2)Memory_allocation = 1
-					Mapping is done remote to each node. Number of threads to create per node can be tuned thru rules file
-					parameter threads_per_node.  
-					Ex: If threads_per_node = 4
-						k0:n0:p0:t0 memory on k0:n1:p0:t0 
-						k0:n0:p1:t0 memory on k0:n1:p1:t0
-						k0:n0:p2:t0 memory on k0:n1:p2:t0
-						k0:n1:p0:t0 memory on k0:n2:p0:t0 
-						k0:n1:p1:t0 memory on k0:n2:p1:t0 
-						k0:n2:p0:t0 memory on k0:n0:p0:t0
-						k0:n2:p1:t0 memory on k0:n0:p1:t0
- 	
-			6.3)Memory_allocation = 2
-					Mapping is done remote to each node in a round robin fashion. Number of threads to create per node can 
-					be tuned thru rules file parameter threads_per_node.
-					Ex: If threads_per_node = 4 
-						k0:n0:p0:t0 memory on k0:n1:p0:t0 
-						k0:n0:p1:t0 memory on k0:n2:p0:t0 
-						k0:n0:p2:t0 memory on k0:n1:p1:t0 
-						k0:n1:p0:t0 memory on k0:n2:p0:t0 
-						k0:n1:p1:t0 memory on k0:n0:p1:t0 
-						k0:n2:p0:t0 mmeory on k0:n0:p0:t0 
-						k0:n2:p1:t0 memory on k0:n1:p0:t0
-
-			6.4)Memory_allocation = 3
-					Mapping is done remote to each node in a round robin fashion. Algorithm maps all possible threads to 
-					remote node. threads_per_node ignored in this case. 
-					Ex: 
-						k0:n0:p0:t0 memory on k0:n1:p0:t0 
-						k0:n0:p0:t1 memory on k0:n2:p0:t0 
-						k0:n0:p1:t0 memory on k0:n1:p0:t1 
-						k0:n0:p1:t1 memory on k0:n2:p0:t1 
-						k0:n0:p2:t0 memory on k0:n1:p1:t0 
-						k0:n0:p2:t1 memory on k0:n2:p1:t0 
-						k0:n0:p3:t0 memory on k0:n1:p1:t1 
-						k0:n0:p3:t1 memory on k0:n2:p1:t1 
-						k0:n1:p0:t0 memory on k0:n2:p0:t1 
-						k0:n1:p0:t1 memory on k0:n0:p0:t0 
-						k0:n1:p1:t0 memory on k0:n2:p0:t1 
-						k0:n1:p1:t1 memory on k0:n0:p0:t1 
-						k0:n1:p2:t0 memory on k0:n2:p1:t0 
-						k0:n1:p2:t1 memory on k0:n0:p1:t0
-						k0:n2:p0:t0 memory on k0:n0:p0:t0
-						k0:n2:p0:t1 memory on k0:n1:p0:t0 
-						k0:n2:p1:t0 memory on k0:n0:p0:t1 
-						k0:n2:p1:t1 memory on k0:n1:p0:t1
-
-			6.5)Memory_allocation = 4
-					Mapping is done remote to each chip within the same node in roundrobin fashion. 
-					threads_per_node ignored in this case.
-					Ex: 
-						k0:n0:p0:t0 memory on k0:n0:p1:t0 
-						k0:n0:p0:t1 memory on k0:n0:p2:t0 
-						k0:n0:p1:t0 memory on k0:n0:p2:t0 
-						k0:n0:p1:t1 memory on k0:n0:p3:t0 
-						k0:n0:p2:t0 memory on k0:n0:p3:t0 
-						k0:n0:p2:t1 memory on k0:n0:p0:t0 
-						k0:n0:p3:t0 memory on k0:n0:p0:t0 
-						k0:n0:p3:t1 memory on k0:n0:p1:t0
-						k0:n1:p0:t0 memory on k0:n1:p1:t0 
-						k0:n1:p0:t1 memory on k0:n1:p2:t0 
-						k0:n1:p1:t0 memory on k0:n1:p2:t0 
-						k0:n1:p1:t1 memory on k0:n1:p0:t0 
-						k0:n1:p2:t0 memory on k0:n1:p0:t0
-						k0:n1:p2:t1 memory on k0:n1:p1:t0 
-						k0:n2:p0:t0 memory on k0:n2:p1:t0 
-						k0:n2:p0:t1 memory on k0:n2:p1:t1
-						k0:n2:p1:t0 memory on k0:n2:p0:t0 
-						k0:n2:p1:t1 memory on k0:n2:p0:t1
-
- 
-7)MEMORY_CONFIGURE
-		This parameter provides user leverage to specify ones own memory mapping. If memory_configure 
-		is 1 (default 0) then user can specify ones own cpu Vs memory map through config file 
-		/tmp/fabricbus_mem_config_<memory_allocation>. 
-		A default /tmp/fabricbus_mem_config_<memory_allocation> is created on the basis
-		of current rules file settings, that can used as a template .	
-		To edit /tmp/fabricbus_mem_config_<memory_allocation>, the syntax is:
-		[HOST_CPU, DEST_CPU]
-		This means logical cpu configured as HOST_CPU and its memory is configured on logical cpu 
-		DEST_CPU. Both HOST_CPU and DEST_CPU are the absolute logical cpu nos. 
-		WARNING: User has to account for SMT on/off when specifying logical cpu numbers.
-		Ex:
-
-		In 16 smt threads per node system, Sample file would look like :
-		[1,32 ] - proc1 has its memory configured on proc32
-
-		[2,48] - proc2 has memory configured on proc48
-
-		[3,64]
-
-		[4,80]
-
-		[5,96]
-
-		[6,112]
-
-		... etc
-		Possible Values : 0 - No, Use exer in-build algorithms for mapping
-                          	  1 - Yes, Read memory mapping from config file.
-		Default Value - 0. 
-
-8)PATTERN_ID
-		This parameter specifies the bit pattern to be used for read/write on memory buffers. 
- 		Possible values:
-           	1) Pattern file name along with the size of the pattern to be used.
-           	2) ADDRESS keywords : Use 8 byte address of memory buffer as pattern,
-           	3) direct hexadecimal pattern of minimum 8 bytes and maximum of 32 bytes.
-	   	4) RANDOM keywords : Use 8 byte random numbers as pattern,
-           	5) Multiple patterns specified using any of the above (1), (2), (3) and (4).
- 		Note: The pattern size specified should be a power of 2.
-              	Only these values can be used:
-           		8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096.
- 		Syntax: Examples
-         	pattern_id = HEX55(8)  .... single pattern: file pattern with size.
-         	pattern_id = ADDRESS   .... single pattern: ADDRESS
-		 	pattern_id = RANDOM
-         	pattern_id = 0x1010101010101010 ... single pattern: direct hexadecimal 8 byte pattern.
-         	pattern_id = HEX55(4096) HEXAA(32) ADDRESS 0xA1A2A3A4A5A6A7A8B1B2B3B4B5B6B7B8
-                  			.. the above line is a multiple pattern specification.
- 		Default : By default 9 different 8 bytes patterns are used
-    		If Power 6 machine :
-       			0xFFFFFFFFFFFFFFFF
-               		0x0000000000000000
-              		0xAAAA5555AAAA5555
-               		0x5555AAAA5555AAAA
-              		0xCCCCCCCCCCCCCCCC
-               		0x3333333333333333
-               		0x0F0F0F0F0F0F0F0F
-               		0x3C3C3C3C3C3C3C3C
-               		0x5A5A5A5A5A5A5A5A
-   		If Power 7 machine & others:
-       			0x0000000000000000
-               		0xFFFFFFFFFFFFFFFF
-               		0x5555555555555555
-              		0xAAAAAAAAAAAAAAAA
-               		0xCCCCCCCCCCCCCCCC
-              		0x3333333333333333
-               		0x0F0F0F0F0F0F0F0F
-               		0x3C3C3C3C3C3C3C3C
-             		0x5A5A5A5A5A5A5A5A
-
-9)WRC_ITERATION
-		Each exerciser thread performs W(Write)R(Read)C(Compare) algorithm for the pattern
-		specified(as above). This parameter controls the number of iterations of WRC aglorithm.  
-		Input parameter should be decimal positive integer.
-		Default Value - 32
-
-10)WRC_DATA_PATTERN_ITERATIONS
-		This parameter specifies number of times each pattern (input thru pattern_id rules parameter)  
-		should be repeated.Input parameter should be decimal positive integer. 
-		Default Value - 32
-
-11)COPY_ITERATIONS
-		Copy algorithm splits the shared memory segment in half. Access 1st 8 bytes of a cache line using
-		double word load/store instructions with 128B offset. This algorithm uses the data set previously 
-		generated after execution of WRC algorithm. This parameter specifies number of iterations of copy 
-		algorithm. Input parameter should be decimal positive integer. 
-		Default Value - 32 
-
-12)ADD_ITERATIONS
-		Add algorithm splits the shared memory segment in half. Adds the value in first memory region with
-		value in other half of memory segment and writes it back in first memory region. Add algorithm uses
-		the data set generated after above algorithms are performed on memory region. This parameter specifies 
-		number of iterations of add algorithm. Input parameter should be decimal positive integer.
-		Default Value - 32 
-
-13)DAXPY_ITERATIONS 
-		Daxpy algorith is similar to add iteration, except that operation performed is a[j] = a[j]+daxpy_scalar*b[j].
-		where "a" refers to first memory region and "b" refers to  other half of memory region. Daxpy algorithm  
-		uses the data set generated after above algorithms are performed on memory region. This parameter specifies
-		number of iterations of daxpy algorithm. Input parameter should be decimal positive integer.
-		Default Value - 32 
-
-14)DAXPY_SCALAR
-		Constant value to be used for the daxpy algorithm. Input parameter should be decimal positive integer. 
-		Default Value - 2
-
-		Pseudo code of how various algorithms are invoked in exerciser are as follows:
-
-		while (num_oper_count < num_oper) {
-			while (wrc_count < wrc_iterations) {
-				Run WRC algorithm ;
-				if (wrc_count % wrc_data_pattern_iterations == 0) {
-					pattern_index++
-					if (pattern_index == 9) {
-						pattern_index = 0;
-					}
-				}
-				wrc_count++;
-			}
-			while (copy_count < copy_iterations) {
-				Run copy algorithm ;
-				copy_count++;
-			}
-			while (add_count < add_iterations) {
-				Run add algorithm ;
-				add_count++;
-			}
-			while (daxpy_count < daxpy_iterations) {
-				Run daxpy algorithm ;
-				daxpy_count++;
-			}
-			num_oper_count++
-		}
-
-
-15)SEED
-		Generate the random patterns with the seed specified along with this parameter. Othervise generate a random
-		seed itself. Used for debugging. 
-		Default Value - NULL
-
-16)CEC_NODES
-		User defined number of hardware nodes in the system. Input value should be positive decimal number. 
-		Default Value - NULL 
-
-17)CHIPS_PER_NODE
-		User defined number of chips configured in each node. Input value should be positive decimal number. 
-		Default Value - NULL 
-
-18)CORES_PER_CHIP 
-		User defined number of cores configured per chip. Input value should be positive decimal number. 
-		Default Value - NULL
-
-19)AND_MASK
-		Numerical value specified through this parameter is logical anded with the random patterns generated. 
-		Used only if exerciser is configured to generate random patterns. Ignored in other cases.
-		Input value should be positive hexadecimal number. 
-		Default Value - 0xFFFFffffFFFFffff
-
-20)OR_MASK
-		Numerical value specified through this parameter is logical ored with the random patterns generated.
-		Used only if exerciser is configured to generate random patterns. Ignored in other cases.
-        	Input value should be positive hexadecimal number.
-		Default Value - 0x0
-		
-		AND_MASK and OR_MASK together are used to control specific bits on the bus.
-		
-21)MASK_CONFIGURE
-		This parameter provides users leverage to provide his own link based AND, OR mask.  If this parameter is
-		set to 1 in rules file than masks are read from file /tmp/fabricbus_masks_<memory_allocation>, 
-		/tmp/fabricbus_masks_3 (for InterNode test) or /tmp/fabricbus_mask_4(IntraNode Test). 
-		A default fabricbus_masks_<memory_allocalation> file is created on the basis of current rules file setting 
-		at HTX setup. Users can modify the file and specify mask_configure = 1 in rules file to let exerciser 
-		read the new masks. 
-		Syntax : 
-		For InterNode Test : 
-			[ HOST_NODE, DEST_NODE, AND_MASK, OR_MASK ] 
-			InterNode fabricbus between HOST_NODE and DEST_NODE would use the AND_MASK and OR_MASK.
-			Example : 
-				[ HOST_NODE, DEST_NODE, AND_MASK, OR_MASK ]
-				[ 0, 1, 0xffffffffffffffff, 0x0 ]
-				[ 0, 2, 0xffffffffffffffff, 0x0 ]
-		For IntraNode Test : 
-			[ HOST_CHIP, DEST_CHIP, AND_MASK, OR_MASK ]
-			IntraNode fabricbus between HOST_CHIP and DEST_CHIP would use the AND_MASK and OR_MASK.
-			Example : 
-				  [ HOST_CHIP, DEST_CHIP, AND_MASK, OR_MASK ]
-				  [ 0, 1, 0xaaaaaaaaaaaaaaaacccccccccccccccc, 0xffffffffffffffff1 ]
-				  [ 1, 0, 0xaaaaaaaaaaaaaaaacccccccccccccccc, 0xffffffffffffffff1 ]
-				  [ 4, 5, 0xaaaaaaaaaaaaaaaacccccccccccccccc, 0xffffffffffffffff1 ]
-
-		Please Note : 
-		1. HOST_NODE, HOST_CHIP, DEST_NODE, DEST_CHIP are physical chip and node number, unless sure
-		please dont modify these fields in fabricbus_masks_<memory_allococation> file.
-		2. Users can modify AND_MASK, OR_MASK fields to specify own masks. Masks specified should 
-		be multiple of 8bytes with max size of 32bytes. 
-		3. If User specifies AND_MASK, OR_MASK in rules file and also configures mask_configure = 1 in rules
-		file then AND_MASK, OR_MASK specified in rules file would be treated as default values. AND_MASK, OR_MASK
-		specified in /tmp/fabricbus_masks_<memory_allocation> would override the default entries if conflicting 
-		masks are found. 
-		4. Users can find multiple entries in /tmp/fabricbus_masks_<memory_allocation> that applies to same
-		fabric bus. To make hxefabricbus exerciser independent of system configuratiions, it displays all  possible 
-		mappings between  nodes/chip. Its up to user to to identify the required busses and specify the masks. 
-		Users may end up specifying same masks multiple times  in file to be applied on specific fabricbus. 
-		5.AND_MASK, OR_MASK would only be effective for RANDOM pattern type.  
-		
-22)RANDOM_BUFFER_SIZE 
-		This parameter specifies size of random buffer to be allocated in multiples of 16M pages. 
-		Default : 4 
-		i.e. 4 * 16M = 64MB of random buffer is allocated by default. 
-		If User wants to specify larger random buffer then user can increase it any multiple to 16M pages. 
-		Only limiting factor would be number of free 16M pages available in system. 
-		 
-		 
-		 
-	
+#ls $HTXREGRULES/hxemem64/hxemem64.readme
+/usr/lpp/htx/rules/reg//hxemem64/hxemem64.readme
 		
 		
