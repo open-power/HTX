@@ -51,6 +51,7 @@
 
 #include "hxestorage_rf.h"
 #ifndef __HTX_LINUX__
+
     #include <sys/scsi.h>
     #include <sys/scdisk.h>
     #include <cf.h>
@@ -259,9 +260,8 @@ typedef int (*close_fptr)(struct htx_data *, struct thread_context *);
 typedef int (*oper_fptr)(struct htx_data *, struct thread_context *, int);
 
 extern int read_rules_file_count;
-extern pthread_mutex_t cache_mutex, segment_mutex, log_mutex;
+extern pthread_mutex_t cache_mutex, log_mutex;
 extern int eeh_retries, turn_attention_on;
-extern char misc_run_cmd[100], run_on_misc;
 extern time_t time_mark;
 extern volatile char exit_flag, signal_flag, int_signal_flag;
 extern int total_BWRC_threads;
@@ -313,7 +313,7 @@ struct thread_context {
     char oper_var[OPER_VAR_LEN];
     char oper[OPER_STR_SZ];                             /* Oper to be performed - WRC,RWRC,R,W,RC,S etc */
     char num_oper_var[NUM_OPER_VAR_LEN];
-    int num_oper[SEEK_TYPES];                           /* num of operations defined for SEQ/RANDOM seek types ( oper loop count) */
+    unsigned long long num_oper[SEEK_TYPES];            /* num of operations defined for SEQ/RANDOM seek types ( oper loop count) */
     char seek_breakup_prcnt_var[SEEK_BREAKUP_PRCNT_VAR_LEN];
     short seek_breakup_prcnt;                           /* Percentage of SEQ/RANDOM operations */
     char transfer_sz_var[TRANSFER_SIZE_VAR_LEN];
@@ -401,7 +401,8 @@ struct thread_context {
     char BWRC_zone_index_var[BWRC_ZONE_INDEX_VAR_LEN];
     int BWRC_zone_index;                                /* Used by Non-BWRC threads for finding the BWRC zone corresponding to LBAs where it is going to do operations */
     char seg_table_index_var[SEG_TABLE_INDEX_VAR_LEN];
-    int seg_table_index;                                /* index into segment_table */
+    int seg_table_num[4];
+    int seg_table_index[4];
     char run_reread_var[RUN_REREAD_VAR_LEN];
     char run_reread;                                    /* if need to do re-read in case of miscompare - YES or NO */
     char rule_option_var[RULE_OPTION_VAR_LEN];
@@ -460,6 +461,7 @@ struct BWRC_range {
     volatile unsigned long long min_lba; /* Min LBA till where this instance of BWRC has written */
     volatile unsigned long long max_lba; /* Max LBA till where this instance of BWRC has written */
     unsigned short direction;            /* Direction of BWRC thread - UP or DOWN  */
+    time_t last_update_time;             /* Time when fencepost was updated last */
     char status;                         /* Still running or exited?? */
 };
 struct BWRC_range lba_fencepost[MAX_BWRC_THREADS];
@@ -470,17 +472,17 @@ struct BWRC_range lba_fencepost[MAX_BWRC_THREADS];
 /* which creates cache threads.                    */
 /***************************************************/
 struct cache_thread_info {
-    unsigned long long dlen;
-    char *buf;
-    int DMA_running;
-    int cache_cond;
-    int testcase_done;
-    int cache_threads_created;
-    int num_cache_threads_waiting;
+    volatile unsigned long long dlen;
+    volatile char *buf;
+    volatile int DMA_running;
+    volatile int cache_cond;
+    volatile int testcase_done;
+    volatile int cache_threads_created;
+    volatile int num_cache_threads_waiting;
     pthread_mutex_t cache_mutex;
     pthread_cond_t do_oper_cond;
 };
-volatile struct cache_thread_info c_th_info[MAX_NUM_CACHE_THREADS];
+struct cache_thread_info c_th_info[MAX_NUM_CACHE_THREADS];
 
 /*****************************************/
 /*   Structure to hold state table  info */

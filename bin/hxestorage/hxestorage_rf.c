@@ -24,7 +24,9 @@
 /************************************************************/
 #include "hxestorage_rf.h"
 
-extern int sync_cache_flag, discard_enabled, randomize_sync_cache, total_BWRC_threads;
+extern void user_msg(struct htx_data *ps, int err, int io_err_flag, int sev, char *text);
+
+extern int sync_cache_flag, discard_enabled, randomize_sync_cache, total_BWRC_threads, max_thread_cnt, total_max_thread_cnt;
 int seeds_were_saved = 0, num_sub_blks_psect = 0;
 char fsync_flag ='N';
 struct device_info dev_info;
@@ -394,7 +396,7 @@ int read_rf(struct htx_data *htx_ds, char *rf_name, unsigned long long maxblk, u
     char keywd[32], str[MAX_RULE_LINE_SZ], msg[MSG_TEXT_SIZE];
     int keywd_count =0, line=0, rc=0, str_len, error_no;
     char eof = 'N';
-    unsigned int stanza_defined;
+    unsigned int stanza_defined = UNINITIALIZED;
     void *current_stanza_ptr;
     template *tmplt_ptr;
     parse_stanza_fptr fptr;
@@ -485,11 +487,11 @@ int read_rf(struct htx_data *htx_ds, char *rf_name, unsigned long long maxblk, u
 /************************************************************************************/
 int parse_keywd(char *str, char *value[])
 {
-    char *val, tmp_str[MAX_RULE_LINE_SZ];
+    char tmp_str[MAX_RULE_LINE_SZ];
     int i=0;
 
     strcpy(tmp_str, str);
-    val = strtok(tmp_str, " \n\t");
+    strtok(tmp_str, " \n\t");
     while ((value[i] = strtok(NULL, " \n\t")) != NULL) {
         i++;
     }
@@ -589,6 +591,9 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
             user_msg(ps, 0, 0, SOFT, msg);
             return -1;
         }
+	    if(max_thread_cnt < rule->num_threads){
+	        max_thread_cnt = rule->num_threads;
+	    }
     } else if (strcasecmp(keywd, "ASSOCIATIVITY") == 0) {
         sscanf(str, "%*s %s", varstr);
         if (strcasecmp(varstr, "SEQ") == 0) {
@@ -786,16 +791,20 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
     } else if (strcasecmp(keywd, "MAX_BLKNO") == 0) {
         rule->max_blkno.num_keywds = parse_keywd(str, &input_rule[0]);
         for (i=0; i < rule->max_blkno.num_keywds; i++) {
-            input_val = atof(input_rule[i]);
-            if (input_val > 0 && input_val <= 1) {
-                rule->max_blkno.value[i] = (unsigned long long) (input_val * maxblk);
+            if (strcmp (input_rule[i], ".100") == 0) {
+                rule->max_blkno.value[i] = dev_info.maxblk;
             } else {
-                rule->max_blkno.value[i] = (unsigned long long)input_val;
-            }
-            if (rule->max_blkno.value[i] < 0) {
-                sprintf(msg, "line# %d %s = %lld is incorrect.\n It must be > 0.", *line, keywd, rule->max_blkno.value[i]);
-                user_msg(ps, 0, 0, SOFT, msg);
-                return -1;
+                input_val = atof(input_rule[i]);
+                if (input_val > 0 && input_val <= 1) {
+                    rule->max_blkno.value[i] = (unsigned long long) (input_val * maxblk);
+                } else {
+                    rule->max_blkno.value[i] = (unsigned long long)input_val;
+                }
+                if (rule->max_blkno.value[i] < 0) {
+                    sprintf(msg, "line# %d %s = %lld is incorrect.\n It must be > 0.", *line, keywd, rule->max_blkno.value[i]);
+                    user_msg(ps, 0, 0, SOFT, msg);
+                    return -1;
+                }
             }
             if (rule->max_blkno.value[i] > dev_info.maxblk) {
                 sprintf(msg, "line# %d %s = %lld is > max_blkno(0x%llx). Setting it to maxblk", *line, keywd, rule->max_blkno.value[i], dev_info.maxblk);
@@ -807,7 +816,7 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
         rule->min_blkno.num_keywds = parse_keywd(str, &input_rule[0]);
         for (i=0; i < rule->min_blkno.num_keywds; i++) {
             input_val = atof(input_rule[i]);
-            if (input_val > 0 && input_val <= 1) {
+            if (input_val > 0 && input_val < 1) {
                 rule->min_blkno.value[i] = (unsigned long long) (input_val * maxblk);
             } else {
                 rule->min_blkno.value[i] = (unsigned long long)input_val;
@@ -982,6 +991,13 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
             }
         }
     #endif
+    } else if ( strcasecmp(keywd, "RUN_ON_MISC") == 0 ) {
+        sscanf(str, "%*s %s", varstr);
+        if (strcasecmp(varstr, "YES") == 0) {
+            run_on_misc = 'Y';
+        }
+    } else if ( strcmp(varstr, "MISC_CMD") == 0 ) {
+        sscanf(str, "%*s %[^\n]s",  misc_run_cmd);
     } else if (strcasecmp(keywd, "RUN_REREAD") == 0) {
         sscanf(str, "%*s %s", varstr);
         if (strcasecmp (varstr, "NO") == 0) {
@@ -1164,10 +1180,12 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
 /******************************************************/
 int get_queue_depth(struct htx_data *ps)
 {
-    int i, j=0;
-    int q_depth;
-    char dev_name[32], cmd_str[128], disk_num[6];
+    int i, j=0, q_depth;
+    char dev_name[32], cmd_str[128];
     char buf[16], msg[256];
+#ifndef __HTX_LINUX__
+    char disk_num[6];
+#endif
     FILE *fp;
 
 #ifdef __HTX_LINUX__

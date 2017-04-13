@@ -1,4 +1,3 @@
-
 /* IBM_PROLOG_BEGIN_TAG */
 /*
  * Copyright 2003,2016 IBM International Business Machines Corp.
@@ -98,24 +97,72 @@
 	}
 
 
+#ifdef __HTX_LINUX__
+    #define STRERROR_R(err_num, buf, size) \
+    {     char *err_msg; \
+          if (err_num > 0) { \
+              err_msg = strerror_r(err_num, buf, size); \
+              strcpy(buf, err_msg); \
+          }  else { \
+              strcpy(buf, "Unknown error"); \
+          } \
+    }
+#else
+    #define STRERROR_R(err_num, buf, size) \
+    {    int rc = 0; \
+         if (err_num > 0) { \
+             rc = strerror_r(err_num, buf, size); \
+             if (rc != 0) { \
+                 strcpy(buf,"unknown error"); \
+             } \
+         } else {  \
+             strcpy(buf,"unknown error"); \
+         } \
+    }
+#endif
+
 #define AIO_COMPLETED       0
 #define AIO_ERROR           1
 #define AIO_INPROGRESS      EINPROGRESS
 
+#define SEG_TABLE_LIMIT         20              /* Number of threads per segment table */
+
+extern int max_thread_cnt;
+
 extern unsigned long long saved_data_len;
 extern int volatile collisions;
 
-/**************************************/
-/*	Structure to hold segment info 	***/
-/**************************************/
+/************************************************/
+/*      Structures to hold segment info         */
+/************************************************/
+/* segment_table_data struture holds the information of individual
+ * thread before performing any IO.
+ */
+struct segment_table_data {
+        unsigned long long flba;        /* start LBA no. */
+        unsigned long long llba;        /* End LBA no. */
+        unsigned long long seg_flba;    /* start LBA no of individual segment. */
+        unsigned long long seg_llba;    /* End LBA no of individual segment. */
+        pthread_t tid;                  /* thread id */
+        time_t thread_time;             /* Time when IO started */
+        int hang_count;                 /* hang count */
+        int in_use;                     /* flag to indicate if segment index is in use */
+};
+
+/* segment_table structure holds the uppper and lower lba range of individual segments */
+struct segment_table {
+        pthread_mutex_t segment_mutex;		/* mutex lock for a given seg_table */
+    	pthread_cond_t segment_do_oper;		/* Condition variable used while waiting to get lock */
+        unsigned long long LBA_lower_limit;     /* Lower limit of LBA range for a given segment table */
+        unsigned long long LBA_upper_limit;     /* Upper limit of LBA range for a given segment table */
+        struct segment_table_data seg_table_data[MAX_THREADS + MAX_BWRC_THREADS];
+};
+
+/* segment_info structure hold number of segment tables and pointer to segment tables */
 struct segment_info {
-	unsigned long long flba;	/* start LBA no. */
-	unsigned long long llba;	/* End LBA no. */
-	pthread_t tid;				/* thread id */
-	time_t thread_time;			/* Time when IO started */
-	int hang_count;				/* hang count */
-	int in_use;					/* flag to indicate if segment index is in use */
-} seg_table[MAX_THREADS + MAX_BWRC_THREADS];
+        int num_of_seg_tables;          /*Total number of segment tables created based of thread limit[SEG_TABLE_LIMIT] */
+        struct segment_table *seg_table;
+}seg_info;
 
 /**********************************/
 /***	Function Declarations 	***/
@@ -137,7 +184,7 @@ int allocate_buffers (struct htx_data *htx_ds, struct thread_context *tctx, unsi
 void free_buffers(int *malloc_count, struct thread_context *tctx);
 void free_pattern_buffers (struct thread_context *tctx);
 void clrbuf (char buf[], unsigned long long dlen);
-void bld_header (struct htx_data *, struct thread_context *, unsigned char *, unsigned long long, char, unsigned short);
+void bld_header (struct htx_data *, struct thread_context *, unsigned char *, unsigned long long, char, unsigned short, unsigned int);
 int bldbuf (struct htx_data *htx_ds, struct thread_context *tctx, unsigned short write_stamping);
 int bld_buf (struct htx_data *htx_ds, struct thread_context *tctx, unsigned short write_stamping);
 int update_header(struct thread_context *tctx, register unsigned short write_stamping);
@@ -163,6 +210,7 @@ void wait_for_cache_threads_completion(struct htx_data *htx_ds, struct thread_co
 
 void seg_lock(struct htx_data *htx_ds, struct thread_context *tctx, unsigned long long flba, unsigned long long llba);
 void seg_unlock(struct htx_data *htx_ds, struct thread_context *tctx, unsigned long long flba, unsigned long long llba);
+void segment_table_init(void);
 void initialize_fencepost (struct thread_context *);
 unsigned int get_buf_alignment(struct thread_context *tctx);
 void check_alignment(struct htx_data *, struct thread_context *);

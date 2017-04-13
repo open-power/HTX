@@ -28,22 +28,26 @@ time_t time_mark;
 pthread_t hang_monitor_thread, sync_cache_th;
 
 pthread_attr_t thread_attrs_detached;    /* threads created detached */
-pthread_cond_t  create_thread_cond_var, do_oper_cond_var, segment_do_oper;
+pthread_cond_t  create_thread_cond_var, do_oper_cond_var;
 pthread_cond_t threads_finished_cond_var;
-pthread_mutex_t thread_create_mutex, cache_mutex, segment_mutex, log_mutex;
+pthread_mutex_t thread_create_mutex, cache_mutex, log_mutex, fencepost_mutex, dump_mutex;
 
 struct device_info dev_info;
 
 int total_BWRC_threads, num_non_BWRC_threads;
 int free_BWRC_th_mem_index = 0;
 int threshold = DEFAULT_THRESHOLD, hang_time = DEFAULT_HANG_TIME;
+int max_thread_cnt = 0; 	/* Highest thread count defined in rule file stanza */
 int sync_cache_flag = 0, randomize_sync_cache = 1;
 int discard_enabled = 0, enable_state_table = NO;
 int eeh_retries = 1, turn_attention_on = 0, read_rules_file_count;
 volatile char exit_flag = 'N', signal_flag = 'N', int_signal_flag = 'N';
-char misc_run_cmd[100], run_on_misc = 'N';
+char misc_run_cmd[256] = "", run_on_misc = 'N';
 struct thread_context *non_BWRC_threads_mem = NULL, *BWRC_threads_mem = NULL;
 struct htx_data data;
+
+char *mmap_ptr= NULL;
+int mmap_fd, mmap_offset = 0;
 
 #ifdef __CAPI_FLASH__
 oper_fptr oper_list[TESTCASE_TYPES][MAX_OPER_COUNT] = {{cflsh_read_operation, cflsh_write_operation, compare_buffers, NULL,NULL, NULL},
@@ -71,8 +75,9 @@ int main(int argc, char *argv[])
     int wait_count = DEFAULT_WAIT_COUNT, skip_flag;
     char *kdblevel = NULL, *eeh_env = NULL, *ptr = NULL;
     struct ruleinfo *current_ruleptr;
-    char msg_str[100], msg[MAX_TEXT_MSG], script_path[64], cmd_str[128];
+    char msg[MAX_TEXT_MSG], script_path[64], cmd_str[128];
     struct thread_context *current_tctx;
+    char file_name[128];
 
     struct sigaction sigvector, sigdata;
     static sigset_t  sigmask;
@@ -104,13 +109,13 @@ int main(int argc, char *argv[])
 
     pthread_mutex_init(&thread_create_mutex, DEFAULT_MUTEX_ATTR_PTR);
     pthread_mutex_init(&cache_mutex, DEFAULT_MUTEX_ATTR_PTR);
-    pthread_mutex_init(&segment_mutex, DEFAULT_MUTEX_ATTR_PTR);
+    pthread_mutex_init(&fencepost_mutex, DEFAULT_MUTEX_ATTR_PTR);
     pthread_mutex_init(&log_mutex, DEFAULT_MUTEX_ATTR_PTR);
+    pthread_mutex_init(&dump_mutex, DEFAULT_MUTEX_ATTR_PTR);
 
     pthread_cond_init(&create_thread_cond_var, DEFAULT_COND_ATTR_PTR);
     pthread_cond_init(&do_oper_cond_var, DEFAULT_COND_ATTR_PTR);
     pthread_cond_init(&threads_finished_cond_var, DEFAULT_COND_ATTR_PTR);
-    pthread_cond_init(&segment_do_oper, DEFAULT_COND_ATTR_PTR);
 
     bzero(&dev_info, sizeof(dev_info));
     dev_info.cont_on_misc = UNINITIALIZED;
@@ -138,16 +143,6 @@ int main(int argc, char *argv[])
     /* If check_disk returns < 0, then the device is OK to exercise.         */
     /*************************************************************************/
 
-#ifndef __HTX_LINUX__
-    if ( (rc = check_disk(data.sdev_id, msg_str, sizeof(msg_str))) == 0) {
-        user_msg(&data, 0, 0, HARD, msg_str);
-        exit(126);
-    } else if (rc > 0 ) {
-        sprintf(msg, "ODM or LVM error in check_disk, rc = %d\n%s", rc, msg_str);
-        user_msg(&data, 0, 0, HARD, msg);
-        exit(1);
-    }
-#else
     ptr = getenv("HTXSCRIPTS");
     if (ptr != NULL) {
 		strcpy(script_path, ptr);
@@ -156,6 +151,17 @@ int main(int argc, char *argv[])
         user_msg(&data, 0, 0, INFO, msg);
         exit(1);
     }
+
+#ifndef __HTX_LINUX__
+    if ( (rc = check_disk(data.sdev_id, msg, sizeof(msg))) == 0) {
+        user_msg(&data, 0, 0, HARD, msg);
+        exit(126);
+    } else if (rc > 0 ) {
+        sprintf(msg, "ODM or LVM error in check_disk, rc = %d\n%s", rc, msg);
+        user_msg(&data, 0, 0, HARD, msg);
+        exit(1);
+    }
+#else
     sprintf(cmd_str, "%scheck_disk %s", script_path, data.sdev_id);
     rc = system(cmd_str);
     if (WIFEXITED(rc)) {
@@ -199,11 +205,37 @@ int main(int argc, char *argv[])
 			}
         } else if((strcmp(data.run_type, "REG") == 0) && data.p_shm_HE->cont_on_err) {
             /* If User specifies COE in mdt file, then need to make sure all
-             * read/write calls are successful. If we see occasional error, retry.
+             * read/write call are successfull. If we see ocassional error, retry.
              */
             eeh_retries = DEFAULT_EEH_RETRIES;
         }
     }
+
+    /* Create mmaped dump file */
+    sprintf (file_name, "%s/IO_details_dump.log", data.htx_exer_log_dir);
+    mmap_fd = open (file_name, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (mmap_fd == -1) {
+        sprintf(msg, "Could not open the dump file. errno: %d\n", errno);
+        user_msg(&data, 0, 0, HARD, msg);
+    }
+    if (lseek (mmap_fd, MMAP_FILE_SIZE, SEEK_SET) == -1) {
+        perror("lseek");
+    }
+    rc = write(mmap_fd, "", 1);
+    close(mmap_fd);
+
+    mmap_fd = open (file_name, O_RDWR);
+    if (mmap_fd == -1) {
+        sprintf(msg, "Could not open the dump file. errno: %d\n", errno);
+        user_msg(&data, 0, 0, HARD, msg);
+    }
+    /* Do the mmap of the file */
+    mmap_ptr = (char *) mmap( NULL, MMAP_FILE_SIZE, PROT_READ | PROT_WRITE, MAP_FILE | MAP_SHARED, mmap_fd, 0);
+    if (mmap_ptr == (void *) -1) {
+        sprintf(msg, "mmap failed. errno: %d\n", errno);
+        user_msg(&data, 0, 0, HARD, msg);
+    }
+    close(mmap_fd);
 
     /****************************************************************************/
 	/*   For CAPI flash, Device given as input is of format /dev/rhdisk[0-1]*.N */
@@ -380,6 +412,12 @@ int main(int argc, char *argv[])
         user_msg(&data, 0, 0, HARD, msg);
         exit(1);
     }
+    segment_table_init();
+
+    /* if run_on_misc is set to YES and misc_run_cmd is null. {Populate the default script to run*/
+    if (run_on_misc == 'Y' && strcmp(misc_run_cmd, "") == 0) {
+        sprintf(misc_run_cmd, "%s/storage_miscom_pre_kdb_script", script_path);
+    }
 
     time_mark = time(0); /* set time mark for comparison */
     if (enable_state_table == YES) {
@@ -479,8 +517,8 @@ int main(int argc, char *argv[])
                     skip_flag = 1;
                 }
             } else if ( current_ruleptr->repeat_neg > 0 ) {
-                if ((read_rules_file_count != 1)                                    &&
-                    ((read_rules_file_count % current_ruleptr->repeat_neg) != 0)    ||
+                if (((read_rules_file_count != 1)                                   &&
+                    ((read_rules_file_count % current_ruleptr->repeat_neg) != 0))   ||
                     ((current_ruleptr->repeat_neg == 1)                             &&
                     (!(read_rules_file_count & 1))                                  &&
                     (read_rules_file_count != 1))) {
@@ -676,6 +714,7 @@ int main(int argc, char *argv[])
         user_msg(&data, 0, 0, INFO, msg);
     }
     cleanup_threads_mem();
+    munmap(mmap_ptr, MMAP_FILE_SIZE);
 
     /* If enable_state_table flag is YES, SYNC the state table (i.e. update metadata on disk) */
     if (enable_state_table == YES) {
@@ -782,7 +821,6 @@ void initialize_threads(struct thread_context *tctx, int num_threads)
         current_tctx->fencepost_index = UNDEFINED;
         current_tctx->transfer_sz.min_len = UNDEFINED;
         current_tctx->BWRC_zone_index = UNDEFINED;
-        current_tctx->seg_table_index = UNDEFINED;
 
     }
 }
@@ -798,7 +836,7 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
     char tmp[64], msg[1024];
     int rc = 0, malloc_count = 0;
     int nwrites_left = 0, nreads_left = 0;
-    int oper, oper_loop, cur_num_oper;
+    unsigned long long oper, oper_loop, cur_num_oper;
     unsigned int opertn = 1, hot = 1, buf_alignment;
     int err_no, i = 0, j;
     volatile unsigned short write_stamping = (((hot & 0x7FF) << 5 ) | (i & 0x1F));
@@ -824,7 +862,7 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
         tctx->fd = (*tctx->open_func)(htx_ds, tmp, tctx);
         if (tctx->fd == -1) {
             err_no = errno;
-            if (errno == EINVAL && j < (open_retry_count - 1)) {
+            if (err_no == EINVAL && j < (open_retry_count - 1)) {
                 sleep(30);
             } else {
                 exit(1);
@@ -887,14 +925,14 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
             /* initialize fencepost status variables for the current BWRC thread.
              * Take lock and then update.
              */
-            rc = pthread_mutex_lock(&segment_mutex);
+            rc = pthread_mutex_lock(&fencepost_mutex);
             if (rc) {
                 sprintf(msg, "mutex lock failed while initializing fencepost, rc = %d\n", rc);
                 user_msg(htx_ds, rc, 0, HARD, msg);
                 goto cleanup_pattern_buffer ;
             }
             lba_fencepost[tctx->fencepost_index].status = 'R';
-            rc = pthread_mutex_unlock(&segment_mutex);
+            rc = pthread_mutex_unlock(&fencepost_mutex);
             if (rc) {
                 sprintf(msg, "mutex unlock failed while initializing fencepost, rc = %d\n", rc);
                 user_msg(htx_ds, rc, 0, HARD, msg);
@@ -1010,7 +1048,7 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                     for (i = 0; i < opertn; i++) {
                         write_stamping = (((hot & 0x7FF) << 5 ) | (i & 0x1F));
                         /*************************************************************/
-                        /* Need to build buffer every time if hotness is 1 except for */
+                        /* Need to build buffer everytime if hotness is 1 except for */
                         /* the first iteration in loop. Otherwise, just update time  */
                         /* and write stamping as blkno will be same.                 */
                         /*************************************************************/
@@ -1269,7 +1307,7 @@ cleanup_pattern_buffer :
 	if (tctx->testcase == CACHE) {
     	wait_for_cache_threads_completion(htx_ds, tctx);
     }
-close_disk :
+
     /* close the disk */
 	tctx->force_op = rc;
     rc = (*tctx->close_func)(htx_ds, tctx);
@@ -1285,8 +1323,8 @@ int execute_performance_test (struct htx_data *htx_ds, struct thread_context *tc
 {
 
     char tmp[64], msg[512];
-    int malloc_count=0, oper_loop=0, oper;
-    int i, rc = 0;
+    unsigned long long oper_loop=0, oper;
+    int i, malloc_count=0, rc = 0;
     unsigned int buf_alignment;
     volatile unsigned short write_stamping = 1;
 
@@ -1453,7 +1491,6 @@ cleanup_pattern_buffer :
         free(tctx->aio_req_queue);
     }
 
-close_disk :
     /* close the disk */
 	tctx->force_op = rc;
     rc = (*tctx->close_func)(htx_ds, tctx);
@@ -1523,18 +1560,18 @@ void * execute_thread_context (void *th_context)
      * Need to take sgement_mutex lock for it.
      */
     if (strcasecmp(tctx->oper, "BWRC") == 0) {
-        rc = pthread_mutex_lock(&segment_mutex);
+        rc = pthread_mutex_lock(&fencepost_mutex);
         if (rc) {
-            sprintf(msg, "mutex lock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
+            sprintf(msg, "mutex lock failed for fencepost_mutex in function execute_thread_context, rc = %d\n", rc);
             user_msg(&htx_ds, rc, 0, HARD, msg);
             exit(rc);
         }
 
         lba_fencepost[tctx->fencepost_index].status = 'F';
 
-        rc = pthread_mutex_unlock(&segment_mutex);
+        rc = pthread_mutex_unlock(&fencepost_mutex);
         if (rc) {
-            sprintf(msg, "mutex unlock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
+            sprintf(msg, "mutex unlock failed for fencepost_mutex in function execute_thread_context, rc = %d\n", rc);
             user_msg(&htx_ds, rc, 0, HARD, msg);
             exit(rc);
         }
@@ -1867,7 +1904,7 @@ void update_blkno(struct htx_data *htx_ds, struct ruleinfo *ruleptr, struct thre
         }
 #if 0
         /* No need as it is getting called in populate thread_context after update_blkno */
-        /* initialize first block and fencepost structure again as these are dependent on min_blkno and max_blkno */
+        /* initialize first block and fencepost structure again as these are dependant on min_blkno and max_blkno */
         current_tctx->first_blk = set_first_blk(htx_ds, current_tctx);
         /* DPRINT("id: %s - First block: 0x%llx, min_blkno: 0x%llx, max_blkno: 0x%llx\n", current_tctx->id, current_tctx->first_blk, current_tctx->min_blkno, current_tctx->max_blkno); */
         if (current_tctx->fencepost_index != -1) {
@@ -1891,6 +1928,7 @@ void initialize_fencepost(struct thread_context *tctx)
         lba_fencepost[tctx->fencepost_index].min_lba = tctx->max_blkno;
         lba_fencepost[tctx->fencepost_index].max_lba = tctx->max_blkno;
     }
+    lba_fencepost[tctx->fencepost_index].last_update_time = time(0);
     lba_fencepost[tctx->fencepost_index].status = 'F';
 }
 
@@ -2125,7 +2163,7 @@ void apply_template_settings (struct thread_context *current_tctx, template *tmp
 
 /************************************************************/
 /*  Function to copy rule info to thread context structure  */
-/*  If any template is associated with rule and template    */
+/*  If any template is associated with rule and tempalte    */
 /*  variables values are defined in rule stanza also, Then  */
 /*  it will over-write template values.                     */
 /************************************************************/
@@ -2507,7 +2545,7 @@ int get_disk_info(struct htx_data *data, char *dev_name)
     if ( info.devtype == DD_SCDISK || info.devtype == DD_SCRWOPT || info.devtype == DD_CDROM)  {
         rc = get_lun(data, dev_info.diskname);
         if (rc) {
-            sprintf(msg, "Unable to retrieve SCSI ID/LUN from ODM database. rc=%d", rc);
+            sprintf(msg, "Unable to retreive SCSI ID/LUN from ODM database. rc=%d", rc);
             user_msg(data, 0, 0, HARD, msg);
             if ((close(filedes)) == -1) {
                 sprintf(msg, "CLOASE call failed!");
@@ -2821,7 +2859,7 @@ void print_thread_context(struct thread_context *tctx)
     printf("testcase: %d\n", tctx->testcase);
     printf("mode: %d\n", tctx->mode);
     printf("oper: %s, oper_count: %d\n", tctx->oper, tctx->oper_count);
-    printf("num_oper[SEQ]: %d, num_oper[RANDOM]: %d\n", tctx->num_oper[SEQ], tctx->num_oper[RANDOM]);
+    printf("num_oper[SEQ]: %lld, num_oper[RANDOM]: %lld\n", tctx->num_oper[SEQ], tctx->num_oper[RANDOM]);
     printf("starting block: %lld\n", tctx->starting_block);
     printf("Direction: %d\n", tctx->direction);
     printf("min_len: %lld, max_len: %lld, increment: %d\n", tctx->transfer_sz.min_len, tctx->transfer_sz.max_len, tctx->transfer_sz.increment);
