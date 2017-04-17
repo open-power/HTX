@@ -1,29 +1,43 @@
 include ../../htx.mk
 
-TARGET= hxefabricbus 
+TARGET=hxefabricbus
 
 LDFLAGS +=
 
 OBJ_SUFF=.o
-OBJECTS = main${OBJ_SUFF} \
-                setup${OBJ_SUFF} \
-                rf_parser${OBJ_SUFF}
+
+vpath = %.% ../hxemem64/
+
+OBJECTS =  \
+    nest_framework${OBJ_SUFF} \
+    nest_read_rules${OBJ_SUFF} \
+    parse_filters${OBJ_SUFF} \
+    mem${OBJ_SUFF} \
+    fabricbus_setup${OBJ_SUFF} \
+    memory_operations${OBJ_SUFF} \
+    mem_pattern_file_operations${OBJ_SUFF} \
+    mem_random_pat_operations${OBJ_SUFF} \
+    stride_operation${OBJ_SUFF}
+
 
 SRCS = $(patsubst %.o, %.c, $(OBJECTS))
 
-CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE  -D_REENTRANT -D__HTX_LINUX__ -D_target_ppc -D__GR2600__  -O2 -DFALSE=0 -DTRUE=1
- 
-LIBS = -lhtx64 -lpthread 
- 
+CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g -O2 -D__HTX_LINUX_ -DTRUE=1 -DFALSE=0 -I./../hxemem64
+
+LIBS = -lhtx64 -lpthread
 
 .PHONY: all clean
+
+%.o: ../hxemem64/%.c 
+	${CC} ${CFLAGS} ${INCLUDES} -c $< -o $@
 
 all: ${OBJECTS}
 	${CC} ${LDFLAGS} ${LIBPATH} ${OBJECTS} ${LIBS} -o ${TARGET}
 	${CP} ${TARGET} ${SHIPBIN}
 
-%.o: %.c
-	${CC} ${CFLAGS} ${INCLUDES} -c $< -o $@
+
+%.o: ../hxemem64/%.s
+	${AS} -c $< -o $@
 
 clean:
 	${RM} -f *.o ${TARGET} ${SHIPBIN}/${TARGET}

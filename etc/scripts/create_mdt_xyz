@@ -1,26 +1,9 @@
 #!/bin/bash
 
-proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
-proc_ver_dec=`printf %d $proc_ver`
-
-if [[ $proc_ver_dec -ge 78 ]]
-then
-    rule="default.inter_chip"
-    device="fabc"
-    mdt="mdt.inter_chip"
-    echo "Creating mdt.inter_chip..."
-else
-	# Print the memory configure
-	${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.xyz query_memconf > /dev/null 2>&1
-
-	# Print the memory configure
-	${HTXBIN}/hxefabricbus  /dev/ablink OTH ${HTXREGRULES}/hxefabricbus/default.xyz query_maskconf > /dev/null 2>&1
-
-	rule="default.xyz"
-	device="xyzlink"
-	mdt="mdt.xyzlink"
-	echo "Creating mdt.xyzlink ..."
-fi
+rule="default.inter_chip"
+device="fabc"
+mdt="mdt.inter_chip"
+echo "Creating mdt.inter_chip..."
 
 cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk                                              > ${HTXMDT}/${mdt}
 

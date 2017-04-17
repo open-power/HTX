@@ -2624,7 +2624,7 @@ int run_stanza_operation(){
 			}
 			if(strlen(msg) >= (2*KB)){
     			displaym(HTX_HE_INFO,DBG_MUST_PRINT,"%s\n",msg);
-				sprintf(msg,NULL);
+				msg[0]=0;/*move terminal char to start of array*/
 			}
 		}   
 	}

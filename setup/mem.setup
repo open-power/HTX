@@ -68,12 +68,7 @@ then
         cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxemem64_new
         cp ${HTXBIN}/hxetlbie ${HTXBIN}/hxemem64
     fi
-else
-	if [ ! -x ${HTXBIN}/hxefabricbus.old ]
-	then
-		mv ${HTXBIN}/hxefabricbus ${HTXBIN}/hxefabricbus.old
-		cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxefabricbus
-	fi
+
 fi
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
 if [[ $Hugepagesize -lt 2048 ]]
