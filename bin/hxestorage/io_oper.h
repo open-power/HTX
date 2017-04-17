@@ -1,5 +1,5 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/*
+/* 
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +24,8 @@
 /********************************************************************/
 
 #include "hxestorage_utils.h"
+#include <sys/mman.h>
+
 #ifdef __HTX_LINUX__
     #include <scsi/sg.h>
     #include <scsi/scsi.h>
@@ -38,6 +40,7 @@
 typedef loff_t  offset_t;
 #endif
 
+#define MMAP_FILE_SIZE (200 * KB)
 extern char fsync_flag;
 
 #ifdef __CAPI_FLASH__
@@ -78,6 +81,8 @@ int close_disk (struct htx_data *, struct thread_context *);
 int read_disk (struct htx_data *, struct thread_context *, int);
 int write_disk (struct htx_data *, struct thread_context *, int);
 int compare_buffers (struct htx_data *, struct thread_context *, int);
+int do_compare_with_discard(struct htx_data *, struct thread_context *, char *, char *, int, char *);
+int do_compare (struct htx_data *, struct thread_context *, char *, char *, int, int *, int, char *);
 int discard (struct htx_data *, struct thread_context *, int);
 
 /* ASYNC IO functions */
@@ -106,6 +111,8 @@ void read_mem(struct cache_thread *);
 /* SYNC cache functions */
 int sync_cache(struct htx_data *, struct thread_context *, int);
 int sync_cache_operation(struct htx_data *, int);
+
+int run_cmd(struct htx_data *, char *);
 
 #ifdef __CAPI_FLASH__
 int open_lun(struct htx_data *htx_ds, const char * capi_device, struct thread_context * );

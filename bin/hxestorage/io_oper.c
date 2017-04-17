@@ -30,6 +30,8 @@ pthread_t cache_threads[MAX_NUM_CACHE_THREADS];
 
 pthread_mutex_t cache_mutex;
 
+extern pthread_mutex_t fencepost_mutex, dump_mutex;
+
 #ifdef __HTX_LINUX__
 void __attn(unsigned int a,
             unsigned int b,
@@ -43,6 +45,14 @@ void __attn(unsigned int a,
 }
 #endif
 
+#ifndef __HTX_LINUX__
+    unsigned long long read_tb(void);
+    #pragma mc_func read_tb {"7c6c42a6"}
+    #pragma reg_killed_by read_tb gr3
+#else
+    #define read_tb(var) asm volatile ("mfspr %0, 268":"=r"(var));
+#endif
+
 #ifdef __CAPI_FLASH__
     extern volatile chunk_id_t shared_lun_id;
 	extern int lun_type;
@@ -53,9 +63,41 @@ void __attn(unsigned int a,
 extern pthread_mutex_t thread_create_mutex;
 extern pthread_cond_t threads_finished_cond_var;
 extern int discard_enabled;
+extern char *mmap_ptr;
+extern int mmap_offset;
 
-/***************************************/
-/****   set file pointer        *******/
+/***************************************************/
+/****   Function to update the debug dump file  ****/
+/***************************************************/
+int update_dump_file (char *msg, char *err_str)
+{
+    int i, rc = 0;
+
+    rc = pthread_mutex_lock(&dump_mutex);
+    if (rc) {
+        sprintf(err_str, "mutex lock failed in function update_dump_file, rc = %d\n", rc);
+        return (-1);
+    }
+
+    if (mmap_offset + strlen(msg) >= MMAP_FILE_SIZE) {
+         for (i = 0; i < MMAP_FILE_SIZE - mmap_offset; i++) {
+              mmap_ptr[mmap_offset + i] = ' ';
+         }
+         mmap_offset = 0;
+     }
+     sprintf(mmap_ptr + mmap_offset, "%s", msg);
+     mmap_offset += strlen(msg);
+
+     rc = pthread_mutex_unlock(&dump_mutex);
+     if (rc) {
+        sprintf(err_str, "mutex unlock failed in function update_dump_file, rc = %d\n", rc);
+        return (-1);
+     }
+    return (rc);
+}
+
+/**************************************/
+/****      set file pointer        ****/
 /**************************************/
 int set_addr(struct htx_data *htx_ds, struct thread_context *tctx, int loop)
 {
@@ -82,12 +124,13 @@ int set_addr(struct htx_data *htx_ds, struct thread_context *tctx, int loop)
     } while (rcode == -1 && temp_retries > 0);
 
     if (rcode == -1) {
+        err_no = errno;
         tctx->io_err_flag = SEEK_ERR;
         sprintf(msg, "error in llseek: addr = %llu (0x%llx).", (unsigned long long)addr, (unsigned long long)addr);
         prt_msg(htx_ds, tctx, loop, err_no, HARD, msg);
     } else  if (addr != rcode) {
         tctx->io_err_flag = SEEK_ERR;
-        sprintf(msg,"Error in setaddr: addr %llx rcode %llx \n",(unsigned long long)addr, (unsigned long long)rcode);
+        sprintf(msg,"Error in set_addr: addr %llx rcode %llx \n",(unsigned long long)addr, (unsigned long long)rcode);
         user_msg(htx_ds, -1, tctx->io_err_flag, HARD, msg);
     } else {
         rcode = 0;
@@ -143,6 +186,7 @@ int open_disk (struct htx_data *htx_ds, const char * pathname, struct thread_con
     } while (rc == -1 && temp_retries > 0);
 
     if (rc == -1 && temp_retries == 0) {
+        err_no = errno;
         tctx->io_err_flag = OPEN_ERR;
         sprintf(msg, "\nExerciser failed on max retries, open system call failed \n");
         user_msg(htx_ds, err_no, tctx->io_err_flag, HARD, msg);
@@ -175,6 +219,7 @@ int close_disk (struct htx_data *htx_ds, struct thread_context * tctx)
     } while (rc == -1 && temp_retries > 0);
 
     if (rc == -1 && temp_retries == 0) {
+        err_no = errno;
         tctx->io_err_flag = CLOSE_ERR;
         sprintf(msg, "\nExerciser failed on max retries, close system call failed \n");
         user_msg(htx_ds, err_no, tctx->io_err_flag, HARD, msg);
@@ -225,12 +270,12 @@ int open_lun(struct htx_data *htx_ds, const char * device, struct thread_context
                     return(-1);
                 }
                 if(size <=  chunk_size) {
-                    sprintf(msg, "Cannot allocate requested size= %#llx, reducing to %#llx \n", chunk_size, size);
+                    sprintf(msg, "Cannot allocate requested size= %#llx, depricating to %#llx \n", chunk_size, size);
                     user_msg(htx_ds, 0, tctx->io_err_flag, INFO, msg);
                     chunk_size = size;
                     return(0);
                 } else {
-                    sprintf(msg, "Failed to allocate request size for VLUN, cblk_set_size failed with ENOMEM, device = %s \n", capi_device );
+                    sprintf(msg, "Failed to allocate request size for VLUN, cblk_set_size failed wtih ENOMEM, device = %s \n", capi_device );
                     user_msg(htx_ds, ENOMEM, tctx->io_err_flag, HARD, msg);
                     return(-1);
                 }
@@ -318,18 +363,18 @@ int close_lun(struct htx_data *htx_ds, struct thread_context * tctx) {
     }
 
     if(strcasecmp(tctx->oper, "BWRC") == 0 )  {
-		rc = pthread_mutex_lock(&segment_mutex);
+		rc = pthread_mutex_lock(&fencepost_mutex);
         if (rc) {
-           	sprintf(msg, "mutex lock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
+           	sprintf(msg, "mutex lock failed for fencepost_mutex in function execute_thread_context, rc = %d\n", rc);
            	user_msg(htx_ds, rc, 0, HARD, msg);
            	exit(rc);
         }
 
         lba_fencepost[tctx->fencepost_index].status = 'F';
 
-        rc = pthread_mutex_unlock(&segment_mutex);
+        rc = pthread_mutex_unlock(&fencepost_mutex);
         if (rc) {
-           	sprintf(msg, "mutex unlock failed for segment_mutex in function execute_thread_context, rc = %d\n", rc);
+           	sprintf(msg, "mutex unlock failed for fencepost_mutex in function execute_thread_context, rc = %d\n", rc);
            	user_msg(htx_ds, rc, 0, HARD, msg);
            	exit(rc);
         }
@@ -606,8 +651,10 @@ retry :
 int disk_read_operation(struct htx_data *htx_ds, int filedes, void *buf, unsigned int len)
 {
     int rc = -1;
+#ifndef __HTX_LINUX__
     char msg[512];
     int err_no = 0;
+#endif
     unsigned int temp_retries = eeh_retries;
 
     do {
@@ -630,9 +677,9 @@ int disk_read_operation(struct htx_data *htx_ds, int filedes, void *buf, unsigne
 /********************************************************/
 int read_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
 {
-    long long rc = 0;
-    int err_no = 0;
-    char msg[512], *rbuf;
+    long long rc = 0, dump_rc;
+    char msg[512], *rbuf, info[256], err_str[128];;
+    unsigned long long time;
 
     rbuf = tctx->rbuf;
 
@@ -651,6 +698,20 @@ int read_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
         return rc;
     }
 
+#ifndef __HTX_LINUX__
+    time = read_tb();
+#else
+    read_tb(time);
+#endif
+
+    sprintf(info, "thread_id: %s - time: 0x%llx, oper: %s, cur_oper: read, blkno: 0x%llx, num_blks: %d, rbuf addr: 0x%llx\n", tctx->id, time,
+                tctx->oper, tctx->blkno[0], tctx->num_blks, (unsigned long long)tctx->rbuf);
+
+    dump_rc = update_dump_file(info, err_str);
+    if (dump_rc == -1) {
+        prt_msg(htx_ds, tctx, loop, -1, HARD, err_str);
+    }
+
     /***************************************************/
     /*****  Do read operation for eeh_retries time. ****/
     /*****  On linux, eeh_retries set to 1          ****/
@@ -659,7 +720,7 @@ int read_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
     if (rc == -1) {
         tctx->io_err_flag = READ_ERR;
         htx_ds->bad_reads += 1;
-        prt_msg(htx_ds, tctx, loop, errno, HARD, "read error.");
+        prt_msg(htx_ds, tctx, loop, errno, HARD, "read system call failed.\n");
         RETURN(rc, tctx->io_err_flag);
     } else if (rc != tctx->dlen) {
         tctx->io_err_flag = READ_ERR;
@@ -680,8 +741,11 @@ int read_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
 /******************************************************/
 int disk_write_operation(struct htx_data *htx_ds, int filedes, void *buf, unsigned int len)
 {
-    int rc = -1, err_no = 0;
+    int rc = -1;
+#ifndef __HTX_LINUX__
+    int err_no = 0;
     char msg[512];
+#endif
     unsigned int temp_retries = eeh_retries;
 
     do {
@@ -704,8 +768,9 @@ int disk_write_operation(struct htx_data *htx_ds, int filedes, void *buf, unsign
 /****************************************************/
 int write_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
 {
-    long long rc = 0;
-    char msg[512];
+    long long rc = 0, dump_rc;
+    char msg[512], info[256], err_str[128];
+    unsigned long long time;
 
     /****************************************************/
     /***** Set file descriptor to required blkno    *****/
@@ -713,6 +778,19 @@ int write_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
     rc = set_addr(htx_ds, tctx, loop);
     if (rc != 0) {
         return rc;
+    }
+
+#ifndef __HTX_LINUX__
+    time = read_tb();
+#else
+    read_tb(time);
+#endif
+
+    sprintf(info, "thread_id: %s - time: 0x%llx, oper: %s, cur oper: write, blkno: 0x%llx, num_blks: %d, wbuf addr: 0x%llx\n", tctx->id, time,
+                tctx->oper, tctx->blkno[0], tctx->num_blks, (unsigned long long)tctx->wbuf);
+    dump_rc = update_dump_file(info, err_str);
+    if (dump_rc == -1) {
+        prt_msg(htx_ds, tctx, loop, -1, HARD, err_str);
     }
 
     /****************************************************/
@@ -724,7 +802,7 @@ int write_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
     if (rc == -1) {
         tctx->io_err_flag = WRITE_ERR;
         htx_ds->bad_writes += 1;
-        prt_msg(htx_ds, tctx, loop, errno, HARD, " write error - ");
+        prt_msg(htx_ds, tctx, loop, errno, HARD, " write system call failed.\n");
         RETURN(rc, tctx->io_err_flag);
     } else if (rc != tctx->dlen) {
         tctx->io_err_flag = WRITE_ERR;
@@ -870,11 +948,12 @@ int do_compare_with_discard(struct htx_data *htx_ds, struct thread_context *tctx
 int do_compare (struct htx_data *htx_ds, struct thread_context *tctx, char *wbuf, char *rbuf,
                 int loop, int *cksum, int cmp_offset, char *msg)
 {
-    int error_found = 0, offset = -1;
+    int rc = 0, error_found = 0, offset = -1;
     time_t time_buffer;
     register unsigned int j;
     unsigned long long i, compare_len;
     unsigned short *sptr;
+    char cmd[256];
     int cmp_bytes = dev_info.blksize / (num_sub_blks_psect + 1);
 
     if (discard_enabled == YES) {
@@ -929,8 +1008,7 @@ int do_compare (struct htx_data *htx_ds, struct thread_context *tctx, char *wbuf
                              " was written to\n" "the disk or disk was not initalized during this run.\n", (unsigned int)time_buffer,
                              (unsigned int)time_mark);
                 prt_msg(htx_ds, tctx, loop, 0, SOFT, msg);
-                j = i + 8; /* time stamp */
-                break;
+                offset = 8; /* time stamp */
             } else {
                 /* First calc the sum of HEADER shorts. Note: the  */
                 /* sum was gen'd from an array of shorts so use a  */
@@ -949,7 +1027,7 @@ int do_compare (struct htx_data *htx_ds, struct thread_context *tctx, char *wbuf
                     offset = 0;
                 } else {
                     offset = HEADER_SIZE ;
-                }
+			    }
             }
         }
 
@@ -975,15 +1053,21 @@ int do_compare (struct htx_data *htx_ds, struct thread_context *tctx, char *wbuf
                     }
                    if (turn_attention_on == 1) {
                     #ifndef __HTX_LINUX__
-                        attn( 0xBEEFDEAD, (unsigned long long)wbuf, (unsigned long long)rbuf, j, &lba_fencepost[0],
+                        attn( 0xBEEFDEAD, (unsigned long long)wbuf, (unsigned long long)rbuf, j, (unsigned long long)lba_fencepost,
                               (unsigned long long)tctx, tctx->dlen, (unsigned long long)tctx->mis_log_buf);
                     #else
-                        __attn( 0xBEEFDEAD, (unsigned long long)wbuf, (unsigned long long)rbuf, j, &lba_fencepost[0],
+                        __attn( 0xBEEFDEAD, (unsigned long long)wbuf, (unsigned long long)rbuf, j, (unsigned long long)lba_fencepost,
                                 (unsigned long long)tctx, tctx->dlen, (unsigned long long)tctx->mis_log_buf);
                     #endif
                     }
                     if (run_on_misc == 'Y') {
-                        system(misc_run_cmd);
+                        sprintf(cmd, "%s %s %s 0x%llx %d > %s/pre_kdb_script_output", misc_run_cmd, dev_info.diskname, tctx->oper,
+                                      tctx->blkno[0], tctx->num_blks, htx_ds->htx_exer_log_dir);
+                        rc = system(cmd);
+                        if (!WIFEXITED(rc)) {
+                            sprintf(msg, "cmd %s could not be executed before entering into kDB.\n", misc_run_cmd);
+                            /* user_msg(htx_ds, -1, 0, INFO, msg); */
+						}
                     }
                     if (dev_info.crash_on_miscom) {
                     #ifndef __HTX_LINUX__
@@ -1015,14 +1099,14 @@ int compare_buffers(struct htx_data *htx_ds, struct thread_context *tctx, int lo
 {
     long long offs, offs_reread = -1; /* Offset of miscompare if found                */
     int cksum = 0, rc = 0, err_no = 0, bufrem;
-    char *save_reread_buf; /* Pointer to a reread-buffer (if necessary) */
+    char *save_reread_buf = NULL; /* Pointer to a reread-buffer (if necessary) */
     static unsigned short miscompare_count = 0; /* miscompare count */
     unsigned int alignment, cnt = 0;
     char *rbuf = tctx->rbuf;
     char *wbuf = tctx->wbuf;
     char msg[MAX_TEXT_MSG], msg1[512];
     char path[128], path_w[128], path_r[128]; /* dump files path */
-    char id_save[32], *tmp_ptr = NULL;
+    char id_save[32];
     char err_str[ERR_STR_SZ], log_dir[32];
     FILE *fp;
 
@@ -1044,7 +1128,7 @@ int compare_buffers(struct htx_data *htx_ds, struct thread_context *tctx, int lo
             tctx->reread_buf = malloc (tctx->dlen +  alignment + 128);
             if (tctx->reread_buf == NULL) {
                 err_no = errno;
-                strerror_r(err_no, err_str, ERR_STR_SZ);
+                STRERROR_R(err_no, err_str, ERR_STR_SZ);
                 sprintf(msg1, "Can't malloc re-read buffer. errno: %d (%s) - re-read not done.\n",
                         err_no, err_str);
                 strcat(msg, msg1);
@@ -1248,7 +1332,7 @@ int read_async_disk(struct htx_data *htx_ds, struct thread_context *tctx, int lo
     rc = aio_read(&tctx->aio_req_queue[index].aio_req);
     if (rc != 0) {
         err_no = errno;
-        sprintf(msg, "aio_read error. errno: %d\n", err_no);
+        sprintf(msg, "aio_read error\n");
         prt_msg(htx_ds, tctx, loop, err_no, HARD, msg);
         return rc;
     } else {
@@ -1274,7 +1358,7 @@ int write_async_disk(struct htx_data *htx_ds, struct thread_context *tctx, int l
     rc = aio_write(&tctx->aio_req_queue[index].aio_req);
     if (rc != 0) {
         err_no = errno;
-        sprintf(msg, "aio_write error. errno: %d\n", err_no);
+        sprintf(msg, "aio_write error.\n");
         prt_msg(htx_ds, tctx, loop, err_no, HARD, msg);
         return rc;
     } else {
@@ -1301,7 +1385,6 @@ int open_passth_disk(struct htx_data *htx_ds, const char *pathname, struct threa
     char tmp[32], msg[128];
     int rc, adapter, err_no;
     struct scsi_sciolst sciolst;
-    char err_str[ERR_STR_SZ];
 
     strcpy(tmp, pathname);
 
@@ -1323,9 +1406,8 @@ int open_passth_disk(struct htx_data *htx_ds, const char *pathname, struct threa
     if (rc != 0) {
         tctx->io_err_flag = IOCTL_ERR;
         err_no = errno;
-        strerror_r(err_no, err_str, ERR_STR_SZ);
         close(adapter);
-        sprintf(msg, "SCIOLSTART failed: %d(%s)\n",err_no, err_str);
+        sprintf(msg, "SCIOLSTART failed.\n");
         user_msg(htx_ds, err_no, tctx->io_err_flag, HARD, msg);
         RETURN(-1, tctx->io_err_flag);
     }
@@ -1342,10 +1424,9 @@ int open_passth_disk(struct htx_data *htx_ds, const char *pathname, struct threa
 int close_passth_disk (struct htx_data *htx_ds, struct thread_context * tctx)
 {
 #ifndef __HTX_LINUX__
-    int rc = 0, err_no;
+    int rc = 0, err_no = 0;
     char msg[128];
     struct scsi_sciolst sciolst;
-    char err_str[ERR_STR_SZ];
 
     /* Issue SCIOSTOP */
     if(dev_info.parent_info.devsubtype == DS_SAS || dev_info.parent_info.devsubtype == 'D') {
@@ -1360,9 +1441,8 @@ int close_passth_disk (struct htx_data *htx_ds, struct thread_context * tctx)
     if( rc !=0 ) {
         tctx->io_err_flag = IOCTL_ERR;
         err_no = errno;
-        strerror_r(err_no, err_str, ERR_STR_SZ);
         close(tctx->fd);
-        sprintf(msg, "STOP failed: %d(%s)\n", err_no, err_str);
+        sprintf(msg, "SCIOLSTOP failed.\n");
         user_msg(htx_ds, err_no, tctx->io_err_flag, HARD, msg);
         RETURN(-1, tctx->io_err_flag);
     }
@@ -1415,8 +1495,8 @@ int read_passth_disk(struct htx_data *htx_ds, struct thread_context *tctx, int l
     }
     rc = do_ioctl(htx_ds, tctx->fd, SCIOLCMD, (void *)&iocmd);
     if ( rc != 0 ) {
-        tctx->io_err_flag = IOCTL_ERR;
         err_no = errno;
+        tctx->io_err_flag = IOCTL_ERR;
         sprintf( msg, "errno = %d, adap_set_flags = %d, status_validity = %d, scsi_bus_status = %d,"
                       " adapter_status = %d, sense_data_len = %d, sense_data_ptr: %llx\n ", err_no, iocmd.adap_set_flags,
                       iocmd.status_validity, iocmd.scsi_bus_status, iocmd.adapter_status, iocmd.autosense_length, (unsigned long long)iocmd.autosense_buffer_ptr);
@@ -1542,7 +1622,6 @@ int verify_passth_disk (struct htx_data *htx_ds, struct thread_context *tctx, in
     char msg[256], tmp[64];
     struct sc_passthru scpt;
     int temp_retries = eeh_retries;
-    char err_str[ERR_STR_SZ];
 
     strcpy(tmp,"/dev/");
     strcat(tmp, dev_info.disk_parent);
@@ -1550,8 +1629,7 @@ int verify_passth_disk (struct htx_data *htx_ds, struct thread_context *tctx, in
     if ((adapter = open_disk(htx_ds, tmp,  tctx) ) == -1 ) {
         tctx->io_err_flag = OPEN_ERR;
         err_no = errno;
-        strerror_r(err_no, err_str, ERR_STR_SZ);
-        sprintf(msg, "Open error in verify_passth_disk - errno: %d(%s)\n", err_no, err_str);
+        sprintf(msg, "Open error in verify_passth_disk.\n");
         user_msg(htx_ds, err_no, tctx->io_err_flag, HARD, msg);
         RETURN(-1, tctx->io_err_flag);
     }
@@ -1560,9 +1638,8 @@ int verify_passth_disk (struct htx_data *htx_ds, struct thread_context *tctx, in
     if (rc !=0 ) {
         tctx->io_err_flag = IOCTL_ERR;
         err_no = errno;
-        strerror_r(err_no, err_str, ERR_STR_SZ);
         close(adapter);
-        sprintf(msg, "first SCIOSTOP failed: errno - %d(%s)\n", err_no, err_str);
+        sprintf(msg, "first SCIOSTOP failed: errno.\n");
         user_msg(htx_ds, err_no, tctx->io_err_flag, HARD, msg);
         RETURN(rc, tctx->io_err_flag);
     }
@@ -1571,9 +1648,8 @@ int verify_passth_disk (struct htx_data *htx_ds, struct thread_context *tctx, in
     if (rc !=0 ) {
         tctx->io_err_flag = IOCTL_ERR;
         err_no = errno;
-        strerror_r(err_no, err_str, ERR_STR_SZ);
         close(adapter);
-        sprintf(msg, "SCIO START failed: %d (%s)\n", err_no, err_str);
+        sprintf(msg, "SCIO START failed.\n");
         user_msg(htx_ds, err_no, tctx->io_err_flag, HARD, msg);
         RETURN(rc, tctx->io_err_flag);
     }
@@ -1842,9 +1918,9 @@ int compare_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop
     int  i, j, cmp_cnt, save_reread, err_no;
     int rc, err_cond;
     char s[3], path[128], cmp_str[512], msg[MAX_TEXT_MSG];
-    char *save, stanza_save[9], *tmp_ptr = NULL;
+    char *save = NULL, stanza_save[9];
     char *rbuf, *wbuf, err_str[ERR_STR_SZ], log_dir[32];
-    unsigned int alignment, blk_shift, bufrem;
+    unsigned int alignment, bufrem;
     static ushort misc_count = 0;
 
     err_cond = 0;
@@ -1906,13 +1982,12 @@ int compare_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop
         strcat(msg, "\n");
 
         alignment = get_buf_alignment(tctx);
-        blk_shift = (alignment * dev_info.blksize) - 1; /* why multipying it by blksize, check original code -- preeti */
         tctx->reread_buf= (char *) 0; /* This buffer will hold the re-read block      */
         save_reread = 0;
         tctx->reread_buf = (char *) malloc(tctx->dlen + alignment + 128);
         if(tctx->reread_buf == NULL) {
             err_no = errno;
-            strerror_r(err_no, err_str, ERR_STR_SZ);
+            STRERROR_R(err_no, err_str, ERR_STR_SZ);
             sprintf(cmp_str,"** Can't malloc re-read buf in compare_cache: errno %d (%s)\n",
                     err_no, err_str);
             strcat(msg, cmp_str);
@@ -1941,28 +2016,28 @@ int compare_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop
             if (rc != tctx->dlen) {
                 sprintf(cmp_str, "CACHE > Error trying to re-read disk buffer!\n");
                 strcat(msg, cmp_str);
-                free(tctx->reread_buf);
+                free(save);
                 tctx->reread_buf = (char *) 0;
             } else {
                 err_cond = 0;
                 for ( i = 0; i < tctx->dlen; i++ ) {
-                    if ((tctx->reread_buf+i == (char *)wbuf[i])                    ||
-                        ((tctx->reread_buf+i == ( char *)0x11) && (i % MAX_CACHE_PATTERNS == 0))    ||
-                        ((tctx->reread_buf+i == ( char *)0x22) && (i % MAX_CACHE_PATTERNS == 1))    ||
-                        ((tctx->reread_buf+i == ( char *)0x33) && (i % MAX_CACHE_PATTERNS == 2))    ||
-                        ((tctx->reread_buf+i == ( char *)0x44) && (i % MAX_CACHE_PATTERNS == 3))    ||
-                        ((tctx->reread_buf+i == ( char *)0x55) && (i % MAX_CACHE_PATTERNS == 4))    ||
-                        ((tctx->reread_buf+i == ( char *)0x66) && (i % MAX_CACHE_PATTERNS == 5))    ||
-                        ((tctx->reread_buf+i == ( char *)0x77) && (i % MAX_CACHE_PATTERNS == 6))    ||
-                        ((tctx->reread_buf+i == ( char *)0x88) && (i % MAX_CACHE_PATTERNS == 7))    ||
-                        ((tctx->reread_buf+i == ( char *)0x99) && (i % MAX_CACHE_PATTERNS == 8))    ||
-                        ((tctx->reread_buf+i == ( char *)0xaa) && (i % MAX_CACHE_PATTERNS == 9))    ||
-                        ((tctx->reread_buf+i == ( char *)0xbb) && (i % MAX_CACHE_PATTERNS == 10))    ||
-                        ((tctx->reread_buf+i == ( char *)0xcc) && (i % MAX_CACHE_PATTERNS == 11))    ||
-                        ((tctx->reread_buf+i == ( char *)0xdd) && (i % MAX_CACHE_PATTERNS == 12))    ||
-                        ((tctx->reread_buf+i == ( char *)0xee) && (i % MAX_CACHE_PATTERNS == 13))    ||
-                        ((tctx->reread_buf+i == ( char *)0xff) && (i % MAX_CACHE_PATTERNS == 14))    ||
-                        ((tctx->reread_buf+i == ( char *)0x5a) && (i % MAX_CACHE_PATTERNS == 15)) );
+                    if ((tctx->reread_buf[i] == wbuf[i])                    ||
+                        ((tctx->reread_buf[i] == 0x11) && (i % MAX_CACHE_PATTERNS == 0))    ||
+                        ((tctx->reread_buf[i] == 0x22) && (i % MAX_CACHE_PATTERNS == 1))    ||
+                        ((tctx->reread_buf[i] == 0x33) && (i % MAX_CACHE_PATTERNS == 2))    ||
+                        ((tctx->reread_buf[i] == 0x44) && (i % MAX_CACHE_PATTERNS == 3))    ||
+                        ((tctx->reread_buf[i] == 0x55) && (i % MAX_CACHE_PATTERNS == 4))    ||
+                        ((tctx->reread_buf[i] == 0x66) && (i % MAX_CACHE_PATTERNS == 5))    ||
+                        ((tctx->reread_buf[i] == 0x77) && (i % MAX_CACHE_PATTERNS == 6))    ||
+                        ((tctx->reread_buf[i] == 0x88) && (i % MAX_CACHE_PATTERNS == 7))    ||
+                        ((tctx->reread_buf[i] == 0x99) && (i % MAX_CACHE_PATTERNS == 8))    ||
+                        ((tctx->reread_buf[i] == 0xaa) && (i % MAX_CACHE_PATTERNS == 9))    ||
+                        ((tctx->reread_buf[i] == 0xbb) && (i % MAX_CACHE_PATTERNS == 10))    ||
+                        ((tctx->reread_buf[i] == 0xcc) && (i % MAX_CACHE_PATTERNS == 11))    ||
+                        ((tctx->reread_buf[i] == 0xdd) && (i % MAX_CACHE_PATTERNS == 12))    ||
+                        ((tctx->reread_buf[i] == 0xee) && (i % MAX_CACHE_PATTERNS == 13))    ||
+                        ((tctx->reread_buf[i] == 0xff) && (i % MAX_CACHE_PATTERNS == 14))    ||
+                        ((tctx->reread_buf[i] == 0x5a) && (i % MAX_CACHE_PATTERNS == 15)) );
                     else {
                         err_cond = 1;
                         i = tctx->dlen;
@@ -2012,7 +2087,8 @@ int compare_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop
                 } else {
                     strcat(msg, "Re-read compares OK; buffer not saved.\n");
                 }
-                free(tctx->reread_buf);
+                free(save);
+                tctx->reread_buf = NULL;
             }
             user_msg(htx_ds, -1, 0, MISCOM, msg);
         } else {
@@ -2021,7 +2097,8 @@ int compare_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop
             strcat(msg, cmp_str);
             user_msg(htx_ds, -1, 0, HARD, msg);
             if (tctx->reread_buf != (char *) 0) {
-                free(tctx->reread_buf);
+                free(save);
+                tctx->reread_buf = NULL;
             }
         }
         return(1);
@@ -2035,7 +2112,7 @@ void write_mem(struct cache_thread *c_th)
 {
     int rc = 0;
     long long i;
-    char pattern, *buf;
+    char pattern = 'x', *buf;
     char msg[MSG_TEXT_SIZE];
     if (c_th->th_num % MAX_CACHE_PATTERNS == 0) {
         pattern = 0x11;
@@ -2161,6 +2238,7 @@ void read_mem(struct cache_thread *c_th)
         i = c_th->th_num;
         while (c_th_info[c_th->parent_th_num].DMA_running) {
             hold_pattern = c_th_info[c_th->parent_th_num].buf[i];
+            hold_pattern++; /* Due to optimization, Doing any operation will actually read from memory  */
             i += 128;
             if (i >= c_th_info[c_th->parent_th_num].dlen) {
                 i = c_th->th_num;
@@ -2277,7 +2355,7 @@ int sync_cache_operation(struct htx_data *htx_ds, int fd)
 {
     unsigned char cdb[10] = {SYNCHRONIZE_CACHE, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     struct sg_io_hdr io_hdr;
-    int i, rc = 0;
+    int rc = 0;
     char msg[128];
 
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
@@ -2315,9 +2393,7 @@ int run_cmd(struct htx_data *htx_ds, char *cmd_line)
 {
     char msg[256], cmd[256], msg1[512];
     int a, b, c, d, rc;
-    int flag = 0;
     char filename[64], log_dir[32];
-    char *tmp_ptr = NULL;
     int filedes;
 
     sprintf(log_dir, "%s/", htx_ds->htx_exer_log_dir);
@@ -2382,7 +2458,6 @@ int run_cmd(struct htx_data *htx_ds, char *cmd_line)
                         b++;
                         d++;
                     }
-                    flag = 1;
                     break;
                }
             } else {
@@ -2410,5 +2485,6 @@ int run_cmd(struct htx_data *htx_ds, char *cmd_line)
         }
         user_msg(htx_ds, -1, 0, HARD, msg);
     }
+    return 0;
 }
 

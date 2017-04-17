@@ -128,6 +128,7 @@ enum testcase {SYNC, ASYNC, PASSTHROUGH, CACHE};
 /*****************************************************/
 typedef int (*parse_stanza_fptr)(struct htx_data *, char *, void *, int *, unsigned long long, unsigned int);
 
+extern char misc_run_cmd[256], run_on_misc;
 extern int threshold, hang_time, enable_state_table;
 extern int num_sub_blks_psect;
 
