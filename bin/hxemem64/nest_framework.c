@@ -23,7 +23,7 @@
 int AME_enabled = FALSE;
 char  page_size_name[MAX_PAGE_SIZES][8]={"4K","64K","2M","16M","16G"};/*RV2:add new supported pages*/
 struct nest_global g_data;
-
+extern struct mem_exer_info mem_g;
 
 /*********************************************
  * Function Prototypes						*
@@ -48,11 +48,13 @@ extern void SIGUSR2_hdl(int, int, struct sigcontext *);
  
 void SIGTERM_hdl (int sig, int code, struct sigcontext *scp)
 {
+    char hndlmsg[200];
     /* Dont use display function inside signal handler.
      * the mutex lock call will never return and process
      * will be stuck in the display function */
-    hxfmsg(&g_data.htx_d,0,HTX_HE_INFO,"hxemem64: Sigterm Received!\n");
-    g_data.exit_flag = 1;
+    sprintf(hndlmsg,"%s: Sigterm Received!\n",EXER_NAME);
+    hxfmsg(&g_data.htx_d,0,HTX_HE_INFO,hndlmsg);
+    g_data.exit_flag = SET;
 }
 #if 0
 void SIGSEGV_hdl(int sig, int code, struct sigcontext *scp)
@@ -513,14 +515,14 @@ int get_system_details() {
 								core,lcpu,sysptr->node[node].chip[chip].core[core].lprocs[lcpu]);
 
      			    		}
-
+		     		        sysptr->node[node].chip[chip].num_cores++;
 		   				}
-		     		    sysptr->node[node].chip[chip].num_cores++;
 		   			}	
                     memcpy(&sysptr->node[node].chip[chip].mem_details,&g_data.sys_details.chip_mem_pool_data[srad_counter].memory_details,sizeof(struct mem_info));         	
+                    srad_counter++;
+                    sysptr->node[node].num_chips++;
+                    sysptr->node[node].num_cores += sysptr->node[node].chip[chip].num_cores;
 				}
-                srad_counter++;
-	    		sysptr->node[node].num_chips++;
 	    	}
 		}
     }
@@ -697,7 +699,7 @@ int main(int argc, char *argv[])
 	}
     print_partition_config(HTX_HE_INFO);
 
-    if (g_data.exit_flag == 1) {
+    if (g_data.exit_flag == SET) {
         return(-1);
     } 
 
@@ -706,7 +708,7 @@ int main(int argc, char *argv[])
 		exit(1);/*RV3: check for error possibility*/
 	}
 
-    if (g_data.exit_flag == 1) {
+    if (g_data.exit_flag == SET) {
         return(-1);
     } 
 	
@@ -727,6 +729,11 @@ int main(int argc, char *argv[])
 			break;
 		
 		case TLB:
+            mem_g.memory_allocation = DO_NOT_ALLOCATE_MEM;
+            ret_code =  mem_exer_opearation();
+			if(ret_code != SUCCESS){
+					exit(1);
+			}
 			break;
 	
 		case CACHE:
@@ -870,6 +877,10 @@ int fill_exer_huge_page_requirement(){
                 case FABRICB:
                         rc = set_fabricb_exer_page_preferances(); 
                     break;
+
+                case TLB:
+
+                    break;
                         
 				default:
 					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]wrong test type arg is passed to fun %s for filling huge page deatils from %s\n",
@@ -905,7 +916,7 @@ int modify_shared_mem_limits_linux(unsigned long total_segments){
     if (fp == NULL) {
         displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT,
                         "popen failed for ipcs command: errno(%d)\n", errno);
-        return(-1);
+        return(FAILURE);
     }
     rc  = fscanf(fp,"%s",oth_exer_segments);
     if (rc == 0 || rc == EOF) {

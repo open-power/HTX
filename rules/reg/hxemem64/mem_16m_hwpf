@@ -1,17 +1,3 @@
-* IBM_PROLOG_BEGIN_TAG 
-* This is an automatically generated prolog. 
-*  
-* htx72F src/htx/usr/lpp/htx/rules/reg/hxemem64/mem_16m_hwpf 1.3 
-*  
-* Licensed Materials - Property of IBM 
-*  
-* COPYRIGHT International Business Machines Corp. 2010 
-* All Rights Reserved 
-*  
-* US Government Users Restricted Rights - Use, duplication or 
-* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
-*  
-* IBM_PROLOG_END_TAG 
 * Targeted at concurrent operations with 16M pages and hardware prefetch
 * This rule stanza creates Cache to memory traffic by working with 16M page
 * creating hardware prefetch operations in the process

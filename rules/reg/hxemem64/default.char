@@ -1,17 +1,3 @@
-* IBM_PROLOG_BEGIN_TAG 
-* This is an automatically generated prolog. 
-*  
-* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxemem64/default.char 1.2 
-*  
-* Licensed Materials - Property of IBM 
-*  
-* COPYRIGHT International Business Machines Corp. 2016 
-* All Rights Reserved 
-*  
-* US Government Users Restricted Rights - Use, duplication or 
-* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
-*  
-* IBM_PROLOG_END_TAG 
 **With this rule exerciser attempts to drive max bandwidth with 40% of free 
 **memory which will be exercised by 50% of cpus from every core.
 **Please read the documnetation htxmem64.readme for explaination of rule parameters.

@@ -1,17 +1,3 @@
-* IBM_PROLOG_BEGIN_TAG 
-* This is an automatically generated prolog. 
-*  
-* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxemem64/default 1.2 
-*  
-* Licensed Materials - Property of IBM 
-*  
-* COPYRIGHT International Business Machines Corp. 2016 
-* All Rights Reserved 
-*  
-* US Government Users Restricted Rights - Use, duplication or 
-* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
-*  
-* IBM_PROLOG_END_TAG 
 **The default rule file allocates 70% of free memory available in the partition, 
 **Each stanza has differant stress test case in terms of oper/memory access width/pattern,  
 **that exercises allocated memory dependng mem_filetr and cpu_filter parameter.

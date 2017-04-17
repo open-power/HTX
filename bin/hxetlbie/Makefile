@@ -8,13 +8,17 @@ OBJ_SUFF=.o
 
 vpath= ../hxemem64/
 
-OBJECTS = \
-	hxemem${OBJ_SUFF} \
-	mem_operation${OBJ_SUFF} \
-	rand_operation${OBJ_SUFF} \
-	pat_operation${OBJ_SUFF} \
-	test_L4${OBJ_SUFF} \
-	gen_tlbie${OBJ_SUFF} \
+OBJECTS =  \
+    nest_framework${OBJ_SUFF} \
+    nest_read_rules${OBJ_SUFF} \
+    parse_filters${OBJ_SUFF} \
+    mem${OBJ_SUFF} \
+    tlbie_irritator${OBJ_SUFF} \
+    fabricbus_setup${OBJ_SUFF} \
+    memory_operations${OBJ_SUFF} \
+    mem_pattern_file_operations${OBJ_SUFF} \
+    mem_random_pat_operations${OBJ_SUFF} \
+    stride_operation${OBJ_SUFF}
 
 CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g -D__HTX_LINUX__ -I./../hxemem64
  
