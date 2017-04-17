@@ -1,17 +1,3 @@
-* IBM_PROLOG_BEGIN_TAG 
-* This is an automatically generated prolog. 
-*  
-* htx72F src/htx/usr/lpp/htx/rules/reg/hxemem64/rules.web_server 1.1 
-*  
-* Licensed Materials - Property of IBM 
-*  
-* COPYRIGHT International Business Machines Corp. 2010 
-* All Rights Reserved 
-*  
-* US Government Users Restricted Rights - Use, duplication or 
-* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
-*  
-* IBM_PROLOG_END_TAG 
 * This rule files is primarily used by manufacturing
 * This combinations of patterns and associated iterations is able to stress
 * the memory for a minimum length of time, as required by manufacturing.

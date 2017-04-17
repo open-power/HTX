@@ -13,6 +13,7 @@ OBJECTS =  \
     nest_read_rules${OBJ_SUFF} \
     parse_filters${OBJ_SUFF} \
     mem${OBJ_SUFF} \
+    tlbie_irritator${OBJ_SUFF} \
     fabricbus_setup${OBJ_SUFF} \
     memory_operations${OBJ_SUFF} \
     mem_pattern_file_operations${OBJ_SUFF} \

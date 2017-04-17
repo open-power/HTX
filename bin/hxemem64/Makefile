@@ -10,6 +10,7 @@ OBJECTS =  \
     nest_read_rules${OBJ_SUFF} \
     parse_filters${OBJ_SUFF} \
     mem${OBJ_SUFF} \
+    tlbie_irritator${OBJ_SUFF} \
     fabricbus_setup${OBJ_SUFF} \
     memory_operations${OBJ_SUFF} \
     mem_pattern_file_operations${OBJ_SUFF} \
@@ -19,7 +20,7 @@ OBJECTS =  \
  
 SRCS = $(patsubst %.o, %.c, $(OBJECTS))
 
-CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g -O2  -D__HTX_LINUX_ -DTRUE=1 -DFALSE=0
+CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g  -D__HTX_LINUX_ -DTRUE=1 -DFALSE=0
  
 LIBS = -lhtx64 -lpthread
 

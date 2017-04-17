@@ -1,16 +1,19 @@
-* tblie test case...
-rule_id = mem_tlb1
-messages = no
+* tblie irritator test has 2 stanzas, first divides the segment size into 4k pages and touches each page by random cpus,
+* second stanza pick page size(4k or 64k) randomly and divides the segment into selected page size and then sequentially
+* every core in the system touches each page.
+*******Global Rules**********
+global_alloc_mem_percent = -1
+global_disable_cpu_bind  = NO
+*********************************
+rule_id = rand_tlb1
 num_oper = 100
-oper = tlb
 seg_size_4k = 16777216
 percent_hw_threads = 10
 tlbie_test_case = RAND_TLB
+disable_cpu_bind = no
 
-rule_id = mem_tlb2
-messages = no
-num_oper = 100
-oper = tlb
-seg_size_4k = 16777216
+rule_id = seq_tlb2
+num_oper = 50
 percent_hw_threads = 10
 tlbie_test_case = SEQ_TLB
+disable_cpu_bind = no

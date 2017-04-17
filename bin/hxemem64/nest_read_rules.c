@@ -322,17 +322,20 @@ int get_rule(int * line, FILE *fp)
         sscanf(s,"%s",keywd);
 
         if((strcmp(keywd,"GLOBAL_ALLOC_MEM_PERCENT"))== 0) {
-            sscanf(s,"%*s %u",&g_data.gstanza.global_alloc_mem_percent); 
-            if((g_data.gstanza.global_alloc_mem_percent<=0) && (g_data.gstanza.global_alloc_mem_percent>= 100)){
+            sscanf(s,"%*s %d",&g_data.gstanza.global_alloc_mem_percent); 
+            if((g_data.gstanza.global_alloc_mem_percent < -1) && (g_data.gstanza.global_alloc_mem_percent >= 100)){
                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %s"
                         " must be greater than 0 and less than 100",*line,keywd,r.rule_id);
                 exit(1);
+            }
+            if(g_data.gstanza.global_alloc_mem_percent == -1){
+                mem_g.memory_allocation = DO_NOT_ALLOCATE_MEM;
             }
         }else if((strcmp(keywd,"GLOBAL_MEM_4K_USE_PERCENT"))== 0) {
             sscanf(s,"%*s %u",&g_data.gstanza.global_mem_4k_use_percent); 
             if((g_data.gstanza.global_mem_4k_use_percent <=0) && (g_data.gstanza.global_mem_4k_use_percent > 100)){
                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %s"
-                        " must be greater than 0 and less than equal to 100",*line,keywd,r.rule_id);
+                        " must be greater than 0 and less than equal to 100 or -1 If do not want to enable mem allocation",*line,keywd,r.rule_id);
                 exit(1);
             }
         }else if((strcmp(keywd,"GLOBAL_MEM_64K_USE_PERCENT"))== 0) {
@@ -344,10 +347,13 @@ int get_rule(int * line, FILE *fp)
             }
         }else if((strcmp(keywd,"GLOBAL_ALLOC_MEM_SIZE"))==0){
             sscanf(s,"%*s %ld",&g_data.gstanza.global_alloc_mem_size);
-            if(g_data.gstanza.global_alloc_mem_size<=0) {
+            if(g_data.gstanza.global_alloc_mem_size < -1) {
                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %s"
-                    " must be greater than 0",*line,keywd,r.rule_id);
+                    " must be greater than 0 or -1 If do not want to enable mem allocation",*line,keywd,r.rule_id);
                 exit(1); 
+            }
+            if(g_data.gstanza.global_alloc_mem_size == -1){
+                mem_g.memory_allocation = DO_NOT_ALLOCATE_MEM;
             }
         }else if((strcmp(keywd,"GLOBAL_ALLOC_SEGMENT_SIZE"))==0){
             sscanf(s,"%*s %ld",&g_data.gstanza.global_alloc_segment_size);
@@ -1000,6 +1006,8 @@ int get_rule(int * line, FILE *fp)
         else if ((strcmp(keywd,"PERCENT_HW_THREADS"))== 0)
         {
              sscanf(s,"%*s %d",&r.percent_hw_threads);
+			 if(r.percent_hw_threads > 100)
+             r.percent_hw_threads =  100;
         }
         else if ((strcmp(keywd,"TLBIE_TEST_CASE"))==0){
             sscanf(s,"%*s %s",r.tlbie_test_case);
@@ -1077,7 +1085,8 @@ int get_rule(int * line, FILE *fp)
 
     if (rc != EOF ) {
 
-		if(((g_data.gstanza.global_disable_filters == 0) || (g_data.sys_details.unbalanced_sys_config == 0)) && (g_data.sys_details.shared_proc_mode != 1)){
+        if(((g_data.gstanza.global_disable_filters == 0) || ((g_data.sys_details.unbalanced_sys_config == 0) || (g_data.test_type == FABRICB))) && (g_data.sys_details.shared_proc_mode != 1)
+            && (g_data.test_type != TLB)){
             g_data.gstanza.global_disable_filters = 0;
 			/* calling cpu/mem  filter parsing modules*/
 			rc = parse_cpu_filter(r.cpu_filter_str);
@@ -1143,6 +1152,7 @@ int read_rules(void)
 	g_data.gstanza.global_disable_filters = 1;
     g_data.gstanza.global_alloc_huge_page = 1;
 	g_data.gstanza.global_num_threads = -1;
+    mem_g.memory_allocation = ALLOCATE_MEM;
     if(!g_data.standalone) {
         g_data.gstanza.global_debug_level = 0;
     }

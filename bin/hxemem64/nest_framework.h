@@ -12,8 +12,11 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
  * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+*/
+/*
+ * Debug messages levels (for displaying)
+ * 0 (MUST DISPLAY MESSAGES), 1 (VERY IMPORTANT DISPLAY MESSAGES) ,
+ * 2 (INFORMATIVE DISPLAY MESSAGES ), 3 (DEBUG PURPOSE DISPLAY MESSAGES ).
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,6 +44,9 @@
 #define SUCCESS				0
 #define FAILURE				-1
 
+#define SET                 1
+#define UNSET               0
+
 #define DEVICE_NAME  g_data.htx_d.sdev_id
 #define RUN_MODE    g_data.htx_d.run_type
 #define EXER_NAME   g_data.htx_d.HE_name
@@ -60,6 +66,9 @@
 #define MIN_PATTERN_SIZE    8
 #define MAX_PATTERN_SIZE    4096
 #define MAX_RULE_LINE_SIZE  700     /* Inline with pattern text widths */
+
+#define DO_NOT_ALLOCATE_MEM 0
+#define ALLOCATE_MEM        1
 
 #define LS_BYTE             1       /* Load-Store Bytes */
 #define LS_WORD             4       /* Load-Store Words */
@@ -234,6 +243,7 @@ struct chip_info{
 struct node_info{
     unsigned int node_num;
     unsigned int num_chips;
+    unsigned int num_cores;
 	unsigned int lprocs[MAX_CPUS_PER_NODE];
     struct chip_info chip[MAX_CHIPS_PER_NODE];
 };
@@ -279,7 +289,7 @@ struct filter_info{
 };
 
 struct global_rule{
-    unsigned int global_alloc_mem_percent;
+    int global_alloc_mem_percent;
 	unsigned int global_mem_4k_use_percent;
 	unsigned int global_mem_64k_use_percent;
     int          global_alloc_huge_page;
@@ -444,6 +454,7 @@ struct mem_exer_info {
     unsigned long long dummy_read_data;
     unsigned long total_segments;
     int shm_cleanup_done;
+    int memory_allocation;              /*used as flag to decide memory allocation is needed or not*/
 };
 
 /*fabric bus exerciser specific structures*/
@@ -530,6 +541,8 @@ int modify_shared_mem_limits_linux(unsigned long);
 int dump_miscompared_buffers(int,unsigned long,int,int,unsigned long *,int,int,int,struct segment_detail*);
 int parse_cpu_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
 int parse_mem_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
+int allocate_mem_for_threads(void);
+void release_thread_resources(int);
 #ifdef __HTX_LINUX__
 extern void SIGUSR2_hdl(int, int, struct sigcontext *);
 #endif
@@ -613,4 +626,4 @@ int do_trap_htx64 (unsigned long arg1,
                        unsigned long arg6,
                        unsigned long arg7);
 #endif
-
+int run_tlb_operaion(void);

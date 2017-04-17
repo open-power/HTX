@@ -65,10 +65,10 @@ then
 
     if [ ! -x ${HTXBIN}/hxemem64_new ]
     then
+        echo "Old mem exer binary will be used" >> $HTXNoise
         cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxemem64_new
-        cp ${HTXBIN}/hxetlbie ${HTXBIN}/hxemem64
+        cp ${HTXBIN}/hxecentaur ${HTXBIN}/hxemem64
     fi
-
 fi
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
 if [[ $Hugepagesize -lt 2048 ]]
