@@ -26,6 +26,9 @@
 
 #include "hxsmsg.h"
 
+#include <unistd.h>
+#include <sys/types.h>
+
 /*
  * check_wrap() error code #defines
  */

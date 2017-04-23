@@ -23,6 +23,8 @@ static char sccsid[] = "@(#)84	1.1  src/htx/usr/lpp/htx/bin/hxesamp/hxesamp.c, e
 #include <signal.h>
 #include <fcntl.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct htx_data htx;              /* HTX Hardware Exerciser data         */
 int fdes;                         /* file descriptor                     */

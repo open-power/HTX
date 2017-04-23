@@ -60,6 +60,7 @@
 
 #include "hxssup.h"
 #include <stdlib.h>
+#include <unistd.h>
 
 /*
  * For Linux compatibility

@@ -26,6 +26,7 @@ static char sccsid[] = "@(#)75  1.2  src/htx/usr/lpp/htx/lib/htx64/hxfsbuf.c, ht
 #endif
 
 
+#include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
 

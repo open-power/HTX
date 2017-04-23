@@ -58,6 +58,7 @@
 /*****************************************************************************/
 
 #include "hxssup.h"
+#include <unistd.h>
 #include <sys/wait.h>
 
 #ifdef	__HTX_LINUX__

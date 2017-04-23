@@ -57,6 +57,8 @@
 #include "cfgclibdef.h"
 #endif
 
+#include <unistd.h>
+
 #include <sys/resource.h>
 
 #include <sys/types.h>

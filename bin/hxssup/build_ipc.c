@@ -47,6 +47,9 @@
 #include "cfgclibdef.h"
 #endif
 
+#include <sys/types.h>
+#include <unistd.h>
+
 /*
  * Define all other un-supported signals as SIGUNUSED
  */

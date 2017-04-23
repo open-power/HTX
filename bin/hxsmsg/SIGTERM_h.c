@@ -23,6 +23,8 @@
  *   FUNCTIONS: SIGTERM_hdl
  */
 
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "hxsmsg.h"
 

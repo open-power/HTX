@@ -52,6 +52,8 @@
 #define	SIGMAX	(SIGRTMAX)
 #endif
 
+#include <unistd.h>
+
 #ifdef	__HTX_LINUX__
 #include <sys/wait.h>
 #endif
