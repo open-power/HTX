@@ -1,21 +1,21 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/* 
- * Copyright 2003,2016 IBM International Business Machines Corp.
+/*  "@(#)74	1.1  src/htx/usr/lpp/htx/lib/htxmp64/hxfpatmp_new.c, htx_libhtxmp, htxubuntu 9/22/10 07:32:53"; */
+
+/*
+ * COMPONENT_NAME: (HTXLIB) HTX Libraries
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * FUNCTIONS: hxfpat_tefficient()
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ * ORIGINS: 27
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
+ * IBM CONFIDENTIAL -- (IBM Confidential Restricted when
+ * combined with the aggregated modules for this product)
+ * OBJECT CODE ONLY SOURCE MATERIALS
+ * (C) COPYRIGHT International Business Machines Corp. 1988, 1990, 1991
+ * All Rights Reserved
+ *
+ * US Government Users Restricted Rights - Use, duplication or
+ * disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
+ */    
 
 #include <pthread.h>
 
@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <memory.h>
+#include <unistd.h>
 
 /*
  * NAME: hxfpat_tefficient()
@@ -99,7 +100,6 @@ int hxfpat_tefficient(char *filename, char *pattern_buf, int num_chars)
   size_t chars_left_to_copy;  /* the number of chars left to copy            */
   size_t chars_this_copy;     /* the number of chars to copy this time in    */
   char *s;
-  char error_message[256];
   int str_len, hex_flag;
   /*                             the loop                                    */
   
@@ -127,6 +127,7 @@ int hxfpat_tefficient(char *filename, char *pattern_buf, int num_chars)
   num_words=num_chars/4;
 
 #ifdef DEBUG
+	 char error_message[256];
          (void) sprintf(error_message,
          "hxfpat_tefficient()-Pattern file(%s) errno_save=%d,hex_flag=%d,num_chars=%d,num_words=%d,modulus=%d\n",
              filename,errno_save,hex_flag,num_chars,num_words,modulus);

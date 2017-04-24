@@ -214,12 +214,6 @@ unsigned long pat_operation (int code, unsigned long count, char *buf,
     int allocate_shm_with_specified_page_size_linux (int ti,
 													 int page_size_index);
     int fill_mem_info_data_linux (void);
-    int do_trap_htx64 (unsigned long arg1,
-                       unsigned long arg2,
-                       unsigned long arg3,
-                       unsigned long arg4,
-                       unsigned long arg5,
-                       unsigned long arg6);
     int bindprocessor (int What, int Who, int Where);
 #endif
 
@@ -5778,7 +5772,8 @@ int save_buffers(int ti, unsigned long rc, struct segment_detail sd, \
                                 (unsigned long) (shr_mem_ptr[j]+(rc-1)*(width)+new_offset),\
                                 expected_pat, \
                                 (unsigned long)(shm_size_ptr[j]),\
-                                (unsigned long) &msg_text[0]\
+                                (unsigned long) &msg_text[0],\
+                                0,0\
                             );
         }
         #endif

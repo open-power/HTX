@@ -1,23 +1,5 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * Copyright 2003,2016 IBM International Business Machines Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
 
-static char sccsid[] = "@(#)92	1.29.6.15  src/htx/usr/lpp/htx/lib/htx64/hxfupdate.c, htx_libhtx, htxubuntu 1/12/16 05:27:10";
+/* "@(#)92	1.29.6.15  src/htx/usr/lpp/htx/lib/htx64/hxfupdate.c, htx_libhtx, htxubuntu 1/12/16 05:27:10"; */
 
 #define addw(msw, lsw, num) \
 { \
@@ -91,6 +73,7 @@ static char sccsid[] = "@(#)92	1.29.6.15  src/htx/usr/lpp/htx/lib/htx64/hxfupdat
 #include <scr_info64.h>
 #include <libgen.h>
 #include "hxihtxmp_vars_new.h"
+#include "htxlibdef.h"
 #ifdef _DR_HTX_
 #include <sys/dr.h> /* DR reconfig changes */
 #include <sys/procfs.h>
@@ -133,7 +116,6 @@ int hxfadd(char *server_ip, struct htxshm_HE add_HE, char *ecg)
 {
   struct hostent *he;
   struct sockaddr_in their_addr;
-  int yes=1,sin_size;
   struct timeval tval;
   int sockfd, indx, numbytes, subcmd;
   short cmd;
@@ -288,12 +270,11 @@ int hxfupdate_tunsafe(char call, struct htx_data *data)
   struct  tm      *asc_time, asc_time1;
   struct semid_ds sembuffer;
 
-  int     rc;                             /* return code.             */
+  int     rc = 0,rc1;                             /* return code.             */
   int     rel_pos;                        /* relative position in mdt */
 
   time_t     stop_time;
   time_t     temp_time;
-  char cmmd[80];
 
   static  unsigned semnum, err_semnum;            /* cont-halt on err sem num */
   static  int     save_time;              /* cycle start time.        */
@@ -407,7 +388,10 @@ if ( call == 'S' ) {
 	he_name = basename(data->HE_name);
 
 	snprintf(stat_fname,ENV_VAR_SIZE,"mkdir -p %shtx/%s/%s",data->htx_log_dir,he_name,dev_id);
-	system(stat_fname);
+	rc1 = system(stat_fname);
+	if(rc1 != 0)
+		printf("[%d][%s]Failed to execute system call with errno=%d\n",__LINE__,__FUNCTION__,errno);
+		
 	snprintf(data->htx_exer_log_dir,ENV_VAR_SIZE,"%shtx/%s/%s/",data->htx_log_dir,he_name,dev_id);
 
 	int ret = setenv("HTX_EXER_LOG_DIR",data->htx_exer_log_dir,1);
@@ -503,7 +487,7 @@ if ( call == 'S' ) {
       if (p_shm_HE->max_cycles !=0) {
         if (p_shm_HE->cycles >= p_shm_HE->max_cycles) {
 		  temp_time = p_shm_HE->tm_last_upd;	/* promote to long */
-          asc_time = htx_localtime_r(&temp_time, &asc_time1);
+          asc_time = (struct tm *)htx_localtime_r(&temp_time, &asc_time1);
           (void) strcpy(disp_time, asctime_r(asc_time, disp_time1));
           disp_time[24] = '\0';
           data->error_code = 0;
@@ -548,7 +532,7 @@ Stopped - cycles run (%llu) = max_cycles (%llu).\n\n",
           }
 
           stop_time = time((time_t *) 0);
-          asc_time = htx_localtime_r(&stop_time, &asc_time1);
+          asc_time = (struct tm *)htx_localtime_r(&stop_time, &asc_time1);
           (void) strcpy(disp_time, asctime_r(asc_time, disp_time1));
           disp_time[24] = '\0';
           /*(void) sprintf(data->msg_text,
@@ -673,7 +657,6 @@ int htx_start(struct htx_data *data, int *p_sem_id, int *p_save_time)
   int     MAX_EXER_ENTRIES=0;
   int     semkey,shmkey;
   /*texer_ipc *ex_ipc;*/
-  char cmmd[80];
   char  tmp_sdev_id[DEV_ID_MAX_LENGTH];
 
 
@@ -1039,7 +1022,7 @@ Unable to find %s in HTX shared memory structure.\n",
 		data->error_code = 0;
 		data->severity_code = (enum sev_code )7;
 		temp_time = started_time;
-		asc_time = htx_localtime_r(&temp_time, &asc_time1);
+		asc_time = (struct tm *)htx_localtime_r(&temp_time, &asc_time1);
 		strcpy(disp_time, asctime_r(asc_time, disp_time1));
 		disp_time[24] = '\0';
 
@@ -1048,7 +1031,7 @@ Unable to find %s in HTX shared memory structure.\n",
 			\nDevice id:%-18s\nTimestamp:%-20s\
 			\nerr=%-8.8x\nsev=%-1.1d\nExerciser Name:%-14s\
 			\nDevice:%s\
-			\nMessage Text:test start delay is set as %d seconds, going to sleep...\
+			\nMessage Text:test start delay is set as %llu seconds, going to sleep...\
 			\n---------------------------------------------------------------------\n",
 			data->sdev_id,
 			&disp_time[4],
@@ -1071,7 +1054,7 @@ Unable to find %s in HTX shared memory structure.\n",
 		p_shm_HE->started_delay_flag = 0;
 
 		temp_time = current_time;
-		asc_time = htx_localtime_r(&temp_time, &asc_time1);
+		asc_time = (struct tm *)htx_localtime_r(&temp_time, &asc_time1);
 		strcpy(disp_time, asctime_r(asc_time, disp_time1));
 		disp_time[24] = '\0';
 
@@ -1080,7 +1063,7 @@ Unable to find %s in HTX shared memory structure.\n",
 			\nDevice id:%-18s\nTimestamp:%-20s\
 			\nerr=%-8.8x\nsev=%-1.1d\nExerciser Name:%-14s\
 			\nDevice:%s\
-			\nMessage Text:test start delay (%d seconds) is completed, start running...\
+			\nMessage Text:test start delay (%llu seconds) is completed, start running...\
 			\n---------------------------------------------------------------------\n",
 			data->sdev_id,
 			&disp_time[4],
@@ -1278,10 +1261,8 @@ int htx_update(struct htx_data *data)
 int htx_get_msg(struct htx_data *data, char *msg_send)
 {
   char    disp_time[30], disp_time1[30];
-/*  char    msg_send[MSG_TEXT_SIZE];*/
 
   time_t     call_time;
-  time_t     temp_time;
   static   int once_only_flag = 1;
 
   char htxstr[80];
@@ -1290,8 +1271,6 @@ int htx_get_msg(struct htx_data *data, char *msg_send)
   char *name, *tmp, *tmp1;
   FILE *fvp;
   char spare1[80], *name1, *tmps1, *tmps;
-
-  size_t str_length;
 
   struct  tm      *asc_time, asc_time1;
 
@@ -1312,7 +1291,7 @@ int htx_get_msg(struct htx_data *data, char *msg_send)
 
 
   call_time = time((time_t *) 0);
-  asc_time = htx_localtime_r(&call_time, &asc_time1);
+  asc_time = (struct tm *)htx_localtime_r(&call_time, &asc_time1);
   (void) strcpy(disp_time, asctime_r(asc_time, disp_time1));
   disp_time[24] = '\0';
 
@@ -1484,7 +1463,7 @@ int htx_message(struct htx_data *data, char* msg_send){
 	static  struct  htx_msg_buf *msgp = &msgb;
 	
 	call_time = time((time_t *) 0);
-	asc_time = htx_localtime_r(&call_time, &asc_time1);
+	asc_time = (struct tm *)htx_localtime_r(&call_time, &asc_time1);
 	(void) strcpy(disp_time, asctime_r(asc_time, disp_time1));
 	disp_time[24] = '\0';
 
@@ -1628,6 +1607,7 @@ int htx_message(struct htx_data *data, char* msg_send){
 void htx_error(struct htx_data *data, char* msg_send){	
 
 	char    *libhtx_HOE;
+	int rc =0;
 	size_t str_length;
 	str_length = strlen(msg_send);
 	if (msg_send[str_length - 2] != '\n')
@@ -1644,14 +1624,16 @@ void htx_error(struct htx_data *data, char* msg_send){
            *  system() to run it.  Careful kids, don't try this at home.
            */
 	libhtx_HOE = getenv("LIBHTX_HOE");
-	if (( libhtx_HOE != NULL )&&(strcmp (data->run_type, "REG") != 0) && (strcmp (data->run_type, "EMC") != 0))
-		if ( *libhtx_HOE == NULL )
+	if (( libhtx_HOE != (void *) NULL )&&(strcmp (data->run_type, "REG") != 0) && (strcmp (data->run_type, "EMC") != 0))
+		if ( *libhtx_HOE == 0 )
         {
 			(void) kill(getpid(), SIGTERM);
 		}
 		else
 		{
-			(void) system(libhtx_HOE);
+			rc = system(libhtx_HOE);
+			if(rc != 0)
+				printf("[%d][%s]Failed to execute system call with errno=%d\n",__LINE__,__FUNCTION__,errno);
 		}
 
   return;
@@ -1714,7 +1696,7 @@ int htx_finish(struct htx_data *data, int *p_save_time)
 
   p_shm_HE->cycles++;
   temp_time = p_shm_HE->tm_last_upd;	/* promote to long */
-  asc_time = htx_localtime_r(&temp_time, &asc_time1);
+  asc_time = (struct tm *)htx_localtime_r(&temp_time, &asc_time1);
   (void) strcpy(disp_time, asctime_r(asc_time, disp_time1));
   disp_time[24] = '\0';
 
@@ -1742,7 +1724,7 @@ if(p_shm_HE->log_vpd==1)
         \nerr=%-8.8x\nsev=%-1.1d\nExerciser Name:%-14s\
         \nSerial No:%s\nPart No:%s\nLocation:%s\nFRU Number:%s\
         \nDevice:%s\
-        \nMessage Text:End of Hardware Exerciser program.cycle time =%d seconds.\
+        \nMessage Text:End of Hardware Exerciser program.cycle time =%llu seconds.\
         \n---------------------------------------------------------------------\n",
                  data->sdev_id,
                  &disp_time[4],
@@ -1759,8 +1741,8 @@ if(p_shm_HE->log_vpd==1)
    else
    {
         (void) sprintf(data->msg_text,
-                 "\n%-18s%-20s err=%-8.8x sev=%-1.1u %-14s\n%-s\n\
-                \nMessage text:End of hardware exerciser program.cycle time=%d\n",
+                 "\n%-18s%-20s err=%-8.8x sev=%-1.1u %-14s\n \
+                \nMessage text:End of hardware exerciser program.cycle time=%llu\n",
                  data->sdev_id,
                  &disp_time[4],
                  data->error_code,

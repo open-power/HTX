@@ -210,9 +210,10 @@ printf("thread:%d, in random test\n",t->thread_num);
                 *R4=expected value
                 *R5=Actual value
                 *R6=read buffer address
-                *R7=current num oper
-                *R8=thread pointer
-                *R9=current stanza pointer*/
+                *R7=bind proc
+                *R8=current num oper
+                *R9=thread pointer
+                *R10=current stanza pointer*/
                 if( (g_data.stanza_ptr->misc_crash_flag) && (g_data.kdb_level) ){
                     displaym(HTX_HE_SOFT_ERROR, DBG_MUST_PRINT, "TLBIE:Miscompare Detected\n");
                     #ifdef __HTX_LINUX__
@@ -220,6 +221,7 @@ printf("thread:%d, in random test\n",t->thread_num);
                                 (unsigned long)0xBEEFDEAD,\
                                 (unsigned long)buf,\
                                 (unsigned long)parse_read_shm_ptr,\
+                                (unsigned long)t->bind_proc,\
                                 (unsigned long)iter,\
                                 (unsigned long)t,\
                                 (unsigned long)g_data.stanza_ptr);
@@ -338,16 +340,18 @@ void tlb_gen_sequential_cores(void* th){
                     *R3=0xBEEFDEAD
                     *R4=Expected value address
                     *R5=actual value address  address
-                    *R6=CPU number to bound
-                    *R7=current num_oper
-                    *R8=Thread pointer
-                    *R8=current stanza pointer*/
+                    *R6-page index
+                    *R7=CPU number to bound
+                    *R8=current num_oper
+                    *R9=Thread pointer
+                    *R10=current stanza pointer*/
                     if( (g_data.stanza_ptr->misc_crash_flag) && (g_data.kdb_level) ){
                         displaym(HTX_HE_SOFT_ERROR, DBG_MUST_PRINT, "TLBIE:Miscompare Detected\n");
                         #ifdef __HTX_LINUX__
                         do_trap_htx64 ((unsigned long)0xBEEFDEAD,\
                                 (unsigned long)&pattern[c],\
                                 (unsigned long)parse_read_shm_ptr,\
+                                (unsigned long)pi,\
                                 (unsigned long)t->bind_proc,\
                                 (unsigned long)iter,\
                                 (unsigned long)t,\

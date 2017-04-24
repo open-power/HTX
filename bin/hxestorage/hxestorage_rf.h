@@ -29,7 +29,6 @@
 #include <libgen.h>
 #include <string.h>
 #include "hxiipc64.h"
-#include "hxihtxmp.h"
 #include <sys/time.h>
 #ifdef __HTX_LINUX__
     /* Linux Specific header files */

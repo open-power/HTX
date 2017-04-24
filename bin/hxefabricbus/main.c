@@ -920,7 +920,7 @@ run_test_stages(void *arg ) {
         sprintf(msg, "\n %d:bindprocessor failed with %d", __LINE__, errno);
         hxfmsg(&htx_d, errno, HTX_HE_SOFT_ERROR, msg);
     }
-
+#if 0
     th_index = mp_start(&t->th_htx_d);
     if(th_index == -1) {
         sprintf(msg, "\n Unable to get unique thread index, th_index = %d \n",th_index);
@@ -928,6 +928,7 @@ run_test_stages(void *arg ) {
         /* This would make all  failing instance to use same locks */
         th_index = 0;
     }
+#endif
 
     /*
      * If num_oper is 0 then run infinitely else num_oper times.

@@ -23,7 +23,6 @@ TARGET= bufupd.h \
                         hxerng.h \
                         getrule.h \
 			hxfcpp_wrap.H \
-                        hxihtxmp.h \
                         expirekey.h \
 			xscom.h \
                         nx_corsa.h \
