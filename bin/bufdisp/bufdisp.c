@@ -33,6 +33,7 @@
 #include <stdio.h>                         /* standard include declarations */
 #include <ctype.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>     
 

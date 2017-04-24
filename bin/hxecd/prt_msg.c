@@ -31,6 +31,7 @@
  *   DESCRIPTION: Functions to format messages and send to HTX.
  ******************************************************************************/
 #include <string.h>
+#include <stdio.h>
 #include "hxecd.h"
 
 /**************************************************************************/

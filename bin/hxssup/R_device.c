@@ -45,6 +45,8 @@
 #include "hxssup.h"
 #include <scr_info.h>
 
+#include <unistd.h>
+
 #ifdef	__HTX_LINUX__
 #include <sys/wait.h>
 #endif

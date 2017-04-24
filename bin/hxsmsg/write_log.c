@@ -26,6 +26,9 @@
 
 #include "hxsmsg.h"
 
+#include <unistd.h>
+#include <sys/types.h>
+
 #ifdef __HTX_LINUX__
 #include <sys/stat.h>
 #include <sys/types.h>

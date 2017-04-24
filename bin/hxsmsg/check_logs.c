@@ -28,8 +28,11 @@
 
 
 #include "hxsmsg.h"
+#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+
 #if !defined(__HTX_LINUX__) && !defined(__OS400__)
 #include <sys/mode.h>
 #else
