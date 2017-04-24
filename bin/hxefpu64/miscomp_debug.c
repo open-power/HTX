@@ -1630,11 +1630,11 @@ struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype
 			if (cptr->dc_instr[i].miscmp == NULL) {
 				cptr->dc_instr[i].miscmp = *head;
 			}else {
-				if (cptr->dc_instr[i].miscmp->type && CMP_TYPE_VSR) {
+				if (cptr->dc_instr[i].miscmp->type & CMP_TYPE_VSR) {
 					fprintf(dump, "Merged with VSR Miscompare: VSR# %d\n", cptr->dc_instr[i].miscmp->reg_num);
-				} else if (cptr->dc_instr[i].miscmp->type && CMP_TYPE_GPR) {
+				} else if (cptr->dc_instr[i].miscmp->type & CMP_TYPE_GPR) {
 					fprintf(dump, "Merged with GPR Miscompare: GPR# %d\n", cptr->dc_instr[i].miscmp->reg_num);
-				} else if (cptr->dc_instr[i].miscmp->type && CMP_TYPE_LS) {
+				} else if (cptr->dc_instr[i].miscmp->type & CMP_TYPE_LS) {
 					fprintf(dump, "Merged with Load Store Miscompare: Offset# 0x%x\n", cptr->dc_instr[i].miscmp->offset);
 				}
 	            return NULL;
