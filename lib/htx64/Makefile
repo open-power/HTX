@@ -11,11 +11,9 @@ OBJECTS =hxfupdate${OBJ_SUFF} \
 		 hxfmsg${OBJ_SUFF} \
          hxfcbuf${OBJ_SUFF} \
          linux${OBJ_SUFF} \
-         keycheck${OBJ_SUFF} \
          hxf_sig_safe${OBJ_SUFF} \
 	     htxsyscfg${OBJ_SUFF} \
 	     xscom${OBJ_SUFF} \
-	     config_rw${OBJ_SUFF} \
 	     misc${OBJ_SUFF} \
 	     htxmp_new${OBJ_SUFF} \
 	     hxfsbuf${OBJ_SUFF}

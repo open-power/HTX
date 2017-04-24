@@ -1,21 +1,3 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * Copyright 2003,2016 IBM International Business Machines Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
 
 /* @(#)68     1.17.3.25  src/htx/usr/lpp/htx/lib/misc64/misc.c, libmisc, htxfedora 7/30/15 06:09:11 */
 
@@ -117,6 +99,9 @@ int get_cpu_version(void)
  		pvr = 0x003f0000; // P8 running in P7 mode
 	}
 
+	if ((TempPvr == 0x4e || TempPvr == 0x4f) && (!strncmp(str,"POWER8",6))) {
+ 		pvr = 0x004b0000; // P9 running in P8 mode
+	}
 	return pvr;
 }
 
@@ -429,7 +414,11 @@ int get_online_cpu_mask(cpu_set_t *ptr_mask,size_t size)
 		}
 	}
 		
-	fscanf(fp, "%s", cpu_str);
+	rc = fscanf(fp, "%s", cpu_str);
+	if(rc==0){
+		sprintf(msg,"[%d][%s]Failed to open %s with errno=%d\n",__LINE__,__FUNCTION__,fname,errno);
+		hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+	}
 
 	tok_str = strtok_r(cpu_str, ",", &save_ptr);
 	while(tok_str != NULL)
@@ -472,7 +461,11 @@ int check_cpu_exist(int pcpu)
         	return(rc);
 		}
 	}
-	fscanf(fp, "%d", &status);
+	rc = fscanf(fp,"%d", &status);
+	if(rc==0){
+		sprintf(msg,"[%d][%s]Failed to open %s with errno=%d\n",__LINE__,__FUNCTION__,fname,errno);
+		hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+	}
     fclose(fp);
 	return status;
 }
@@ -545,9 +538,17 @@ int print_sysfs_cpu(int pcpu,size_t size,cpu_set_t* mask){
 		fp2 = fopen(fname2, "r");
 		if ( fp1 != NULL  &&  fp2 != NULL )
 		{
-			fscanf(fp1, "%d", &online);
+			rc = fscanf(fp1,"%d",  &online);
+			if(rc==0){
+				sprintf(msg,"[%d][%s]Failed to open %s with errno=%d\n",__LINE__,__FUNCTION__,fname1,errno);
+				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			}
 			fclose(fp1);
-			fscanf(fp2, "%s", g_online);
+			rc = fscanf(fp2, "%s", g_online);
+			if(rc==0){
+				sprintf(msg,"[%d][%s]Failed to open %s with errno=%d\n",__LINE__,__FUNCTION__,fname2,errno);
+				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			}
 			fclose(fp2);
 			if((misc_htx_data != NULL)  && ((strcmp (misc_htx_data->run_type, "OTH") == 0))) {	
 				sprintf(msg,"[%d][%s]sysfs contents: /sys/devices/system/cpu/cpu%d/online value is %d\n /sys/devices/system/cpu/online value is %s \n And content of cpu_set_t mask is:", 
@@ -572,7 +573,7 @@ int print_sysfs_cpu(int pcpu,size_t size,cpu_set_t* mask){
 		ptr = (long long*)mask;
 		for(i=0;i<iter;i++){
                         char loc_msg[9];
-                        snprintf(loc_msg,9,"%zx\t",*ptr);
+                        snprintf(loc_msg,9,"%lld\t",*ptr);
                         strncat(msg,loc_msg,9);
                         ptr++;
 
@@ -583,7 +584,11 @@ int print_sysfs_cpu(int pcpu,size_t size,cpu_set_t* mask){
 		fp1 = fopen(fname1, "r");
 		if ( fp1 != NULL )
 		{
-			fscanf(fp1, "%s", g_online);
+			rc = fscanf(fp1, "%s", g_online);
+			if(rc==0){
+				sprintf(msg,"[%d][%s]Failed to open %s with errno=%d\n",__LINE__,__FUNCTION__,fname1,errno);
+				hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+			}
 			fclose(fp1);
 				sprintf(msg,"sysfs contents: /sys/devices/system/cpu/online value is %s \n And content of cpu_set_t mask is:", g_online); 
 		} else {
@@ -595,7 +600,7 @@ int print_sysfs_cpu(int pcpu,size_t size,cpu_set_t* mask){
 		ptr = (long long*)mask;
 		for(i=0;i<iter;i++){
 			char loc_msg[9];
-			snprintf(loc_msg,9,"%zx\t",*ptr);
+			snprintf(loc_msg,9,"%lld\t",*ptr);
 			strncat(msg,loc_msg,9);
 			ptr++;
 		}

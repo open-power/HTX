@@ -1,23 +1,5 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * Copyright 2003,2016 IBM International Business Machines Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
 
-static char sccsid[] = "@(#)85        1.15.1.19  src/htx/usr/lpp/htx/lib/htxsyscfg64/htxsyscfg.c, htx_libhtxsyscfg64, htxfedora 5/19/15 01:28:11";
+/* "@(#)85        1.15.1.19  src/htx/usr/lpp/htx/lib/htxsyscfg64/htxsyscfg.c, htx_libhtxsyscfg64, htxfedora 5/19/15 01:28:11";*/
 
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -45,7 +27,7 @@ unsigned int 		syscfg_base_page_size;
 /* to read the entries for core exclusion from /tmp/syscfg_excluded_cores.txt file */
 int read_core_exclusion_array(void)
 {
-	int i,j,k,l,flag,str_len;
+	int i,j,k,l,flag;
 	i = j = k = l = flag = 0;
 	char buffer[20];
 	char * pch;
@@ -512,7 +494,7 @@ int get_osversion(void)
 
 int phy_logical_virt_cpus_update(void)
 {
-    int r1,r2;
+    int r1;
     char dest[100];
 	htxsyscfg_cpus_t *t;
     t =&(global_ptr->global_lpar.cpus);
@@ -528,11 +510,11 @@ int phy_logical_virt_cpus_update(void)
         t->phy_to_logical = (t->p_cpus *100)/ t->l_cpus; /*Physical-to-logical cpu percentage*/
         return r1;
     #else
-
+	int r2, r3;
     r2 = get_cmd_op(dest,"ls -l /proc/device-tree/cpus | grep -i power | wc -l");
     t->p_cpus=atoi(dest);     /*Physical cpus*/
 
-    r2 = get_cmd_op(dest,"ls -l /proc/device-tree/cpus | grep ^d | awk '($NF ~ /POWER/)' | wc -l");
+    r3 = get_cmd_op(dest,"ls -l /proc/device-tree/cpus | grep ^d | awk '($NF ~ /POWER/)' | wc -l");
     t->v_cpus=atoi(dest);
 
     t->phy_to_virt = (t->p_cpus *100)/ t->v_cpus; /*Physical-to-virtual cpu percentage*/
@@ -648,7 +630,6 @@ int get_lpar_details(htxsyscfg_lpar_t *t)
 /*Retrieves smt details*/
 int get_smt_details_update(void)
 {
-    int l_cpus, v_cpus;
     int r1;
     char dest[100];
 	htxsyscfg_smt_t *t;
@@ -662,11 +643,6 @@ int get_smt_details_update(void)
         r1 = get_cmd_op(dest, "ls /sys/devices/system/cpu/cpu0 | grep smt_snooze_delay | wc -l");
         t->smt_enabled=atoi(dest);  /*System is smt capable and/or whether smt is enabled*/
     }
-    l_cpus = get_nprocs();
-
-    /*r3 = get_cmd_op(dest, "ls -l /proc/device-tree/cpus | grep ^d | awk '($NF ~ /POWER/)' | wc -l");*/
-    v_cpus = global_ptr->system_cpu_map.stat.cores;
-    /*v_cpus=atoi(dest);*/
 
     t->smt_threads     = global_ptr->global_core.smtdetails.smt_threads;
     t->min_smt_threads = global_ptr->global_core.smtdetails.min_smt_threads;/*min and max smt is because in case of hotplug supported env there is no fix cpu numbers per core*/
@@ -1000,7 +976,7 @@ int get_memory_pools(void) {
 	htxsyscfg_mempools_t *t;
 	FILE *fp=0;
 	char command[200],fname[100];
-	int i,j,rc,cpu,lcpu,huge_page_size;
+	int i,j,rc,cpu,lcpu,huge_page_size,rc1;
 	int tot_pools = -1;
 	unsigned long total_pages, free_pages;
 	total_pages = free_pages = 0;
@@ -1103,7 +1079,7 @@ int get_memory_pools(void) {
 			/*printf("%d:",t[i].procs_per_pool[cpu]);*/
 		}
 		/*printf("\n");*/
-		fscanf(fp,"\n");
+		if( fscanf(fp,"\n")){};
 	}
 	fclose(fp);
     if(tot_pools > 0) {
@@ -1276,7 +1252,7 @@ int get_page_size_update(void)
     unsigned int Pvr;
 	htxsyscfg_pages_t *t;
 	i = j = k = num = 0;
-    t=&(global_ptr->global_memory.page_details);
+    t=&(global_ptr->global_memory.page_details[0]);
 
     Pvr = get_true_cpu_version();
        Pvr = Pvr>>16;
@@ -1906,7 +1882,7 @@ printf("Pvr=%x,temp=%d\n", Pvr, temp);
 int get_env_details_update(void)
 {
     unsigned int i = 1;
-    int temp,r1;
+    int temp;
     char dest[100],fname[100];
 	FILE* fp1;
 	htxsyscfg_env_details_t* e;
@@ -1928,14 +1904,14 @@ int get_env_details_update(void)
 	strcpy(e->virt_typ,"PVM_GUEST");
 	strcpy(e->proc_shared_mode,"no");
 
-	r1 = get_cmd_op(dest,"cat /proc/ppc64/lparcfg 2> /dev/null | grep shared_processor_mode | awk -F= '{print $2}'");
+	get_cmd_op(dest,"cat /proc/ppc64/lparcfg 2> /dev/null | grep shared_processor_mode | awk -F= '{print $2}'");
 	temp = atoi(dest);
 	if (temp > 0)
     {
 		strcpy(e->proc_shared_mode,"yes");
 		e->virt_flag = PVM_PROC_SHARED_GUEST;
 	}
-    r1 = get_cmd_op(dest, "cat /proc/cpuinfo | grep -i PowerNV | wc -l"); /* host machine */
+    get_cmd_op(dest, "cat /proc/cpuinfo | grep -i PowerNV | wc -l"); /* host machine */
     temp = atoi(dest);
     if (temp > 0)
     {
@@ -1944,7 +1920,7 @@ int get_env_details_update(void)
 		strcpy(e->proc_shared_mode,"no");
     }
 
-    r1 = get_cmd_op(dest, "cat /proc/cpuinfo | grep -i qemu | wc -l");  /* guest machine */
+    get_cmd_op(dest, "cat /proc/cpuinfo | grep -i qemu | wc -l");  /* guest machine */
 
     temp = atoi(dest);
     if (temp > 0)
@@ -1964,7 +1940,7 @@ int get_env_details_update(void)
         }
     }
 
-    r1 = get_cmd_op(dest, "uname -a | grep -i bml | wc -l");  /*  BML  machine */
+    get_cmd_op(dest, "uname -a | grep -i bml | wc -l");  /*  BML  machine */
 
     temp = atoi(dest);
     if (temp > 0)
@@ -2602,7 +2578,7 @@ int get_phy_cpus_in_core(int core_no,signed int *cpus_in_core)
 /* -1 on error                                    */
 int get_phy_cpus_in_chip(int chip_no,signed int *cpus_in_chip)
 {
-    int              i,j,k;
+    int              i,j;
 
     for(i=0; i<MAX_THREADS_PER_CHIP; i++) {
         cpus_in_chip[i] = -1;
@@ -2642,7 +2618,7 @@ int get_cpu_id(int cpu_number)
     unsigned int pir;
     FILE *fp;
     char file_name[50];
-    int rc = 0,fd;
+    int rc = 0,fd,rc1;
 
     if (FP == NULL)
     {
@@ -2662,7 +2638,11 @@ int get_cpu_id(int cpu_number)
             return -1;
         }
     }
-    fscanf(fp, "%x", &pir);
+    rc1 = fscanf(fp, "%x", &pir);
+	if(rc1==0){
+		sprintf(msg,"[%d][%s]Failed to open with errno=%d\n",__LINE__,__FUNCTION__,errno);
+		hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+	}
     fclose(fp);
 
     }
@@ -2996,7 +2976,7 @@ int get_core_info(int *core_number_list, int instance)
 int get_nprocs_awan (void)
 {
         FILE *fp;
-        int n_procs=1;
+        int n_procs=1,rc;
 
         printf("Detecting number of cpus on AWAN\n");
 
@@ -3009,7 +2989,12 @@ int get_nprocs_awan (void)
                 return n_procs;
         }
 
-        fscanf(fp, "%d", &n_procs);
+        rc = fscanf(fp, "%d", &n_procs);
+        if(rc==0){
+                sprintf(msg,"[%d][%s]Failed to open file with errno=%d\n",__LINE__,__FUNCTION__,errno);
+                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
+        }
+
         if(n_procs == 0) {
                 printf("Number of cpus couldn't be determined.\n");
                 printf("Assuming CPUs = 1\n");
@@ -3111,14 +3096,14 @@ int get_smt_awan (void)
 int update_syscfg(void)
 {
 	int lock1,lock2,lock3,lock4,lock5,lock6,lock7,lock8,lock9,lock10,lock11,lock12,lock13,lock14,lock18,lock19;
-    int rc2,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,r17,r18,r19,rc;
+    int r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,r17,r18,r19,rc;
 	int i,j;
     unsigned int pvr;
 
     int temp_shm_key;
 	temp_shm_key = 0;
 	lock1=lock2=lock3=lock4=lock5=lock6=lock7=lock8=lock9=lock10=lock11=lock12=lock13=lock14=lock18=lock19=0;
-	rc2=r1=r2=r3=r4=r5=r6=r7=r8=r9=r10=r11=r12=r13=r14=r15=r16=r17=r18=r19=rc=0;
+	r1=r2=r3=r4=r5=r6=r7=r8=r9=r10=r11=r12=r13=r14=r15=r16=r17=r18=r19=rc=0;
 	i=j=0;
 
 	read_core_exclusion_array();
@@ -3386,7 +3371,7 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
     unsigned long node_num, chip_num, core_num, cpu_num;
     unsigned int begin_node, begin_chip, begin_core, begin_cpu;
     unsigned int end_node, end_chip, end_core, end_cpu;
-    char tmp_str[128], tmp_str1[128], msg[8092], msg_temp[2048];
+    char tmp_str[128], tmp_str1[128], msg[8092];
     char *chr_ptr[4], *end_ptr, htx_msg[256];
     char *ptr[16], *tmp, tmp_filter_str[128];
 
@@ -3442,8 +3427,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                 if ((tmp = strchr(ptr[k],'%')) != NULL) { /* indicates a percentage of nodes is given in filter->*/
                     num_nodes = (filter->num_nodes * (float)((atoi(tmp+1))/100.0));
                     if (num_nodes < 0 || num_nodes > filter->num_nodes) {
-                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu filter: %s, filter num:%d\n"
-                                 "node percentage as %d%(num_nodes=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu filter: %s, filter num:%d\n \
+                                 node percentage as %d(num_nodes=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                  filt_idx, atoi(tmp+1), filter->num_nodes);
                         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                         return (-1);
@@ -3459,7 +3444,7 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                 } else if (strchr(ptr[k], '-') != NULL) { /* indicates that range of nodes is given in filter->*/
                     strcpy (tmp_str1, ptr[k]);
                     if ((tmp = strtok (tmp_str1, "-")) == NULL) {
-                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n", \
                                  __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
                         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                         return(-1);
@@ -3467,8 +3452,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                     errno = 0;
                     begin_node = strtol (tmp, &end_ptr, 10);
                     if (begin_node >= filter->num_nodes ||  errno != 0 || end_ptr == ptr[k]) {
-                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                                 "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n \
+                                 node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx], \
                                  filt_idx, begin_node, filter->num_nodes);
                          hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                          return (-1);
@@ -3483,8 +3468,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                         end_node = strtol (tmp, &end_ptr, 10);
                     }
                     if (end_node >= filter->num_nodes ||  errno != 0 || end_ptr == ptr[k]) {
-                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                                 "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n \
+                                 node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                  filt_idx, end_node, filter->num_nodes);
                         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                         return (-1);
@@ -3498,8 +3483,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                     errno = 0;
                     node_num = strtol (ptr[k], &end_ptr, 10);
                     if (node_num >= filter->num_nodes || errno != 0 || end_ptr == ptr[k]) {
-                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                                 "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                        sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n \
+                                 node field as %lu ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                  filt_idx, node_num, filter->num_nodes);
                         hxfmsg (misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                         return(-1);
@@ -3513,8 +3498,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
         } else if ((tmp = strchr (chr_ptr[0], '%')) != NULL) { /* indicates a percentage of nodes is given in filter->*/
             num_nodes = (filter->num_nodes * (float)((atoi(tmp+1))/100.0));
             if ((num_nodes < 0) ||  (num_nodes > filter->num_nodes)) {
-                sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d,"
-                         "node percentage as %d%(num_nodes=%d)\n",   __LINE__, __FUNCTION__, filter_str[filt_idx],
+                sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d, \
+                         node percentage as %d (num_nodes=%d)\n",   __LINE__, __FUNCTION__, filter_str[filt_idx], 
                          filt_idx, num_nodes, filter->num_nodes);
                 hxfmsg (misc_htx_data, 0, HTX_HE_INFO, msg);
                 return (-1);
@@ -3531,8 +3516,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
             errno = 0;
             node_num = strtol (chr_ptr[0], &end_ptr, 10);
             if (node_num >= filter->num_nodes ||  errno != 0 || end_ptr == chr_ptr[0]) {
-                 sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d,"
-                         "node field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                 sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d, \
+                         node field as %lu ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                          filt_idx, node_num, filter->num_nodes);
                 hxfmsg (misc_htx_data, 0, HTX_HE_INFO, msg);
                 return (-1);
@@ -3569,8 +3554,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                     if ((tmp = strchr (ptr[k], '%')) != NULL) { /* indicates a percentage of chips is given in filter->*/
                         num_chips = (filter->node[node_num].num_chips * (float)((atoi (tmp+1)) / 100.0));
                         if ((num_chips < 0) ||  (num_chips > filter->node[node_num].num_chips)) {
-                            sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                                     "chip percentage as %d%(num_chips=%d)\n", __LINE__, __FUNCTION__,
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided for cpu_filer:%s,filter num:%d\n \
+                                     chip percentage as %d(num_chips=%d)\n", __LINE__, __FUNCTION__, \
                                      filter_str[filt_idx], filt_idx, atoi(tmp+1), filter->node[node_num].num_chips);
                             hxfmsg (misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                             return (-1);
@@ -3594,8 +3579,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                         errno = 0;
                         begin_chip = strtol (tmp, &end_ptr, 10);
                         if (begin_chip >= filter->node[node_num].num_chips || errno != 0 || end_ptr == ptr[k]) {
-                            sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                                     "chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                            sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n \
+                                     chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                      filt_idx, begin_chip, filter->node[node_num].num_chips);
                             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                             return (-1);
@@ -3613,8 +3598,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                             end_chip = strtol (tmp, &end_ptr, 10);
                         }
                         if (end_chip >= filter->node[node_num].num_chips || errno != 0 || end_ptr == ptr[k]) {
-                            sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                                     "chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                            sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n \
+                                     chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                      filt_idx, end_chip, filter->node[node_num].num_chips);
                             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                             return (-1);
@@ -3638,8 +3623,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
             } else if ((tmp = strchr (chr_ptr[1], '%')) != NULL) { /* indicates a percentage of chips is given in filter->*/
                 num_chips = (filter->node[node_num].num_chips * (float)(( atoi(tmp+1))/100.0));
                 if ((num_chips < 0) ||  (num_chips > filter->node[node_num].num_chips)) {
-                    sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                             "chip percentage as %d%(num_chips=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                    sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n \
+							chip percentage as %d(num_chips=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                              filt_idx, atoi(tmp+1), filter->node[node_num].num_chips);
                     hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                     return (-1);
@@ -3656,8 +3641,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                 errno = 0;
                 chip_num = strtol (chr_ptr[1], &end_ptr, 10);
                 if (chip_num >= filter->node[node_num].num_chips ||  errno != 0 || end_ptr == chr_ptr[1]) {
-                    sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                             "chip field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                    sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n \
+                             chip field as %lu ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                              filt_idx, chip_num, filter->node[node_num].num_chips);
                     hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
                     return (-1);
@@ -3683,7 +3668,7 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                     j = 0;
                     strcpy (tmp_str, chr_ptr[2]);
                     if ((ptr[j++] = strtok (tmp_str, "[],")) == NULL) {
-                        sprintf (htx_msg, "Improper value is provided for cpu_filer:%s,filter num:%d\n",
+                        sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n",
                                  __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
                         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                         return (-1);
@@ -3695,8 +3680,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                        if ((tmp = strchr (ptr[k], '%')) != NULL) { /* indicates a percentage of cores is given in filter->*/
                            num_cores = (filter->node[node_num].chip[chip_num].num_cores * (float)(( atoi(tmp+1))/100.0));
                            if ((num_cores < 0) ||  (num_cores > filter->node[node_num].chip[chip_num].num_cores)) {
-                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
-                                       "core percentage as %d%(num_cores=%d)\n",  __LINE__, __FUNCTION__, filter_str[filt_idx],
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d, \
+                                       core percentage as %d(num_cores=%d)\n",  __LINE__, __FUNCTION__, filter_str[filt_idx],
                                        filt_idx, atoi(tmp+1), filter->node[node_num].chip[chip_num].num_cores);
                                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                                return (-1);
@@ -3715,8 +3700,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                            errno = 0;
                            begin_core = strtol (tmp, &end_ptr, 10);
                            if (begin_core >= filter->node[node_num].chip[chip_num].num_cores || errno != 0 || end_ptr == ptr[k]) {
-                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
-                                       "core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d, \
+                                       core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                        filt_idx, begin_core, filter->node[node_num].chip[chip_num].num_cores);
                                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                                return (-1);
@@ -3731,8 +3716,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
 							   end_core = strtol (tmp, &end_ptr, 10);
                            }
                            if (end_core >= filter->node[node_num].chip[chip_num].num_cores || errno != 0 || end_ptr == ptr[k]) {
-                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
-                                       "core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d, \
+                                       core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                        filt_idx, end_core, filter->node[node_num].chip[chip_num].num_cores);
                                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                                return (-1);
@@ -3746,8 +3731,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                            errno = 0;
                            core_num = strtol (ptr[k], &end_ptr, 10);
                            if (core_num >= filter->node[node_num].chip[chip_num].num_cores ||  errno != 0 || end_ptr == ptr[k]) {
-                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
-                                        "core filed as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                               sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d, \
+                                        core filed as %lu ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                         filt_idx, core_num, filter->node[node_num].chip[chip_num].num_cores);
                                hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                                return (-1);
@@ -3760,8 +3745,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                 } else if ((tmp = strchr (chr_ptr[2], '%')) != NULL ) {/* indicates a percentage of cores is given in filter->*/
                     num_cores = (filter->node[node_num].chip[chip_num].num_cores * (float)(( atoi(tmp+1))/100.0));
                     if ((num_cores < 0) ||  (num_cores > filter->node[node_num].chip[chip_num].num_cores)) {
-                         sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
-                                  "core filed as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                         sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d, \
+                                  core filed as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                   filt_idx, atoi(tmp+1), filter->node[node_num].chip[chip_num].num_cores);
                          hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                          return (-1);
@@ -3773,8 +3758,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                     errno = 0;
                     core_num = strtol (chr_ptr[2], &end_ptr, 10);
                     if (core_num >= filter->node[node_num].chip[chip_num].num_cores ||  errno != 0 || end_ptr == ptr[k]) {
-                        sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d,"
-                                 "core field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                        sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d, \
+                                core field as %lu ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                         filt_idx, core_num, filter->node[node_num].chip[chip_num].num_cores);
                         hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                         return (-1);
@@ -3809,8 +3794,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                             if ((tmp = strchr (ptr[k], '%')) != NULL) { /* indicates a percentage of cpus is given in filter->*/
                                 num_cpus = (filter->node[node_num].chip[chip_num].core[core_num].num_procs * (float) ((atoi (tmp+1)) / 100.0));
                                 if ((num_cpus < 0) ||  (num_cpus > filter->node[node_num].chip[chip_num].core[core_num].num_procs)) {
-                                    sprintf (htx_msg, "Improper value is provided for cpu_filer:%s,filter num:%d\n"
-                                             "cpu percentage as %d%(num_cpus=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                    sprintf (htx_msg, "[%d]%s:Improper value is provided for cpu_filer:%s,filter num:%d\n"
+                                             "cpu percentage as %d(num_cpus=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                              filt_idx, atoi(tmp+1), filter->node[node_num].chip[chip_num].core[core_num].num_procs);
                                     hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                                     return (-1);
@@ -3831,14 +3816,14 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                                 errno = 0;
                                 begin_cpu = strtol (tmp, &end_ptr, 10);
                                 if (begin_cpu > filter->node[node_num].chip[chip_num].core[core_num].num_procs || errno != 0 || end_ptr == ptr[k]) {
-                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
-                                             "thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n \
+                                             thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                              filt_idx, begin_cpu, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
                                     hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
                                     return (-1);
                                 }
                                 if ((tmp = strtok (NULL, "-")) == NULL) {
-                                     sprintf (htx_msg, "Improper value is provided  for cpu_filer:%s,filter num:%d\n",
+                                     sprintf (htx_msg, "[%d]%s:Improper value is provided  for cpu_filer:%s,filter num:%d\n",
                                               __LINE__, __FUNCTION__, filter_str[filt_idx], filt_idx);
                                     hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
                                     return (-1);
@@ -3850,8 +3835,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
 							        end_cpu = strtol (tmp, &end_ptr, 10);
                                 }
                                 if (end_cpu > filter->node[node_num].chip[chip_num].core[core_num].num_procs || errno != 0 || end_ptr == ptr[k]) {
-                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
-                                             "thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n \
+                                             thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                              filt_idx, end_cpu, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
                                     hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
                                     return (-1);
@@ -3865,8 +3850,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                                 errno = 0;
                                 cpu_num = strtol (ptr[k], &end_ptr, 10);
                                 if (cpu_num >= filter->node[node_num].chip[chip_num].core[core_num].num_procs  ||  errno != 0 || end_ptr == ptr[k]) {
-                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
-                                             "thread field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                                    sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n \
+                                             thread field as %lu ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                              filt_idx, cpu_num, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
                                     hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
                                     return (-1);
@@ -3879,8 +3864,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                     } else if ((tmp = strchr (chr_ptr[3], '%')) != NULL) { /* indicates a percentage of cpus is given in filter->*/
                         num_cpus = (filter->node[node_num].chip[chip_num].core[core_num].num_procs * (float) ((atoi (tmp+1)) / 100.0));
                         if ((num_cpus < 0) ||  (num_cpus > filter->node[node_num].chip[chip_num].core[core_num].num_procs)) {
-                            sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
-                                     "thread percentage as %d%(num_cpus=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n \
+                                     thread percentage as %d(num_cpus=%d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                      filt_idx, atoi (tmp+1), filter->node[node_num].chip[chip_num].core[core_num].num_procs);
                             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                             return (-1);
@@ -3894,8 +3879,8 @@ int parse_filter(char filter_str[][MAX_FILTER_STR], struct resource_filter_info 
                         errno = 0;
                         cpu_num = strtol (chr_ptr[3], &end_ptr, 10);
                         if (cpu_num >= filter->node[node_num].chip[chip_num].core[core_num].num_procs  ||  errno != 0 || end_ptr == ptr[k]) {
-                            sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n"
-                                     "cpu field as %d ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
+                            sprintf (htx_msg, "[%d]%s: Improper value is provided  for cpu_filer:%s,filter num:%d\n \
+                                     cpu field as %lu ( must be < %d)\n", __LINE__, __FUNCTION__, filter_str[filt_idx],
                                      filt_idx, cpu_num, filter->node[node_num].chip[chip_num].core[core_num].num_procs);
                             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, htx_msg);
                             return (-1);

@@ -617,13 +617,4 @@ int memory_segments_calculation(void);
 int fill_fabb_segment_details(int);
 int modify_fabb_shmsize_based_on_cpufilter(int,int);
 int fill_fabb_thread_structure(struct chip_mem_pool_info*,int);
-#ifdef __HTX_LINUX__
-int do_trap_htx64 (unsigned long arg1,
-                       unsigned long arg2,
-                       unsigned long arg3,
-                       unsigned long arg4,
-                       unsigned long arg5,
-                       unsigned long arg6,
-                       unsigned long arg7);
-#endif
 int run_tlb_operaion(void);

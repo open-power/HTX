@@ -1,22 +1,20 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * Copyright 2003,2016 IBM International Business Machines Corp.
+/* static char sccsid[] = "@(#)71  1.2  src/htx/usr/lpp/htx/lib/htxmp64/htxmp_proto_new.h, htx_libhtxmp, htxubuntu 1/20/14 06:11:24"; 
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * COMPONENT_NAME: htx_libhtxmp 
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ * FUNCTIONS:
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * ORIGINS: 27
+ *
+ * IBM CONFIDENTIAL -- (IBM Confidential Restricted when
+ * combined with the aggregated modules for this product)
+ * OBJECT CODE ONLY SOURCE MATERIALS
+ * (C) COPYRIGHT International Business Machines Corp. 1988, 1990, 1991
+ * All Rights Reserved
+ *
+ * US Government Users Restricted Rights - Use, duplication or
+ * disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
  */
-/* IBM_PROLOG_END_TAG */
-
 
 #include "hxiipc64.h" 
 #include "hxihtx64.h"
@@ -37,7 +35,7 @@ struct htx_data * global_mp_htx_ds ;
    and the new version
  */ 
    int new_mp = 0; 
-/* This flag tells whether mp_instialization was 
+/* This flag tells whether mp_initialization was 
 	successful or not */ 
 	int new_mp_initialize = 0;
 /* This thread will make stats update thread wait,

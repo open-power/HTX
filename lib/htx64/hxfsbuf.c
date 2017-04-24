@@ -1,22 +1,21 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/* 
- * Copyright 2003,2016 IBM International Business Machines Corp.
+/* "@(#)75  1.2  src/htx/usr/lpp/htx/lib/htx64/hxfsbuf.c, htx_libhtxmp, htxubuntu 10/8/10 04:38:42"; */
+/*
+ * COMPONENT_NAME: (HTXLIB) HTX Libraries
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * FUNCTIONS: hxfcbuf(), hxfsbuf()
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ * ORIGINS: 27
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * IBM CONFIDENTIAL -- (IBM Confidential Restricted when
+ * combined with the aggregated modules for this product)
+ * OBJECT CODE ONLY SOURCE MATERIALS
+ * (C) COPYRIGHT International Business Machines Corp. 1988, 1990, 1991
+ * All Rights Reserved
+ *
+ * US Government Users Restricted Rights - Use, duplication or
+ * disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
  */
-/* IBM_PROLOG_END_TAG */
-static char sccsid[] = "@(#)75  1.2  src/htx/usr/lpp/htx/lib/htx64/hxfsbuf.c, htx_libhtxmp, htxubuntu 10/8/10 04:38:42";
+
 #include "htx_local.h"
 #include "hxihtx64.h"
 #ifndef __HTX_LINUX__
@@ -26,9 +25,9 @@ static char sccsid[] = "@(#)75  1.2  src/htx/usr/lpp/htx/lib/htx64/hxfsbuf.c, ht
 #endif
 
 
-#include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #define DUMP_PATH "/tmp/"
 
@@ -111,7 +110,7 @@ int hxfsbuf_tefficient(char *buf, size_t len, char *fname, struct htx_data *ps)
         {
           if (num_bytes != (int) len)
             {
-              (void) sprintf(err_msg, "Error writing to %s.\nOnly %d of %d \
+              (void) sprintf(err_msg, "Error writing to %s.\nOnly %d of %lu \
 bytes successfully transfered on write() system call.",
                              fname, num_bytes, len);
               (void) hxfmsg(ps, exit_code, -10, err_msg);

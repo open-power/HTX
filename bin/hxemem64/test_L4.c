@@ -30,6 +30,9 @@
 #define L4_ASSOCIATIVITY    	16
 /*#define debug_l4*/
 
+#ifndef __HTX_LINUX__
+#pragma reg_killed_by trap
+#endif
 /*#define PRINT_BITS_DEBUG*/
 struct mem_req {
     long *ea;  /* array to store effective addr of each page */
@@ -54,16 +57,6 @@ struct L4Roll_thread_context {
 	unsigned int thread_offset;
 }th_ctx[MAX_THREADS_PER_CHIP];
 
-#ifdef __HTX_LINUX__
-   int do_trap_htx64 (unsigned long arg1,
-                      unsigned long arg2,
-                      unsigned long arg3,
-                      unsigned long arg4,
-                      unsigned long arg5,
-                      unsigned long arg6);
-#else
-#pragma reg_killed_by trap
-#endif
 
 static int cpus_in_instance[MAX_CPUS_PER_CHIP];
 static int instance_number;

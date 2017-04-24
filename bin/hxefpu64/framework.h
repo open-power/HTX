@@ -1242,7 +1242,9 @@ void htx_sync_new(uint32 *, uint64, uint32 *, int, int);
 int copy_prolog_p6(int );
 int is_reg_sp(uint32, int);
 int get_logical_to_physical(int cpu);
+#ifndef __HTX_LINUX__
 int bind_thread(uint32 cpu);
+#endif
 int unbind_thread(uint32 cpu);
 int distribute_vsrs_based_on_ins_bias(int cno);
 void generate_and_set_initial_seeds(int32);

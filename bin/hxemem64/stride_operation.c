@@ -260,7 +260,7 @@ int read_comp_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, 
                     #ifndef __HTX_LINUX__
                         trap(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr);
                     #else
-                        do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr);
+                        do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr,0);
                     #endif
                     }
                     rc = l + i + 1;
@@ -349,7 +349,7 @@ int read_comp_word(void *addr, int no_of_strides, int oper_per_stride, int pi, u
 					#ifndef __HTX_LINUX__
 						trap(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr);
 					#else
-						do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr);
+						do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr,0);
 					#endif
 					}
                     rc = l + i + 1;
@@ -437,7 +437,7 @@ int read_comp_byte(void *addr, int no_of_strides, int oper_per_stride, int pi, u
                     #ifndef __HTX_LINUX__
                         trap(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr);
                     #else
-                        do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr);
+                        do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr,0);
                     #endif
                     }
                     rc = l + i + 1;

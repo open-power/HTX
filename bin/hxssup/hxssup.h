@@ -33,7 +33,6 @@
 #include <sys/param.h>
 #include <htx_local.h>
 #include <hxiipc.h>
-#include <hxihtx.h>
 #include <hxiconv.h>
 /*union semun{
 	int val;
@@ -46,7 +45,6 @@
 #else
 #include <htx_local.h>
 #include <hxiipc.h>
-#include <hxihtx.h>
 #include <hxiconv.h>
 #endif
 
