@@ -20,7 +20,7 @@ OBJECTS =  \
     mem_random_pat_operations${OBJ_SUFF} \
     stride_operation${OBJ_SUFF}
 
-CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g -D__HTX_LINUX__ -I./../hxemem64
+CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g -D__HTX_LINUX__ -I./../hxemem64 -std=c99
  
 LIBS += -lpthread -lhtx64
 
