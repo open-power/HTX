@@ -35,9 +35,41 @@ HTX User Manual
 
 	HTX images can be built in .rpm or .deb format depending upon the Linux
 	distribution. First, uninstall the existing version of HTX, if one exists,
-	and then install the new version. 
+	and then install the new version.
 
-	1.3.1 Installing an HTX RPM Package 
+	HTX can also be built and installed using tarball.
+
+	1.3.1 Installing using HTX tarball
+		
+		To install HTX using tarball, do the following steps:
+
+		1. Log in as root.
+		2. Clone HTX project from github
+			git clone https://github.com/open-power/HTX.git
+		3. Go inside HTX directory, Build the package and generate tarball.
+			a. cd HTX/
+			b. make clean
+			c. make all
+			d. make tar
+		   HTX tarball by name "htx_package.tar.gz" will be created in directory (HTX/)
+		4. Extract tarball, Proceed for installation.
+			a. tar --touch -xvzf htx_package.tar.gz
+			b. cd htx_package
+		5. Installing and uninstalling HTX.
+			a. Make sure you are inside htx_package/ directory.
+			b. ./installer.sh 
+			   This will install HTX in default path: /usr/lpp/htx
+			c. ./installer.sh -f    #Force Installation
+			   This will automatically uninstall HTX(if its already installed) and re-install freshly
+			d. ./installer.sh -p /home/htx     #Installation in specified path
+			   This will install HTX in the specified path which is given as argument(In this case its inside "/home/htx")
+			e. ./installer.sh -p /home/htx -f    #Force Installation in specified path "/home/htx"
+			f. ./uninstaller.sh 
+			   This will uninstall HTX from the system
+		
+		
+
+	1.3.2 Installing an HTX RPM Package 
 
 		To install an HTX RPM package, do the following steps: 
 
@@ -57,7 +89,7 @@ HTX User Manual
 			3. Install the latest RPM package for your system: 
 			rpm -ivh <rpmfilename> 
 
-	1.3.2 Installing an HTX .deb Package 
+	1.3.3 Installing an HTX .deb Package 
 
 		To install an HTX .dep package, do the following steps: 
 
