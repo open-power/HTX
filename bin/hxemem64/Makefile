@@ -20,7 +20,7 @@ OBJECTS =  \
  
 SRCS = $(patsubst %.o, %.c, $(OBJECTS))
 
-CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g  -D__HTX_LINUX_ -DTRUE=1 -DFALSE=0
+CFLAGS += -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -D_REENTRANT -g  -D__HTX_LINUX_ -DTRUE=1 -DFALSE=0 -std=c99
  
 LIBS = -lhtx64 -lpthread
 
