@@ -92,7 +92,7 @@ int htxd_hang_monitor_ecg(htxd_ecg_info *p_ecg_info_to_hang_monitor, char *comma
 						"Current elasped time = %d seconds.",
 						p_HE->HE_name, p_HE->sdev_id,
 						p_HE->max_run_tm,
-						elasped_time);
+						(int) elasped_time);
 				}
 			} else {
 				p_HE->hung_flag = 0;

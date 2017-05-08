@@ -315,6 +315,17 @@ char *htxd_get_equaliser_conf_file(void)
 }
 
 
+void htxd_set_equaliser_sys_cpu_util(char *value)
+{
+        htxd_global_instance->equaliser_sys_cpu_util = value;
+}
+
+
+char *htxd_get_equaliser_sys_cpu_util(void)
+{
+        return htxd_global_instance->equaliser_sys_cpu_util;
+}
+
 texer_list * htxd_get_exer_table(void)
 {
 	if(htxd_global_instance->p_ecg_manager == NULL) {
@@ -458,7 +469,7 @@ htxd * htxd_create_instance(void)
 
 	htxd_new_instance = malloc(sizeof(htxd));
 	if(htxd_new_instance == NULL) {
-		sprintf(trace_string, "htxd_create_instance: failed malloc with errno <%d>, exiting...", errno);	
+		sprintf(trace_string, "htxd_create_instance: failed malloc with errno <%d>, exiting...", errno);
 		HTXD_TRACE(LOG_ON, trace_string);
 		exit(0);
 	}
@@ -484,7 +495,7 @@ htxd_command * htxd_create_command(void)
 
 	p_htxd_command = malloc(sizeof(htxd_command));
 	if(p_htxd_command == NULL) {
-		sprintf(trace_string, "htxd_create_command: failed malloc with errno <%d>, exiting...", errno);	
+		sprintf(trace_string, "htxd_create_command: failed malloc with errno <%d>, exiting...", errno);
 		HTXD_TRACE(LOG_ON, trace_string);
 		exit(0);
 	}
@@ -551,7 +562,7 @@ int htxd_reset_exer_pid(pid_t child_pid, char *exit_reason)
 		} else if ( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->DR_term ) {
 			strcat(exit_detail_string, " because of DR operation");
 		} else if ( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period_expired ) {
-			sprintf(temp_str, " because of run time (%d seconds) is completed", (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period);
+			sprintf(temp_str, " because of run time (%ld seconds) is completed", (long) (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period);
 			strcat(exit_detail_string, temp_str);
 		}
 
@@ -735,3 +746,6 @@ int htxd_get_ecg_sem_id(void)
 
 	return p_ecg_manager->ecg_info_list->ecg_sem_id;
 }
+
+
+

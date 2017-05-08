@@ -966,6 +966,7 @@ int htxd_init_equaliser_info( htxd_ecg_info *p_ecg_info)
     p_ecg_info->ecg_equaliser_info.startup_time_delay = 0;
     p_ecg_info->ecg_equaliser_info.log_duration = 0;
     p_ecg_info->ecg_equaliser_info.pattern_length = 0;
+    p_ecg_info->ecg_equaliser_info.sys_cpu_util[0] = '\0';
 
 	mdt_fd = cfgcopsf (p_ecg_info->ecg_name);
 	if (mdt_fd == (CFG__SFT *) NULL) {
@@ -987,6 +988,11 @@ int htxd_init_equaliser_info( htxd_ecg_info *p_ecg_info)
 				htxd_set_equaliser_conf_file(p_ecg_info->ecg_equaliser_info.config_file);
 			}
 
+			return_code = cfgcskwd("cpu_util", default_mdt_snz, temp_str);
+			if(return_code ==  CFG_SUCC) {
+				strcpy( p_ecg_info->ecg_equaliser_info.sys_cpu_util, htxd_unquote(temp_str));
+				htxd_set_equaliser_sys_cpu_util(p_ecg_info->ecg_equaliser_info.sys_cpu_util);
+			}
 			return_code = cfgcskwd("equaliser_debug_flag", default_mdt_snz, temp_str);
 			if(return_code ==  CFG_SUCC) {
 				p_ecg_info->ecg_equaliser_info.debug_flag = atoi(htxd_unquote(temp_str));

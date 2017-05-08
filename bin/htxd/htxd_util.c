@@ -478,10 +478,10 @@ int htxd_execute_shell_profile(void)
 
 
 #ifdef  __HTX_LINUX__
-	sprintf(trace_string, "/bin/bash %s/etc/scripts/htx_setup.sh > %s/htxd_htx_setup_output 2>&1", global_htx_home_dir, global_htxd_log_dir);
+	sprintf(trace_string, "/bin/bash %s/etc/scripts/htx_setup.sh > %s/%s 2>&1", global_htx_home_dir, global_htxd_log_dir, HTXD_CREATE_MDT_LOG);
 	return_status = system(trace_string);
 #else
-	sprintf(trace_string, "%s/.profile > %s/htxd_profile_output 2>&1", global_htx_home_dir, global_htxd_log_dir);
+	sprintf(trace_string, "%s/.profile > %s/%s 2>&1", global_htx_home_dir, global_htxd_log_dir, HTXD_CREATE_MDT_LOG);
 	return_status = system(trace_string);
 #endif
 
@@ -564,35 +564,47 @@ void htxd_ipc_cleanup_on_process_exit(int exit_pid)
 
 
 
-int htxd_get_daemon_state_string(int daemon_state, char *daemon_state_string)
+int htxd_get_daemon_state_string(int daemon_state, char *daemon_state_string, char *daemon_state_detail)
 {
 	switch(daemon_state) {
 		case HTXD_DAEMON_STATE_IDLE:
 		strcpy(daemon_state_string, "IDLE");
+		strcpy(daemon_state_detail, "No MDT is currently running");
 		break;
 
 		case HTXD_DAEMON_STATE_CREATING_MDT:
 		strcpy(daemon_state_string, "CREATING_MDT");
+		strcpy(daemon_state_detail, "MDT creation is in progress");
 		break;
 
 		case HTXD_DAEMON_STATE_SELECTING_MDT:
 		strcpy(daemon_state_string, "SELECTING_MDT");
+		strcpy(daemon_state_detail, "MDT selecton is in progress");
 		break;
 
 		case HTXD_DAEMON_STATE_SELECTED_MDT:
 		strcpy(daemon_state_string, "SELECTED_MDT");
+		strcpy(daemon_state_detail, "MDT is selected");
 		break;
 
 		case HTXD_DAEMON_STATE_STARTING_MDT:
 		strcpy(daemon_state_string, "STARTING_MDT");
+		strcpy(daemon_state_detail, "MDT is start is in progress");
 		break;
 
 		case HTXD_DAEMON_STATE_RUNNING_MDT:
 		strcpy(daemon_state_string, "RUNNING_MDT");
+		strcpy(daemon_state_detail, "MDT is running");
 		break;
 
 		case HTXD_DAEMON_SHUTTING_DOWN_MDT:
 		strcpy(daemon_state_string, "SHUTTING_DOWN_MDT");
+		strcpy(daemon_state_detail, "MDT shutdown is in progress");
+		break;
+
+		case HTXD_DAEMON_STATE_AUTOSTART_SETUP:
+		strcpy(daemon_state_string, "HTXD_DAEMON_AUTOSTART_SETUP");
+		strcpy(daemon_state_detail, "MDT auto start setup is in progress");
 		break;
 
 		default:
@@ -601,4 +613,36 @@ int htxd_get_daemon_state_string(int daemon_state, char *daemon_state_string)
 
 	return 0;
 }
+
+
+
+int htxd_verify_is_ready_to_start(void)
+{
+	char *command_string = "ps -aef | grep -E 'hxssup|hxe|eservd|hxsmsg|hxstats' | grep -v grep | awk '{print $8}' | grep -E 'hxssup|hxe|eservd|hxsmsg|hxstats' | wc -l";
+	FILE *command_fp;
+	char trace_string[512];
+	int process_count;
+	
+
+	command_fp = popen(command_string, "r");
+	if(command_fp == NULL) {
+		sprintf(trace_string, "htxd_verify_is_ready_to_start: popen failed with errno <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+		return -1;
+	}
+
+	fscanf(command_fp, "%d", &process_count);
+	
+	pclose(command_fp);
+	
+	if(process_count == 0) {
+		return 0;
+	} else {
+		sprintf(trace_string, "ps -aef | grep -E 'hxssup|hxe|eservd|hxsmsg|hxstats' | grep -v grep > %s/%s", global_htxd_log_dir, HTXD_PROCESS_CHECK_LOG);
+		system(trace_string);
+		return -1;
+	}	
+}
+
+
 

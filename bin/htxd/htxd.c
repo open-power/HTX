@@ -36,6 +36,7 @@
 #include "htxd_thread.h"
 #include "htxd_socket.h"
 #include "htxd_util.h"
+#include "htxd_signal.h"
 
 
 htxd *htxd_global_instance = NULL;

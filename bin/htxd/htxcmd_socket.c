@@ -203,7 +203,7 @@ void htxcmd_prepare_command_string(htxcmd_command *p_command_object, char *comma
 	char temp_string[COMMAND_STRING_LENGTH];
 
 	sprintf(temp_string, ":%010d:%s:%s:", p_command_object->command_index, p_command_object->ecg_name, p_command_object->option_list);
-	sprintf(command_string, "%010d%s", strlen(temp_string), temp_string);		
+	sprintf(command_string, "%010d%s", (int) strlen(temp_string), temp_string);		
 }
 
 

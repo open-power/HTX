@@ -81,7 +81,7 @@ int htxd_option_method_create_mdt(char **result_string, htxd_command *p_command)
 		strcpy(trace_string, *result_string);
 		HTXD_TRACE(LOG_ON, trace_string);
 	} else {
-		sprintf(*result_string, "Error: mdt creation is failed, please check error at log file <%s/htxd_bash_profile_output>.", global_htxd_log_dir);
+		sprintf(*result_string, "Error: mdt creation is failed, please check error at log file <%s/%s>.", global_htxd_log_dir, HTXD_CREATE_MDT_LOG);
 		strcpy(trace_string, *result_string);
 		HTXD_TRACE(LOG_ON, trace_string);
 		htxd_set_daemon_state(HTXD_DAEMON_STATE_IDLE);

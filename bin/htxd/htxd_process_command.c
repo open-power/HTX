@@ -50,6 +50,7 @@ int htxd_process_command(char **result_string, htxd_command *p_command_object)
 	char	trace_str[512];
 	int	daemon_state;
 	char  daemon_state_string[128];
+	char  daemon_state_details[128];
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_process_command");
@@ -62,10 +63,10 @@ int htxd_process_command(char **result_string, htxd_command *p_command_object)
 
 	daemon_state = htxd_get_daemon_state();
 	if( (daemon_state & option_list[index].command_state) == 0) {
-		htxd_get_daemon_state_string(daemon_state, daemon_state_string);
+		htxd_get_daemon_state_string(daemon_state, daemon_state_string, daemon_state_details);
 		*result_string = malloc(1000);	
 		memset(*result_string, 0, 1000);
-		sprintf(*result_string, "Daemon state is <%s>, command option <%s> is not supported at this daemon state", daemon_state_string, option_list[index].option_string );
+		sprintf(*result_string, "Daemon state is <%s>:%s,\ncommand option <%s> is not supported at this daemon state", daemon_state_string, daemon_state_details, option_list[index].option_string );
 		strcpy(trace_str, *result_string);
 		HTXD_TRACE(LOG_ON, trace_str);
 		return -1;

@@ -53,10 +53,26 @@
 #define NO_BPT_NAME_PROVIDED "NO_BPT_NAME_PROVIDED"
 #define CAMSS_MDT_UPDATE_SCRIPT "update_camss_mdt"
 #define HTXD_TRACE_LOG	"htxd_trace"
-
+#define HTXD_PROCESS_CHECK_LOG "htxd_process_check_log"
+#define	HTXD_CREATE_MDT_LOG "htxd_create_mdt_log"
 #define HTXD_LOG_FILE	"htxd_log"
-
 #define HTXD_START_STOP_LOG	"htxd.start.stop.time"
+
+#define HTXD_BOOTME_ON		1
+#define HTXD_BOOTME_OFF		2
+#define HTXD_BOOTME_STATUS	3
+#define HTXD_SOFT_BOOTME	10
+#define HTXD_SOFT_FAST_BOOTME	15
+#define HTXD_HARD_BOOTME	20
+#define HTXD_HARD_FAST_BOOTME	25
+#define	HTXD_BOOTME_REBOOT "REBOOT_NO_MDT"
+#define	HTXD_BOOTME_SCRIPT_ERROR_LOG	"htxd_bootme_scripts_error_log"
+#ifdef __HTX_LINUX__
+#define HTXD_BOOTME_USAGE_TEXT	"usage:\nhtxcmdline -bootme <operation> [mode:<mode type>] [period:<1,2,3, or 4>]\noperation:<on, off ,status or help>\nmode type:\n\tsoft  - reboot\n\tsoftf - reboot -f\n\thard  - shoudown\n\thardf - shutdown -f\nperiod:\n\t1 - every 20 minutes\n\t2 - every 30 minutes\n\t3 - every hour\n\t4 - every midnight\n\nexample: htxcmdline -bootme on mode:softf period:1\nNote: default values are from bootme rule file"
+#else
+#define HTXD_BOOTME_USAGE_TEXT	"usage:\nhtxcmdline -bootme <operation> [mode:<mode type>] [period:<1,2,3, or 4>]\noperation:<on, off ,status or help>\nmode type:\n\tsoft  - shutdown -r\n\tsoftf - shutdown -Fr\n\thard  - shutdown\n\thardf - shutdown -F\nperiod:\n\t1 - every 20 minutes\n\t2 - every 30 minutes\n\t3 - every hour\n\t4 - every midnight\n\nexample: htxcmdline -bootme on mode:softf period:1\nNote: default values are from bootme rule file"
+#endif
+
 
 
 #define EXTRA_DEVICE_ENTRIES 0
@@ -106,6 +122,8 @@
 
 #define HTXD_MDT_SHUTDOWN_MSG	190
 
+#define HTXD_HTX_PROCESS_FOUND 51
+
 
 /* daemon states */
 #define		HTXD_DAEMON_STATE_IDLE			1
@@ -115,6 +133,7 @@
 #define		HTXD_DAEMON_STATE_STARTING_MDT		16
 #define		HTXD_DAEMON_STATE_RUNNING_MDT		32
 #define		HTXD_DAEMON_SHUTTING_DOWN_MDT		64
+#define		HTXD_DAEMON_STATE_AUTOSTART_SETUP	128
 
 /* command supported state */
 #define		HTXD_COMMND_STATE_IDLE			HTXD_DAEMON_STATE_IDLE 
@@ -122,7 +141,7 @@
 #define         HTXD_COMMND_STATE_SELECTED_RUNNING	(HTXD_DAEMON_STATE_SELECTED_MDT | HTXD_DAEMON_STATE_RUNNING_MDT)
 #define         HTXD_COMMND_STATE_IDLE_SELECTED_RUNNING (HTXD_DAEMON_STATE_IDLE | HTXD_DAEMON_STATE_SELECTED_MDT | HTXD_DAEMON_STATE_RUNNING_MDT)
 #define         HTXD_COMMND_STATE_IDLE_SELECTED		(HTXD_DAEMON_STATE_IDLE | HTXD_DAEMON_STATE_SELECTED_MDT)
-#define         HTXD_COMMND_STATE_ALL			(HTXD_DAEMON_STATE_IDLE | HTXD_DAEMON_STATE_CREATING_MDT | HTXD_DAEMON_STATE_SELECTING_MDT | HTXD_DAEMON_STATE_SELECTED_MDT | HTXD_DAEMON_STATE_STARTING_MDT | HTXD_DAEMON_STATE_RUNNING_MDT | HTXD_DAEMON_SHUTTING_DOWN_MDT)
+#define         HTXD_COMMND_STATE_ALL			(HTXD_DAEMON_STATE_IDLE | HTXD_DAEMON_STATE_CREATING_MDT | HTXD_DAEMON_STATE_SELECTING_MDT | HTXD_DAEMON_STATE_SELECTED_MDT | HTXD_DAEMON_STATE_STARTING_MDT | HTXD_DAEMON_STATE_RUNNING_MDT | HTXD_DAEMON_SHUTTING_DOWN_MDT | HTXD_DAEMON_STATE_AUTOSTART_SETUP)
 
 
 

@@ -86,6 +86,7 @@ typedef struct
 	union shm_pointers	equaliser_shm_addr;
 	int			equaliser_semhe_id;
 	char *			equaliser_conf_file;
+	char *      equaliser_sys_cpu_util;
 	int			is_auto_started;
 	int			init_syscfg_flag;
 	int			master_client_mode;

@@ -153,7 +153,7 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
     char	*cmd_string;	/* command to pass to shell */
     char	*script_cmd;	/* formatted script command */
     char	*p_script_cmd;
-    char	*p_temp_filename;	/* name of temporary file to hold awk output */
+    char	*p_temp_filename = "/tmp/htx_temp_file_script";	/* name of temporary file to hold awk output */
 
     int		ct_cmdOutput;	/* byte count of output in cmdOutput */
     int		ct_script_cmd;
@@ -193,16 +193,16 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
 /*
  *	Create a temporary file name for the script command
  */
-    p_temp_filename = tempnam(NULL, "hxs");
-    if (p_temp_filename == NULL) {
-	(void) sprintf(msg_text, "Problem getting the temporary file name for awk output.  errno = %d", errno);
-	HTXD_TRACE(LOG_ON, msg_text);
+//    p_temp_filename = tempnam(NULL, "hxs");
+//    if (p_temp_filename == NULL) {
+//	(void) sprintf(msg_text, "Problem getting the temporary file name for awk output.  errno = %d", errno);
+//	HTXD_TRACE(LOG_ON, msg_text);
 	//(void) send_message(msg_text, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
 //	if (!editor_PID && !shell_PID) print_log(LOGMSG,"%s\n", msg_text);
-	rc = -1;
-	*conf_emsg = TRUE;
-	goto getout;
-    } /* if */
+//	rc = -1;
+//	*conf_emsg = TRUE;
+//	goto getout;
+//    } /* if */
 
 /*
  *	Use awk to get find the script and build the command line.

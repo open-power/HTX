@@ -366,6 +366,22 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_run_mdt");
+
+	*result = malloc(1024);
+	if(*result == NULL) {
+		sprintf(trace_str, "htxd_option_method_run_mdt: failed with malloc, errno<%d>", errno);
+		HTXD_TRACE(LOG_OFF, trace_str);
+	}
+
+	if(htxd_is_daemon_selected()  != TRUE) {
+		return_code = htxd_verify_is_ready_to_start();
+		if(return_code != 0) {
+			sprintf(*result, "Error: Not able to start the MDT\nHTX test is already running on the system, please shutdown the running test\n%s/%s contains the HTX process details", global_htxd_log_dir, HTXD_PROCESS_CHECK_LOG);
+			HTXD_TRACE(LOG_OFF, *result);
+			return HTXD_HTX_PROCESS_FOUND;
+		}
+	}
+
 	/* htxd instance will be created only first time */
 	htxd_instance = htxd_get_instance();
 	strcpy(command_ecg_name, p_command->ecg_name);
@@ -377,7 +393,9 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 
 	ecg_manager = htxd_get_ecg_manager();
 
-	if(command_ecg_name[0] == '\0') {
+	if( (htxd_is_daemon_selected() == TRUE) && (command_ecg_name[0] == '\0') ) {
+		strcpy(command_ecg_name, ecg_manager->selected_ecg_name);
+	} else if(command_ecg_name[0] == '\0') {
 		sprintf(command_ecg_name, "%s/mdt/%s", global_htx_home_dir, DEFAULT_ECG_NAME);
 	}
 
@@ -386,7 +404,6 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 		htxd_instance->is_mdt_created = 1;
 	}
 
-	*result = malloc(1024);
 
 	if(htxd_is_file_exist(command_ecg_name) == FALSE) {
 		sprintf(*result, "specified mdt(%s) is invalid", command_ecg_name);
@@ -462,6 +479,7 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 
 	/* initializing syscfg */
 	if(htxd_is_init_syscfg() != TRUE) {
+		HTXD_TRACE(LOG_OFF, "starting init_syscfg...");
 		return_code = init_syscfg();
 		if (return_code != 0) {
 			sprintf(*result, "Internal error: failed to initialize syscfg with error code <%d>", return_code);
@@ -559,6 +577,7 @@ int htxd_option_method_select_mdt(char **result, htxd_command *p_command)
 	htxd_ecg_manager *ecg_manager;
 	char trace_str[512], cmd[128];
 	char temp_str[512];
+	int return_code;
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_select_mdt");
@@ -566,6 +585,18 @@ int htxd_option_method_select_mdt(char **result, htxd_command *p_command)
 	htxd_instance = htxd_get_instance();
 
 	*result = malloc(1024);
+	if(*result == NULL) {
+		sprintf(trace_str, "htxd_option_method_run_mdt: failed with malloc, errno<%d>", errno);
+		HTXD_TRACE(LOG_OFF, trace_str);
+	}
+
+	return_code = htxd_verify_is_ready_to_start();
+	if(return_code != 0) {
+		sprintf(*result, "Error: Not able to start the MDT\nHTX test is already running on the system, please shutdown the running test\n%s/%s contains the HTX process details", global_htxd_log_dir, HTXD_PROCESS_CHECK_LOG);
+		HTXD_TRACE(LOG_OFF, *result);
+		return HTXD_HTX_PROCESS_FOUND;
+	}
+
 	ecg_manager = htxd_get_ecg_manager();
 	strcpy(command_ecg_name, p_command->ecg_name);
 

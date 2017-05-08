@@ -24,6 +24,7 @@
  *		write_pipe
  */
 
+#include <unistd.h>
 
 #include "hxsmsg.h"
 
@@ -320,7 +321,7 @@ short write_pipe(struct htx_msg_xbuf *p_message_buffer)
     	{
       		(void) sprintf(error_msg,
 	    	"\n%s -- Error writing to pipe.\n\
-		Only %d of %d bytes actually written.\n",
+		Only %d of %zd bytes actually written.\n",
 	     	program_name,
 	     	pipe_write_rc,
 	     	text_str_len);

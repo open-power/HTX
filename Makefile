@@ -28,7 +28,7 @@ all: ${SUBDIRS}
 	@echo "making dir - "${SHIPTOPDIR}
 	${MKDIR} ${SHIPTOPDIR}
 	${CP} ${TARGET} ${SHIPTOPDIR}
-	touch /tmp/.htx_build_done
+	touch /${SHIPTOPDIR}/.htx_build_done
 
 .PHONY: clean ${SUBDIRS_CLEAN} clean_local
 
@@ -39,9 +39,9 @@ clean: ${SUBDIRS_CLEAN} clean_local
 	${RM} -rf ${EXPORT}
 	${RM} -rf htx_package.tar.gz
 	${RM} -rf htxubuntu.deb
-	@if [ -e /tmp/.htx_build_done ]; \
+	@if [ -e /${SHIPTOPDIR}/.htx_build_done ]; \
 	then \
-		${RM} /tmp/.htx_build_done ; \
+		${RM} /${SHIPTOPDIR}/.htx_build_done ; \
 	fi
 
 ${SUBDIRS_CLEAN}:
@@ -56,7 +56,7 @@ deb:
 	dpkg-deb -b $(SHIPDIR)  $(TOPDIR)/htxubuntu.deb
 
 tar:    
-	@if [ ! -f /tmp/.htx_build_done ] ; \
+	@if [ ! -f /${SHIPTOPDIR}/.htx_build_done ] ; \
         then \
                 echo -e "HTX is not built for tar package creation, \ndo 'make all' and retry, exiting...";  \
 		exit 1; \

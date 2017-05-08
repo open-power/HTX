@@ -69,6 +69,9 @@ extern void			htxd_set_equaliser_semhe_id(int);
 extern int			htxd_get_equaliser_semhe_id(void);
 extern void			htxd_set_equaliser_conf_file(char *);
 extern char *		htxd_get_equaliser_conf_file(void);
+extern void         htxd_set_equaliser_sys_cpu_util(char *);
+extern char *       htxd_get_equaliser_sys_cpu_util(void);
+
 extern void			htxd_set_equaliser_debug_flag(int);
 extern int			htxd_get_equaliser_debug_flag(void);
 extern void			htxd_set_equaliser_offline_cpu_test_flag(int);

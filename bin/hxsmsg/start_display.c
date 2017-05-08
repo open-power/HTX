@@ -27,7 +27,7 @@ int start_display_device(void)
 	pid_t pid;
 	if((pid = fork()) == 0)
 	{
-		execl("/usr/bin/htx/bin/nf",(char *)0);
+		execl("/usr/bin/htx/bin/nf", "/usr/bin/htx/bin/nf", (char *) NULL);
 		exit(1);
 	}
 	return(GOOD);

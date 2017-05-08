@@ -161,7 +161,7 @@ short write_log(int *fileid_ptr, char *filename, char *message,
 		{
 	  		(void) sprintf(error_msg,
                         "\n%s -- error writing to %s.\n\
-			Only %d bytes out of a %d byte buffer were written to disk.\n",
+			Only %d bytes out of a %zd byte buffer were written to disk.\n",
                         program_name,
                         filename,
 			bytes_written,

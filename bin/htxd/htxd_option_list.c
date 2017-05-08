@@ -33,6 +33,7 @@ void init_option_list(void)
 	option_list[index++].option_method = htxd_option_method_list_mdt;
 	option_list[index++].option_method = htxd_option_method_run_mdt;
 	option_list[index++].option_method = htxd_option_method_getactecg;
+	option_list[index++].option_method = htxd_option_method_getactecg;
 	option_list[index++].option_method = htxd_option_method_shutdown_mdt;
 	option_list[index++].option_method = htxd_option_method_refresh;
 	option_list[index++].option_method = htxd_option_method_activate;
@@ -51,6 +52,8 @@ void init_option_list(void)
 	option_list[index++].option_method = htxd_option_method_set_hxecom;
 	option_list[index++].option_method = htxd_option_method_getvpd;
 	option_list[index++].option_method = htxd_option_method_getecgsum;
+	option_list[index++].option_method = htxd_option_method_getecgsum;
+	option_list[index++].option_method = htxd_option_method_getecglist;
 	option_list[index++].option_method = htxd_option_method_getecglist;
 	option_list[index++].option_method = htxd_option_method_select_mdt;
 	option_list[index++].option_method = htxd_option_method_exersetupinfo;

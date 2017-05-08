@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "hxihtx.h"
 #include "htxd_ecg.h"
@@ -42,14 +43,115 @@
 test_config_struct test_config;
 struct SYS sys_detail;
 
-int num_tests = 0, total_tests=0;
+int num_tests = 0, total_tests=0, num_cpus;
 int pattern_length = UTILIZATION_QUEUE_LENGTH;
 int length_flag = 0;
+
+unsigned long long sys_cpu_util_pattern[MAX_THREADS] = {0};
+FILE *util_fp;
+time_t util_log_update_time;
+SYS_STAT sys_stat;
 
 void update_sys_details(void);
 void update_exer_info(void);
 
 void equaliser_sig_end(int signal_number, int code, struct sigcontext *scp);
+struct tm * htx_localtime_r (const time_t *, struct tm *);
+
+#ifdef __HTX_LINUX__
+int get_logical_2_physical(int);
+int bind_process(pid_t, int, int);
+#endif
+
+void bin(unsigned long long n)
+{
+    unsigned long long i;
+    /* printf ("pattern_length: %d, pattern is; %llx\n", pattern_length, n); */
+    for (i = 1ull << (pattern_length - 1); i > 0; i = i / 2) {
+        /* (n & i)? printf("1"): printf("0"); */
+        (n & i)? fprintf(util_fp, "1"): fprintf(util_fp, "0");
+    }
+    /* printf("\n"); */
+    fprintf(util_fp, "\n");
+}
+
+void print_util_seq()
+{
+    int cpu_num;
+
+    for (cpu_num = 0; cpu_num < num_cpus; cpu_num++) {
+        /* printf("cpu_num: %d, util_pattern:\t", cpu_num); */
+        fprintf(util_fp, "cpu_num: %d, util_pattern:\t", cpu_num);
+        bin(sys_cpu_util_pattern[cpu_num]);
+        /* fprintf(util_fp, "timestamp: %s, cpu thread no: %d, cpu_utilization - %16llx\n", strtok(ctime(&cur_time), "\n"), cpu_num, sys_cpu_util_pattern[cpu_num]); */
+    }
+    fflush(util_fp);
+}
+
+void generate_sys_util_pattern(int cur_sys_cpu_util_prcnt)
+{
+    int num_active_cpus, core_num, cur_cpu_util_index = 0;
+    int i, len, cpu, active_cpus_num[MAX_CPUS_PER_CORE];
+    int num_of_cpus, cpu_num;
+    unsigned long long bit_value;
+    time_t cur_time;
+
+    for (i = 0; i < num_cpus; i++) {
+        sys_cpu_util_pattern[i] = 0;
+    }
+    /* printf("inside generate_sys_util_pattern - cur_sys_cpu_util_prcnt: %d, pattern_length: %d\n", cur_sys_cpu_util_prcnt, pattern_length); */
+    num_active_cpus = (cur_sys_cpu_util_prcnt * num_cpus) / 100;
+    for (len = 0; len < pattern_length; len++, cur_cpu_util_index++) {
+        for (cpu = 0; cpu < num_active_cpus; ) {
+            do {
+                bit_value = 0;
+                if (test_config.sys_util_flag == 1) {
+                    core_num = rand() % sys_stat.cores;
+                    num_of_cpus = get_cpus_in_core(core_num, active_cpus_num);
+                } else {
+                    active_cpus_num[0] = rand() % num_cpus;
+                    num_of_cpus = 1;
+                }
+                bit_value = (sys_cpu_util_pattern[active_cpus_num[0]] >> cur_cpu_util_index) & 0x1;
+            } while (bit_value != 0);
+            for (cpu_num = 0; cpu_num < num_of_cpus; cpu_num++, cpu++) {
+                sys_cpu_util_pattern[active_cpus_num[cpu_num]] |= (1ull << cur_cpu_util_index);
+            }
+        }
+    }
+    cur_time = time((long *)0);
+    fprintf(util_fp, "cur_sys_cpu_util_prcnt: %d, timestamp: %s", cur_sys_cpu_util_prcnt, ctime(&cur_time));
+    print_util_seq();
+}
+
+ void update_sys_util_pattern()
+ {
+     int node_num, chip_num, core_num, cpu_num;
+     int lcpu = 0, test, num_tests_configured, index = 0;
+
+     test_config.sys_util_config.data.current_seq_step = (test_config.sys_util_config.data.current_seq_step + 1) % test_config.sys_util_config.config.sequence_length;
+     test_config.sys_util_config.data.target_utilization = test_config.sys_util_config.config.utilization_sequence[test_config.sys_util_config.data.current_seq_step];
+     generate_sys_util_pattern (test_config.sys_util_config.data.target_utilization);
+
+     for (node_num = 0; node_num < sys_detail.num_nodes; node_num++) {
+         for (chip_num = 0; chip_num < sys_detail.nodes[node_num].num_chips; chip_num++) {
+             for (core_num = 0; core_num < sys_detail.nodes[node_num].chips[chip_num].num_cores; core_num++) {
+                 for (cpu_num= 0; cpu_num < sys_detail.nodes[node_num].chips[chip_num].cores[core_num].num_cpus; cpu_num++) {
+                     lcpu = get_logical_cpu_num(node_num, chip_num, core_num, cpu_num);
+                     num_tests_configured = sys_detail.nodes[node_num].chips[chip_num].cores[core_num].cpus[cpu_num].num_tests_configured;
+                     if (num_tests_configured != 0) {
+                         for (test = 0; test < num_tests_configured; test++) {
+                             index = sys_detail.nodes[node_num].chips[chip_num].cores[core_num].cpus[cpu_num].exer_info_index[test];
+                             test_config.exer_config[index].config.utilization_pattern = sys_cpu_util_pattern[lcpu];
+                             test_config.exer_config[index].config.util_pattern = UTIL_PATTERN;
+                             test_config.exer_config[index].config.pattern_length = pattern_length;
+                         }
+                     }
+                 }
+             }
+         }
+     }
+ }
 
 void update_sys_details()
 {
@@ -81,40 +183,43 @@ void update_sys_details()
     }
 }
 
-void update_config_detail(int index)
+void update_config_detail(int index, char *util_pattern)
 {
-    union shm_pointers shm_addr;
-    struct htxshm_HE *p_htxshm_HE;    /* pointer to a htxshm_HE struct     */
-    union shm_pointers shm_addr_wk;     /* work ptr into shm                 */
-    char *ptr, tmp_str[64], util_pattern[64];
-    int sequence_length = 0;
+    char *ptr, tmp_str[64];
+    int i, sequence_length = 0;
+    run_time_config *config_info;
 
-    shm_addr = htxd_get_equaliser_shm_addr();
-    shm_addr_wk.hdr_addr = shm_addr.hdr_addr;   /* copy addr to work space  */
-    (shm_addr_wk.hdr_addr)++;         /* skip over header                  */
-    p_htxshm_HE = shm_addr_wk.HE_addr;
-
-    strcpy(util_pattern,((p_htxshm_HE + index)->cpu_utilization));
+    printf("inside update_config_detail, index: %d, utilt_pattern: %s\n", index, util_pattern);
+    if (index == -1) {
+        config_info = &test_config.sys_util_config;
+    } else {
+        config_info = &test_config.exer_config[index];
+    }
     if (strchr(util_pattern, '%') != NULL) {
         strcpy(tmp_str, util_pattern);
         ptr = strtok(tmp_str, "%");
         if (strcmp(ptr, "UTIL_LEFT") == 0) {
-            test_config.exer_config[index].config.util_pattern = UTIL_LEFT;
+            config_info->config.util_pattern = UTIL_LEFT;
         } else if (strcmp(ptr, "UTIL_RIGHT") == 0) {
-            test_config.exer_config[index].config.util_pattern = UTIL_RIGHT;
+            config_info->config.util_pattern = UTIL_RIGHT;
         } else if (strcmp(ptr, "UTIL_RANDOM") == 0) {
-            test_config.exer_config[index].config.util_pattern = UTIL_RANDOM;
+            config_info->config.util_pattern = UTIL_RANDOM;
         }
         while ((ptr = strtok(NULL, "_")) != NULL) {
-            test_config.exer_config[index].config.utilization_sequence[sequence_length] = atoi(ptr);
+            config_info->config.utilization_sequence[sequence_length] = atoi(ptr);
             sequence_length++;
         }
-        test_config.exer_config[index].config.sequence_length = sequence_length;
-        test_config.exer_config[index].config.pattern_length = pattern_length;
+        config_info->config.sequence_length = sequence_length;
+        config_info->config.pattern_length = pattern_length;
+        printf("inside update_config_detail - seq:");
+        for (i = 0; i < config_info->config.sequence_length; i++) {
+			printf(" %d,", test_config.sys_util_config.config.utilization_sequence[i]);
+		}
+		printf("\n");
     } else {
-        test_config.exer_config[index].config.utilization_pattern = strtoul(util_pattern, NULL, 2);
-        test_config.exer_config[index].config.util_pattern = UTIL_PATTERN;
-        test_config.exer_config[index].config.pattern_length = strlen(util_pattern);
+        config_info->config.utilization_pattern = strtoul(util_pattern, NULL, 2);
+        config_info->config.util_pattern = UTIL_PATTERN;
+        config_info->config.pattern_length = strlen(util_pattern);
     }
 
 }
@@ -126,7 +231,7 @@ void update_exer_info()
     union shm_pointers shm_addr_wk;     /* work ptr into shm                 */
     int node_num, chip_num, core_num, cpu_num;
     int i, k, lcpu, bind_cpu_num, num_tests_configured = 0;
-    char *ptr, workstr[64];
+    char *ptr, util_pattern[64], workstr[64];
 
     sprintf(workstr, "inside update_exer_info");
     htxd_send_message(workstr, 0, HTX_SYS_INFO, HTX_SYS_MSG);
@@ -135,6 +240,13 @@ void update_exer_info()
     shm_addr_wk.hdr_addr = shm_addr.hdr_addr;   /* copy addr to work space  */
     (shm_addr_wk.hdr_addr)++;         /* skip over header                  */
     p_htxshm_HE = shm_addr_wk.HE_addr;
+
+    if (test_config.sys_util_flag) {
+        update_config_detail(-1, test_config.sys_cpu_util);
+        test_config.sys_util_config.data.current_seq_step = 0;
+        test_config.sys_util_config.data.target_utilization = test_config.sys_util_config.config.utilization_sequence[0];
+        generate_sys_util_pattern(test_config.sys_util_config.data.target_utilization);
+    }
 
     for (k=0; k < (shm_addr.hdr_addr)->num_entries; k++, p_htxshm_HE++) {
         /* Extract cpu number. */
@@ -156,7 +268,14 @@ void update_exer_info()
                             num_tests_configured = sys_detail.nodes[node_num].chips[chip_num].cores[core_num].cpus[cpu_num].num_tests_configured;
                             sys_detail.nodes[node_num].chips[chip_num].cores[core_num].cpus[cpu_num].exer_info_index[num_tests_configured] = k;
                             num_tests_configured++;
-                            update_config_detail(k);
+                            if (test_config.sys_util_flag == 0) {
+                                strcpy(util_pattern, (p_htxshm_HE + k)->cpu_utilization);
+                                update_config_detail(k, util_pattern);
+                            } else {
+                                test_config.exer_config[k].config.utilization_pattern = sys_cpu_util_pattern[lcpu];
+                                test_config.exer_config[k].config.util_pattern = UTIL_PATTERN;
+                                test_config.exer_config[k].config.pattern_length = strlen(util_pattern);
+                            }
                             sys_detail.nodes[node_num].chips[chip_num].cores[core_num].cpus[cpu_num].num_tests_configured = num_tests_configured;
                         }
                     }
@@ -176,11 +295,11 @@ int init_random_no(void)
 /*****************  Function to shuffle utilization Pattern  *****************/
 /*****************************************************************************/
 
-void shuffle_pattern(int n, uint32 *pattern)
+void shuffle_pattern(int n, uint64 *pattern)
 {
 	uint16 first_pos, second_pos, first_digit, second_digit;
-	uint32 digits_to_exch, digits_aft_exch;
-	uint32 final_pattern;
+	uint64 digits_to_exch, digits_aft_exch;
+	uint64 final_pattern;
 
 	final_pattern = *pattern;
 	for(first_pos=0; first_pos<n; first_pos++) {
@@ -247,7 +366,7 @@ void reset_utilization_queue(int index)
             strcat(workstr, msg);
         }
         strcat(workstr, "\n");
-        sprintf(msg, "Target Utilization: %d\nUtilization pattern: 0x%x(%s)", exer_conf[index].data.target_utilization, exer_conf[index].config.utilization_pattern, buf);
+        sprintf(msg, "Target Utilization: %d\nUtilization pattern: 0x%llx(%s)", exer_conf[index].data.target_utilization, exer_conf[index].config.utilization_pattern, buf);
         strcat(workstr, msg);
         htxd_send_message(workstr, 0, HTX_SYS_INFO, HTX_SYS_MSG);
     }
@@ -290,7 +409,7 @@ void initialize_run_time_data(void)
                                 reset_utilization_queue(index);
                             } else {
                                 sprintf(workstr, "Device Name: %s\n", (p_htxshm_HE + index)->sdev_id);
-                                sprintf(msg, "Utilization pattern: 0x%x\n", exer_conf[index].config.utilization_pattern);
+                                sprintf(msg, "Utilization pattern: 0x%llx\n", exer_conf[index].config.utilization_pattern);
                                 strcat(workstr, msg);
                                 htxd_send_message(workstr, 0, HTX_SYS_INFO, HTX_SYS_MSG);
                                 /* printf("%s", workstr);  */
@@ -320,7 +439,7 @@ void htxd_equaliser(void)
     int action, num_tests_configured, index;
     useconds_t micro_seconds;
     char global_htxd_log_dir[256] = "/tmp/";
-    long clock, tm_log_save;
+    long clock, tm_log_save= 0, tm_util_log_save = 0;
     struct stat buf1;
 
     static char process_name[] = "htx_equaliser";
@@ -330,13 +449,13 @@ void htxd_equaliser(void)
     struct sigaction sigvector;     /* structure for signals             */
     run_time_config *exer_conf;
     char equaliser_log_file[300], equaliser_log_file_save[300];
+    char equaliser_util_log_file[300], equaliser_util_log_file_save[300];
     struct tm new_time;
     char str_time[50];
 
   /*
    ***********************  beginning of executable code  *******************
    */
-    printf("DEBUG: equaliser process started\n");
     htxd_set_program_name(process_name);
     (void) htxd_send_message("Equaliser process started.", 0, HTX_SYS_INFO, HTX_SYS_MSG);
 
@@ -345,6 +464,9 @@ void htxd_equaliser(void)
 
     sprintf(equaliser_log_file, "%s/%s", global_htxd_log_dir, LOGFILE);
     sprintf(equaliser_log_file_save, "%s/%s", global_htxd_log_dir, LOGFILE_SAVE);
+
+    sprintf(equaliser_util_log_file, "%s/%s", global_htxd_log_dir, UTIL_LOGFILE);
+    sprintf(equaliser_util_log_file_save, "%s/%s", global_htxd_log_dir, UTIL_LOGFILE_SAVE);
 
   /*
    *************************  Set default SIGNAL handling  **********************
@@ -375,11 +497,21 @@ void htxd_equaliser(void)
 		remove(equaliser_log_file_save);
 	}
 
+    rc = stat(equaliser_util_log_file, &buf1);
+    if ((rc == 0) || ((rc == -1 ) && (errno != ENOENT))) {
+        remove(equaliser_util_log_file);
+    }
+    rc = stat(equaliser_util_log_file_save, &buf1);
+    if ((rc == 0) || ((rc == -1 ) && (errno != ENOENT))) {
+        remove(equaliser_util_log_file_save);
+    }
+
+    rc = get_hardware_stat(&sys_stat);
+    num_cpus = sys_stat.cpus;
 
   /*
    *************************  Get config data  *********************************
    */
-    printf("DEBUG: point 1\n");
     test_config.exer_config = (run_time_config *) malloc(sizeof(run_time_config) * (shm_addr.hdr_addr)->max_entries);
     if( test_config.exer_config == NULL) {
         sprintf(msg, "Error (errno = %d) in allocating memory for equaliser process.\nProcess will exit now.", errno);
@@ -392,12 +524,25 @@ void htxd_equaliser(void)
         exit(1);
     }
 
-    printf("DEBUG: point 2\n");
     test_config.time_quantum = htxd_get_equaliser_time_quantum();
     test_config.startup_time_delay = htxd_get_equaliser_startup_time_delay();
     test_config.log_duration = htxd_get_equaliser_log_duration();
     test_config.offline_cpu = htxd_get_equaliser_offline_cpu_flag();
+    test_config.sys_cpu_util = htxd_get_equaliser_sys_cpu_util();
+    /* printf("DEBUG: point 2.1 : ptr: %llx\n", (unsigned long long) test_config.sys_cpu_util); */
+    test_config.sys_util_flag = 0;
+    if (test_config.sys_cpu_util != NULL && strlen(test_config.sys_cpu_util) != 0) {
+        test_config.sys_util_flag = 1;
+    }
+    /* sprintf(workstr, "sys_cpu_util: %s\n", test_config.sys_cpu_util);
+    htxd_send_message(workstr, 0, HTX_SYS_INFO, HTX_SYS_MSG); */
+    if ((strstr(test_config.sys_cpu_util, "SYS") != NULL) || (strstr(test_config.sys_cpu_util, "sys") != NULL)) {
+        test_config.sys_util_flag = 2;
+    }
     pattern_length = htxd_get_equaliser_pattern_length();
+
+    log_fp = fopen(equaliser_log_file, "w");
+    util_fp = fopen(equaliser_util_log_file, "w");
 
     /* Update the structure with system config details */
     update_sys_details();
@@ -408,7 +553,6 @@ void htxd_equaliser(void)
   /***********************  set up shared memory addressing  ***********************/
   /*********************************************************************************/
 
-	printf("DEBUG: point 3\n");
  	shm_addr_wk.hdr_addr = shm_addr.hdr_addr;  /* copy addr to work space  */
   	(shm_addr_wk.hdr_addr)++;         /* skip over header                  */
   	p_htxshm_HE = shm_addr_wk.HE_addr;
@@ -419,9 +563,8 @@ void htxd_equaliser(void)
 		htxd_send_message(msg, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 		sleep(test_config.startup_time_delay);
 	}
-	log_fp = fopen(equaliser_log_file, "w");
 	tm_log_save = time((long *) 0);
-	printf("DEBUG: point 4\n");
+	tm_util_log_save = time((long *) 0);
 	while(1) {
 
 		clock = time((long *) 0);
@@ -429,9 +572,17 @@ void htxd_equaliser(void)
 			sprintf(workstr, "cp %s %s", equaliser_log_file, equaliser_log_file_save);
 			system(workstr);
 			fclose(log_fp);
-			tm_log_save = clock;
 			log_fp = fopen(equaliser_log_file, "w");
+			tm_log_save = clock;
 		}
+        if((clock - tm_util_log_save) >= test_config.log_duration ) {
+            fclose(util_fp);
+            sprintf(workstr, "cp %s %s", equaliser_util_log_file, equaliser_util_log_file_save);
+            system(workstr);
+            util_fp = fopen(equaliser_util_log_file, "w");
+            tm_util_log_save = clock;
+        }
+
 		exer_conf = test_config.exer_config;
         for (node_num = 0; node_num < sys_detail.num_nodes; node_num++) {
             for (chip_num = 0; chip_num < sys_detail.nodes[node_num].num_chips; chip_num++) {
@@ -532,6 +683,12 @@ void htxd_equaliser(void)
 			    }
 		    }
 	    }
+        if (test_config.sys_util_flag) {
+            test_config.sys_util_config.data.current_step = (test_config.sys_util_config.data.current_step + 1) % test_config.sys_util_config.config.pattern_length;
+            if (test_config.sys_util_config.data.current_step == 0) {
+                update_sys_util_pattern();
+            }
+        }
         fflush(log_fp);
 		usleep(micro_seconds); /* scheduling quantum */
 	}
