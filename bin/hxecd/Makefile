@@ -19,7 +19,7 @@ OBJECTS = hxecd${OBJ_SUFF} \
 SRCS = $(patsubst %.o, %.c, $(OBJECTS))
 SUBDIRS_CLEAN = $(patsubst %,%.clean,$(SUBDIRS))
 
-CFLAGS += -D__DEFINE_PAGE_MACROS__ -D_FILE_OFFSET_BITS=64 -DFALSE=0 -DTRUE=1
+CFLAGS += -D_LARGEFILE64_SOURCE -D__DEFINE_PAGE_MACROS__  -DFALSE=0 -DTRUE=1
  
 LIBS = -lpthread -lc -lhtx64 
 

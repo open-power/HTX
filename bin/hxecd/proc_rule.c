@@ -28,24 +28,13 @@
  *
  *   DESCRIPTION: Process a rules stanza.
  ******************************************************************************/
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <ctype.h>
 #include "hxecd.h"
 
 extern char device_subclass[];
 
 #define TMP_BUF_SIZE  (4*1024) /* 1 page */
 
-proc_rule(ps,pr,wbuf,rbuf,plast_lba,pblk_size)
-struct htx_data *ps;
-struct ruleinfo *pr;
-char *wbuf,*rbuf;
-
-int *plast_lba,*pblk_size;
+int proc_rule(struct htx_data *ps, struct ruleinfo *pr, char *wbuf, char *rbuf, unsigned int *last_lba, unsigned int *pblk_size)
 {
   int            blkno[3], blkno_save[3]; /* block # ptrs 0-curr,1-up,2-dwn */
   int            rc, i, rc_ptr, save_dlen, loop;
@@ -103,7 +92,7 @@ int *plast_lba,*pblk_size;
 
   for ( loop = 1 ; loop <= pr->num_oper ; loop++ ) {
      if ( strcmp(pr->oper, "MS") == 0 ) {
-        ms_get(pr, ps, plast_lba, pblk_size);
+        ms_get(pr, ps, last_lba, pblk_size);
     } else if ( strcmp(pr->oper, "R") == 0 ) {
         read_cdrom(ps, pr, loop, blkno, rbuf);
     } else if ( strcmp(pr->oper, "RWP") == 0 ) {
@@ -157,7 +146,9 @@ int *plast_lba,*pblk_size;
     } else if ( strcmp(pr->oper, "D") == 0 ) {
         diag_cdrom(ps, pr, loop, blkno);
     } else if ( strcmp(pr->oper, "A") == 0 ) {
+      #ifndef __HTX_LINUX__
         audio_cdrom(ps, pr, loop, blkno);
+      #endif
     } else if ( strcmp(pr->oper, "AMM") == 0 ) {
 		if ( (0 != strncmp(device_subclass, "sata", 16)) && (0 != strncmp(device_subclass, "usbif", 16)) ) {
 			/* PLAYUDIO MSF is not supported for SATA drives */

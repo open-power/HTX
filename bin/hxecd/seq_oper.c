@@ -31,15 +31,12 @@
  *
  *   DESCRIPTION: Functions used in sequential operations.
  ******************************************************************************/
-#include <string.h>
 #include "hxecd.h"
 
 /**************************************************************************/
 /* initialize block number                                                */
 /**************************************************************************/
-void init_blkno(pr,blkno)
-struct ruleinfo *pr;
-int *blkno;
+void init_blkno(struct ruleinfo *pr, int *blkno)
 {
   int blk, over;
 
@@ -69,8 +66,7 @@ int *blkno;
 /*************************************************************************/
 /* set first_block number for sequential operations                      */
 /*************************************************************************/
-set_first_blk(pr)
-struct ruleinfo *pr;
+int set_first_blk(struct ruleinfo *pr)
 {
   int   blk; 
 
@@ -90,11 +86,7 @@ struct ruleinfo *pr;
 /**************************************************************************/
 /* set next block number                                                  */
 /**************************************************************************/
-set_blkno(blkno,direction,increment,num_blks)
-int *blkno;
-char *direction;
-int  increment;
-int  num_blks;
+void set_blkno( int *blkno, char *direction, int increment, int num_blks)
 {
   if ( strcmp(direction, "UP") == 0 ) 
      blkno[0] = blkno[1] = blkno[1] + num_blks + increment;
@@ -109,9 +101,7 @@ int  num_blks;
 /**************************************************************************/
 /* check for file wrap around on sequential operations                    */
 /**************************************************************************/
-wrap(pr,blkno)
-struct ruleinfo *pr;
-int *blkno;
+int wrap( struct ruleinfo *pr, int *blkno)
 {
   int rc;
 

@@ -25,8 +25,23 @@
  *   FUNCTIONS: none
  *
  ******************************************************************************/
-
+#include <stdio.h>
+#ifndef __HTX_LINUX__ /* AIX */
+	#include <sys/scdisk.h>
+	#include <sys/scsi_buf.h>
+#endif
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
 #include <sys/signal.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
+
 #include "hxihtx.h"
 
 #define MAX_BLKNO 269250               /* maximum block number                */
@@ -127,7 +142,7 @@ void do_trap_htx64(unsigned long, ...);
 #define PAGE_MASK (~(PAGE_SIZE-1))
 #endif
 
-#define HTX_PAGE_ALIGN(_X_) ((((unsigned long)_X_)+PAGE_SIZE-1)&PAGE_MASK)
+#define HTX_PAGE_ALIGN(_X_) (char *)((((unsigned long)_X_)+PAGE_SIZE-1)&PAGE_MASK)
 
 /* MODE DEFINITIONS */
 
@@ -149,9 +164,12 @@ void do_trap_htx64(unsigned long, ...);
 /* Drop extended attributes with openx */
 #define openx(_P1_, _P2_, _P3_, _P4_) open(_P1_, _P2_)
 
+typedef off64_t  offset_t;
+
 /* POSIX Compliant macros for string functions */
 #include <string.h>
 
+#if 0
 #define strlen(_X_)\
         (  (_X_) ? strlen(_X_) : (size_t) NULL )
 
@@ -173,4 +191,42 @@ void do_trap_htx64(unsigned long, ...);
 #define strncmp(_S1_,_S2_,_N_)\
         ( (int) ( (_S1_) ? (_S2_) ? strncmp(_S1_,_S2_,_N_) : 1 : -1  ) )
 
+#endif
+#endif
+
+/* Function declarations */
+int get_disc_capacity(struct htx_data *, struct ruleinfo *, unsigned int *, unsigned int *);
+int get_audio_type(struct ruleinfo *, struct htx_data *);
+int ms_get(struct ruleinfo *, struct htx_data *, unsigned int *, unsigned int *);
+int get_disc_pn(struct htx_data *, struct ruleinfo *);
+int get_rule(struct htx_data *, struct ruleinfo *);
+void start_msg(struct htx_data *, struct ruleinfo *, char *);
+int proc_rule(struct htx_data *, struct ruleinfo *, char *, char *, unsigned int *, unsigned int *);
+int halt_audio_mm(int);
+void set_defaults(struct ruleinfo *);
+int htx_getline(char *, int);
+int set_first_blk(struct ruleinfo *);
+void init_seed(unsigned short *);
+int random_dlen(short, long, unsigned short *);
+void init_blkno(struct ruleinfo *, int *);
+void random_blkno(int *, unsigned int, short, long, unsigned short *, long);
+int read_cdrom(struct htx_data *, struct ruleinfo *, int, int *, char *);
+void read_write_pattern(struct htx_data *, struct ruleinfo *, int, int *, char *);
+char cmpbuf(struct htx_data *, struct ruleinfo *, int, int *, char *, char *);
+void prt_msg(struct htx_data *, struct ruleinfo *, int, int*, int, int, char *);
+void set_blkno(int *, char *, int, int);
+void diag_cdrom(struct htx_data *, struct ruleinfo *, int, int *);
+void audio_cdrom(struct htx_data *, struct ruleinfo *, int, int *);
+int audio_mm(struct htx_data *, struct ruleinfo *, int, int *);
+void prt_req_sense(struct htx_data *, struct ruleinfo *, int, int *);
+void do_sleep(struct htx_data *, struct ruleinfo *, int, int *);
+int do_cmd(struct htx_data *, struct ruleinfo *);
+void info_msg(struct htx_data *,struct ruleinfo *, int, int *, char *);
+int wrap(struct ruleinfo *, int *);
+void init_seed(unsigned short *);
+void prt_msg_asis(struct htx_data *, struct ruleinfo *, int, int *, int, int, char *);
+int read_subchannel(struct htx_data *, struct ruleinfo *, int, int *);
+#ifndef __HTX_LINUX__
+int halt_audio_cdrom(int);
+int play_audio_msf(struct htx_data *, struct ruleinfo *, int, int *, struct cd_audio_cmd *);
 #endif

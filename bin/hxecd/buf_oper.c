@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)33	1.17.3.2  src/htx/usr/lpp/htx/bin/hxecd/buf_oper.c, exer_cd, htxubuntu 1/20/14 05:23:35 */
+/* @(#)33       1.17.3.2  src/htx/usr/lpp/htx/bin/hxecd/buf_oper.c, exer_cd, htxubuntu 1/20/14 05:23:35 */
 
 
 /******************************************************************************
@@ -45,11 +45,10 @@ extern int crash_on_mis;
 #include <string.h>
 #include <stdio.h>
 
-bldbuf(unsigned short *wbuf, unsigned int dlen, int buf_size,
+void bldbuf(unsigned short *wbuf, unsigned int dlen, int buf_size,
        char *pattern_id, int *blkno)
 {
    int            i, j = 1, k, dlen_static, a, b, c;
-   long           nrand48();
    unsigned short xsubi[3];
 
    dlen_static = dlen;
@@ -138,16 +137,16 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
 
   if ( mis_flag == TRUE ) {
       ps->bad_others = ps->bad_others + 1;
-      sprintf(msg1, "Miscompare at buffer offset %d (0x%x)  "
-                    "\ncbuf (baseaddr 0x%x) ", i, i, wbuf);
+      sprintf(msg1, "Miscompare at buffer offset %ld (0x%lx)  "
+                    "\ncbuf (baseaddr 0x%llx) ", i, i, (unsigned long long)wbuf);
       for ( j = i; ((j - i) < 20) && (j < pr->dlen); j++ ) {
-          sprintf(s, "%0.2x", wbuf[j]);
+          sprintf(s, "%.2x", wbuf[j]);
           strcat(msg1, s);
       }
-      sprintf(work_str, "\nrbuf (baseaddr 0x%x) ",rbuf);
+      sprintf(work_str, "\nrbuf (baseaddr 0x%llx) ",(unsigned long long)rbuf);
       strcat(msg1, work_str);
       for ( j = i; ((j - i) < 20) && (j < pr->dlen); j++ ) {
-          sprintf(s, "%0.2x", rbuf[j]);
+          sprintf(s, "%.2x", rbuf[j]);
           strcat(msg1, s);
       }
       strcat(msg1, "\n");
@@ -258,15 +257,15 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
                 sprintf(work_str, "There have been %d M2F2 miscompares in"
                                   " the past HOUR!\n", M2F2_MISCOM_THRESH);
                 strcat(msg1, work_str);
-                strftime(&ctime, 9, "%T", localtime(&m2f2[0].dtime));
+                strftime(ctime, 9, "%T", localtime(&m2f2[0].dtime));
                 sprintf(work_str, "Start LBA = %d  Offset = %d  Time = %s\n",
                         m2f2[0].start_lba, m2f2[0].offset, ctime);
                 strcat(msg1, work_str);
-                strftime(&ctime, 9, "%T", localtime(&m2f2[1].dtime));
+                strftime(ctime, 9, "%T", localtime(&m2f2[1].dtime));
                 sprintf(work_str, "Start LBA = %d  Offset = %d  Time = %s\n",
                         m2f2[1].start_lba, m2f2[1].offset, ctime);
                 strcat(msg1, work_str);
-                strftime(&ctime, 9, "%T", localtime(&m2f2[2].dtime));
+                strftime(ctime, 9, "%T", localtime(&m2f2[2].dtime));
                 sprintf(work_str, "Start LBA = %d  Offset = %d  Time = %s\n",
                         m2f2[2].start_lba, m2f2[2].offset, ctime);
                 strcat(msg1, work_str);
