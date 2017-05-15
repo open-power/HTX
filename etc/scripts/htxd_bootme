@@ -35,12 +35,19 @@
 
 ###############################################################################
 ###############################################################################
-usage()
+return_value()
 {
-	echo "$0 (on | off | status)"
+	echo $1; exit $1;
 }
 ###############################################################################
 
+###############################################################################
+usage()
+{
+	echo "Error: $1 should be run from 'htxcmdline -bootme' command"
+	return_value 51
+}
+###############################################################################
 
 ###############################################################################
 htxd_bootme_on ()
@@ -56,9 +63,13 @@ htxd_bootme_on ()
 	if [ "$CRONENTRY" == ""  ]; then
 		cp /etc/crontab /etc/crontab.ORIG
 		bootmeStuff=${HTX_HOME_DIR}/etc/scripts/bootmeStuff
-		echo "$REBOOT * * *  root $bootmeStuff >/dev/null 2>&1 &" >>/etc/crontab
+		if [ -z ${BOOT_CMD_FOUND} ] ; then
+			echo "$REBOOT * * *  root $bootmeStuff >/dev/null 2>&1 &" >>/etc/crontab
+		else
+			echo "$REBOOT * * * root $bootmeStuff ${BOOT_CMD_FOUND} >/dev/null 2>&1 &" >>/etc/crontab
+		fi
 	else
-		exit 21
+		return_value 21
 	fi
 
 
@@ -85,14 +96,14 @@ htxd_bootme_off ()
 {
 	CRONENTRY="`cat /etc/crontab | grep bootme`"
 	if [ "$CRONENTRY" == ""  ]; then
-		exit 32;
+		return_value 32;
 	fi
 
 # remove crontab entry
 	[ -e /etc/crontab.ORIG ] && cp /etc/crontab.ORIG /etc/crontab 
 
 # Remore HTXD bootme flag file
-	[ -e ${HTX_HOME_DIR}/.htxd_autostart ] && rm -f ${HTX_HOME_DIR}/.htxd_autostart || exit 31;
+	[ -e ${HTX_HOME_DIR}/.htxd_autostart ] && rm -f ${HTX_HOME_DIR}/.htxd_autostart || return_value 31;
 
 # Remove the hidden "yes" file for the shutdown -t command
 	[ -e /tmp/.bootme ] && rm -f /tmp/.bootme
@@ -117,10 +128,10 @@ htxd_bootme_status ()
 {
 	CRONENTRY="`cat /etc/crontab | grep bootme`"
 	if [ "$CRONENTRY" == ""  ]; then
-		exit 41;
+		return_value 41;
 	fi
 
-	[ ! -e ${HTX_HOME_DIR}/.htxd_autostart ] && exit 42;
+	[ ! -e ${HTX_HOME_DIR}/.htxd_autostart ] && return_value 42;
 
 }
 ###############################################################################
@@ -129,10 +140,10 @@ htxd_bootme_status ()
 ###############################################################################
 htxd_bootme_net ()
 {
-	bootme_mdt_name=`cat ${HTX_HOME_DIR}/.htxd_autostart`
-	is_net_device_present=`grep hxecom ${bootme_mdt_name}-htxd_bootme | wc -l 2>/dev/null`
-    bootme_mdt_name=`cat ${HTX_HOME_DIR}/.htxd_autostart | xargs basename`
-	[ ${is_net_device_present} -ne 0 ] && { ${HTX_HOME_DIR}/mdt/mdt_net ${bootme_mdt_name}; }
+	bootme_mdt_name_path=`cat ${HTX_HOME_DIR}/.htxd_autostart | awk '{print $1}' `
+	is_net_device_present=`grep hxecom ${bootme_mdt_name_path}-htxd_bootme | wc -l 2>/dev/null`
+	bootme_mdt_name=`echo ${bootme_mdt_name_path} | xargs basename`
+	[ ${is_net_device_present} -ne 0 ] && { ${HTX_HOME_DIR}/etc/scripts/mdt_net ${bootme_mdt_name}; }
 }
 ###############################################################################
 
@@ -142,7 +153,7 @@ check_space ()
 {
 	SpaceAvail=`df -P -k $1 | tail -1 | awk '{print $4}'`
 	SpaceAvail=$((SpaceAvail/1024))
-	[ $SpaceAvail -lt $2 ] && { echo "Insufficient space in $1 (needed $2 MB, have $SpaceAvail MB" >> ${BOOTME_LOG_FILE} ; exit 2; }
+	[ $SpaceAvail -lt $2 ] && { echo "Insufficient space in $1 (needed $2 MB, have $SpaceAvail MB" >> ${BOOTME_LOG_FILE} ; return_value 2; }
 }
 ###############################################################################
 
@@ -151,59 +162,48 @@ check_space ()
 # main
 ###############################################################################
 
-
 if [ "${HTX_HOME_DIR}" = "" ] ; then
-	if [ -f /var/log/htx_install_path ] ; then
-		HTX_HOME_DIR=`cat /var/log/htx_install_path`
-		if [ -f ${HTX_HOME_DIR}/.htx_profile ] ; then
-			export HTX_HOME_DIR;
-		else
-			echo "HTX_HOME_DIR is not set."
-			echo "To fix this issue, export environment variable HTX_HOME_DIR with value as HTX installation directory"
-			echo "export HTX_HOME_DIR=<htx_install_directory> , where <htx_install_directory> is the HTX installed path"
-			echo "eg: export HTX_HOME_DIR=/usr/lpp/htx"
-			echo "exiting..."
-			exit 1
-		fi
-	else
-		echo "HTX_HOME_DIR is not set."
-		echo "To fix this issue, export environment variable HTX_HOME_DIR with value as HTX installation directory"
-		echo "export HTX_HOME_DIR=<htx_install_directory> , where <htx_install_directory> is the HTX installed path"
-		echo "eg: export HTX_HOME_DIR=/usr/lpp/htx"
-		echo "exiting..."
-		exit 2
-	fi
-else
-	if [ ! -f ${HTX_HOME_DIR}/.htx_profile ] ; then
-		echo "HTX_HOME_DIR is set as <${HTX_HOME_DIR}>, and the path set <${HTX_HOME_DIR}> is not HTX installed directory"
-		echo "To fix this, export environment variable HTX_HOME_DIR with value as HTX installation directory"
-		echo "export HTX_HOME_DIR=<htx_install_directory> , where <htx_install_directory> is the HTX installed path"
-		echo "eg: export HTX_HOME_DIR=/usr/lpp/htx"
-		echo "exiting..."
-		exit 2
-	fi
-		
+	usage
 fi
-
-. ${HTX_HOME_DIR}/etc/scripts/htx_env.sh
 
 # setting bootme log file
 	BOOTME_LOG_FILE="${HTX_BOOTME_LOG_DIR}/bootme.log"
 
 # pulls REBOOT statement from ${HTX_HOME_DIR}/rules/reg/bootme/default
 	rules=${HTX_HOME_DIR}/rules/reg/bootme/default
-	REBOOT=$(grep "^REBOOT:" $rules | head -n1)
-	REBOOT=${REBOOT##*: }
-	[ -z "$REBOOT" ] && { echo "Please check the value of REBOOT in: $rules" >> ${BOOTME_LOG_FILE} ; exit 11; }
+	if [ "$3" == "1" ] ; then
+		REBOOT="0,20,40 *"
+	elif [ "$3" == "2" ] ; then
+		REBOOT="0,30 *"
+	elif [ "$3" == "3" ] ; then
+		REBOOT="0 *"
+	elif [ "$3" == "4" ] ; then
+		REBOOT="0 0"; 
+	else
+		REBOOT=$(grep "^REBOOT:" $rules | head -n1)
+		REBOOT=${REBOOT##*: }
+		[ -z "$REBOOT" ] && { echo "Please check the value of REBOOT in: $rules" >> ${BOOTME_LOG_FILE} ; return_value 11; }
+	fi
+
 
 # checks BOOT_CMD statement from $rules
-	BOOT_CMD=$(grep "^BOOT_CMD:" $rules | head -n1)
-	BOOT_CMD=${BOOT_CMD##*: }
-	[ -z "$BOOT_CMD" ] && { echo "Please check the value of BOOT_CMD in: $rules" >> ${BOOTME_LOG_FILE} ; exit 12; }
+	if [ "$2" == "10" ] ; then
+		BOOT_CMD_FOUND="reboot"
+	elif [ "$2" == "15" ] ; then
+		BOOT_CMD_FOUND="reboot -f"
+	elif [ "$2" == "20" ] ; then
+		BOOT_CMD_FOUND="shutdown"
+	elif [ "$2" == "25" ] ; then
+		BOOT_CMD_FOUND="shutdown -f"
+	else
+		BOOT_CMD=$(grep "^BOOT_CMD:" $rules | head -n1)
+		BOOT_CMD=${BOOT_CMD##*: }
+		[ -z "$BOOT_CMD" ] && { echo "Please check the value of BOOT_CMD in: $rules" >> ${BOOTME_LOG_FILE} ; return_value 12; }
+	fi
 
 # checks BOOT_WAIT statement from $rules
 	BOOT_WAIT=$(grep "^BOOT_WAIT:" $rules | head -n1 | awk '{ print $2 }')
-	[ -z "$BOOT_WAIT" ] && { echo "Please check the value of BOOT_WAIT in: $rules" >> ${BOOTME_LOG_FILE} ; exit 13; }
+	[ -z "$BOOT_WAIT" ] && { echo "Please check the value of BOOT_WAIT in: $rules" >> ${BOOTME_LOG_FILE} ; return_value 13; }
 
 # select action
 case $1 in
@@ -220,6 +220,6 @@ case $1 in
 esac
 
 sync;
-exit 0
+return_value 0
 
 ###############################################################################

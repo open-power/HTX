@@ -44,7 +44,8 @@ extern int 	htxd_execute_shell_profile(void);
 extern int	htxd_truncate_error_file(void);
 extern int	htxd_truncate_message_file(void);
 extern void	htxd_ipc_cleanup_on_process_exit(int exit_pid);
-extern int	htxd_get_daemon_state_string(int, char*);
+extern int	htxd_get_daemon_state_string(int, char*, char *);
+extern int	htxd_verify_is_ready_to_start(void);
 
 #ifdef __HTX_LINUX__
 	extern int do_the_bind_proc(pid_t);

@@ -28,6 +28,7 @@
 #include "htxd_profile.h"
 #include "htxd_instance.h"
 #include "htxd_signal.h"
+#include "htxd_thread.h"
 
 
 extern int htxd_option_method_run_mdt(char **, htxd_command *);
@@ -41,7 +42,7 @@ int htxd_get_autostart_mdt_name(char *flagfile, char *mdt_name)
 
 	p_flag_file = fopen(flagfile, "r");
 	if(p_flag_file == NULL) {
-		sprintf(trace_str, "fopen failed with errno = <%d>", errno);
+		sprintf(trace_str, "fopen failed while opening file <%s> with errno = <%d>", flagfile, errno);
 		HTXD_TRACE(LOG_OFF, trace_str);
 		return -1;
 	}
@@ -51,8 +52,7 @@ int htxd_get_autostart_mdt_name(char *flagfile, char *mdt_name)
 }
 
 
-
-int htxd_autostart(htxd *htxd_instance)
+void *htxd_autostart(void *vprt)
 {
 	int return_code;
 	char *result_str = NULL;
@@ -60,30 +60,29 @@ int htxd_autostart(htxd *htxd_instance)
 	char autostart_mdt_name[256] = {'\0'};
 	char temp_string[300];
 	htxd_command autostart_run_command;
+	htxd *htxd_instance;
+
 
 
 	sprintf(temp_string, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
-	return_code = htxd_is_file_exist(temp_string);
-	if(return_code == FALSE) {
-		sprintf(trace_str, "auto start mode is not enabled, continue normal mode");
-		HTXD_TRACE(LOG_OFF, trace_str);
-		return -1;
-	} else {
-		sprintf(trace_str, "found autostart flag file <%s>, start with auto start mode", temp_string);
-		HTXD_TRACE(LOG_OFF, trace_str);
-	}
-	
 	return_code = htxd_get_autostart_mdt_name(temp_string, autostart_mdt_name);
 	if(return_code != 0) {
 		sprintf(trace_str, "failed to get auto start MDT name, htxd_get_autostart_mdt_name retuned with <%d>", return_code);
 		HTXD_TRACE(LOG_OFF, trace_str); 
-		return return_code;
+		htxd_exit_autostart_thread();	
 	}
 	if( strlen(autostart_mdt_name) < 1) {
 		sprintf(trace_str, "auto start MDT name is not present in <%s>, continue normal mode", temp_string);
 		HTXD_TRACE(LOG_OFF, trace_str);
-		return -1;
+		htxd_exit_autostart_thread();
 	}	
+
+	if(strcmp(autostart_mdt_name, HTXD_BOOTME_REBOOT) == 0 ) {
+		sprintf(trace_str, "auto start MDT name is set as <%s> in <%s>, continue normal mode", autostart_mdt_name, temp_string);
+		HTXD_TRACE(LOG_OFF, trace_str);
+		htxd_exit_autostart_thread();
+	}
+
 	sprintf(trace_str, "auto start MDT name <%s>", autostart_mdt_name);
 	HTXD_TRACE(LOG_ON, trace_str)
 
@@ -92,7 +91,7 @@ int htxd_autostart(htxd *htxd_instance)
 	if(return_code != 0) {
 		sprintf(trace_str, "MDT creation failed with error code <%d> whlie doing autostart", return_code);
 		HTXD_TRACE(LOG_ON, trace_str);
-		return -1;
+		htxd_exit_autostart_thread();
 	}
 
 	if(strcmp( basename(autostart_mdt_name), "net.mdt") != 0) {
@@ -101,10 +100,14 @@ int htxd_autostart(htxd *htxd_instance)
 	}
  #endif	
 
+	htxd_instance = htxd_get_instance();
 	if(htxd_is_profile_initialized(htxd_instance) != TRUE) {
 		HTXD_TRACE(LOG_ON, "initialize HTX profile details from auto start");
 		htxd_init_profile(&(htxd_instance->p_profile));
 	}
+
+	htxd_instance->is_mdt_created = 1;
+	htxd_instance->is_auto_started = 1;
 
 	strcpy(autostart_run_command.ecg_name, autostart_mdt_name);
 	return_code = htxd_option_method_run_mdt(&result_str, &autostart_run_command);
@@ -120,5 +123,38 @@ int htxd_autostart(htxd *htxd_instance)
 		free(result_str);
 	}
 
-	return 0;
+	htxd_exit_autostart_thread();
+
+	return NULL;
 }
+
+
+
+int htxd_launch_autostart(void)
+{
+	htxd_thread autostart_thread;
+	int return_code;
+	char temp_string[300];
+	char trace_str[256];
+
+
+	sprintf(temp_string, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
+	return_code = htxd_is_file_exist(temp_string);
+	if(return_code == FALSE) {
+		sprintf(trace_str, "auto start mode is not enabled, continue normal mode");
+		HTXD_TRACE(LOG_OFF, trace_str);
+		return -1;
+	} else {
+		sprintf(trace_str, "found autostart flag file <%s>, start with auto start mode", temp_string);
+		HTXD_TRACE(LOG_OFF, trace_str);
+	}
+	
+	htxd_set_daemon_state(HTXD_DAEMON_STATE_AUTOSTART_SETUP);
+	memset(&autostart_thread, 0, sizeof(htxd_thread));
+	autostart_thread.thread_function = htxd_autostart;
+	autostart_thread.thread_stack_size = 10000000;
+	return_code = htxd_create_command_thread(&autostart_thread);
+	return return_code;
+}
+
+

@@ -50,7 +50,7 @@ extern volatile int htxd_shutdown_flag;
 
 extern int htxd_shutdown_all_mdt(void);
 extern int htxd_stop_hotplug_monitor(htxd_thread **);
-extern int htxd_autostart(htxd *);
+extern int htxd_launch_autostart(void);
 extern int detach_syscfg(void);
 
 int htxd_verify_command_buffer_format(char *command_buffer)
@@ -187,7 +187,7 @@ int htxd_start_daemon(htxd *htxd_instance)
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_start_daemon");
 
 	init_option_list();
-	htxd_autostart(htxd_instance);  /* try autostart if find the autostart flag file */
+	htxd_launch_autostart();
 
 	if(htxd_is_profile_initialized(htxd_instance) != TRUE) {
 		HTXD_TRACE(LOG_ON, "initialize HTX profile details");

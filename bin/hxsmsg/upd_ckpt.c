@@ -248,7 +248,7 @@ short update_ckpt(int fileid, char *filename, off_t *ckpt_offset_ptr,
 	    		{
 	      			(void) sprintf(error_msg,
 			     	"\n%s -- error writing to %s.\n\
-				Only %d bytes out of a %d byte buffer were written to disk.\n",
+				Only %d bytes out of a %zd byte buffer were written to disk.\n",
 			     	program_name,
 			     	CKPT_FILE,
 			    	bytes_written,

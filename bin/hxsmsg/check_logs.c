@@ -372,7 +372,7 @@ short check_ckpt(off_t err_thres, off_t msg_thres, off_t err_save_thres,
       		else if (num_write_bytes != sizeof(ckpt))
 		{
 	  		(void) sprintf(error_msg,
-			"\n%s -- Error: Only %d out of %d bytes written to \
+			"\n%s -- Error: Only %d out of %zd bytes written to \
 %s.\n",
 			program_name,
 			num_write_bytes,

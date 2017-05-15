@@ -47,6 +47,7 @@ extern void htxd_trace_log_lock_destroy(void);
 extern int htxd_create_command_thread(htxd_thread *p_thread_info);
 extern void htxd_exit_command_thread(void);
 extern void htxd_register_signal_handler_thread(void);
+extern void htxd_exit_autostart_thread(void);
 
 
 #endif

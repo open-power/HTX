@@ -1376,6 +1376,9 @@ void htxd_bootme_error_string(int error_code, char ** result_string)
 	case 42:
 		sprintf(*result_string, "bootme status : inconsistant state, bootme cron entry is present, bootme flag file <%s/.htxd_autostart> was missing", global_htx_home_dir);
 		break;
+	case 51:
+		sprintf(*result_string, "Error: Invalid usage of htxd_bootme script");
+		break;
 	case 0:
 		break;
 	default: 
@@ -1385,18 +1388,115 @@ void htxd_bootme_error_string(int error_code, char ** result_string)
 }
 
 
+int htxd_execute_bootme_script(char *bootme_command)
+{
+	FILE *fp_bootme;
+	int return_code = 0;
+	char trace_string[256];
+	int return_value;
+
+	fp_bootme = popen(bootme_command, "r");
+	if(fp_bootme == NULL) {
+		sprintf(trace_string, "htxd_execute_bootme_script: popen failed with errno = <%d>", errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
+	return_value = fscanf(fp_bootme, "%d", &return_code);
+	if(return_value < 1) {
+		sprintf(trace_string, "htxd_execute_bootme_script: fscanf returned %d, errno = <%d>", return_value, errno);
+		HTXD_TRACE(LOG_ON, trace_string);
+	}
+	fclose(fp_bootme);
+
+	return return_code;
+}
+
+
+
+int htxd_parse_bootme_option(char *bootme_option_list, int *operation, int *mode, int *time_interval, char *error_msg)
+{
+	char *temp_option_list_ptr;
+	char temp_option[100];
+
+
+	*operation = 0;
+	*mode = 0;
+	*time_interval = 0;
+	error_msg[0] = '\0';
+
+	sscanf(bootme_option_list, "%s", temp_option);
+	if(strcmp(temp_option, "on") == 0) {
+		*operation = HTXD_BOOTME_ON;
+	} else	if(strcmp(temp_option, "off") == 0) {
+		*operation = HTXD_BOOTME_OFF;
+	} else	if(strcmp(temp_option, "status") == 0) {
+		*operation = HTXD_BOOTME_STATUS;
+	} else if( (strcmp(temp_option, "help") == 0) || (strcmp(temp_option, "h") == 0)) {
+		sprintf(error_msg, "%s", HTXD_BOOTME_USAGE_TEXT);	
+		return -1;
+	} else {
+		sprintf(error_msg, "Invaid bootme operation in provided, valid operation is on, off or status\n%s", HTXD_BOOTME_USAGE_TEXT);
+		return -1;
+	}
+
+	temp_option_list_ptr = strstr(bootme_option_list, "mode");
+	if(temp_option_list_ptr != NULL) {
+		sscanf(temp_option_list_ptr, "%s", temp_option);
+		if(strlen(temp_option) > 6) {
+			temp_option_list_ptr += 5;
+			if(strncmp(temp_option_list_ptr, "softf", 5) == 0) {
+				*mode = HTXD_SOFT_FAST_BOOTME;
+			} else if(strncmp(temp_option_list_ptr, "soft", 4) == 0) {
+				*mode = HTXD_SOFT_BOOTME;
+			} else if(strncmp(temp_option_list_ptr, "hardf", 5) == 0) {
+				*mode = HTXD_HARD_FAST_BOOTME;
+			} else if(strncmp(temp_option_list_ptr, "hard", 4) == 0) {
+				*mode = HTXD_HARD_BOOTME;
+			} else {
+				sprintf(error_msg, "Invaid bootme mode in provided, valid bootme mode is soft, softf, hard, or hardf\n%s", HTXD_BOOTME_USAGE_TEXT);
+				return -1;
+			}
+		} else {
+			sprintf(error_msg, "Error: invaid mode option is provided\n%s", HTXD_BOOTME_USAGE_TEXT); 
+			return -1;
+		}
+	}
+
+	temp_option_list_ptr = strstr(bootme_option_list, "period");
+	if(temp_option_list_ptr != NULL) {
+		sscanf(temp_option_list_ptr, "%s", temp_option);
+		if(strlen(temp_option) == 8) {
+			temp_option_list_ptr += 7;
+			*time_interval = atoi(temp_option_list_ptr);
+			if( (*time_interval < 1) || (*time_interval > 4) ) {
+				sprintf(error_msg, "Invaid bootme period in provided\n%s", HTXD_BOOTME_USAGE_TEXT);
+				return -1;
+			}
+		} else {
+			sprintf(error_msg, "Invaid bootme period in provided, please provide valid time period value (1, 2, 3, or 4)\n%s", HTXD_BOOTME_USAGE_TEXT);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+
 int htxd_option_method_bootme(char **command_result, htxd_command *p_command)
 {
 
 	htxd_option_method_object bootme_method;
-	char *temp_option_list = NULL;
-	int option_list_length;
-	char trace_string[256];
-	FILE *p_boot_flag;
-	int bootme_status;
-	char *running_mdt_name;
-	int bootme_return_code;
-	char temp_string[300];
+	char	*temp_option_list = NULL;
+	int	option_list_length;
+	char	trace_string[512];
+	FILE	*p_boot_flag;
+	char	*running_mdt_name;
+	int	bootme_return_code;
+	char	temp_string[2048];
+	char	bootme_mdt_name[256];
+	int	operation_type = 0;
+	int	bootme_mode = 0;
+	int	bootme_time = 0;
+	int	return_code;
 
 
 	htxd_init_option_method(&bootme_method, p_command);
@@ -1417,10 +1517,76 @@ int htxd_option_method_bootme(char **command_result, htxd_command *p_command)
 			return 1;
 		}
 		strcpy(temp_option_list, bootme_method.command_option_list);
+		return_code = htxd_parse_bootme_option(temp_option_list, &operation_type, &bootme_mode, &bootme_time, temp_string);
+		if(return_code != 0) {
+			strcpy(*command_result, temp_string);
+			sprintf(trace_string, "Error code = <%d>, error text = <%s>", return_code, temp_string);
+			HTXD_TRACE(LOG_ON, trace_string);
+			return return_code;
+		}
 		
-		if( strcmp(temp_option_list, "on") == 0 ) {
+		if( operation_type == HTXD_BOOTME_ON ) {
 			bootme_method.return_code = htxd_validate_command_requirements(bootme_method.htxd_instance, bootme_method.error_string);
-			if(bootme_method.return_code != 0) {
+			if( bootme_method.return_code  == -1) {
+				sprintf(trace_string, "%s/etc/scripts/%s on %d %d 2>%s/%s", global_htx_home_dir, HTXD_BOOTME_SCRIPT, bootme_mode, bootme_time, global_htxd_log_dir, HTXD_BOOTME_SCRIPT_ERROR_LOG);
+				sprintf(temp_string, "bootme command: <%s>", trace_string);
+				HTXD_TRACE(LOG_OFF, temp_string);
+				bootme_return_code = htxd_execute_bootme_script(trace_string);
+				if(bootme_return_code == 0) {
+					sprintf(temp_string, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
+					p_boot_flag = fopen(temp_string, "w");
+					if(p_boot_flag == NULL) {
+						sprintf(trace_string, "fopen failed with errno = <%d>", errno);
+						HTXD_TRACE(LOG_ON, trace_string);
+						sprintf(*command_result, "bootme on failed, could not set bootme flag file <%s>", temp_string);
+						sprintf(trace_string, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
+						system(trace_string);
+					} else {
+						switch(bootme_mode)
+						{
+						case HTXD_SOFT_BOOTME:
+							strcpy(temp_string, "mode:soft");
+							break;
+
+						case HTXD_SOFT_FAST_BOOTME:
+							strcpy(temp_string, "mode:softf");
+							break;
+
+						case HTXD_HARD_BOOTME:
+							strcpy(temp_string, "mode:hard");
+							break;
+
+						case HTXD_HARD_FAST_BOOTME:
+							strcpy(temp_string, "mode:hardf");
+							break;
+
+						default:
+							strcpy(temp_string, "mode:default");
+							break;
+
+						}
+						
+						if(bootme_time != 0) {
+							sprintf(trace_string, "period:%d", bootme_time);
+						} else {
+							sprintf(trace_string, "period:%s", "default");
+						}
+
+						fprintf(p_boot_flag, "%s %s %s", HTXD_BOOTME_REBOOT, temp_string, trace_string);
+						fclose(p_boot_flag);
+						strcpy(*command_result, "No MDT is running, bootme is set for reboot only");
+					}
+				} else {
+					htxd_bootme_error_string(bootme_return_code, command_result);
+				}
+					
+				if(temp_option_list != NULL) {
+					free(temp_option_list);
+				}
+
+				return bootme_method.return_code;
+				
+			} else if(bootme_method.return_code != 0) {
 				strcpy(*command_result, bootme_method.error_string);
 
 				if(temp_option_list != NULL) {
@@ -1429,9 +1595,10 @@ int htxd_option_method_bootme(char **command_result, htxd_command *p_command)
 
 				return bootme_method.return_code;
 			}
-			sprintf(trace_string, "%s/etc/scripts/%s on", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
-			bootme_status = system(trace_string);
-			bootme_return_code = WEXITSTATUS(bootme_status);
+			sprintf(trace_string, "%s/etc/scripts/%s on %d %d 2>%s/%s", global_htx_home_dir, HTXD_BOOTME_SCRIPT, bootme_mode, bootme_time, global_htxd_log_dir, HTXD_BOOTME_SCRIPT_ERROR_LOG);
+			sprintf(temp_string, "bootme command: <%s>", trace_string);
+			HTXD_TRACE(LOG_OFF, temp_string);
+			bootme_return_code = htxd_execute_bootme_script(trace_string);
 			if(bootme_return_code == 0) {
 				running_mdt_name = htxd_get_running_ecg_name();
 				sprintf(temp_string, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
@@ -1443,7 +1610,37 @@ int htxd_option_method_bootme(char **command_result, htxd_command *p_command)
 					sprintf(trace_string, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
 					system(trace_string);
 				} else {
-					fprintf(p_boot_flag, "%s", running_mdt_name);
+					switch(bootme_mode)
+					{
+					case HTXD_SOFT_BOOTME:
+						strcpy(temp_string, "mode:soft");
+						break;
+
+					case HTXD_SOFT_FAST_BOOTME:
+						strcpy(temp_string, "mode:softf");
+						break;
+
+					case HTXD_HARD_BOOTME:
+						strcpy(temp_string, "mode:hard");
+						break;
+
+					case HTXD_HARD_FAST_BOOTME:
+						strcpy(temp_string, "mode:hardf");
+						break;
+
+					default:
+						strcpy(temp_string, "mode:default");
+						break;
+
+					}
+					
+					if(bootme_time != 0) {
+						sprintf(trace_string, "period:%d", bootme_time);
+					} else {
+						sprintf(trace_string, "period:%s", "default");
+					}
+
+					fprintf(p_boot_flag, "%s %s %s", running_mdt_name, temp_string, trace_string);
 					fclose(p_boot_flag);
 					strcpy(*command_result, "bootme on is completed successfully");
 					sprintf(trace_string, "cp %s %s-htxd_bootme", running_mdt_name, running_mdt_name);
@@ -1453,10 +1650,9 @@ int htxd_option_method_bootme(char **command_result, htxd_command *p_command)
 				htxd_bootme_error_string(bootme_return_code, command_result);
 			}
 
-		} else if(  strcmp(temp_option_list, "off") == 0 ) {
-			sprintf(trace_string, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
-			bootme_status = system(trace_string);
-			bootme_return_code = WEXITSTATUS(bootme_status);
+		} else if( operation_type == HTXD_BOOTME_OFF ) {
+			sprintf(trace_string, "%s/etc/scripts/%s off 2>%s/%s", global_htx_home_dir, HTXD_BOOTME_SCRIPT, global_htxd_log_dir, HTXD_BOOTME_SCRIPT_ERROR_LOG);
+			bootme_return_code = htxd_execute_bootme_script(trace_string);
 			if(bootme_return_code == 0) {
 				strcpy(*command_result, "bootme off is completed successfully");
 				sprintf(trace_string, "rm -f %s/mdt/*-htxd_bootme >/dev/null 2>&1", global_htx_home_dir);
@@ -1464,20 +1660,31 @@ int htxd_option_method_bootme(char **command_result, htxd_command *p_command)
 			} else {
 				htxd_bootme_error_string(bootme_return_code, command_result);
 			}
-		} else if( strcmp(temp_option_list, "status") == 0 ) {
-			sprintf(trace_string, "%s/etc/scripts/%s status", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
-			bootme_status = system(trace_string);
-			bootme_return_code = WEXITSTATUS(bootme_status);
+		} else if( operation_type == HTXD_BOOTME_STATUS ) {
+			sprintf(trace_string, "%s/etc/scripts/%s status 2>%s/%s", global_htx_home_dir, HTXD_BOOTME_SCRIPT, global_htxd_log_dir, HTXD_BOOTME_SCRIPT_ERROR_LOG);
+			bootme_return_code = htxd_execute_bootme_script(trace_string);
 			if(bootme_return_code == 0) {
-				strcpy(*command_result, "bootme status: on");
+				sprintf(temp_string, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
+				p_boot_flag = fopen(temp_string, "r");
+				if(p_boot_flag == NULL) {
+					sprintf(trace_string, "fopen failed with errno = <%d>", errno);
+					HTXD_TRACE(LOG_ON, trace_string);
+					sprintf(*command_result, "bootme on failed, could not set bootme flag file <%s>", temp_string);
+					sprintf(trace_string, "%s/etc/scripts/%s off", global_htx_home_dir, HTXD_BOOTME_SCRIPT);
+					system(trace_string);
+				} else {
+					fscanf(p_boot_flag, "%s %s %s", bootme_mdt_name, temp_string, trace_string);
+					fclose(p_boot_flag);
+				}
+				sprintf(*command_result, "bootme status: on\n%s\n%s\nbootme mdt:%s", temp_string, trace_string, bootme_mdt_name);
 			} else {
 				htxd_bootme_error_string(bootme_return_code, command_result);	
-			}
+			}	
 		} else {
-			strcpy(*command_result, "Error: bootme unknow option\nUsage: bootme (on|off|status)");
+			sprintf(*command_result, "Error: bootme unknown option\n%s", HTXD_BOOTME_USAGE_TEXT);
 		}
 	} else {
-		strcpy(*command_result, "Error: invalid bootme command\nUsage: bootme (on|off|status)");
+		sprintf(*command_result, "Error: invalid bootme command\n%s", HTXD_BOOTME_USAGE_TEXT);
 	}
  
 
@@ -1552,6 +1759,7 @@ int htxd_getstats_ecg(htxd_ecg_info * p_ecg_info_to_getstats, char **command_res
 	int return_code = 0;
 	int  htx_stats_pid;
 	char temp_string[300];
+	char trace_string[512];
 
 	/* get HTX stats program PID */
 	htx_stats_pid = htxd_get_htx_stats_pid();
@@ -1560,11 +1768,14 @@ int htxd_getstats_ecg(htxd_ecg_info * p_ecg_info_to_getstats, char **command_res
 	sprintf(temp_string, "%s/%s", global_htx_log_dir, HTX_STATS_SEND_FILE);
 	if(truncate(temp_string, 0) == -1) {
 		if(errno == ENOENT ) {
-			if(creat(temp_string, 0) >= 0) {
-			} else {
+			if(creat(temp_string, 0) == -1) {
+				sprintf(trace_string, "htxd_getstats_ecg: creat() is failed with errno <%d>", errno);
+				HTXD_TRACE(LOG_ON, trace_string);
 			}
 				
 		} else {
+			sprintf(trace_string, "htxd_getstats_ecg: truncate() is failed with errno <%d>", errno);
+			HTXD_TRACE(LOG_ON, trace_string);
 		}
 	}
 
@@ -1599,29 +1810,28 @@ int htxd_option_method_getstats(char **command_result, htxd_command *p_command)
 
 	*command_result = NULL;
 
-	if(command_ecg_name[0] == '\0') {
-		sprintf(command_ecg_name, "%s/mdt/%s", global_htx_home_dir, DEFAULT_ECG_NAME );
-	}
-
 	return_code = htxd_validate_command_requirements(htxd_instance, error_string);
-
 	if(return_code == 0) {
 		if( htxd_get_daemon_state() != HTXD_DAEMON_STATE_RUNNING_MDT ) {
 			strcpy(error_string,"No ECG/MDT is currently running");
+			HTXD_TRACE(LOG_ON, error_string);
 			return_code = -1;
 		}
 	}
-
 	if(return_code != 0) {
 		*command_result = malloc(512);
 		strcpy(*command_result, error_string);
 		return return_code;
 	}
 
+	if(command_ecg_name[0] == '\0') {
+		strcpy(command_ecg_name, htxd_get_running_ecg_name() );
+	}
+
 	p_ecg_info_list = htxd_get_ecg_info_node(htxd_instance->p_ecg_manager, command_ecg_name);	
 	if(p_ecg_info_list == NULL) {
 		*command_result = malloc(512);
-		HTXD_TRACE(LOG_OFF, *command_result);
+		HTXD_TRACE(LOG_ON, *command_result);
 		sprintf(*command_result, "Specified ECG/MDT<%s> is not currently running", command_ecg_name);
 		return -1;
 	}
@@ -1746,7 +1956,7 @@ int htxd_option_method_cmd(char **command_result, htxd_command *p_command)
 
 
 	sprintf(temp_string, "%s/%s", global_htxd_log_dir, HTX_CMD_RESULT_FILE);
-	sprintf(command_string, "echo \" Error: failed to execute command \<%s\> \" >%s; sync",  p_command->option_list, temp_string);
+	sprintf(command_string, "echo \" Error: failed to execute command :%s \" >%s; sync",  p_command->option_list, temp_string);
 	system(command_string);
 
 	sprintf(command_string, " (%s) > %s 2>&1 ; sync", p_command->option_list, temp_string);
@@ -2338,7 +2548,7 @@ void htxd_get_screen_5_row_entry(struct htxshm_HE *p_HE, htxd_ecg_info * p_ecg_i
 		device_run_status,
 		last_update_day_of_year,
 		last_update_time,
-		p_HE->cycles,
+		(int) p_HE->cycles,
 		p_HE->test_id,
 		last_error_day_of_year,
 		last_error_time

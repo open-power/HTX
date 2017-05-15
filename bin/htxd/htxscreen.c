@@ -2446,7 +2446,13 @@ int htxscreen_mdt_list_display(int previous_return_code)
 
 	if(global_selected_mdt_name[0] != '\0') {
 		return_code = htxscreen_select_mdt(global_selected_mdt_name);
-		if(return_code != 0) {
+		if(return_code == HTXD_HTX_PROCESS_FOUND) {
+			PRTMSG((MSGLINE - 2), 0, ("HTX test is already running on the system, please shutdown the running test"));
+			PRTMSG((MSGLINE - 1), 0, ("%s/htx/htxd/%s contains the HTX process details, exiting..", global_htx_log_dir, HTXD_PROCESS_CHECK_LOG));
+			PRTMSG(MSGLINE, 0, ("Press any key to exit..."));
+			getch();
+			exit(return_code);
+		} else if(return_code != 0) {
 			PRTMSG(MSGLINE, 0, ("Selected MDT <%s> is invalid", global_selected_mdt_name));
 			global_selected_mdt_name[0] = '\0';
 			return return_code;
@@ -3385,7 +3391,13 @@ int htxscreen_htx_logo_screen_display(void)
 	if(global_parameter.ecg_name[0] != '\0') {
 		strcpy(global_selected_mdt_name, global_parameter.ecg_name);
 		return_code = htxscreen_select_mdt(global_selected_mdt_name);
-		if(return_code != 0) {
+		if(return_code == HTXD_HTX_PROCESS_FOUND) {
+			PRTMSG((MSGLINE - 2), 0, ("HTX test is already running on the system, please shutdown the running test"));
+			PRTMSG((MSGLINE - 1), 0, ("%s/htx/htxd/%s contains the HTX process details, exiting..", global_htx_log_dir, HTXD_PROCESS_CHECK_LOG));
+			PRTMSG(MSGLINE, 0, ("Press any key to exit..."));
+			getch();
+			exit(return_code);
+		} else if(return_code != 0) {
 			PRTMSG(MSGLINE, 0, ("Provided MDT <%s> is invalid", global_selected_mdt_name));
 			global_selected_mdt_name[0] = '\0';
 		}

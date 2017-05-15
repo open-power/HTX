@@ -26,6 +26,9 @@
 
 #include "htxd_thread.h"
 #include "htxd_trace.h"
+#include "htxd_define.h"
+#include "htxd_util.h"
+#include "htxd_instance.h"
 
 
 extern volatile int htxd_shutdown_flag;
@@ -153,6 +156,19 @@ int htxd_create_command_thread(htxd_thread *p_thread_info)
 void htxd_exit_command_thread(void)
 {
 /*	pthread_detach(pthread_self()); */
+	pthread_exit(0);
+}
+
+
+void htxd_exit_autostart_thread(void)
+{
+	int deamon_state;
+
+
+	deamon_state = htxd_get_daemon_state();
+	if(deamon_state == HTXD_DAEMON_STATE_AUTOSTART_SETUP) {
+		htxd_set_daemon_state(HTXD_DAEMON_STATE_IDLE);
+	}
 	pthread_exit(0);
 }
 

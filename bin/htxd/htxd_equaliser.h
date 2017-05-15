@@ -30,6 +30,9 @@
 #define LOGFILE       "eq_status"
 #define LOGFILE_SAVE  "eq_status_save"
 
+#define UTIL_LOGFILE       "eq_util_seq"
+#define UTIL_LOGFILE_SAVE  "eq_util_seq_save"
+
 #define UTIL_LEFT	    0
 #define UTIL_RIGHT	    1
 #define UTIL_RANDOM  	2
@@ -38,6 +41,7 @@
 typedef char uint8;
 typedef unsigned short uint16;
 typedef unsigned int uint32;
+typedef unsigned long long uint64;
 
 struct CPU {
     int lcpu;
@@ -78,7 +82,7 @@ typedef struct run_time_data run_time_data;
 
 struct config_parameters {
     uint32      util_pattern;        /* UTIL_LEFT/UTIL_RIGHT/UTIL_RANDOM/UTIL_PATTERN */
-    uint32      utilization_pattern; /* Bit pattern */
+    uint64      utilization_pattern; /* Bit pattern */
     uint16      pattern_length;      /* length of bit pattern */
     uint16      sequence_length;     /* Num of %age util defined */
     uint16      utilization_sequence[MAX_UTIL_SEQUENCE_LENGTH];
@@ -94,12 +98,16 @@ typedef struct run_time_config_structure run_time_config;
 struct test_config_structure {
     uint32                      time_quantum;
     uint32                      offline_cpu;           /* Flag to make cpu offline. only supported for Linux */
+    uint32                      sys_util_flag;         /* Flag set if system level utilization is give */
     uint32                      startup_time_delay;    /* Time delay for equaliser to be effective */
     uint32                      log_duration;          /* Time duration foe which logs are collected. */
+    char                        *sys_cpu_util;         /* System cpu utilizatio string */
+    run_time_config             sys_util_config;       /* Info if system level utilization is given */
     run_time_config             *exer_config;          /* info for each exerciser running under equaliser control */
 };
 typedef struct test_config_structure test_config_struct;
 
-extern void htxd_equaliser(void);
-
+void htxd_equaliser(void);
+void print_util_seq(void);
+void update_sys_util_pattern(void);
 #endif

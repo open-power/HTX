@@ -145,6 +145,10 @@ int	main(int argc, char *argv[])
 		exit(2);
 	}
 #endif
+
+/************************************************************************/
+/* set HTX log path                                                     */
+/************************************************************************/
 	temp_env_val_ptr = getenv("HTX_LOG_DIR");
 	if(temp_env_val_ptr == NULL) {
 		strcpy(global_htx_log_dir, default_log_dir);
@@ -400,7 +404,7 @@ int	main(int argc, char *argv[])
 									sprintf(
 										workstr,
 										"         %9lu\n",
-										HE_ptr->bytes_read2);
+										(unsigned long) HE_ptr->bytes_read2);
 									htx_strcat(
 										   file_buffer,
 										   workstr);

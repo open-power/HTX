@@ -63,17 +63,13 @@ void child_death(int sig, int code, struct sigcontext *scp)
 	pid_t child_pid;
 	int child_process_exit_status;	
 	char exit_reason[120];
-	int is_ipc_cleanup_required = 0;
 
 
 	while( (child_pid = wait3(&child_process_exit_status, WNOHANG, (struct rusage *) NULL) ) > 0  ) {
-		is_ipc_cleanup_required = 0;
 		if ( WIFEXITED(child_process_exit_status) ) {
 			sprintf(exit_reason, "exit(%d) call", WEXITSTATUS(child_process_exit_status) );
-			is_ipc_cleanup_required = 1;
 		} else if ( WIFSIGNALED(child_process_exit_status) )  {
 			sprintf(exit_reason, "signal %d", WTERMSIG(child_process_exit_status) );
-			is_ipc_cleanup_required = 1;
 		}	
 
 		if(child_pid == htxd_get_htx_stats_pid() ) {

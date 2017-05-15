@@ -20,6 +20,30 @@
 # IBM_PROLOG_END_TAG
 ########################################################
 
-ps -ef | grep -w "${HTXBIN}htxd" | grep -v grep | awk '{print $2}' | xargs kill -15 >/dev/null 2>&1
+# stopping HTXD daemon
+htxd_path="`cat /var/log/htx_install_path 2>/dev/null`/bin/htxd"
+htxd_pid=$(ps -aef | grep "$htxd_path" | grep -v grep | awk '$3 == 1 {print $2}')
+if [ -z "$htxd_pid" ] ; then
+	echo "htxd is already exited..."
+	exit 0
+else
+	echo "stopping htxd with pid:$htxd_pid..."
+	kill -15 $htxd_pid
+fi
 
+
+# waiting for all process to exit
+process_count=1;
+while [ "$process_count"  -ne 0 ]
+do
+	sleep 1
+	process_count=$(ps -aef | grep -e $htxd_pid | grep -v grep | wc -l)
+	exerciser_count=$(ps -aef | grep -e hxe | grep -v grep | wc -l)
+	echo "remaining exerciser count : $exerciser_count" 
+done
+
+echo "all htx processes are exited..."
+echo "htxd is stopped"
+
+exit 0
 

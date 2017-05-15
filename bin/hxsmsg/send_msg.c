@@ -116,9 +116,6 @@ short send_message(char *msg_text, int errno_val, int severity,
 
   	size_t str_length;         /* string length variable                  */
  
-        struct htx_data data;      /* Hardware Exerciser type HTX data structure   */
-
-
   	struct htx_msg_buf msg_buffer;  
 		                   /* message buffer for HTX IPC msg queue    */
 

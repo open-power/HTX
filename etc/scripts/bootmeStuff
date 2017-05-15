@@ -26,7 +26,8 @@ else
     echo "Either file is empty or does not contain correct install path. Hence exiting..."  
     exit 1
 fi
-    
+
+  BOOTME_PARAMETER=$*   
   PROG_DIR=${HTXSCRIPTS}
   SC_ERR=${HTX_LOG_DIR}/sctcheckstop.err
   rules=${HTXREGRULES}/bootme/default
@@ -232,7 +233,7 @@ function logError
 
           logError
   fi
-  [ -f $BOOT_PRE ] && { echo "`date +\"%D %T\"`: Running BOOT_PRE $BOOT_PRE" >> $blog; $BOOT_PRE; }
+  [ -f $BOOT_PRE ] && { echo "`date +\"%D %T\"`: Running BOOT_PRE, . $BOOT_PRE" >> $blog; . $BOOT_PRE; }
 
 
 #############################################################################
@@ -354,6 +355,14 @@ function timeCalc
 
 #############################################################################
 # Issue the tester supplied shutdown / reboot command
+
+  if [[ ! -z ${BOOTME_PARAMETER} ]] ; then
+	echo "`date +\"%D %T\"`: ${BOOTME_PARAMETER}" >> $blog
+	sync
+	$BOOTME_PARAMETER
+	exit 0
+  fi
+
   if [[ -z $(echo $BOOT_CMD | grep "\-t") ]]
      then echo "`date +\"%D %T\"`: $BOOT_CMD:" >> $blog
           sync
