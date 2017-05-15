@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-static char sccsid[] = "@(#)34  1.32.5.1  src/htx/usr/lpp/htx/bin/hxecd/hxecd.c, exer_cd, htxubuntu 6/15/10 03:41:59";
-
 /******************************************************************************
  *   COMPONENT_NAME: EXER_CD
  *
@@ -32,14 +30,6 @@ static char sccsid[] = "@(#)34  1.32.5.1  src/htx/usr/lpp/htx/bin/hxecd/hxecd.c,
  *
  ******************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include "hxecd.h"
 
 dev_t device_st_rdev;                      /* device id (see stat.h) */
@@ -51,9 +41,9 @@ FILE *fptr;
 char device_subclass[32];  /* subclass of device */
 char rules_file_name[100];                  /* argv[3] - Rules File name */
 char pipe_name[15], signal_flag = 'N';
-void sig_function(int, int, struct sigcontext *);
+void sig_function(int);
 
-void sig_function(int sig, int code, struct sigcontext *scp)
+void sig_function(int sig)
 {
   signal_flag = 'Y';
 }
@@ -71,12 +61,11 @@ struct htx_data *st_phtx_info;     /* pointer to active htx_info struct  */
 /* Env variable affecting the working of hxecd */
 const char* MEDIAOVR = "HXECD_MEDIA_OVERRIDE"; /* whether to continue on finding invalid media / halt with error */
 
-main (argc, argv)                    /* Begin MAIN line code                */
-    int argc;
-    char *argv[];
+int main (int argc, char **argv)                    /* Begin MAIN line code   */
 {
-  int    i, done, rc, disc_code, last_lba = 0, blk_size = 0;
-  char   bad_rule, msg[220], tmp_msg[100], rules_file_name[100];
+  int    i, done, rc, disc_code;
+  unsigned int last_lba = 0, blk_size = 0;
+  char   msg[220], rules_file_name[100];
   char   *wptr, *rptr;  /* read / write / buffer pointers (aligned) */
   char   *wptr_malloc, *rptr_malloc;  /* read / write / malloc buffer pointers  */
 /*struct devinfo b; Unused */
@@ -119,9 +108,9 @@ main (argc, argv)                    /* Begin MAIN line code                */
   if(wptr == NULL || rptr == NULL) {
     sprintf(msg, "Unable to allocate memory of %d bytes\n", BUF_SIZE+PAGE_SIZE);
 	hxfmsg(&s, 0, SYSERR, msg);
-  }                                /****************************************/
-                                  /*- SIGTERM handler initializations    -*/
-                                  /****************************************/
+  }     /****************************************/
+        /*- SIGTERM handler initializations    -*/
+        /****************************************/
   sigemptyset(&(sigvector.sa_mask));
   sigvector.sa_flags = 0 ;
   sigvector.sa_handler = (void (*)(int)) SIGTERM_hdl;
@@ -155,8 +144,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
   strcat(pipe_name, ".pipe");
   if ( (fptr = fopen(rules_file_name, "r")) == NULL ) {
      strcpy(msg, "error opening rules file - ");
-     if (errno <= sys_nerr)
-        strcat(msg, sys_errlist[errno]);
+        strcat(msg, strerror(errno));
      strcat(msg, "\n");
      hxfmsg(&s, errno, SYSERR, msg);
      exit(1);
@@ -191,8 +179,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
 
   if ( r.fildes == -1 ) {
      strcpy(msg, "Initial open error - ");
-     if (errno <= sys_nerr)
-        strcat(msg, sys_errlist[errno]);
+        strcat(msg, strerror(errno));
      strcat(msg, "\n");
      hxfmsg(&s, errno, SYSERR, msg);
      exit(1);
@@ -206,8 +193,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
   p_dev_stat = (struct stat *) malloc(sizeof (struct stat));
   if ( 0 != (rc = fstat(r.fildes, p_dev_stat))) {
      strcpy(msg, "fstat() error - ");
-     if (errno <= sys_nerr)
-         strcat(msg, sys_errlist[errno]);
+         strcat(msg, strerror(errno));
      strcat(msg, "\n");
      hxfmsg(&s, errno, SYSERR, msg);
      exit(1);
@@ -238,11 +224,14 @@ main (argc, argv)                    /* Begin MAIN line code                */
             *  1 = vendor unique play audio scsi commands   *
             *  2 = vendor unique play audio scsi commands   *
             *************************************************/
+#ifndef __HTX_LINUX__
    r.master_audio_type = get_audio_type(&r, &s);
+#else 
+   r.master_audio_type = 0;
+#endif
    if ( r.master_audio_type == -1 ) {
       strcpy(msg, "Get Audio Type error - ");
-      if (errno <= sys_nerr)
-         strcat(msg,sys_errlist[errno]);
+         strcat(msg, strerror(errno));
       strcat(msg,"\n");
       hxfmsg(&s,errno,SYSERR,msg);
       exit(1);
@@ -309,8 +298,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
              exit(1);
          }
 
-        if ( errno <= sys_nerr )
-           strcat(msg, sys_errlist[errno]);
+           strcat(msg, strerror(errno));
         strcat(msg,"\n");
         hxfmsg(&s, errno, HARD, msg);
      } else {
@@ -324,12 +312,10 @@ main (argc, argv)                    /* Begin MAIN line code                */
             /************************************************************
              *  validity check all rule stanzas                         *
              ************************************************************/
-  bad_rule = 'n';
   cnt = 0;
   while ( (rc = get_rule(&s, &r)) != EOF ) {
     cnt++;
     if ( rc == 1 ) {
-       bad_rule = 'y';
        exit(1);
     }
   }
@@ -410,7 +396,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
   do {
      rewind(fptr);
      for ( rc = 0; rc < cnt; rc++ )
-         rule_stanza[rc] = NULL;
+         rule_stanza[rc] = 0;
      cnt = 0;
      sprintf(msg, "using rules file %s \n", rules_file_name);
      hxfmsg(&s, 0, INFO, msg);
@@ -450,8 +436,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
         fclose(fptr);
         if ( (fptr = fopen(pipe_name, "r")) == NULL ) {
            strcpy(msg, "error opening pipe file - ");
-           if ( errno <= sys_nerr )
-              strcat(msg, sys_errlist[errno]);
+              strcat(msg, strerror(errno));
            strcat(msg, "\n");
            hxfmsg(&s, errno, SYSERR, msg);
            return(1);
@@ -464,8 +449,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
         signal_flag = 'N';
         if ( (fptr = fopen(rules_file_name, "r")) == NULL ) {
            strcpy(msg, "error opening rules file - ");
-           if ( errno <= sys_nerr )
-              strcat(msg, sys_errlist[errno]);
+              strcat(msg, strerror(errno));
            strcat(msg, "\n");
            hxfmsg(&s, errno, SYSERR, msg);
            return(1);
@@ -486,10 +470,7 @@ main (argc, argv)                    /* Begin MAIN line code                */
 /**************************************************************************/
 /* put out rule started message                                           */
 /**************************************************************************/
-start_msg(ps,pr,msg_text)
- struct htx_data *ps;
- struct ruleinfo *pr;
- char *msg_text;
+void start_msg(struct htx_data *ps, struct ruleinfo *pr, char *msg_text)
 {
   sprintf(msg_text, "HXECD: %s - %s  Num_Ops: %d  Blocks: %d  Pattern: "
                     "%s  Bytes: %d\n",
@@ -507,11 +488,15 @@ void SIGTERM_hdl (int sig, int code, struct sigcontext *scp)
                     /*-- do a shutdown of operation if one is active   --*/
   switch ( st_prule_info->op_in_progress ) {
      case 1 :  {             /*-Toshiba vendor unique play audio active -*/
+          #ifndef __HTX_LINUX__
           halt_audio_cdrom(st_prule_info->fildes);
+          #endif
           break;
      }
      case 2 : {                         /*- scsi play play audio active -*/
+          #ifndef __HTX_LINUX__
           halt_audio_cdrom(st_prule_info->fildes);
+          #endif
           break;
      }
      case 3 : {                  /*- device driver CD_PLAY_AUDIO active -*/

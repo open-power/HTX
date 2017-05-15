@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)35	1.34.4.2  src/htx/usr/lpp/htx/bin/hxecd/io_oper.c, exer_cd, htxubuntu 5/19/14 23:57:01 */
-
 /******************************************************************************
  *   COMPONENT_NAME: exer_cd
  *
@@ -48,29 +46,17 @@
  *
  *   DESCRIPTION: Functions used to exercise the cdrom devices.
  ******************************************************************************/
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <time.h>
 
-#ifndef __HTX_LINUX__ /* AIX */
-#include <sys/scdisk.h>
-#include <sys/scsi_buf.h>
-#endif
-
-#include <sys/ioctl.h>
-#include <sys/types.h>
 #include "hxecd.h"
 #define MAX_SENSE 64
 
-extern char device_subclass[];  /* subclass of device */
-extern dev_t device_st_rdev;    /* device id (see stat.h) */
-
+#ifndef __HTX_LINUX__
 static char sense_buf [MAX_SENSE];
 static char msg_str [256];
+#endif
 
-int read_subchannel(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno);
-int play_audio_msf(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno, struct cd_audio_cmd *audio_ioctl);
+extern char device_subclass[];  /* subclass of device */
+extern dev_t device_st_rdev;    /* device id (see stat.h) */
 
 /*************************************************************************/
 /* close_reopen - close device and reopen in the passed mode.            */
@@ -84,11 +70,12 @@ int play_audio_msf(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkn
 /*          always be SC_SINGLE since SC_DIAGNOSTIC is not supported     */
 /*          for ide atapi passthru.                                      */
 /*************************************************************************/
+#ifndef __HTX_LINUX__
 int close_reopen(struct htx_data *ps, struct ruleinfo *pr, int omode,
                  char whodo[100])
 {
-#ifndef __HTX_LINUX__
-  int  rc, lcl_last_lba, lcl_blk_size;
+  int  rc;
+  unsigned int lcl_last_lba, lcl_blk_size;
   char tmpmsg[20], tmsg[200];
 
   strcpy(tmsg, whodo);
@@ -132,10 +119,8 @@ int close_reopen(struct htx_data *ps, struct ruleinfo *pr, int omode,
         }
   }
   return(rc);
-#else
-  return 0;
-#endif
 }
+#endif
 
 /**********************************************************************/
 /* get_audio_type: do an inquiry and look at Manufacturer and Product */
@@ -152,9 +137,9 @@ int close_reopen(struct htx_data *ps, struct ruleinfo *pr, int omode,
 /*    audio_type set = -1 for error.                                  */
 /*                                                                    */
 /**********************************************************************/
+#ifndef __HTX_LINUX__
 int get_audio_type(struct ruleinfo *pr, struct htx_data *ps)
 {
-#ifndef __HTX_LINUX__
   int    rc, i, xrc, x, xno;
   int    sens_len, retry_op, audio_type;
   char   sense_buf[120], tmp_str[120], rbuf[220];
@@ -221,8 +206,7 @@ int get_audio_type(struct ruleinfo *pr, struct htx_data *ps)
                     /*********************************************************/
               if ( (xrc == 0) && (retry_op == 0) ) {
                  strcpy(msg_str, " audio type inquiry command error - ");
-                 if ( errno <= sys_nerr )
-                    strcat(msg_str, sys_errlist[errno]);
+                    strcat(msg_str, strerror(errno));
                  strcat(msg_str, "\n  Request Sense Data:");
                  sens_len = 8 + sense_buf[7];
                  for ( i = 0; i < sens_len; i++ ) {
@@ -275,21 +259,17 @@ int get_audio_type(struct ruleinfo *pr, struct htx_data *ps)
     }
   }  /*- end opened in sc_diagnostic mode -*/
   return(audio_type);
-#else
-  return 0;
-#endif
 }
+#endif
 
 /**************************************************************************/
 /* set file pointer                                                       */
 /**************************************************************************/
-#ifndef __HTX_LINUX__ /* AIX */
 
-set_addr(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
+void set_addr(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 {
   /*off_t addr, rcode, lseek();*/
-    offset_t addr, rcode, llseek();
-  char  msg[200];
+    offset_t addr, rcode;
 
 #ifdef __HTX_LINUX__     /* Linux */
   /* No seek required for M2F1 M2F2 and DA */
@@ -305,44 +285,17 @@ set_addr(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
   * prt_msg(ps, pr, loop, blkno, errno, INFO, msg);
   ***********************************************************************/
 /*  rcode = lseek(pr->fildes, addr, 0);*/
-  rcode = llseek(pr->fildes, addr, 0);
-  if ( rcode == -1 ) {
-     ps->bad_others = ps->bad_others + 1;
-     prt_msg(ps, pr, loop, blkno, errno, SYSERR, "lseek error - ");
-  }
-  return;
-}
-
-#else
-
-void set_addr(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
-{
-  /*off_t addr, rcode, lseek();*/
-  loff_t addr, rcode;
-  char  msg[200];
-
-#ifdef __HTX_LINUX__     /* Linux */
-  /* No seek required for M2F1 M2F2 and DA */
-  if(strncmp(pr->mode, "M1", 4) != 0) {
-    return;
-  }
-#endif
-  addr = (loff_t)blkno[0] * (loff_t)pr->bytpsec;
- /**********************************************************************
-  * sprintf(msg, "DEBUG: set_addr: blkno[0] = %d  pr->bytpsec = %d "
-  *              " addr = %d (x%04X)\n",
-  *         blkno[0], pr->bytpsec, addr,addr);
-  * prt_msg(ps, pr, loop, blkno, errno, INFO, msg);
-  ***********************************************************************/
+#ifdef __HTX_LINUX__
   rcode = lseek64(pr->fildes, addr, 0);
+#else
+  rcode = llseek(pr->fildes, addr, 0);
+#endif
   if ( rcode == -1 ) {
      ps->bad_others = ps->bad_others + 1;
      prt_msg(ps, pr, loop, blkno, errno, SYSERR, "lseek error - ");
   }
   return;
 }
-
-#endif
 
 /**************************************************************************/
 /* read from cdrom                                                        */
@@ -381,7 +334,7 @@ int read_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno,
          cda_cmd.addr_format = CDROM_LBA;
          cda_cmd.nframes = pr->dlen/pr->bytpsec;
          cda_cmd.nframes = 1;
-         cda_cmd.buf = rbuf;
+         cda_cmd.buf = (unsigned char *)rbuf;
          rc = ioctl(pr->fildes, CDROMREADAUDIO, &cda_cmd);
 
          if( rc == 0 ) { /* Success */
@@ -480,7 +433,7 @@ int read_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno,
 /*         CDxxxxxx       = accompanying read compare data file.          */
 /*          (xxxxxx) above = the supplied Pattern ID.                     */
 /**************************************************************************/
-read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
+void read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
                    int *blkno, char *rbuf)
 {
   int  rc, r_ptr, save_dlen;
@@ -579,9 +532,9 @@ read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
 /**************************************************************************/
 /* audio                                                                  */
 /**************************************************************************/
-audio_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
-{
 #ifndef __HTX_LINUX__
+void audio_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
+{
   int    rc, xrc, i, sens_len;
   char   tmp_str[3], buf[1024];
   FILE   *fp;
@@ -590,7 +543,7 @@ audio_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 
   rc = 0;
   if ( close_reopen(ps, pr, SC_DIAGNOSTIC, "audio_cdrom") != 0 )
-     prt_msg(ps, pr, loop, *blkno, errno, HARD,
+     prt_msg(ps, pr, loop, blkno, errno, HARD,
              "open in diagnostic mode failure - ");
   else {
                                 /* TOSHIBA device and/or vendor unique play */
@@ -715,15 +668,15 @@ audio_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
      }
   }
   if ( close_reopen(ps, pr, SC_SINGLE, "audio_cdrom") != 0 )
-     prt_msg(ps, pr, loop, *blkno, errno, HARD, "reopen failure - ");
+     prt_msg(ps, pr, loop, blkno, errno, HARD, "reopen failure - ");
   }
-#endif
 }
+#endif
 
 /**************************************************************************/
 /* audio multimedia - play audio using multimedia mode of device driver   */
 /**************************************************************************/
-audio_mm(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
+int audio_mm(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 {
 #ifndef __HTX_LINUX__ /* AIX */
   int    rc, i, num_blks;
@@ -787,7 +740,7 @@ audio_mm(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 		 /* See F432984 for more details */
 
          if ( close_reopen(ps, pr, SC_DIAGNOSTIC, "audio_mm") != 0 ) {
-		 	prt_msg(ps, pr, loop, *blkno, errno, HARD, "open in diagnostic mode failure - ");
+		 	prt_msg(ps, pr, loop, blkno, errno, HARD, "open in diagnostic mode failure - ");
 		 	return 0;
 		 }
 
@@ -823,7 +776,7 @@ audio_mm(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 
 		 }
 		  if ( close_reopen(ps, pr, SC_SINGLE, "audio_mm") != 0 ) {
-			 prt_msg(ps, pr, loop, *blkno, errno, HARD, "reopen failure - ");
+			 prt_msg(ps, pr, loop, blkno, errno, HARD, "reopen failure - ");
 		  }
 
 		  return 0;
@@ -994,7 +947,7 @@ init_viocmd(struct scsi_iocmd *viocmd_buf)
 /**************************************************************************/
 /* to_bcd -- convert an integer to bcd                                    */
 /**************************************************************************/
-to_bcd(int i)
+int to_bcd(int i)
 {
   return( (16 * (i / 10)) + (i % 10) );
 }
@@ -1002,7 +955,7 @@ to_bcd(int i)
 /**************************************************************************/
 /* do diagnostics                                                         */
 /**************************************************************************/
-diag_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
+void diag_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 {
 #ifndef __HTX_LINUX__
   int    rc, i;
@@ -1011,7 +964,7 @@ diag_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
   struct scsi_iocmd viocmd_buf;
 
   if ( close_reopen(ps, pr, SC_DIAGNOSTIC, "diag_cdrom") != 0 )
-     prt_msg(ps, pr, loop, *blkno, errno, HARD, "diagnostic error - ");
+     prt_msg(ps, pr, loop, blkno, errno, HARD, "diagnostic error - ");
   else {
    if ( device_subclass[0] == 'S' ) { /* scsi */
                                         /*--- send do diagnostics command ---*/
@@ -1053,10 +1006,10 @@ diag_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 
      if ( rc == -1 ) {
         ps->bad_others = ps->bad_others + 1;
-        prt_msg(ps, pr, loop, *blkno, 0, HARD, "send diagnostics error - ");
+        prt_msg(ps, pr, loop, blkno, 0, HARD, "send diagnostics error - ");
      }
      if ( close_reopen(ps, pr, SC_SINGLE, "diag_cdrom") != 0 )
-        prt_msg(ps, pr, loop, *blkno, errno, HARD, "reopen failure - ");
+        prt_msg(ps, pr, loop, blkno, errno, HARD, "reopen failure - ");
   }
 #endif
 }
@@ -1064,7 +1017,7 @@ diag_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 /**************************************************************************/
 /* sleep                                                                  */
 /**************************************************************************/
-do_sleep(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
+void do_sleep(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 {
   time_t t1;
 
@@ -1077,7 +1030,7 @@ do_sleep(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 /**************************************************************************/
 /* prt_req_sense -- print the request sense data                         */
 /**************************************************************************/
-prt_req_sense(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
+void prt_req_sense(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 {
 #ifndef __HTX_LINUX__
   int    rc, i;
@@ -1087,7 +1040,7 @@ prt_req_sense(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
   struct scsi_iocmd viocmd_buf;
 
   if ( close_reopen(ps, pr, SC_DIAGNOSTIC, "prt_req_sense") != 0 )
-     prt_msg(ps, pr, loop, *blkno, errno, HARD, "request sense error - ");
+     prt_msg(ps, pr, loop, blkno, errno, HARD, "request sense error - ");
   else {
      if ( device_subclass[0] == 'S' ) { /* scsi */
 		 iocmd_buf.data_length = sizeof(sense_buf);
@@ -1142,7 +1095,7 @@ prt_req_sense(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 
      if ( rc == -1 ) {
         ps->bad_others = ps->bad_others + 1;
-        prt_msg(ps, pr, loop, *blkno, errno, HARD, "request sense error - ");
+        prt_msg(ps, pr, loop, blkno, errno, HARD, "request sense error - ");
      } else {
         strcpy(msg_str, "request sense_buf:");
         for ( i = 0; i < iocmd_buf.data_length; i++ ) {
@@ -1152,7 +1105,7 @@ prt_req_sense(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
         hxfmsg(ps,rc,INFO,msg_str);
      }
      if ( close_reopen(ps, pr, SC_SINGLE, "prt_req_sense") != 0 )
-        prt_msg(ps, pr, loop, *blkno, errno, HARD, "reopen failure - ");
+        prt_msg(ps, pr, loop, blkno, errno, HARD, "reopen failure - ");
   }
 #endif
 }
@@ -1160,8 +1113,8 @@ prt_req_sense(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 /**************************************************************************/
 /* mode select / get parms                                                */
 /**************************************************************************/
-int ms_get(struct ruleinfo *pr, struct htx_data *ps,int *p_last_lba,
-           int *p_blk_size)
+int ms_get(struct ruleinfo *pr, struct htx_data *ps, unsigned int *p_last_lba,
+           unsigned int *p_blk_size)
 {
   int rc=0;
   char   msg[150], tmp_msg[150];
@@ -1291,8 +1244,7 @@ int ms_get(struct ruleinfo *pr, struct htx_data *ps,int *p_last_lba,
 #endif
   if ( rc != 0 ) {
      sprintf(msg, "%s : Mode Select error : %s.\n", pr->rule_id, mode_descr);
-     if ( errno <= sys_nerr )
-        strcat(msg, sys_errlist[errno]);
+        strcat(msg, strerror(errno));
      strcat(msg,"\n");
      hxfmsg(ps, errno, HARD, msg);
      rc = -1;
@@ -1307,8 +1259,7 @@ int ms_get(struct ruleinfo *pr, struct htx_data *ps,int *p_last_lba,
      if ( rc != 0 ) {
         sprintf(msg, "Mode Get error : %s.\n", mode_descr);
         strcat(tmp_msg, msg);
-        if ( errno <= sys_nerr )
-           strcat(tmp_msg, sys_errlist[errno]);
+           strcat(tmp_msg, strerror(errno));
         strcat(tmp_msg,"\n");
         hxfmsg(ps, errno, HARD, tmp_msg);
         rc = -1;
@@ -1348,13 +1299,12 @@ int ms_get(struct ruleinfo *pr, struct htx_data *ps,int *p_last_lba,
         if ( *p_blk_size == 0 ) {
            sprintf(msg, "Mode Get error : %s.\n", mode_descr);
            strcat(tmp_msg, msg);
-           if ( errno <= sys_nerr )
-              strcat(tmp_msg, sys_errlist[errno]);
+              strcat(tmp_msg, strerror(errno));
            strcat(tmp_msg,"\n");
            hxfmsg(ps, errno, HARD, tmp_msg);
            rc = -1;
         } else {
-           sprintf(msg, "%s  Last lba = %d  Blksize = %d.\n",
+           sprintf(msg, "%s  Last lba = %ld  Blksize = %d.\n",
                    mode_descr, pr->tot_blks, *p_blk_size);
            strcat(tmp_msg, msg);
            hxfmsg(ps, errno, INFO, tmp_msg);
@@ -1368,10 +1318,10 @@ int ms_get(struct ruleinfo *pr, struct htx_data *ps,int *p_last_lba,
 /**************************************************************************/
 /* show_stuff - show iocmd_buf present values and do a request sense     */
 /**************************************************************************/
-show_stuff(struct htx_data *ps, struct ruleinfo *pr, int loop,
+#ifndef __HTX_LINUX__
+void show_stuff(struct htx_data *ps, struct ruleinfo *pr, int loop,
            int *blkno, struct sc_iocmd *piocmd_buf)
 {
-#ifndef __HTX_LINUX__
    int    rc, i;
    char   tmp_str[100];
    struct sc_iocmd iocmd_buf;
@@ -1397,7 +1347,7 @@ show_stuff(struct htx_data *ps, struct ruleinfo *pr, int loop,
    strcat(msg_str, tmp_str);
    hxfmsg(ps, 0, INFO, msg_str);
    if ( close_reopen(ps, pr, SC_DIAGNOSTIC, "show_stuff") != 0 )
-      prt_msg(ps, pr, loop, *blkno, errno, HARD,
+      prt_msg(ps, pr, loop, blkno, errno, HARD,
               "open in diagnostic mode failure - ");
    else {
       iocmd_buf.data_length = sizeof(sense_buf);    /* send req sns command */
@@ -1417,7 +1367,7 @@ show_stuff(struct htx_data *ps, struct ruleinfo *pr, int loop,
       rc = ioctl(pr->fildes, DKIOCMD, &iocmd_buf);
       if ( rc == -1 ) {
          ps->bad_others = ps->bad_others + 1;
-         prt_msg(ps, pr, loop, *blkno, errno, HARD,
+         prt_msg(ps, pr, loop, blkno, errno, HARD,
                  "show_stuff : request sense error - ");
       } else {
          strcpy(msg_str, "show_stuff : request sense_buf:");
@@ -1428,10 +1378,10 @@ show_stuff(struct htx_data *ps, struct ruleinfo *pr, int loop,
          hxfmsg(ps, rc, INFO, msg_str);
       }
       if ( close_reopen(ps, pr, SC_SINGLE, "show_stuff") != 0 )
-         prt_msg(ps, pr, loop, *blkno, errno, HARD, "reopen failure - ");
+         prt_msg(ps, pr, loop, blkno, errno, HARD, "reopen failure - ");
    }
-#endif
 }
+#endif
 
 /**************************************************************************/
 /* do_req_sense -- do a request sense operation and return sense data     */
@@ -1495,6 +1445,7 @@ int do_req_sense(int fildes, char *sense_buf, int sense_buf_len)
 /**********************************************************************/
 int get_disc_pn(struct htx_data *ps, struct ruleinfo *pr)
 {
+#ifndef __HTX_LINUX__
                /***********************************************************/
                /*- known cdrom test disc'c toc data                      -*/
                /***********************************************************/
@@ -1520,6 +1471,7 @@ const char toc2048_81F8902[200] =
 000409E30014AA0000041BC2";
 
 const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
+#endif
 
 #ifndef __HTX_LINUX__
    int    rc, i, xrc, x, xno;
@@ -1595,9 +1547,9 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
 				sense_buf[7] = 0;  /* reset sense buffer's additional sense byte */
 				xrc = do_req_sense(pr->fildes, sense_buf, sizeof(sense_buf));
 				if ( (xrc == 0) && (retry_op == 0) ) {
-				   strcpy(msg_str, " Unable to determine toc_length, errno = %d\n", errno );
-				   if ( errno <= sys_nerr )
-					  strcat(msg_str, sys_errlist[errno]);
+				   sprintf(tmp_str, " Unable to determine toc_length, errno = %d\n", errno );
+                   strcpy(msg_str, tmp_str);
+					  strcat(msg_str, strerror(errno));
 				   strcat(msg_str, "\n  Request Sense Data:");
 				   sens_len = (8 + sense_buf[7]);
 				   for ( i = 0; i < sens_len; i++ ) {
@@ -1668,9 +1620,9 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
                                     sense_buf[7] = 0;  /* reset sense buffer's additional sense byte */
                                     xrc = do_req_sense(pr->fildes, sense_buf, sizeof(sense_buf));
                                     if ( (xrc == 0) && (retry_op == 0) ) {
-                                       strcpy(msg_str, " Unable to determine toc_length, errno = %d\n", errno );
-                                       if ( errno <= sys_nerr )
-                                          strcat(msg_str, sys_errlist[errno]);
+                                       sprintf(tmp_str, " Unable to determine toc_length, errno = %d\n", errno );
+                                       strcpy(msg_str, tmp_str);
+                                          strcat(msg_str, strerror(errno));
                                           strcat(msg_str, "\n  Request Sense Data:");
                                           sens_len = (8 + sense_buf[7]);
                                              for ( i = 0; i < sens_len; i++ ) {
@@ -1765,8 +1717,7 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
             xrc = do_req_sense(pr->fildes, sense_buf, sizeof(sense_buf));
             if ( (xrc == 0) && (retry_op == 0) ) {
                strcpy(msg_str, " read table of contents error - ");
-               if ( errno <= sys_nerr )
-                  strcat(msg_str, sys_errlist[errno]);
+                  strcat(msg_str, strerror(errno));
                strcat(msg_str, "\n  Request Sense Data:");
                sens_len = (8 + sense_buf[7]);
                for ( i = 0; i < sens_len; i++ ) {
@@ -1816,8 +1767,7 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
             xrc = do_req_sense(pr->fildes, sense_buf, sizeof(sense_buf));
             if ( (xrc == 0) && (retry_op == 0) ) {
                strcpy(msg_str, " read table of contents error - ");
-               if ( errno <= sys_nerr )
-                  strcat(msg_str, sys_errlist[errno]);
+                  strcat(msg_str, strerror(errno));
                strcat(msg_str, "\n  Request Sense Data:");
                sens_len = (8 + sense_buf[7]);
                for ( i = 0; i < sens_len; i++ ) {
@@ -2048,7 +1998,7 @@ int get_disc_capacity(struct htx_data *ps, struct ruleinfo *pr,
 /***************************************************************************/
 /* HALT audio multimedia operation in progress                             */
 /***************************************************************************/
-void halt_audio_mm(int fildes)
+int halt_audio_mm(int fildes)
 {
  int    rc;
 #ifndef __HTX_LINUX__
@@ -2059,28 +2009,30 @@ void halt_audio_mm(int fildes)
 #else
  rc = ioctl(fildes, CDROMSTOP, 0);
 #endif
+ return (rc);
 }
 
 /***************************************************************************/
 /* HALT scsi play audio operation in progress                              */
 /***************************************************************************/
-void halt_audio_cdrom(int fildes)
-{
 #ifndef __HTX_LINUX__
-   int    rc, i;
+int halt_audio_cdrom(int fildes)
+{
+   int    rc = 0, i;
    struct sc_iocmd iocmd_buf;
 
    init_iocmd(&iocmd_buf);
    iocmd_buf.command_length = 6;
    iocmd_buf.scsi_cdb[0] = 0x1b;
    rc = ioctl(fildes, CDIOCMD, &iocmd_buf);
-#endif
+   return(rc);
 }
+#endif
 
 /**************************************************************************/
 /* Execute a system command from a pseudo command line                    */
 /**************************************************************************/
-do_cmd(struct htx_data *ps, struct ruleinfo *pr)
+int do_cmd(struct htx_data *ps, struct ruleinfo *pr)
 {
    int    a, b, c, d, rc = 0, filedes;
    char   tmsg[600], cmd_line[300], msg[650];
@@ -2145,7 +2097,7 @@ do_cmd(struct htx_data *ps, struct ruleinfo *pr)
       sprintf(msg, "Command to be Executed > \n %s\n", cmd_line);
       hxfmsg(ps, 0, INFO, msg);
    }
-   if ( rc = system(cmd_line) != 0 ) {
+   if ((rc = system(cmd_line)) != 0 ) {
       if ( (filedes = open(filenam, O_RDONLY)) == -1 ) {
          sprintf(msg, "Command FAILED rc = %d > \n No Error Information "
                       "returned from command:\n %s\n",

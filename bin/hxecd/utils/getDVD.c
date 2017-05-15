@@ -17,7 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-static char sccsid[] = "@(#)16  1.12.4.2  src/htx/usr/lpp/htx/bin/hxecd/utils/getDVD.c, exer_cd, htxubuntu 7/29/14 23:35:55";
+/* static char sccsid[] = "@(#)16  1.12.4.2  src/htx/usr/lpp/htx/bin/hxecd/utils/getDVD.c, exer_cd, htxubuntu 7/29/14 23:35:55"; */
 
 /******************************************************************************
  *   COMPONENT_NAME: EXER_CD
@@ -473,7 +473,7 @@ FILE *fp;
 #endif
 
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 
 #ifndef __HTX_LINUX__
