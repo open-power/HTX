@@ -1,22 +1,18 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/* 
- * Copyright 2003,2016 IBM International Business Machines Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
-/* @(#)66	1.3  src/htx/usr/lpp/htx/bin/hxerng/hxerng.h, exer_rng, htx61Q 3/9/11 00:36:42 */
+/* IBM_PROLOG_BEGIN_TAG                                                   */
+/* This is an automatically generated prolog.                             */
+/*                                                                        */
+/* htx72F src/htx/usr/lpp/htx/inc/hxerng.h 1.3                            */
+/*                                                                        */
+/* Licensed Materials - Property of IBM                                   */
+/*                                                                        */
+/* COPYRIGHT International Business Machines Corp. 2011,2017              */
+/* All Rights Reserved                                                    */
+/*                                                                        */
+/* US Government Users Restricted Rights - Use, duplication or            */
+/* disclosure restricted by GSA ADP Schedule Contract with IBM Corp.      */
+/*                                                                        */
+/* IBM_PROLOG_END_TAG                                                     */
+/* %Z%%M%       %I%  %W% %G% %U%                                          */
 
 #ifndef _HXERNG_H_
 #define _HXERNG_H_
@@ -38,10 +34,10 @@
 #endif
 
 /* HTX related header files */
-#include <hxihtx64.h>
+#include "hxihtx64.h"
 
-/* Random testing function related header files */
-#include "test_utils.h"
+/* Random testing function related header files
+#include "test_utils.h" */
 
 #ifdef __HTX_LINUX__
 #else
@@ -60,11 +56,11 @@ struct dev_info {
 #define		EXTRA_THS	2
 
 #ifdef DEBUG
-#define DPRINT fprintf
-#define FFLUSH fflush
+#define DPRINT(x, format, ...) fprintf(x, format, ##__VA_ARGS__)
+#define FFLUSH(x) fflush(x)
 #else
-#define DPRINT
-#define FFLUSH
+#define DPRINT(x, format, ...)
+#define FFLUSH(x)
 #endif
 
 /* Definition of all types of tests */
@@ -84,6 +80,7 @@ struct dev_info {
 #define		RANDOM_EXCURSIONS_VARIANT			13
 #define		SERIAL								14
 #define		LINEAR_COMPLEXITY					15
+#define		RNG_RETRY							50
 
 /* Shared seg key */
 #define		BIT_SHM_KEY			0x10010000
@@ -110,6 +107,8 @@ struct rule_parameters {
 	int linearComplexity_sequence_len;
 	int tests_to_run[NUM_TESTS];
 	int num_oper;
+	char rnd_num_type[20];
+	char rnd_32[5];
 };
 
 /* function pointer for all the client functions */
@@ -120,18 +119,39 @@ void sigusr1_hdl(void);
 void clean_up(void);
 int check_rng_available(void);
 int allocate_mem(void);
-int read_rf(void);
 int parse_line(char *);
 int get_line( char *, int, FILE *, char, int *);
 int get_rule(int *, FILE *, struct rule_parameters *);
 int get_PVR(void);
-unsigned long getPvr(void);
-
+int read_rf(void);
+int apply_rf_default(void);
 
 unsigned long long read_rn(void);
+void read_rn_32_bit(unsigned long long *temp);
+void read_rn_64_bit(unsigned long long *temp);
+void read_rn_raw(unsigned long long *temp);
+void read_rn_for_p8_and_earlier(unsigned long long *temp);
 int read_rn_func(void *);
 int convert_bit_2_byte(void *);
+extern int get_cpu_version(void);
+extern int get_true_cpu_version(void);
+
 #ifdef __HTX_OPEN_SOURCE__
+double Frequency(char *, int);
+double BlockFrequency(char *, int, int);
+double Runs(char *, int);
+double Serial(char *, int, int);
+double Universal(char *, int);
+double LongestRunOfOnes(char *, int);
+double Rank(char *, int);
+double LinearComplexity(char *, int, int);
+double DiscreteFourierTransform(char *, int);
+double CumulativeSums(char *, int);
+double ApproximateEntropy(char *, int, int);
+double NonOverlappingTemplateMatchings(char *, int, int);
+double OverlappingTemplateMatchings(char *, int, int);
+double RandomExcursions(char *, int);
+double RandomExcursionsVariant(char *, int);
 int freq(void *);
 int block_freq(void *);
 int runs(void *);
@@ -148,7 +168,11 @@ int random_excursion_var(void *);
 int serial(void *);
 int linear_complexity(void *);
 #endif
-int h_cop_random_k(caddr_t *, caddr_t *);
+
+int h_cop_random_k(caddr_t, caddr_t);
+extern unsigned long long read_rn_32(void);
+extern unsigned long long read_rn_64_cond(void);
+extern unsigned long long read_rn_64_raw(void);
 
 /* Global string to print messages */
 char msg[1000];

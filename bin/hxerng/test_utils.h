@@ -1,15 +1,7 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * This software was developed at the National Institute of Standards and Technology
- * by employees of the Federal Government in the course of their official duties.
- * Pursuant to title 17 Section 105 of the United States Code this software is not
- * subject to copyright protection and is in the public domain. The NIST Statistical
- * Test Suite is an experimental system. NIST assumes no responsibility whatsoever
- * for its use by other parties, and makes no guarantees, expressed or implied, about
- * its quality, reliability, or any other characteristic. We would appreciate
- * acknowledgment if the software is used.
- */
-/* IBM_PROLOG_END_TAG */
+#include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+
 
 #ifndef _TEST_UTILS_H_
 #define _TEST_UTILS_H_ 1
@@ -107,6 +99,21 @@ typedef unsigned char	BitSequence;
               U T I L I T Y  F U N C T I O N  P R O T O T Y P E S 
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+int freq(void *);
+int block_freq(void *);
+int runs(void *);
+int longest_run_of_ones(void *);
+int rank(void *);
+int dft(void *);
+int non_overlapping_tm(void *);
+int overlapping_tm(void *);
+int universal(void *);
+int approx_entropy(void *);
+int cusum(void *);
+int random_excursion(void *);
+int random_excursion_var(void *);
+int serial(void *);
+int linear_complexity(void *);
 int		displayGeneratorOptions(void);
 int		generatorOptions(char** streamFile);
 void	chooseTests(void);

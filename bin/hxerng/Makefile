@@ -5,8 +5,7 @@ TARGET= hxerng
 LDFLAGS +=
 
 OBJ_SUFF=.o
-OBJECTS = test_utils${OBJ_SUFF} \
-                  hxerng${OBJ_SUFF} 
+OBJECTS = test_utils${OBJ_SUFF} p9_darn${OBJ_SUFF} hxerng${OBJ_SUFF} 
  
 SRCS = $(patsubst %.o, %.c, $(OBJECTS))
 

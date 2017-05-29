@@ -1,18 +1,4 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * This software was developed at the National Institute of Standards and Technology
- * by employees of the Federal Government in the course of their official duties.
- * Pursuant to title 17 Section 105 of the United States Code this software is not
- * subject to copyright protection and is in the public domain. The NIST Statistical
- * Test Suite is an experimental system. NIST assumes no responsibility whatsoever
- * for its use by other parties, and makes no guarantees, expressed or implied, about
- * its quality, reliability, or any other characteristic. We would appreciate
- * acknowledgment if the software is used.
- */
-/* IBM_PROLOG_END_TAG */
-
-
-#include "hxerng.h"  
+#include "test_utils.h"  
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
                 A P P R O X I M A T E  E N T R O P Y   T E S T
@@ -1857,7 +1843,7 @@ void __ogg_fdcosqb(int n,double *x,double *wsave,int *ifac)
 
 double DiscreteFourierTransform(char *epsilon, int n)
 {
-	double	p_value, upperBound, percentile, N_l, N_o, d, *m, *X, *wsave, *ifac;
+	double	p_value, upperBound, N_l, N_o, d, *m, *X, *wsave, *ifac;
 	int		i, count;
 	
 	if ( ((X = (double*) calloc(n,sizeof(double))) == NULL) ||
@@ -1881,8 +1867,8 @@ double DiscreteFourierTransform(char *epsilon, int n)
 	for ( i=0; i<n; i++ )
 		X[i] = 2*(int)epsilon[i] - 1;
 	
-	__ogg_fdrffti(n, wsave, ifac);		/* INITIALIZE WORK ARRAYS */
-	__ogg_fdrfftf(n, X, wsave, ifac);	/* APPLY FORWARD FFT */
+	__ogg_fdrffti(n, wsave, (int *)ifac);		/* INITIALIZE WORK ARRAYS */
+	__ogg_fdrfftf(n, X, wsave, (int *)ifac);	/* APPLY FORWARD FFT */
 	
 	m[0] = sqrt(X[0]*X[0]);	    /* COMPUTE MAGNITUDE */
 	
@@ -1894,7 +1880,6 @@ double DiscreteFourierTransform(char *epsilon, int n)
 	for ( i=0; i<n/2; i++ )
 		if ( m[i] < upperBound )
 			count++;
-	percentile = (double)count/(n/2)*100;
 	N_l = (double) count;       /* number of peaks less than h = sqrt(3*n) */
 	N_o = (double) 0.95*n/2.0;
 	d = (N_l - N_o)/sqrt(n/2.0*0.95*0.05);
