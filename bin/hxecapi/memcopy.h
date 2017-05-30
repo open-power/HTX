@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <ctype.h>
+#include <libgen.h>
 #include <unistd.h>
 
 #ifdef _64BIT_

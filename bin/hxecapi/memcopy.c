@@ -119,7 +119,7 @@ void check_errors (struct htx_data * htx_d, struct wed *wed0)
 
 void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_lines, int response_lines, int control_lines)
 {
-    uint64_t trace_id, last_time, trace_time;
+    uint64_t trace_id, trace_time;
     uint64_t tdata0, tdata1, tdata2;
     int rc;
     int command_lines_outstanding = command_lines;
@@ -129,8 +129,6 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
 
     //trace_id = 0x8000C00000000000ull;
     trace_id = 0x8000C00000000000;//rblack changing this line
-
-    last_time = 0;
 
     sprintf (msg, "Command events:\n");
     hxfmsg(htx_d, -1, HTX_HE_SOFT_ERROR, msg);
@@ -172,7 +170,6 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
     	rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata1);
 	    rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata2);
     	command_lines_outstanding = command_lines_outstanding - 1;
-	    last_time = trace_time;
     	trace_time = (tdata0 >> 24) & 0xffffffffffull;
 
 	    sprintf (msg,"0x%010llx:", (long long) trace_time);
@@ -181,7 +178,6 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
     printf ("\n");
 
     ++trace_id;
-    last_time = 0;
 
     sprintf (msg,"Response events:\n");
 	hxfmsg(htx_d, -1, HTX_HE_SOFT_ERROR, msg);
@@ -209,7 +205,6 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
 	    rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata0);
     	rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata1);
 	    response_lines_outstanding = response_lines_outstanding - 1;
-    	last_time = trace_time;
 	    trace_time = (tdata0 >> 24) & 0xffffffffffull;
 
     	sprintf (msg,"0x%010llx:", (long long) trace_time);
@@ -219,7 +214,6 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
     printf ("\n");
 
     ++trace_id;
-    last_time = 0;
 
     sprintf (msg,"Control events:\n");
     hxfmsg(htx_d, -1, HTX_HE_SOFT_ERROR, msg);
@@ -256,7 +250,6 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
     	rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata1);
 	    rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata2);
     	control_lines_outstanding = control_lines_outstanding - 1;
-	    last_time = trace_time;
     	trace_time = (tdata0 >> 24) & 0xffffffffffull;
 	    sprintf (msg,"0x%010llx:", (long long) trace_time);
 		hxfmsg(htx_d, -1, HTX_HE_SOFT_ERROR, msg);
@@ -283,8 +276,6 @@ int main (int argc, char *argv[])
 	uint32_t stanza = 0, num_stanzas = 0;
 	uint32_t miscompare_count = 0;
     
-	uint64_t mmio_data;
-
 	/*
 	 * HTX Data Structure and rules file variable
 	 */
@@ -691,7 +682,8 @@ int main (int argc, char *argv[])
 					if(rc) {
 						htx_d.bad_writes += 1;
 					} else {
-						printf("**************************: oper = %d, r_buf=%#llx, w_buf=%#llx, bufsize=%#x \n",  oper, wed0->from, wed0->to, wed0->size);
+						printf("**************************: oper = %d, r_buf=%#llx, w_buf=%#llx, bufsize=%#lx \n",  oper, (unsigned long long)wed0->from, 
+                                                       (unsigned long long)wed0->to, wed0->size);
 
 	                    htx_d.good_writes += 1;
     	                htx_d.bytes_writ += wed0->size;

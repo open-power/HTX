@@ -146,7 +146,7 @@ int
 main (int argc, char *argv[])
 {
    int    done, i, rc, new_num_oper;
-   char   bad_rule, dev_type[40], msg[220], tmp_msg[80], kdblevel[4];
+   char   dev_type[40], msg[220], tmp_msg[80], kdblevel[4];
    char   *rptr, *wptr;             /* read / write buffer pointers   */
    struct ruleinfo rule_info;
    struct htx_data htx_info;
@@ -211,8 +211,7 @@ main (int argc, char *argv[])
       strcpy(msg, "Error opening rules file - ");
       strcat(msg, rules_file_name);
       strcat(msg, "\n");
-      if ( errno <= sys_nerr )
-         strcat(msg, sys_errlist[errno]);
+      strcat(msg, strerror(errno));
       strcat(msg, "\n");
       hxfmsg(&htx_info, errno, SYSERR, msg);
       exit(3);
@@ -262,11 +261,9 @@ main (int argc, char *argv[])
 #endif
          strcpy(msg, "Media is write protected. Opening device in READ "
                      "ONLY mode \n");
-         if ( errno <= sys_nerr ) {
-            sprintf(tmp_msg, " System error number value : (%d) %s.\n",
-                    errno, sys_errlist[errno]);
-            strcat(msg, tmp_msg);
-         }
+         sprintf(tmp_msg, " System error number value : (%d) %s.\n",
+                    errno, strerror(errno));
+         strcat(msg, tmp_msg);
          hxfmsg(&htx_info, 0, INFO, msg);
          Open_Mode = O_RDONLY;              /*  set open mode for read only  */
          rule_info.fildes = open(htx_info.sdev_id, Open_Mode);
@@ -276,8 +273,7 @@ main (int argc, char *argv[])
       strcpy(msg, "Open error on device - ");
       strcat(msg, htx_info.sdev_id);
       strcat(msg, "\n");
-      if (errno <= sys_nerr)
-         strcat(msg, sys_errlist[errno]);
+      strcat(msg, strerror(errno));
       strcat(msg, "\n");
       hxfmsg(&htx_info, errno, SYSERR, msg);
       exit(5);
@@ -285,12 +281,10 @@ main (int argc, char *argv[])
    st_prule_info = &rule_info;        /* pointer to active rule_info struct */
    rule_info.tot_blks = 100000000;                 /* Max tape blocks       */
 
-   bad_rule = 'n';                       /* validity check all rule stanzas */
    cnt = 0;
    while ( (rc = get_rule(&htx_info, &rule_info, rules_file_name)) != EOF ) {
      cnt++;
      if ( rc == 1 ) {
-        bad_rule = 'y';
         exit(4);
      }
    }
@@ -329,7 +323,6 @@ get_tape_config( rule_info.fildes, &htx_info );
 	 */
 /*#ifndef __HTX_LINUX__*/
 	 if(random_blksize)	 {
-		int blksize;
 		if((rc=randomize_fixedblk(&htx_info, &rule_info))< 0){
 	   		sprintf(msg, "Block size couldn't be set to random value\n");
 			hxfmsg(&htx_info, rc, HARD, msg);
@@ -347,7 +340,6 @@ get_tape_config( rule_info.fildes, &htx_info );
 /*#ifndef __HTX_LINUX__*/
 		if(random_blksize && (strncmp(rule_info.oper, "VBS", 3) != 0) && rule_info.num_blks >=0 ) {
 			unsigned long long expected_capacity;
-			int tmp1;
 
 			/*
 			 * If user specified too many blocks which multiplied by BLKSIZE, exceeds total tape capacity,
@@ -405,20 +397,20 @@ get_tape_config( rule_info.fildes, &htx_info );
             }
 
             if( bus_width ) {
-				sprintf(msg,"Buster pattern malloc'ed wptr = %x, rptr = %x\n", wptr, rptr);
+				sprintf(msg,"Buster pattern malloc'ed wptr = %llx, rptr = %llx\n", (unsigned long long)wptr, (unsigned long long)rptr);
 				hxfmsg(&htx_info, 0, INFO, msg);
 
-				bufrem = ((unsigned) wptr ) % bus_width;
+				bufrem = (int)((unsigned long long) wptr  % bus_width);
 				if( bufrem != 0 ) {
 					wptr = wptr + ( bus_width - bufrem );
 				}
 
-				bufrem = ((unsigned) rptr ) % bus_width;
+				bufrem = (int)((unsigned long long) rptr  % bus_width);
 				if( bufrem != 0 ) {
 					rptr = rptr + ( bus_width - bufrem );
 				}
 
-				sprintf(msg,"Buster pattern aligned wptr = %x, rptr = %x\n", wptr, rptr);
+				sprintf(msg,"Buster pattern aligned wptr = %llx, rptr = %llx\n", (unsigned long long)wptr, (unsigned long long)rptr);
 				hxfmsg(&htx_info, 0, INFO, msg);
 			}
          }
@@ -454,8 +446,7 @@ get_tape_config( rule_info.fildes, &htx_info );
          fclose(fptr);
          if ( (fptr = fopen(pipe_name, "r")) == NULL ) {
             strcpy(msg, "error opening pipe file - ");
-            if ( errno <= sys_nerr )
-               strcat(msg, sys_errlist[errno]);
+            strcat(msg, strerror(errno));
             strcat(msg, "\n");
             hxfmsg(&htx_info, errno, SYSERR, msg);
             return(1);
@@ -468,8 +459,7 @@ get_tape_config( rule_info.fildes, &htx_info );
          signal_flag = 'N';
          if ( (fptr = fopen(rules_file_name, "r")) == NULL ) {
             strcpy(msg, "error opening rules file - ");
-            if ( errno <= sys_nerr )
-               strcat(msg, sys_errlist[errno]);
+            strcat(msg, strerror(errno));
             strcat(msg, "\n");
             hxfmsg(&htx_info, errno, SYSERR, msg);
             return(1);
@@ -491,8 +481,7 @@ get_tape_config( rule_info.fildes, &htx_info );
       strcpy(msg, "Close error on ");
       strcat(msg, htx_info.sdev_id);
       strcat(msg, " at exerciser termination.\n");
-      if ( errno <= sys_nerr )
-         strcat(msg, sys_errlist[errno]);
+      strcat(msg, strerror(errno));
       strcat(msg, "\n");
       hxfmsg(&htx_info, errno, HARD, msg);
    }
@@ -511,7 +500,7 @@ finish_msg(struct htx_data *phtx_info, char *msg_text)
       if ( tape_error_code == 900 )
          strcat(msg_text, "Not enough data returned on a READ");
       else
-         strcat(msg_text, sys_errlist[tape_error_code]);
+         strcat(msg_text, strerror(tape_error_code));
       strcat(msg_text, "\nExerciser will sleep 7 seconds then "
                        "attempt a restart.\n");
    } else
@@ -578,9 +567,9 @@ start_msg(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   else if ( strcmp(prule_info->oper, "RP") == 0 )
       strcpy(cmd_function, "Adante Read Tape Position");
   else if ( strcmp(prule_info->oper, "ASF") == 0 )
-      strcmp(cmd_function, "Adante Skip File Marks");
+      strcpy(cmd_function, "Adante Skip File Marks");
   else if ( strcmp(prule_info->oper, "ASR") == 0 )
-      strcmp(cmd_function, "Adante Skip Records");
+      strcpy(cmd_function, "Adante Skip Records");
   else if ( strcmp(prule_info->oper, "ADUL") == 0 )
       strcpy(cmd_function, "Adante Serially Unload and Write Tapes");
   else if ( strcmp(prule_info->oper, "TWIE") == 0 )
@@ -906,10 +895,9 @@ restore_tape_config(int arg1, void *arg2)
 static void
 create_scsi_map(struct htx_data *htx_info)
 {
-	int fd,rc=0,count=0,scsi_id=0,st_id=0;
+	int scsi_id=0,st_id=0;
 	struct scsi_mapping *tmp;
 	char tmp_str[80], str[80],x[32];
-	char ch;
 	FILE* fp;
 
 
@@ -1057,7 +1045,7 @@ void get_tape_config( int fildes, struct htx_data *pHTX )
 	#define RBL_REPLY_LEN 6
 
 	char rbuf[RBL_REPLY_LEN] = {0};
-	char cdb[RBL_CMD_LEN] = {RBL_CMD_CODE, 0, 0, 0, 0, 0 };
+	unsigned char cdb[RBL_CMD_LEN] = {RBL_CMD_CODE, 0, 0, 0, 0, 0 };
 
 	unsigned int rbl_gran, rbl_l_limit, rbl_m_limit;
 

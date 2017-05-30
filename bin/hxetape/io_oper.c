@@ -135,10 +135,10 @@ static char		*sense_buf, *data_buffer;
 static struct 	sc_iocmd iocmd_buf;
 static struct 	scsi_iocmd fiocmd_buf;
 extern int		found_fscsi;
+static int buffer_initialized = 0;
 #endif
 extern int random_blksize;
 extern double 	total_bytes;
-static int buffer_initialized = 0;
 
 /* Support for SIOC_PASSTHRU_COMMAND for fscsi drives */
 #ifndef __HTX_LINUX__
@@ -394,8 +394,7 @@ diag_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
      strcpy(tmp_str, "Close error on ");
      strcat(tmp_str, phtx_info->sdev_id);
      strcat(tmp_str, " at start of Diag rule.\n");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      hxfmsg(phtx_info, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -515,8 +514,7 @@ diag_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
            strcpy(tmp_str, "Close error on ");
            strcat(tmp_str, phtx_info->sdev_id);
            strcat(tmp_str, " at end of Diag rule.\n");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str,"\n");
            hxfmsg(phtx_info, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -558,8 +556,7 @@ diag_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
 	strcpy(tmp_str, "Close error on ");
 	strcat(tmp_str, phtx_info->sdev_id);
 	strcat(tmp_str, " at start of Diag rule.\n");
-	if ( errno <= sys_nerr )
-		strcat(tmp_str, sys_errlist[errno]);
+	strcat(tmp_str, strerror(errno));
 	strcat(tmp_str, "\n");
 	hxfmsg(phtx_info, errno, HARD, tmp_str);
 	tape_error_code = errno;
@@ -978,8 +975,7 @@ prt_req_sense(struct htx_data *phtx_info, struct ruleinfo * prule_info,
      strcpy(tmp_str, "Close error on ");
      strcat(tmp_str, phtx_info->sdev_id);
      strcat(tmp_str, " at start of Request Sense rule.\n");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str,"\n");
      hxfmsg(phtx_info, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -1108,8 +1104,7 @@ prt_req_sense(struct htx_data *phtx_info, struct ruleinfo * prule_info,
 			strcpy(tmp_str, "Close error on ");
 			strcat(tmp_str, phtx_info->sdev_id);
 			strcat(tmp_str, " at end of Request Sense rule.\n");
-			if ( errno <= sys_nerr )
-				strcat(tmp_str, sys_errlist[errno]);
+			strcat(tmp_str, strerror(errno));
 			strcat(tmp_str,"\n");
 			hxfmsg(phtx_info, errno, HARD, tmp_str);
 			tape_error_code = errno;
@@ -1150,8 +1145,7 @@ prt_req_sense(struct htx_data *phtx_info, struct ruleinfo * prule_info,
 		strcpy(tmp_str, "Close error on ");
 		strcat(tmp_str, phtx_info->sdev_id);
 		strcat(tmp_str, " at start of Diag rule.\n");
-		if ( errno <= sys_nerr )
-			strcat(tmp_str, sys_errlist[errno]);
+		strcat(tmp_str, strerror(errno));
 		strcat(tmp_str, "\n");
 		hxfmsg(phtx_info, errno, HARD, tmp_str);
 		tape_error_code = errno;
@@ -1269,11 +1263,9 @@ get_dd_blksize(char *sdev_id, char *dev_type, struct htx_data *phtx_info,
      use_default_blksiz = 1;         /* if any error then use default blksiz */
      sprintf(msg, "Open on device %s failed when trying to acquire Blocksize.\n"
              ,sdev_id);
-     if ( errno <= sys_nerr ) {
-        sprintf(tmp_str, " System error number value : (%d) %s.\n",
-                errno, sys_errlist[errno]);
-        strcat(msg,tmp_str);
-     }
+     sprintf(tmp_str, " System error number value : (%d) %s.\n",
+                errno, strerror(errno));
+     strcat(msg,tmp_str);
      hxfmsg(phtx_info, 0, HARD, msg);
   } else {
      dev_info.un.scmt.blksize = 0;
@@ -1295,8 +1287,7 @@ get_dd_blksize(char *sdev_id, char *dev_type, struct htx_data *phtx_info,
         strcpy(tmp_str, "Close error on ");
         strcat(tmp_str, sdev_id);
         strcat(tmp_str, " at end of get blocksize function.\n");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str,"\n");
         hxfmsg(phtx_info, errno, HARD, tmp_str);
      }
@@ -1334,8 +1325,7 @@ get_dd_blksize(char *sdev_id, char *dev_type, struct htx_data *phtx_info,
         strcpy(tmp_str, "open error on ");
         strcat(tmp_str, sdev_id);
         strcat(tmp_str, " at end of get blocksize function.\n");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str,"\n");
         hxfmsg(phtx_info, errno, HARD, tmp_str);
   }
@@ -1353,8 +1343,7 @@ get_dd_blksize(char *sdev_id, char *dev_type, struct htx_data *phtx_info,
         strcpy(tmp_str, "Close error on ");
         strcat(tmp_str, sdev_id);
         strcat(tmp_str, " at end of get blocksize function.\n");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str,"\n");
         hxfmsg(phtx_info, errno, HARD, tmp_str);
   }
@@ -1380,8 +1369,7 @@ set_dbug(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      strcpy(tmp_str, "Close error on ");
      strcat(tmp_str, phtx_info->sdev_id);
      strcat(tmp_str, " at Set DBUG operation.\n");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      hxfmsg(phtx_info, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -1434,12 +1422,11 @@ set_dbug(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         if ( /*rc == -1*/ 0 ) {
         	strcpy(tmp_str, "Close error on ");
 	        strcat(tmp_str, phtx_info->sdev_id);
-            strcat(tmp_str, " at Set DBUG rule.\n");
-            if ( errno <= sys_nerr )
-                 strcat(tmp_str, sys_errlist[errno]);
-    	          strcat(tmp_str, "\n");
-        	      hxfmsg(phtx_info, errno, HARD, tmp_str);
-            	  tape_error_code = errno;
+                strcat(tmp_str, " at Set DBUG rule.\n");
+                strcat(tmp_str, strerror(errno));
+    	        strcat(tmp_str, "\n");
+                hxfmsg(phtx_info, errno, HARD, tmp_str);
+                tape_error_code = errno;
 	         }
 			else {
             	prule_info->fildes = open(phtx_info->sdev_id, Open_Mode);
@@ -1597,15 +1584,15 @@ VBS_Write(struct htx_data *pHTX, struct ruleinfo *pRule,
   }
 
   if( bus_width ) {
-    sprintf(sWork,"Buster pattern malloc'ed Wbuf = %x\n", Wbuf);
+    sprintf(sWork,"Buster pattern malloc'ed Wbuf = %llx\n", (unsigned long long)Wbuf);
     hxfmsg(pHTX, 0, INFO, sWork);
 
-	bufrem = ((unsigned) Wbuf ) % bus_width;
+	bufrem = (int)((unsigned long long) Wbuf  % bus_width);
 	if( bufrem != 0 ) {
 		Wbuf = Wbuf + ( bus_width - bufrem );
 	}
 
-	sprintf(sWork,"Buster pattern aligned Wbuf = %x\n", Wbuf);
+	sprintf(sWork,"Buster pattern aligned Wbuf = %llx\n", (unsigned long long)Wbuf);
 	hxfmsg(pHTX, 0, INFO, sWork);
   }
 
@@ -1793,15 +1780,15 @@ VBS_Read(struct htx_data *pHTX, struct ruleinfo *pRule,
   }
 
   if( bus_width ) {
-    sprintf(sWork,"Buster pattern malloc'ed Rbuf = %x\n", Rbuf);
+    sprintf(sWork,"Buster pattern malloc'ed Rbuf = %llx\n", (unsigned long long)Rbuf);
     hxfmsg(pHTX, 0, INFO, sWork);
 
-	bufrem = ((unsigned) Rbuf ) % bus_width;
+	bufrem = (int)((unsigned long long) Rbuf  % bus_width);
 	if( bufrem != 0 ) {
 		Rbuf = Rbuf + ( bus_width - bufrem );
 	}
 
-	sprintf(sWork,"Buster pattern aligned Rbuf = %x\n", Rbuf);
+	sprintf(sWork,"Buster pattern aligned Rbuf = %llx\n", (unsigned long long)Rbuf);
 	hxfmsg(pHTX, 0, INFO, sWork);
   }
 
@@ -1963,20 +1950,20 @@ VBS_Readc(struct htx_data *pHTX, struct ruleinfo *pRule,
   }
 
   if( bus_width ) {
-    sprintf(sWork,"Buster pattern malloc'ed Rbuf = %x, Wbuf = %x\n", Rbuf, Wbuf);
+    sprintf(sWork,"Buster pattern malloc'ed Rbuf = %llx, Wbuf = %llx\n", (unsigned long long)Rbuf, (unsigned long long)Wbuf);
     hxfmsg(pHTX, 0, INFO, sWork);
 
-	bufrem = ((unsigned) Wbuf ) % bus_width;
+	bufrem = (int)((unsigned long long) Wbuf  % bus_width);
 	if( bufrem != 0 ) {
 		Wbuf = Wbuf + ( bus_width - bufrem );
 	}
 
-	bufrem = ((unsigned) Rbuf ) % bus_width;
+	bufrem = (int)((unsigned long long) Rbuf % bus_width);
 	if( bufrem != 0 ) {
 		Rbuf = Rbuf + ( bus_width - bufrem );
 	}
 
-	sprintf(sWork,"Buster pattern aligned Rbuf = %x, Wbuf = %x\n", Rbuf, Wbuf);
+	sprintf(sWork,"Buster pattern aligned Rbuf = %llx, Wbuf = %llx\n", (unsigned long long)Rbuf, (unsigned long long)Wbuf);
 	hxfmsg(pHTX, 0, INFO, sWork);
   }
 
@@ -2071,7 +2058,7 @@ VBS_Readc(struct htx_data *pHTX, struct ruleinfo *pRule,
         }
       }
           /* Compare against what we expected... */
-      if ( (rc=cmp_buf(pHTX, Wbuf, Rbuf, num_bytes, misc_data)) !=NULL ) {
+      if ( (rc=cmp_buf(pHTX, Wbuf, Rbuf, num_bytes, misc_data)) != 0 ) {
          if ( crash_on_mis )
 	 {
 	    #ifndef __HTX_LINUX__
@@ -2082,7 +2069,7 @@ VBS_Readc(struct htx_data *pHTX, struct ruleinfo *pRule,
 	 sprintf(sWork, "VBS read: ******* miscompare error in readback!\n"
                         "loop #%d of %d, read %d bytes of %d expected.\n"
                         "VBS_last_write flag=%d, found_eot flag=%d\n"
-                        "Total bytes read (so far): %ld\n",
+                        "Total bytes read (so far): %lld\n",
                  loop_count, max_loops, bytes_read, num_bytes,
                  VBS_last_write, found_eot, pHTX->bytes_read);
          strcat(sWork, misc_data);
@@ -2139,8 +2126,7 @@ init_element(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( rc == -1 ) {
      phtx_info->bad_others = phtx_info->bad_others + 1;
      strcpy(tmp_str, "Adante Init Element Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2167,8 +2153,7 @@ read_status(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( rc == -1 ) {
      phtx_info->bad_others = phtx_info->bad_others + 1;
      strcpy(tmp_str, "Adante Read Element Status Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2201,8 +2186,7 @@ medium_load(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( rc == -1 ) {
      phtx_info->bad_others = phtx_info->bad_others + 1;
      strcpy(tmp_str, "Adante Move Medium Load Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror((errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2224,8 +2208,7 @@ medium_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( rc == -1 ) {
      phtx_info->bad_others = phtx_info->bad_others + 1;
      strcpy(tmp_str, "Adante Move Medium UnLoad Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2247,8 +2230,7 @@ loc_block(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( rc == -1 ) {
      phtx_info->bad_others = phtx_info->bad_others + 1;
      strcpy(tmp_str, "Adante Locate Block Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2270,8 +2252,7 @@ read_posit(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( rc == -1 ) {
      phtx_info->bad_others = phtx_info->bad_others + 1;
      strcpy(tmp_str, "Adante Read Position Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2302,8 +2283,7 @@ asearch_file(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                         " file skip operation - ");
      else
         strcpy(tmp_str, "Adante Backward File Skip Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2337,8 +2317,7 @@ asearch_rec(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                         "record skip operation - ");
      else
         strcpy(tmp_str, "Adante Record Skip Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      tape_error_code = errno;
   } else {
@@ -2372,16 +2351,14 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         continue_loop = 1;
         phtx_info->bad_writes = phtx_info->bad_writes + 1;
         strcpy(tmp_str, "Write to End-of-Tape Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
      } else if ( (errno == EBADF) && (Open_Mode == O_RDONLY) ) {
         continue_loop = 1;
         strcpy(tmp_str, "Write Error due to Write-Protected Media - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                      tmp_str);
@@ -2394,8 +2371,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            continue_loop = 1;
            phtx_info->bad_writes = phtx_info->bad_writes + 1;
            strcpy(tmp_str, "Write EOF Error after WEOT - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                    tmp_str);
@@ -2407,8 +2383,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
               continue_loop = 1;
               phtx_info->bad_writes = phtx_info->bad_writes + 1;
               strcpy(tmp_str, "Tape Unload Error - ");
-              if ( errno <= sys_nerr )
-                 strcat(tmp_str, sys_errlist[errno]);
+              strcat(tmp_str, strerror(errno));
               strcat(tmp_str, "\n");
               prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                       tmp_str);
@@ -2422,8 +2397,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                  strcpy(tmp_str, "Close error on ");
                  strcat(tmp_str, phtx_info->sdev_id);
                  strcat(tmp_str, " in Adante Unload Request Sense command.\n");
-                 if ( errno <= sys_nerr )
-                    strcat(tmp_str, sys_errlist[errno]);
+                 strcat(tmp_str, strerror(errno));
                  strcat(tmp_str,"\n");
                  hxfmsg(phtx_info, errno, HARD, tmp_str);
                  continue_loop = 1;
@@ -2433,8 +2407,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                                             SC_DIAGNOSTIC);
                  if ( prule_info->fildes == -1 ) {
                     strcpy(tmp_str, "Diagnostic Open Error - ");
-                    if ( errno <= sys_nerr )
-                       strcat(tmp_str, sys_errlist[errno]);
+                    strcat(tmp_str, strerror(errno));
                      strcat(tmp_str, "\n");
                      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                              tmp_str);
@@ -2456,8 +2429,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 							continue_loop = 1;
 							phtx_info->bad_others = phtx_info->bad_others + 1;
 							strcpy(tmp_str, "Request Sense Error - ");
-							if ( errno <= sys_nerr )
-								strcat(tmp_str, sys_errlist[errno]);
+							strcat(tmp_str, strerror(errno));
 							strcat(tmp_str, "\n");
 							prt_msg(phtx_info, prule_info, loop, pblk_num, errno,HARD, msg_str);
 							tape_error_code = errno;
@@ -2501,8 +2473,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 							continue_loop = 1;
 							phtx_info->bad_others = phtx_info->bad_others + 1;
 							strcpy(tmp_str, "Request Sense Error - ");
-							if ( errno <= sys_nerr )
-								strcat(tmp_str, sys_errlist[errno]);
+							strcat(tmp_str, strerror(errno));
 							strcat(tmp_str, "\n");
 							prt_msg(phtx_info, prule_info, loop, pblk_num, errno,HARD, msg_str);
 							tape_error_code = errno;
@@ -2539,8 +2510,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                     strcpy(tmp_str, "Close error on ");
                     strcat(tmp_str, phtx_info->sdev_id);
                     strcat(tmp_str, " at end of Request Sense rule.\n");
-                    if ( errno <= sys_nerr )
-                       strcat(tmp_str,sys_errlist[errno]);
+                    strcat(tmp_str, strerror(errno));
                     strcat(tmp_str, "\n");
                     hxfmsg(phtx_info, errno, HARD, tmp_str);
                     continue_loop = 1;
@@ -2549,8 +2519,7 @@ write_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                     prule_info->fildes = open(phtx_info->sdev_id,Open_Mode);
                     if ( prule_info->fildes == -1 ) {
                        strcpy(tmp_str, "Open Error in UnLoad Command - ");
-                       if ( errno <= sys_nerr )
-                          strcat(tmp_str, sys_errlist[errno]);
+                       strcat(tmp_str, strerror(errno));
                        strcat(tmp_str, "\n");
                        prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                                HARD, tmp_str);
@@ -2582,8 +2551,7 @@ twin_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 
   if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
      strcpy(tmp_str, "Error on Open in TimberWolf Initialize Element - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      rc = -1;
@@ -2597,8 +2565,7 @@ twin_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
             strcpy(tmp_str, "Close error on ");
             strcat(tmp_str, phtx_info->sdev_id);
             strcat(tmp_str, " at end of initialize element rule.\n");
-            if ( errno <= sys_nerr )
-               strcat(tmp_str, sys_errlist[errno]);
+            strcat(tmp_str, strerror(errno));
             strcat(tmp_str, "\n");
             hxfmsg(phtx_info, errno, HARD, tmp_str);
             tape_error_code = errno;
@@ -2606,8 +2573,7 @@ twin_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      } else {
          phtx_info->bad_others = phtx_info->bad_others + 1;
          strcpy(tmp_str, "TimberWolf Initialize Element Error - ");
-         if ( errno <= sys_nerr )
-            strcat(tmp_str, sys_errlist[errno]);
+         strcat(tmp_str, strerror(errno));
          strcat(tmp_str, "\n");
          prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
          tape_error_code = errno;
@@ -2616,8 +2582,7 @@ twin_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
             strcpy(tmp_str, "Close error on ");
             strcat(tmp_str, phtx_info->sdev_id);
             strcat(tmp_str, " at end of initialize element rule.\n");
-            if ( errno <= sys_nerr )
-               strcat(tmp_str, sys_errlist[errno]);
+            strcat(tmp_str, strerror(errno));
             strcat(tmp_str, "\n");
             hxfmsg(phtx_info, errno, HARD, tmp_str);
             tape_error_code = errno;
@@ -2644,8 +2609,7 @@ twps_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 
   if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
      strcpy(tmp_str, "TimberWolf Position Element Open Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2659,8 +2623,7 @@ twps_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      } else {
         phtx_info->bad_others = phtx_info->bad_others + 1;
         strcpy(tmp_str, "TimberWolf Position Element Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         sprintf(msg_str, "Position to Element command error - \n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
@@ -2671,8 +2634,7 @@ twps_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         strcpy(tmp_str, "Close error on ");
         strcat(tmp_str, phtx_info->sdev_id);
         strcat(tmp_str, " at end of position to element rule.\n");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         hxfmsg(phtx_info, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2704,8 +2666,7 @@ twrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 
   if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
      strcpy(tmp_str, "TimberWolf Read Element Status Open Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2780,8 +2741,7 @@ twrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         } else {
            phtx_info->bad_others = phtx_info->bad_others + 1;
            strcpy(tmp_str, "TimberWolf Read Element Status Error - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror((errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -2789,8 +2749,7 @@ twrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      } else {
         phtx_info->bad_others = phtx_info->bad_others + 1;
         strcpy(tmp_str, "TimberWolf Read Element Status Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2800,8 +2759,7 @@ twrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         strcpy(tmp_str, "Close error on ");
         strcat(tmp_str, phtx_info->sdev_id);
         strcat(tmp_str, " at end of read element status rule.\n");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror((errno));
         strcat(tmp_str, "\n");
         hxfmsg(phtx_info, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2834,8 +2792,7 @@ twmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      if ( rc == -1 ) {
         phtx_info->bad_others = phtx_info->bad_others + 1;
         strcpy(tmp_str, "TimberWolf UnLoad Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror((errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2845,8 +2802,7 @@ twmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( tape_error_code == 0 ) {
      if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
         strcpy(tmp_str, "TimberWolf Move Tape Open Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror((errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2861,8 +2817,7 @@ twmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         } else {
            phtx_info->bad_others = phtx_info->bad_others + 1;
            strcpy(tmp_str, "TimberWolf Move Medium Error - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror((errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -2872,8 +2827,7 @@ twmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            strcpy(tmp_str, "Close error on ");
            strcat(tmp_str, phtx_info->sdev_id);
            strcat(tmp_str, " at end of move medium rule.\n");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror((errno));
            strcat(tmp_str, "\n");
            hxfmsg(phtx_info, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -2907,8 +2861,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         phtx_info->bad_writes = phtx_info->bad_writes + 1;
         if ( errno == ENXIO ) {
            strcpy(tmp_str, "TimberWolf Write Error Past End-of-Media - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                         tmp_str);
@@ -2916,8 +2869,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            tape_error_code = errno;
         } else if ( (errno == EBADF) && (Open_Mode == O_RDONLY) ) {
            strcpy(tmp_str, "TimberWolf Write Error - Write-Protected Media - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror((errno));
            strcat(tmp_str, "\n");
            prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                         tmp_str);
@@ -2925,8 +2877,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            tape_error_code = errno;
         } else {
            strcpy(tmp_str, "TimberWolf Write Error - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
            continue_loop = 1;
@@ -2944,8 +2895,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            continue_loop = 1;
            phtx_info->bad_writes = phtx_info->bad_writes + 1;
            strcpy(tmp_str, "TimberWolf Write EOF Error after WEOT - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror((errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                    tmp_str);
@@ -2957,8 +2907,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
               continue_loop = 1;
               phtx_info->bad_writes = phtx_info->bad_writes + 1;
               strcpy(tmp_str, "TimberWolf Tape UnLoad Error - ");
-              if ( errno <= sys_nerr )
-                 strcat(tmp_str, sys_errlist[errno]);
+              strcat(tmp_str, strerror((errno));
               strcat(tmp_str, "\n");
               prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                       tmp_str);
@@ -2966,8 +2915,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            } else {
               if ( (sffd = open(prule_info->chs_file,O_RDWR | O_NDELAY)) < 0 ) {
                  strcpy(tmp_str, "TimberWolf Tape Open Error - ");
-                 if ( errno <= sys_nerr )
-                    strcat(tmp_str, sys_errlist[errno]);
+                 strcat(tmp_str, strerror((errno));
                  strcat(tmp_str, "\n");
                  prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                          tmp_str);
@@ -2998,8 +2946,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                     continue_loop = 1;
                     phtx_info->bad_others = phtx_info->bad_others + 1;
                     strcpy(tmp_str, "TimberWolf Request Sense Error - ");
-                    if ( errno <= sys_nerr )
-                       strcat(tmp_str, sys_errlist[errno]);
+                    strcat(tmp_str, strerror((errno));
                     strcat(tmp_str, "\n");
                     prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                             HARD, tmp_str);
@@ -3009,8 +2956,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                     strcpy(tmp_str, "Close error on ");
                     strcat(tmp_str, phtx_info->sdev_id);
                     strcat(tmp_str, " at end of tape unload rule.\n");
-                    if ( errno <= sys_nerr )
-                       strcat(tmp_str, sys_errlist[errno]);
+                    strcat(tmp_str, strerror((errno));
                     strcat(tmp_str, "\n");
                     hxfmsg(phtx_info, errno, HARD, tmp_str);
                     tape_error_code = errno;
@@ -3054,16 +3000,14 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
        continue_loop = 1;
        phtx_info->bad_writes = phtx_info->bad_writes + 1;
        strcpy(tmp_str, "TimberWolf Write EOT Error - ");
-       if ( errno <= sys_nerr )
-          strcat(tmp_str, sys_errlist[errno]);
+       strcat(tmp_str, strerror((errno));
        strcat(tmp_str, "\n");
        prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
        tape_error_code = errno;
     } else if ( (errno == EBADF) && (Open_Mode == O_RDONLY) ) {
        continue_loop = 1;
        strcpy(tmp_str, "TimberWolf Write Error - Write Protected Media - ");
-       if ( errno <= sys_nerr )
-          strcat(tmp_str, sys_errlist[errno]);
+       strcat(tmp_str, strerror((errno));
        strcat(tmp_str, "\n");
        prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                     tmp_str);
@@ -3076,8 +3020,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
           continue_loop = 1;
           phtx_info->bad_writes = phtx_info->bad_writes + 1;
           strcpy(tmp_str, "TimberWolf Write EOF Error after WEOT - ");
-          if ( errno <= sys_nerr )
-             strcat(tmp_str, sys_errlist[errno]);
+          strcat(tmp_str, strerror((errno));
           strcat(tmp_str, "\n");
           prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
           tape_error_code = errno;
@@ -3088,8 +3031,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
              continue_loop = 1;
              phtx_info->bad_writes = phtx_info->bad_writes + 1;
              strcpy(tmp_str, "TimberWolf Tape UnLoad Error - ");
-             if ( errno <= sys_nerr )
-                strcat(tmp_str, sys_errlist[errno]);
+             strcat(tmp_str, strerror((errno));
              strcat(tmp_str, "\n");
              prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                      tmp_str);
@@ -3098,8 +3040,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
              sleep(prule_info->u_sleep);
              if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
                 strcpy(tmp_str, "TimberWolf Open Error - ");
-                if ( errno <= sys_nerr )
-                   strcat(tmp_str, sys_errlist[errno]);
+                strcat(tmp_str, strerror((errno));
                 strcat(tmp_str, "\n");
                 prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                         tmp_str);
@@ -3131,8 +3072,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                    continue_loop = 1;
                    phtx_info->bad_others = phtx_info->bad_others + 1;
                    strcpy(tmp_str, "TimberWolf Request Sense Error - ");
-                   if ( errno <= sys_nerr )
-                      strcat(tmp_str, sys_errlist[errno]);
+                   strcat(tmp_str, strerror(errno));
                    strcat(tmp_str, "\n");
                    prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                            HARD, tmp_str);
@@ -3143,8 +3083,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                    strcpy(tmp_str, "Close error on ");
                    strcat(tmp_str, phtx_info->sdev_id);
                    strcat(tmp_str, " at end of move medium rule.\n");
-                   if ( errno <= sys_nerr )
-                      strcat(tmp_str, sys_errlist[errno]);
+                   strcat(tmp_str, strerror((errno));
                    strcat(tmp_str, "\n");
                    hxfmsg(phtx_info, errno, HARD, tmp_str);
                    tape_error_code = errno;
@@ -3180,8 +3119,7 @@ cdmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      if ( rc == -1 ) {
         phtx_info->bad_others = phtx_info->bad_others + 1;
         strcpy(tmp_str, "CdatWolf Error in UnLoad Command - ");
-        if ( errno <= sys_nerr )
-            strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -3191,8 +3129,7 @@ cdmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( tape_error_code == 0 ) {
      if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
         strcpy(tmp_str, "CdatWolf Open Error - ");
-        if ( errno <= sys_nerr )
-            strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -3207,8 +3144,7 @@ cdmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         } else {
            phtx_info->bad_others = phtx_info->bad_others + 1;
            strcpy(tmp_str, "CdatWolf Move Medium Error - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -3218,8 +3154,7 @@ cdmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            strcpy(tmp_str, "Close error on ");
            strcat(tmp_str, phtx_info->sdev_id);
            strcat(tmp_str, " at end of move medium rule.\n");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            hxfmsg(phtx_info, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -3252,8 +3187,7 @@ cdrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 
   if ( (sffd = open(prule_info->chs_file, O_RDWR|O_NDELAY)) < 0 ) {
      strcpy(tmp_str, "CdatWolf Open Error - ");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -3328,8 +3262,7 @@ cdrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         } else {
            phtx_info->bad_others = phtx_info->bad_others + 1;
            strcpy(tmp_str, "CdatWolf Element Status Error - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -3337,8 +3270,7 @@ cdrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      } else {
         phtx_info->bad_others = phtx_info->bad_others + 1;
         strcpy(tmp_str, "CdatWolf Element Status Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -3348,8 +3280,7 @@ cdrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         strcpy(tmp_str, "Close error on ");
         strcat(tmp_str, phtx_info->sdev_id);
         strcat(tmp_str, " at end of read element status rule.\n");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         hxfmsg(phtx_info, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -3378,8 +3309,7 @@ himove(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      strcpy(tmp_str, "Close error on ");
      strcat(tmp_str, phtx_info->sdev_id);
      strcat(tmp_str, " in Hidalgo Move Medium Command.\n");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      hxfmsg(phtx_info, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -3388,8 +3318,7 @@ himove(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                                 SC_DIAGNOSTIC);
      if ( prule_info->fildes == -1 ) {
         strcpy(tmp_str, "Hidalgo Open Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -3417,8 +3346,7 @@ himove(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 		if ( rc == -1 ) {
 			phtx_info->bad_others = phtx_info->bad_others + 1;
 			strcpy(tmp_str, "Hidalgo Move Medium Error - ");
-			if ( errno <= sys_nerr )
-				strcat(tmp_str, sys_errlist[errno]);
+			strcat(tmp_str, strerror(errno));
 			strcat(tmp_str, "\n");
 			prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
 													HARD, tmp_str);
@@ -3445,8 +3373,7 @@ himove(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 		if ( rc == -1 ) {
 			phtx_info->bad_others = phtx_info->bad_others + 1;
 			strcpy(tmp_str, "Hidalgo Move Medium Error - ");
-			if ( errno <= sys_nerr )
-				strcat(tmp_str, sys_errlist[errno]);
+			strcat(tmp_str, strerror(errno));
 			strcat(tmp_str, "\n");
 			prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
 													HARD, tmp_str);
@@ -3457,8 +3384,7 @@ himove(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 				strcpy(tmp_str, "Close error on ");
 				strcat(tmp_str, phtx_info->sdev_id);
 				strcat(tmp_str, " at end of Hidalgo Move Medium rule.\n");
-				if ( errno <= sys_nerr )
-					strcat(tmp_str, sys_errlist[errno]);
+				strcat(tmp_str, strerror(errno));
 				strcat(tmp_str, "\n");
 				hxfmsg(phtx_info, errno, HARD, tmp_str);
 				tape_error_code = errno;
@@ -3466,8 +3392,7 @@ himove(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 				prule_info->fildes = open(phtx_info->sdev_id, Open_Mode);
 				if ( prule_info->fildes == -1 ) {
 					strcpy(tmp_str, "Hidalgo Open Error - ");
-					if ( errno <= sys_nerr )
-						strcat(tmp_str, sys_errlist[errno]);
+					strcat(tmp_str, strerror((errno));
 					strcat(tmp_str, "\n");
 					prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
 																		tmp_str);
@@ -3498,8 +3423,7 @@ int hielem(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
      strcpy(tmp_str, "Close error on ");
      strcat(tmp_str, phtx_info->sdev_id);
      strcat(tmp_str, " in Hidalgo Read Element Status Command.\n");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      hxfmsg(phtx_info, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -3508,8 +3432,7 @@ int hielem(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
                                 SC_DIAGNOSTIC);
      if ( prule_info->fildes == -1 ) {
         strcpy(tmp_str, "Hidalgo Open Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -3543,8 +3466,7 @@ int hielem(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
 		}
         if ( rc == -1 ) {
            strcpy(tmp_str, "Hidalgo Read Element Status Error - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                    HARD, tmp_str);
@@ -3566,8 +3488,7 @@ int hielem(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
               strcpy(tmp_str, "Close error on ");
               strcat(tmp_str, phtx_info->sdev_id);
               strcat(tmp_str, " at end of Hidalgo Read Element rule.\n");
-              if ( errno <= sys_nerr )
-                 strcat(tmp_str, sys_errlist[errno]);
+              strcat(tmp_str, strerror(errno));
               strcat(tmp_str, "\n");
               hxfmsg(phtx_info, errno, HARD, tmp_str);
               tape_error_code = errno;
@@ -3575,8 +3496,7 @@ int hielem(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
               prule_info->fildes = open(phtx_info->sdev_id, Open_Mode);
               if ( prule_info->fildes == -1 ) {
                  strcpy(tmp_str, "Hidalgo Open Error - ");
-                 if ( errno <= sys_nerr )
-                    strcat(tmp_str, sys_errlist[errno]);
+                 strcat(tmp_str, strerror(errno));
                  strcat(tmp_str, "\n");
                  prt_msg(phtx_info,prule_info, loop, pblk_num, errno, HARD,
                          tmp_str);
@@ -3607,8 +3527,7 @@ int hiinit(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
      strcpy(tmp_str, "Close error on ");
      strcat(tmp_str, phtx_info->sdev_id);
      strcat(tmp_str, " in Hidalgo Initialize Element Command.\n");
-     if ( errno <= sys_nerr )
-        strcat(tmp_str, sys_errlist[errno]);
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      hxfmsg(phtx_info, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -3617,8 +3536,7 @@ int hiinit(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
                                 SC_DIAGNOSTIC);
      if ( prule_info->fildes == -1 ) {
         strcpy(tmp_str, "Hidalgo Open Error - ");
-        if ( errno <= sys_nerr )
-           strcat(tmp_str, sys_errlist[errno]);
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -3641,8 +3559,7 @@ int hiinit(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
 		}
         if ( rc == -1 ) {
            strcpy(tmp_str, "Hidalgo Initialize Element Status Error - ");
-           if ( errno <= sys_nerr )
-              strcat(tmp_str, sys_errlist[errno]);
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                    HARD, tmp_str);
@@ -3653,16 +3570,14 @@ int hiinit(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
               strcpy(tmp_str, "Close error on ");
               strcat(tmp_str, phtx_info->sdev_id);
               strcat(tmp_str, " at end of Hidalgo Init Element rule.\n");
-              if ( errno <= sys_nerr )
-                 strcat(tmp_str, sys_errlist[errno]);
+              strcat(tmp_str, strerror(errno));
               strcat(tmp_str, "\n");
               hxfmsg(phtx_info, errno, HARD, tmp_str);
            } else {
               prule_info->fildes = open(phtx_info->sdev_id, Open_Mode);
               if ( prule_info->fildes == -1 ) {
                  strcpy(tmp_str, "Hidalgo Open Error - ");
-                 if ( errno <= sys_nerr )
-                    strcat(tmp_str, sys_errlist[errno]);
+                 strcat(tmp_str, strerror(errno));
                  strcat(tmp_str, "\n");
                  prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                          tmp_str);
@@ -3703,16 +3618,14 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
        continue_loop = 1;
        phtx_info->bad_writes = phtx_info->bad_writes + 1;
        strcpy(tmp_str, "Hidalgo Write EOT Error - ");
-       if ( errno <= sys_nerr )
-          strcat(tmp_str, sys_errlist[errno]);
+       strcat(tmp_str, strerror(errno));
        strcat(tmp_str, "\n");
        prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
        tape_error_code = errno;
     } else if ( (errno == EBADF) && (Open_Mode == O_RDONLY) ) {
        continue_loop = 1;
        strcpy(tmp_str, "Hidalgo Write Error due to Write-Protected Media - ");
-       if ( errno <= sys_nerr )
-          strcat(tmp_str, sys_errlist[errno]);
+       strcat(tmp_str, strerror(errno));
        strcat(tmp_str, "\n");
        prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                     tmp_str);
@@ -3734,8 +3647,7 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
              continue_loop = 1;
              phtx_info->bad_writes = phtx_info->bad_writes + 1;
              strcpy(tmp_str, "Hidalgo Tape UnLoad Error - ");
-             if ( errno <= sys_nerr )
-                strcat(tmp_str, sys_errlist[errno]);
+             strcat(tmp_str, strerror(errno));
              strcat(tmp_str, "\n");
              prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                      tmp_str);
@@ -3748,8 +3660,7 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
              if ( prule_info->fildes == -1 ) {
                 continue_loop = 1;
                 strcpy(tmp_str, "Hidalgo Open Error - ");
-                if ( errno <= sys_nerr )
-                   strcat(tmp_str, sys_errlist[errno]);
+                strcat(tmp_str, strerror(errno));
                 strcat(tmp_str, "\n");
                 prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                         tmp_str);
@@ -3781,8 +3692,7 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                    continue_loop = 1;
                    phtx_info->bad_others = phtx_info->bad_others + 1;
                    strcpy(tmp_str, "Hidalgo Request Sense Error - ");
-                   if ( errno <= sys_nerr )
-                      strcat(tmp_str, sys_errlist[errno]);
+                   strcat(tmp_str, strerror(errno));
                    strcat(tmp_str, "\n");
                    prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                            HARD, tmp_str);
@@ -3815,8 +3725,7 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                          if ( rc == -1 ) {
                             continue_loop = 1;
                             strcpy(tmp_str, "Hidalgo Move Medium Error - ");
-                            if ( errno <= sys_nerr )
-                               strcat(tmp_str, sys_errlist[errno]);
+                            strcat(tmp_str, strerror(errno));
                             strcat(tmp_str, "\n");
                             prt_msg(phtx_info, prule_info, loop, pblk_num,
                                     errno, HARD, tmp_str);
@@ -3826,8 +3735,7 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                          continue_loop = 1;
                          phtx_info->bad_others = phtx_info->bad_others + 1;
                          strcpy(tmp_str, "Hidalgo Request Sense Error - ");
-                         if ( errno <= sys_nerr )
-                            strcat(tmp_str, sys_errlist[errno]);
+                         strcat(tmp_str, strerror(errno));
                          strcat(tmp_str, "\n");
                          prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                                  HARD, tmp_str);
@@ -3842,8 +3750,7 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                 strcpy(tmp_str, "Close error on ");
                 strcat(tmp_str, phtx_info->sdev_id);
                 strcat(tmp_str, " at end of Request Sense rule.\n");
-                if ( errno <= sys_nerr )
-                   strcat(tmp_str, sys_errlist[errno]);
+                strcat(tmp_str, strerror(errno));
                 strcat(tmp_str,"\n");
                 hxfmsg(phtx_info, errno, HARD, tmp_str);
                 tape_error_code = errno;
@@ -3852,8 +3759,7 @@ hidal_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                 if ( prule_info->fildes == -1 ) {
                    continue_loop = 1;
                    strcpy(tmp_str, "Hidalgo Open Error - ");
-                   if ( errno <= sys_nerr )
-                       strcat(tmp_str, sys_errlist[errno]);
+                   strcat(tmp_str, strerror(errno));
                    strcat(tmp_str, "\n");
                    prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                            tmp_str);
@@ -3888,8 +3794,7 @@ do_cmd(struct htx_data *phtx_info, struct ruleinfo *prule_info,
    if ( /*rc == -1*/ 0 ) {
       sprintf(msg, "Close Error on %s in do_cmd() operation:\n",
               phtx_info->sdev_id);
-      if ( errno <= sys_nerr )
-         strcat(msg, sys_errlist[errno]);
+      strcat(msg, strerror(errno));
       strcat(msg, "\n");
       hxfmsg(phtx_info, errno, HARD, msg);
       tape_error_code = errno;
@@ -4223,7 +4128,7 @@ savebuf_tofile(char *buf, size_t len, char *fname, struct htx_data *ps)
         {
           if (num_bytes != (int) len)
             {
-              (void) sprintf(err_msg, "Error writing to %s.\nOnly %d of %d \
+              (void) sprintf(err_msg, "Error writing to %s.\nOnly %d of %ld \
 bytes successfully transferred on write() system call.",
                              fname, num_bytes, len);
               (void) hxfmsg(ps, exit_code, HTX_SYS_HARD_ERROR, err_msg);
