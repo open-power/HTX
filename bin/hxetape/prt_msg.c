@@ -49,10 +49,6 @@
 #endif
 
 extern unsigned int BLK_SIZE;
-#ifndef __HTX_LINUX__
-extern int          sys_nerr;
-extern char         *sys_errlist[];
-#endif
 
 static  char msg[1024];
 
@@ -84,8 +80,7 @@ prt_msg(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
 {
    info_msg(phtx_info, prule_info, loop, pblk_num, msg);
    strncat(msg, text, (sizeof(msg) - strlen(msg)) );
-   if ( err <= sys_nerr )
-      strncat(msg, sys_errlist[err], (sizeof(msg) - strlen(msg)) );
+   strncat(msg, strerror(err), (sizeof(msg) - strlen(msg)) );
    hxfmsg(phtx_info, err, sev, msg);
    return;
 } 
