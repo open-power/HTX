@@ -143,7 +143,7 @@ extern char global_htx_log_dir[256];
                     { \
                         if(ShutdownMask & ShutdownFlag || ShutdownFlag & SH_FORCE) { \
                             if(ShutdownMask & SH_CRASH_ON_ANY_ERROR) {   \
-                                do_trap_htx64((int) MISC, ShutdownFlag, stats,rule); \
+                                do_trap_htx64((int) MISC, ShutdownFlag, stats,rule, 0, 0, 0, 0); \
                             }   \
                             shutdown(WriterTestSock, 2); \
                             shm_pHXECOM->SigTermFlag=1; \

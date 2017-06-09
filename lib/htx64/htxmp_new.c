@@ -1,22 +1,21 @@
-/*static char sccsid[] = "@(#)70  1.2  src/htx/usr/lpp/htx/lib/htxmp64/htxmp_new.c, htx_libhtxmp, htxfedora 10/8/10 04:38:36"; */
-
+/* IBM_PROLOG_BEGIN_TAG */
 /*
- * COMPONENT_NAME: htx_libhtxmp 
+ * Copyright 2003,2016 IBM International Business Machines Corp.
  *
- * FUNCTIONS:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * ORIGINS: 27
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
- * IBM CONFIDENTIAL -- (IBM Confidential Restricted when
- * combined with the aggregated modules for this product)
- * OBJECT CODE ONLY SOURCE MATERIALS
- * (C) COPYRIGHT International Business Machines Corp. 1988, 1990, 1991
- * All Rights Reserved
- *
- * US Government Users Restricted Rights - Use, duplication or
- * disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
+/* IBM_PROLOG_END_TAG */
 
 #include <stdio.h>
 #include <pthread.h>
@@ -59,7 +58,6 @@ char msg[256];
 
 #define DEFAULT_ATTR_PTR   	    NULL	
 
-
 /*---------------------------------------------------------------------
 *  Once init Blocks
 *----------------------------------------------------------------------*/
@@ -71,21 +69,21 @@ void hxfupdate_once_init(void)
 	pthread_mutex_init(&hxfupdate_mutex, &mta);
 }
 
-void hxfpat_once_init()
+void hxfpat_once_init(void)
 {
   pthread_mutex_init(&hxfpat_mutex, DEFAULT_ATTR_PTR);
 }
 
-void hxfcbuf_once_init()
+void hxfcbuf_once_init(void)
 {
   pthread_mutex_init(&hxfcbuf_mutex, DEFAULT_ATTR_PTR);
 }
 
-void hxfsbuf_once_init()
+void hxfsbuf_once_init(void)
 {
   pthread_mutex_init(&hxfsbuf_mutex, DEFAULT_ATTR_PTR);
 }
-void hxfbindto_a_cpu_once_init()
+void hxfbindto_a_cpu_once_init(void)
 {
   pthread_mutex_init(&hxfbindto_a_cpu_mutex, DEFAULT_ATTR_PTR);
 }
@@ -116,8 +114,6 @@ int
 hxfupdate(char type, struct htx_data * data) {    
 
 	int rc = 0; 
-        int thread_index = 0;
-        mp_struct * mp = global_mp_struct;
         char msg_buf[1024];
 	int lockinit1, lock_ret, lock_ret_1;
 	lockinit1 = lock_ret = lock_ret_1 = 0;

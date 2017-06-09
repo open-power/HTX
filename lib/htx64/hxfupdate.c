@@ -1,3 +1,21 @@
+/* IBM_PROLOG_BEGIN_TAG */
+/*
+ * Copyright 2003,2016 IBM International Business Machines Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *               http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/* IBM_PROLOG_END_TAG */
 
 /* "@(#)92	1.29.6.15  src/htx/usr/lpp/htx/lib/htx64/hxfupdate.c, htx_libhtx, htxubuntu 1/12/16 05:27:10"; */
 
@@ -515,7 +533,7 @@ Stopped - cycles run (%llu) = max_cycles (%llu).\n\n",
 
   if (exer_halt_sops[0].sem_num > (unsigned int) 0)   /* Successful htx_start()? */
     {
-      if ((semctl(sem_id, semnum, GETVAL, &sembuffer) == 1) || (semctl(sem_id, err_semnum, GETVAL, &sembuffer) == 1) && ( p_shm_HE->cont_on_err == 0))
+      if ((semctl(sem_id, semnum, GETVAL, &sembuffer) == 1) || ( (semctl(sem_id, err_semnum, GETVAL, &sembuffer) == 1) && ( p_shm_HE->cont_on_err == 0) ) )
         p_shm_HE->halt_flag = 1;
       else
         p_shm_HE->halt_flag = 0;
@@ -732,7 +750,7 @@ Unable to access HTX message queue.\nerrno = %d",
 
       rem_shm_addr = (tmisc_shm *)htx_malloc(sizeof(tmisc_shm));
       rem_shm_addr->sock_hdr_addr = (tsys_hdr  *) shmat(rem_shm_id, (char *) 0, 0);
-      if ((int) rem_shm_addr->sock_hdr_addr == -1) {    /* problem? */
+      if ((int)(uintptr_t) rem_shm_addr->sock_hdr_addr == -1) {    /* problem? */
          data->error_code = errno;
          data->severity_code = HTX_SYS_HARD_ERROR;
          (void) sprintf(data->msg_text,
@@ -772,7 +790,7 @@ Unable to access HTX message queue.\nerrno = %d",
       } /* endif */
 
       exer_info = (texer_list *) shmat(mem_id, (char *) 0, 0);
-      if ((int) exer_info == -1) {    /* problem? */
+      if ((int)(uintptr_t) exer_info == -1) {    /* problem? */
            data->error_code = errno;
          data->severity_code = HTX_SYS_HARD_ERROR;
          (void) sprintf(data->msg_text,
@@ -1625,6 +1643,7 @@ void htx_error(struct htx_data *data, char* msg_send){
            */
 	libhtx_HOE = getenv("LIBHTX_HOE");
 	if (( libhtx_HOE != (void *) NULL )&&(strcmp (data->run_type, "REG") != 0) && (strcmp (data->run_type, "EMC") != 0))
+	{
 		if ( *libhtx_HOE == 0 )
         {
 			(void) kill(getpid(), SIGTERM);
@@ -1635,6 +1654,7 @@ void htx_error(struct htx_data *data, char* msg_send){
 			if(rc != 0)
 				printf("[%d][%s]Failed to execute system call with errno=%d\n",__LINE__,__FUNCTION__,errno);
 		}
+	}
 
   return;
 

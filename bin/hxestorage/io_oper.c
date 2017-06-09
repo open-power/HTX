@@ -1073,7 +1073,9 @@ int do_compare (struct htx_data *htx_ds, struct thread_context *tctx, char *wbuf
                     #ifndef __HTX_LINUX__
                         trap (0xBEEFDEAD, wbuf, rbuf, j, &lba_fencepost[0], tctx, tctx->dlen, tctx->mis_log_buf);
                     #else
-                        do_trap_htx64 (0xBEEFDEAD, wbuf, rbuf, j, &lba_fencepost[0], tctx, tctx->dlen, tctx->mis_log_buf);
+                        do_trap_htx64 (0xBEEFDEAD, (unsigned long)wbuf, (unsigned long)rbuf, (unsigned long)j, (unsigned long)&lba_fencepost[0],
+                                       (unsigned long)tctx, (unsigned long)tctx->dlen, (unsigned long)tctx->mis_log_buf);
+
                     #endif
                     }
                     error_found = 1;
@@ -1949,7 +1951,8 @@ int compare_cache(struct htx_data *htx_ds, struct thread_context *tctx, int loop
             err_cond = 1;
             if (dev_info.crash_on_miscom) {
             #ifdef __HTX_LINUX__
-                do_trap_htx64( 0xBEEFDEAD, tctx->wbuf, tctx->rbuf, i, htx_ds, tctx);
+                do_trap_htx64( 0xBEEFDEAD, (unsigned long)tctx->wbuf, (unsigned long)tctx->rbuf, (unsigned long)i, (unsigned long)htx_ds, (unsigned long)tctx, 0 , 0);
+
             #else
                 trap(0xBEEFDEAD, tctx->wbuf, tctx->rbuf, i, htx_ds, tctx);
             #endif

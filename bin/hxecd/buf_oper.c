@@ -126,7 +126,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
 	   		setleds( 0x2010 );
         		trap(0xBEEFDEAD, wbuf, rbuf, i, ps, pr);
 	   	#else
-                        do_trap_htx64( 0xBEEFDEAD, wbuf, rbuf, i, ps, pr );
+                        do_trap_htx64( 0xBEEFDEAD, (unsigned long)wbuf, (unsigned long)rbuf, (unsigned long)i, (unsigned long)ps, (unsigned long)pr, 0, 0);
 	   	#endif
 	   }
            /* crash_sys(0xBEEFDEAD, wbuf, rbuf, i, ps->sdev_id); */
@@ -250,7 +250,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
 					setleds( 0x2010 );
 						trap(0xBEEFDEAD, wbuf, rbuf, i, ps, pr);
 				#else
-								do_trap_htx64( 0xBEEFDEAD, wbuf, rbuf, i, ps, pr );
+                                                                do_trap_htx64( 0xBEEFDEAD, (unsigned long)wbuf, (unsigned long)rbuf, (unsigned long)i, (unsigned long)ps, (unsigned long)pr, 0, 0);
 				#endif
 			   }
 

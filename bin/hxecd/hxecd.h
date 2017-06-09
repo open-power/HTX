@@ -133,8 +133,6 @@ struct ruleinfo {
 #include <linux/cdrom.h>
 /* #include <asm/page.h> */
 
-void do_trap_htx64(unsigned long, ...);
-
 /* Macro to page align pointer to next page boundary */
 
 #ifdef __DEFINE_PAGE_MACROS__
@@ -158,8 +156,6 @@ void do_trap_htx64(unsigned long, ...);
 #ifdef __HTX_LINUX__
 
 /* Crash-on-miss should call xmon through miscex */
-
-#define trap(_P1_, _P2_, _P3_, _P4_, _P5_, _P6_) do_trap_htx64(_P2_, _P3_, _P4_, _P5_, _P6_)
 
 /* Drop extended attributes with openx */
 #define openx(_P1_, _P2_, _P3_, _P4_) open(_P1_, _P2_)

@@ -1,3 +1,21 @@
+/* IBM_PROLOG_BEGIN_TAG */
+/*
+ * Copyright 2003,2016 IBM International Business Machines Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *               http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/* IBM_PROLOG_END_TAG */
 
 /* "@(#)85        1.15.1.19  src/htx/usr/lpp/htx/lib/htxsyscfg64/htxsyscfg.c, htx_libhtxsyscfg64, htxfedora 5/19/15 01:28:11";*/
 
@@ -976,7 +994,7 @@ int get_memory_pools(void) {
 	htxsyscfg_mempools_t *t;
 	FILE *fp=0;
 	char command[200],fname[100];
-	int i,j,rc,cpu,lcpu,huge_page_size,rc1;
+	int i,j,rc,cpu,lcpu,huge_page_size;
 	int tot_pools = -1;
 	unsigned long total_pages, free_pages;
 	total_pages = free_pages = 0;
@@ -1385,6 +1403,7 @@ int get_page_size(htxsyscfg_pages_t *t)
 }
 
 /*Retrieves memory details*/
+#if 0
 int get_memory_details_update(void)
 {
     int r1,r2,r3;
@@ -1400,6 +1419,7 @@ int get_memory_details_update(void)
 
     return(r3|r1|r2);
 }
+#endif
 
 int get_memory_details(htxsyscfg_memory_t *t)
 {
@@ -2040,7 +2060,7 @@ printf("entering function get_hardware_config,tot_cpus=%d, vir_typ(0=KVM_Guest, 
 	}
 
     for(i = 0 ; i < tot_cpus ; i++ ) {
-		rc = htx_bind_process(i,-1);
+		rc = htx_bind_thread(i,-1);
         if(rc < 0) {
 			if(rc == -2 || rc == -1){
 				sprintf(msg,"syscfg:bind failed for cpu:%d due to hotplug,rc=%d\n",i,rc);
@@ -3214,11 +3234,11 @@ int update_syscfg(void)
 		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 	}
 
-	r7=get_memory_details_update();
+/*	r7=get_memory_details_update();
 	if ( r7 ) {
 			sprintf(msg,"get_memory_details_update() failed with rc=%d\n", r7);
 			hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
-    }
+    } */
 
 	lock4=pthread_rwlock_unlock(&(global_ptr->global_memory.rw));
 	if (lock4!=0  ) {
