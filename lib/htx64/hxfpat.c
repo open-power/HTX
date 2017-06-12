@@ -1,29 +1,31 @@
-/*  "@(#)74	1.1  src/htx/usr/lpp/htx/lib/htxmp64/hxfpatmp_new.c, htx_libhtxmp, htxubuntu 9/22/10 07:32:53"; */
-
+/* IBM_PROLOG_BEGIN_TAG */
 /*
- * COMPONENT_NAME: (HTXLIB) HTX Libraries
+ * Copyright 2003,2016 IBM International Business Machines Corp.
  *
- * FUNCTIONS: hxfpat_tefficient()
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * ORIGINS: 27
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
- * IBM CONFIDENTIAL -- (IBM Confidential Restricted when
- * combined with the aggregated modules for this product)
- * OBJECT CODE ONLY SOURCE MATERIALS
- * (C) COPYRIGHT International Business Machines Corp. 1988, 1990, 1991
- * All Rights Reserved
- *
- * US Government Users Restricted Rights - Use, duplication or
- * disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
- */    
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/* IBM_PROLOG_END_TAG */
+
+/*static char sccsid[] = "@(#)74	1.1  src/htx/usr/lpp/htx/lib/htxmp64/hxfpatmp_new.c, htx_libhtxmp, htxubuntu 9/22/10 07:32:53";*/
 
 #include <pthread.h>
 
 #include "htx_local.h"
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <memory.h>
-#include <unistd.h>
 
 /*
  * NAME: hxfpat_tefficient()
@@ -127,7 +129,6 @@ int hxfpat_tefficient(char *filename, char *pattern_buf, int num_chars)
   num_words=num_chars/4;
 
 #ifdef DEBUG
-	 char error_message[256];
          (void) sprintf(error_message,
          "hxfpat_tefficient()-Pattern file(%s) errno_save=%d,hex_flag=%d,num_chars=%d,num_words=%d,modulus=%d\n",
              filename,errno_save,hex_flag,num_chars,num_words,modulus);

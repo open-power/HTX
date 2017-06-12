@@ -120,7 +120,7 @@ extern char global_htx_log_dir[256];
                     { \
                         if(ShutdownMask & ShutdownFlag || ShutdownFlag & SH_FORCE) { \
                             if(ShutdownMask & SH_CRASH_ON_ANY_ERROR) {   \
-                                do_trap_htx64((int) MISC, ShutdownFlag, stats,rule); \
+                                do_trap_htx64((int) MISC, ShutdownFlag, stats,rule, 0, 0, 0, 0); \
                             }   \
                             shutdown(ReaderTestSock, 2); \
                             shm_pHXECOM->SigTermFlag=1; \
@@ -641,7 +641,7 @@ void * comread(void * Targ)
 	#else
 									/*do_trap_htx64((int) MISC,(int)&pattern, (int)&rbuf,(int)&msgp,(int)&stats,(int)&rule,(int)&bsize);*/
 									/*              r3       r4     r5  r6     r7   r8   r9     r10 r11*/
-									do_trap_htx64((int)MISC,pattern, rbuf,index,stats,rule,bsize,(int)VER,i);
+                                                                        do_trap_htx64((int)MISC,pattern, rbuf,index,stats,rule,bsize,(int)VER);
 	#endif
 								}
 								sprintf(msg_text, "%s\n%s\n", ConnectStr, stats->msg_text);
@@ -812,7 +812,7 @@ void * comread(void * Targ)
 								#else
 									/*do_trap_htx64((int) MISC,(int)&pattern, (int)&rbuf,(int)&msgp,(int)&stats,(int)&rule,(int)&bsize[i]);*/
 									/*              r3       r4     r5  r6   r7   r8 */
-									do_trap_htx64((int)MISC,pattern, rbuf,index,stats,rule,bsize[i],(int)VER,i);
+									do_trap_htx64((int)MISC,pattern, rbuf,index,stats,rule,bsize[i],(int)VER);
 								#endif
 								/*
 									in kdb the regs have pointer to the location of the pointer, so you 

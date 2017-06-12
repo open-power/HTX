@@ -1266,7 +1266,8 @@ void prt_msg(struct htx_data *htx_ds, struct thread_context *tctx, int loop,
     } else {
         if ( dev_info.crash_on_anyerr ) {
 	    #ifdef __HTX_LINUX__
-	        do_trap_htx64( 0xDEADDEED, loop, tctx->blkno, htx_ds, tctx);
+                do_trap_htx64( 0xDEADDEED, (unsigned long)loop, (unsigned long)tctx->blkno, (unsigned long)htx_ds, (unsigned long)tctx, 0, 0, 0);
+
 	    #else
 	        trap( 0xDEADDEED, loop, tctx->blkno, htx_ds, tctx);
 	    #endif
@@ -1314,7 +1315,7 @@ void user_msg(struct htx_data *htx_ds, int err, int io_err_flag, int sev, char *
     } else {
         if ((sev == HARD) && (dev_info.crash_on_anyerr)) {
 	        #ifdef __HTX_LINUX__
-	        do_trap_htx64(0xDEADDEED, htx_ds);
+                do_trap_htx64(0xDEADDEED, (unsigned long)htx_ds, 0, 0, 0, 0, 0, 0);
 	        #else
 		    trap(0xDEADDEED, htx_ds);
 	        #endif
@@ -1899,7 +1900,7 @@ void hang_monitor (struct htx_data *htx_ds)
                         }
                         if (dev_info.crash_on_hang) {
                         #ifdef __HTX_LINUX__
-                                do_trap_htx64(0xBEEFDEAD, (seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, msg1, htx_ds);
+                                do_trap_htx64(0xBEEFDEAD, (seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, (unsigned long)msg1, (unsigned long)htx_ds, 0, 0);
                         #else
                                 trap(0xBEEFDEAD, (seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, msg1, htx_ds);
                         #endif
