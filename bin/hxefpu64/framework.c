@@ -263,11 +263,20 @@ main(int argc, char *argv[])
 	sigaddset(&myset, SIGALRM);
 	sigaddset(&myset, SIGTERM);
 	sigaddset(&myset, SIGINT);
+	char *temp_string = getenv("HTX_DR_TEST");
+	int htx_dr_test = 0;
+	if (temp_string != NULL){
+		htx_dr_test = atoi(temp_string);
+	}
 #ifndef __HTX_LINUX__
-	sigaddset(&myset, SIGRECONFIG);
+	if(htx_dr_test != 1){
+		sigaddset(&myset, SIGRECONFIG);
+	}
 	sigaddset(&myset, SIGCPUFAIL);
 #else
-	sigaddset(&myset, SIGUSR2);
+	if(htx_dr_test != 1){
+		sigaddset(&myset, SIGUSR2);
+	}
 #endif
 
 	strcpy(dinfo.run_type, "OTH");
@@ -567,9 +576,9 @@ main(int argc, char *argv[])
         hxfmsg(&hd, rc, HTX_HE_SOFT_ERROR, msg);
     }
 #ifdef SCTU
-	bind_thread(bcpus_in_gang[0]);
+	fpu_bind_thread(bcpus_in_gang[0]);
 #else
-    bind_thread(cpus_in_core[0]);
+    fpu_bind_thread(cpus_in_core[0]);
 #endif
 #else
 	/* Linux: default memory allocation policy is native only */
@@ -1332,7 +1341,7 @@ void SIGRECONFIG_handler(int sig, int code, struct sigcontext *scp)
 				bound_cpu = global_sdata[INITIAL_BUF].cdata_ptr[i]->bcpu;
 				client_no = global_sdata[INITIAL_BUF].cdata_ptr[i]->client_no;
 
-				rc = unbind_thread(client_no);
+				rc = fpu_unbind_thread(client_no);
 				if (rc  > 0 ) {
 					strcat(msg, dr_info_msg);
 					sprintf(msg, "unbind_thread failed, client: %d, bcpu: %d, errno = %d\n", client_no, bound_cpu, errno);
@@ -1555,7 +1564,7 @@ client_func(void *cinfo)
 
 #ifndef __HTX_LINUX__
 	/* AIX part */
-	rc = bind_thread(bcpu_no);
+	rc = fpu_bind_thread(bcpu_no);
 	if (rc) {
 		hxfmsg(&hd, -1, HTX_HE_SOFT_ERROR, "bind failed. Exiting....\n");
 		pthread_mutex_lock(&exit_flag_lock);
@@ -7364,45 +7373,48 @@ copy_epilog_p7(int cno)
 }
 
 #ifndef __HTX_LINUX__
-int
-bind_thread(uint32 cno)
+/* native implementation for thread bind and unbind */
+int fpu_bind_thread(uint32 cno)
 {
-	int rc;
+	int rc=0;
 
-	rc = bindprocessor(BINDTHREAD, thread_self(), cno);
-    if(rc == -1) {
-		if (( errno == EINVAL ) && ( cno >= _system_configuration.ncpus )) {
-			sprintf(msg, "Bind failed on non existent cpu: %d.\n", cno);
-			hxfmsg(&hd, errno, HTX_HE_INFO, msg);
-			hxfupdate(RECONFIG_CPUFAIL, &hd);
-			exit_flag = 1;
-		} else {
-			sprintf(msg, "bindprocessor() failed on cpu:%d with errno %d(%s)\n", cno, errno, strerror(errno));
-			hxfmsg(&hd, errno, HTX_HE_HARD_ERROR, msg);
+	if(hd.htx_dr != 1){
+		rc = bindprocessor(BINDTHREAD, thread_self(), cno);
+		if(rc == -1) {
+			if (( errno == EINVAL ) && ( cno >= _system_configuration.ncpus )) {
+				sprintf(msg, "Bind failed on non existent cpu: %d.\n", cno);
+				hxfmsg(&hd, errno, HTX_HE_INFO, msg);
+				hxfupdate(RECONFIG_CPUFAIL, &hd);
+				exit_flag = 1;
+			} else {
+				sprintf(msg, "bindprocessor() failed on cpu:%d with errno %d(%s)\n", cno, errno, strerror(errno));
+				hxfmsg(&hd, errno, HTX_HE_HARD_ERROR, msg);
+			}
 		}
-    }
+	}
     return(rc);
 }
 
-int
-unbind_thread(uint32 cno)
+int fpu_unbind_thread(uint32 cno)
 {
 	int rc = 0;
 
 	pthread_t thread_id = global_sdata[INITIAL_BUF].cdata_ptr[cno]->tid;
-	if ( thread_id != 0 ) {
-		rc = bindprocessor(BINDPROCESS, getpid() , PROCESSOR_CLASS_ANY);
-		if(rc) {
-		#if 0
-			if ( errno == ESRCH ) {
-				/* This means the thread we are trying to unbind does not exist.
-				 * Which means that the thread already exited or is not created yet.
-				 * Its safe to return success here.
-				 */
-				return(0);
+	if(hd.htx_dr != 1){
+		if ( thread_id != 0 ) {
+			rc = bindprocessor(BINDPROCESS, getpid() , PROCESSOR_CLASS_ANY);
+			if(rc) {
+			#if 0
+				if ( errno == ESRCH ) {
+					/* This means the thread we are trying to unbind does not exist.
+					 * Which means that the thread already exited or is not created yet.
+					 * Its safe to return success here.
+					 */
+					return(0);
+				}
+			#endif
+				return(errno);
 			}
-		#endif
-			return(errno);
 		}
 	}
 	return(rc);

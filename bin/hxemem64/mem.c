@@ -105,11 +105,19 @@ int mem_exer_opearation(){
         return ( rc );
     }
 
-#ifndef __HTX_LINUX__
     /*Register SIGRECONFIG handler */
-    g_data.sigvector.sa_handler = (void (*)(int)) SIGRECONFIG_handler;
-    sigaction(SIGRECONFIG, &g_data.sigvector, (struct sigaction *) NULL);
+	if(g_data.htx_d.htx_dr != 1){
+#ifndef __HTX_LINUX__
+    	g_data.sigvector.sa_handler = (void (*)(int)) SIGRECONFIG_handler;
+    	sigaction(SIGRECONFIG, &g_data.sigvector, (struct sigaction *) NULL);
 #endif
+#ifdef __HTX_LINUX__
+		/* Register SIGUSR2 for handling CPU hotplug */
+		g_data.sigvector.sa_handler = (void (*)(int)) SIGUSR2_hdl;
+		sigaction(SIGUSR2, &g_data.sigvector, (struct sigaction *) NULL);
+	
+#endif
+	}
 	/* update global pointer */
 	g_data.test_type_ptr = (struct mem_test_info*)&mem_g;
 
@@ -843,7 +851,7 @@ void* get_shm(void* t){
     /*replace below call with bind_to_cpu,common betweeen AIX/LINUX*/
     #ifndef __HTX_LINUX__
         if (g_data.cpu_DR_flag != 1){
-            rc = bindprocessor(BINDTHREAD,thread_self(),th->bind_cpu_num);
+            rc = htx_bind_thread(th->bind_cpu_num,th->bind_cpu_num);
         }
     #else
         rc = htx_bind_thread(th->bind_cpu_num,-1);
@@ -888,12 +896,7 @@ void* get_shm(void* t){
     }
 
     if(!g_data.gstanza.global_disable_cpu_bind){
-    /*replace below call with bind_to_cpu,common betweeen AIX/LINUX*/
-    #ifndef __HTX_LINUX__
-        rc = bindprocessor(BINDTHREAD, th->tid,-1);
-    #else
         rc = htx_unbind_thread();
-    #endif
     }
     pthread_exit((void *)0);
 }
@@ -1590,7 +1593,7 @@ void* mem_thread_function(void *tn){
         /*replace below call with bind_to_cpu,common betweeen AIX/LINUX*/
     #ifndef __HTX_LINUX__
         th->kernel_tid = thread_self();
-        rc = bindprocessor(BINDTHREAD,th->kernel_tid,th->bind_proc);
+        rc = htx_bind_thread(th->bind_proc,th->bind_proc);
     #else
         rc = htx_bind_thread(th->bind_proc,-1);
     #endif
@@ -1665,10 +1668,10 @@ int do_mem_operation(int t){
 
 
     for (num_oper =0;num_oper < g_data.stanza_ptr->num_oper; num_oper++){
-        if(g_data.mem_DR_flag){
+        /*if(g_data.mem_DR_flag){
             displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Thread: %d is exiting for current stanza on mem DR operation \n",t);
             return(-1);
-        }
+        }*/
         for (seg=0;seg<local_ptr->num_segs;){
             sd.page_index=local_ptr->seg_details[seg].page_size_index;
             sd.seg_num=local_ptr->seg_details[seg].seg_num;
@@ -1827,10 +1830,10 @@ int do_rim_operation(int t){
 
 
     for (num_oper =0;num_oper < g_data.stanza_ptr->num_oper; num_oper++){
-        if(g_data.mem_DR_flag){
+        /*if(g_data.mem_DR_flag){
             displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Thread: %d is exiting for current stanza on mem DR operation \n",t);
             return(-1);
-        }
+        }*/
         for (seg=0;seg<local_ptr->num_segs;){
             sd.page_index=local_ptr->seg_details[seg].page_size_index;
             sd.seg_num=local_ptr->seg_details[seg].seg_num;

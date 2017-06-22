@@ -128,7 +128,8 @@ int rem_shm_id;
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-void set_misc_htx_data(struct htx_data *);
+/*void set_misc_htx_data(struct htx_data *);*/
+struct htx_data             *misc_htx_data;
 
 int hxfadd(char *server_ip, struct htxshm_HE add_HE, char *ecg)
 {
@@ -386,6 +387,7 @@ int hxfupdate_tunsafe(char call, struct htx_data *data)
 /* for creating device specific directories for keeping device logs */
 if ( call == 'S' ) {
 
+    misc_htx_data = data;/*will be used by sysfg later*/
 	tmp_path_temp = getenv("HTX_LOG_DIR");
 	if (tmp_path_temp == NULL){
 		strcpy(data->htx_log_dir, "/tmp/");
@@ -401,16 +403,25 @@ if ( call == 'S' ) {
                		exit(0);
        		 }
 	}
+    char *temp_string = getenv("HTX_DR_TEST");
+    if (temp_string == NULL){
+        data->htx_dr = 0;
+    }else{
+        data->htx_dr = atoi(temp_string);
+        if(data->htx_dr != 1){
+            data->htx_dr = 0;
+        }
+    }
 
 	dev_id = basename(data->sdev_id);
 	he_name = basename(data->HE_name);
 
-	snprintf(stat_fname,ENV_VAR_SIZE,"mkdir -p %shtx/%s/%s",data->htx_log_dir,he_name,dev_id);
+	snprintf(stat_fname,ENV_VAR_SIZE,"mkdir -p %s/htx/%s/%s",data->htx_log_dir,he_name,dev_id);
 	rc1 = system(stat_fname);
 	if(rc1 != 0)
 		printf("[%d][%s]Failed to execute system call with errno=%d\n",__LINE__,__FUNCTION__,errno);
 		
-	snprintf(data->htx_exer_log_dir,ENV_VAR_SIZE,"%shtx/%s/%s/",data->htx_log_dir,he_name,dev_id);
+	snprintf(data->htx_exer_log_dir,ENV_VAR_SIZE,"%s/htx/%s/%s/",data->htx_log_dir,he_name,dev_id);
 
 	int ret = setenv("HTX_EXER_LOG_DIR",data->htx_exer_log_dir,1);
 	if(ret){
@@ -424,7 +435,7 @@ if ( call == 'S' ) {
 	if ( call == 'S' ) {
 		fprintf(stderr, "%s\n", IBM_copyright_string);
 		fflush(stderr);
-		set_misc_htx_data(data);
+		/*set_misc_htx_data(data);*/
 	}
     return (0);
   }
@@ -459,7 +470,7 @@ if ( call == 'S' ) {
           rc = -1*rel_pos;        /* set bad return code.     */
           exit(rc);               /* RIP                      */
         } /* endif */
-		set_misc_htx_data(data);
+		/*set_misc_htx_data(data);*/
       break;
 	case UPDATE:               /*  Update Call  ****************************/
 		htx_update(data);

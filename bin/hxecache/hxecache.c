@@ -538,13 +538,13 @@ int get_system_hardware_details(void) {
 
 	/* Now store the SMT values of all the cores, and CPUs in each core */
 	for (i=0 ; i<system_information.num_cores; i++) {
-		int smt, ret, core,j;
+		int smt,core,j;
 		core = system_information.cores_in_instance[i];
 		smt = get_smt_status(core);
 		system_information.core_smt_array[i] = smt;
 		DEBUG_LOG("/n system_information.cpus_in_core_array[%d] =",i);
 		for (j=0 ; j<smt; j++) {
-			ret = get_cpus_in_core(core,system_information.cpus_in_core_array[i]);
+			get_cpus_in_core(core,system_information.cpus_in_core_array[i]);
 			DEBUG_LOG("%d  ",system_information.cpus_in_core_array[i][j]);
 		}
 #ifdef __HTX_MAMBO__
@@ -707,7 +707,9 @@ int get_shared_memory(int shm_size, uint32_t memflg, int page_size) {
 	struct vminfo_psize	vminfo_64k	= { 0 };
 	psize_t			 	psize	  	= page_size/*huge_page_size*/;
 #else
+#ifndef __HTX_LINUX__
 	unsigned long long 	psize 		= page_size/*huge_page_size*/;
+#endif
 #endif
 
 	seg = (page_size == huge_page_size) ? 0 : 1;
@@ -1065,19 +1067,15 @@ int allocate_worst_case_memory(void) {
 		return (rc);
 	}
 #endif
-#if defined(__HTX_LINUX__)
-    htx_unbind_thread();
-    rc = htx_bind_thread(system_information.cpus_in_instance[0],system_information.cpus_in_instance[0]);
-#else
-    bindprocessor(BINDPROCESS, getpid(), PROCESSOR_CLASS_ANY);
-	
+    htx_unbind_process();
+    rc = htx_bind_process(system_information.cpus_in_instance[0],system_information.cpus_in_instance[0]);
+#ifndef __HTX_LINUX__
     /* To get local memory set flag early_lru=1 to select P_FIRST_TOUCH policy(similar to setting MEMORY_AFFINITY environment variable to MCM)*/
     rc = vm_mem_policy(VM_SET_POLICY,&early_lru, &policies ,num_policies);
     if (rc != 0){
         sprintf(msg,"vm_mem_policy() call failed with return value = %d\n",rc);
-		hxfmsg(&h_d, rc, HTX_HE_SOFT_ERROR, msg);
+        hxfmsg(&h_d, rc, HTX_HE_SOFT_ERROR, msg);
     }
-    rc = bindprocessor(BINDPROCESS, getpid(), system_information.cpus_in_instance[0]);
 #endif
     if(rc < 0){
 		sprintf(msg, "Binding to cpu:%d  failed with rc= %d ,Local memory may not be allocated to this instance\n",system_information.cpus_in_instance[0],rc);
@@ -1096,11 +1094,8 @@ int allocate_worst_case_memory(void) {
 			return (rc);
 		}
 	}
-#if defined(__HTX_LINUX__)
-    rc =htx_unbind_thread();
-#else
-    rc = bindprocessor(BINDPROCESS, getpid(), PROCESSOR_CLASS_ANY);
-#endif
+    htx_unbind_process();
+
 	/* Now setup the memory address array in contiguous order and find required contiguous pages in it */
 	rc = setup_memory_to_use();
 	
@@ -1126,37 +1121,38 @@ int register_signal_handlers(void) {
 	sigaction(SIGTERM, &sigvector, (struct sigaction *) NULL);
 
 	/*  Register DR handler */
+	if(h_d.htx_dr != 1){
 #ifndef __HTX_LINUX__
-	sigprocmask(SIG_UNBLOCK, NULL, &mask);
-	sigaddset(&mask, SIGRECONFIG);
-	sigprocmask (SIG_UNBLOCK, &mask , NULL);
+		sigprocmask(SIG_UNBLOCK, NULL, &mask);
+		sigaddset(&mask, SIGRECONFIG);
+		sigprocmask (SIG_UNBLOCK, &mask , NULL);
 
-	sigemptyset(&(sigvector_dr.sa_mask));
-	sigvector_dr.sa_flags   = 0;
-	sigvector_dr.sa_handler = (void (*)(int))DR_handler;
-	dr_rc = sigaction(SIGRECONFIG, &sigvector_dr, (struct sigaction *) NULL);
-	if (dr_rc != 0) {
-		sprintf(msg,"sigaction failed(%d) for SIGRECONFIG\n",errno);
-		hxfmsg(&h_d, 0, HTX_HE_HARD_ERROR, msg);
-		return (FAILURE);
-	}
-	sigprocmask(SIG_UNBLOCK, NULL, &mask);
+		sigemptyset(&(sigvector_dr.sa_mask));
+		sigvector_dr.sa_flags   = 0;
+		sigvector_dr.sa_handler = (void (*)(int))DR_handler;
+		dr_rc = sigaction(SIGRECONFIG, &sigvector_dr, (struct sigaction *) NULL);
+		if (dr_rc != 0) {
+			sprintf(msg,"sigaction failed(%d) for SIGRECONFIG\n",errno);
+			hxfmsg(&h_d, 0, HTX_HE_HARD_ERROR, msg);
+			return (FAILURE);
+		}
+		sigprocmask(SIG_UNBLOCK, NULL, &mask);
 
-	if (sigismember(&mask , SIGRECONFIG) == 1) {
-		sprintf(msg," SIGRECONFIG signal is blocked\n");
-		hxfmsg(&h_d, 0, HTX_HE_HARD_ERROR, msg);
-		return (FAILURE);
-	}
+		if (sigismember(&mask , SIGRECONFIG) == 1) {
+			sprintf(msg," SIGRECONFIG signal is blocked\n");
+			hxfmsg(&h_d, 0, HTX_HE_HARD_ERROR, msg);
+			return (FAILURE);
+		}
 #else
-	    /* Register handler for SIGUSR2 for cpu hotplug add/remove */
-	sigemptyset((&sigvector_usr2.sa_mask));
-	/*sigfillset(&(sigvector_usr2.sa_mask));
-    sigprocmask(SIG_UNBLOCK, &(sigvector_usr2.sa_mask), NULL);*/
-	sigvector_usr2.sa_flags   = 0;
-    sigvector_usr2.sa_handler = (void (*)(int)) SIGUSR2_hdl;
-    sigaction(SIGUSR2, &sigvector_usr2, (struct sigaction *) NULL);
+			/* Register handler for SIGUSR2 for cpu hotplug add/remove */
+		sigemptyset((&sigvector_usr2.sa_mask));
+		/*sigfillset(&(sigvector_usr2.sa_mask));
+		sigprocmask(SIG_UNBLOCK, &(sigvector_usr2.sa_mask), NULL);*/
+		sigvector_usr2.sa_flags   = 0;
+		sigvector_usr2.sa_handler = (void (*)(int)) SIGUSR2_hdl;
+		sigaction(SIGUSR2, &sigvector_usr2, (struct sigaction *) NULL);
 #endif
-
+	}
 	return rc;
 }
 
@@ -1747,7 +1743,7 @@ int write_mem(int index , int tid) {
 	int				walk_class, walk_line, memory_per_set, lines_per_set, ct, current_line_size;
 	int				data_width;
 	char			*addr = NULL;
-	unsigned int	offset1, offset2, pvr;
+	unsigned int	offset1, offset2;
 	int 			rc = SUCCESS;
 	int 			current_asc;
 	int				offset_sum;
@@ -1757,7 +1753,6 @@ int write_mem(int index , int tid) {
 	 */
 
 	ct					= current_rule->tgt_cache;
-	pvr					= system_information.pvr;
 	current_line_size 	= system_information.cinfo[ct].line_size;
 	current_asc			= system_information.cinfo[ct].asc;
 	data_width	 		= current_rule->data_width;
@@ -2233,8 +2228,7 @@ int read_rule_file()
 	char 			line[200], keywd[200];
 	int 			eof_flag = 0, num_tc = 0, change_tc = 1;
 	struct ruleinfo *current_ruleptr = &h_r[0];
-	int disable_cores[MAX_CORES_PER_CHIP];
-	int i=0;
+	/*int disable_cores[MAX_CORES_PER_CHIP];*/
 	srand48_r(time(NULL),&sbuf);
 
 	/* Set defaults is called below to fill in the rule file parameter structure just in case user makes mistakes.
@@ -2598,11 +2592,9 @@ int read_rule_file()
 			char tmp_str[30];
 			int result = FAILURE;
 			char *token;
-			const char delims[] =",";
+			/*const char delims[] =",";*/
 			long int num_cores_to_disable = 0;
-			int i;
 			int percentage = 0;
-			char remaining_string[50];
 
 			sscanf(line, "%*s %s",tmp_str);
 
@@ -2614,7 +2606,6 @@ int read_rule_file()
 
 			/* Check if it is specified in the first way */
 			if ( strcmp(tmp_str,"RANDOM") == 0 ) {
-				int i=0;
 
 				lrand48_r(&sbuf,&num_cores_to_disable);
 				num_cores_to_disable = num_cores_to_disable%system_information.num_cores;
@@ -2710,7 +2701,6 @@ void write_read_and_compare(void *arg) {
 	int						tid	   = t->tid ;
 	int						rc , oper;
 	int						current_num_oper = current_rule->num_oper;
-	int 					physical_cpu;
 
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -2729,7 +2719,8 @@ void write_read_and_compare(void *arg) {
 		rc = htx_bind_thread(cpu,pcpu);
 	}
 #else
-	rc = bindprocessor(BINDTHREAD, thread_self(), cpu);
+	rc = htx_bind_thread(cpu,cpu);
+	/*rc = bindprocessor(BINDTHREAD, thread_self(), cpu);*/
 #endif
 	DEBUG_LOG("[%d] thread %d, binding to cpu %d \n",__LINE__,index,cpu);
 	if(rc < 0) {
@@ -2851,13 +2842,9 @@ void write_read_and_compare(void *arg) {
 		
 	}
 
-#ifdef __HTX_LINUX__
-	/* Restore original/default CPU affinity so that it binds to ANY available processor */
 
 	rc = htx_unbind_thread();
-#else
-	rc = bindprocessor(BINDTHREAD, thread_self(), PROCESSOR_CLASS_ANY);
-#endif
+	/*rc = bindprocessor(BINDTHREAD, thread_self(), PROCESSOR_CLASS_ANY);*/
 	if(rc == -1) {
 		sprintf(msg, "%d: Unbinding from cpu:%d failed with errno %d \n",__LINE__, cpu, errno);
 		hxfmsg(&h_d, errno, HTX_HE_SOFT_ERROR, msg);
@@ -3152,7 +3139,7 @@ int setup_prefetch_thread_context(void) {
 
 
 int setup_cache_thread_context(void) {
-	int 		thd,i=0, j=0, index=0, mem_per_thread, bound_cpu,core,smt,core_num,k,l;
+	int 		thd,i=0, j=0, index=0, mem_per_thread, bound_cpu,core,core_num,k,l;
 	int			num_cores		= system_information.num_cores;
 	int 		rc 				= SUCCESS;
 	int 		tgt_cache_type 	= current_rule->tgt_cache;
@@ -3166,6 +3153,9 @@ int setup_cache_thread_context(void) {
 	int			contiguous_pages 	= ceil( (double)current_rule->cont_memory_pool.contiguous_mem_required / (double) pg_size);
 	int			enabled_cores		= system_information.num_cores - current_rule->num_excluded_cores;
 
+	if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+		enabled_cores = enabled_cores * 2;
+	}
 	if( testcase == CACHE_BOUNCE_ONLY || testcase == CACHE_BOUNCE_WITH_PREF ) {
 
 		/* In case of Cache Bounce test case, only one instance on cache thread runs per core 	*/
@@ -3174,6 +3164,8 @@ int setup_cache_thread_context(void) {
 		/* A cache line width is split amongst the Cache threads. 								*/
 
 		tgt_cache_type 								= L2;
+        cache_asc                                   = system_information.cinfo[tgt_cache_type].asc;
+        line_size                                   = system_information.cinfo[tgt_cache_type].line_size;
 		total_cache_threads							= get_num_threads(system_information.instance_number, testcase, CACHE, current_rule);
 		current_rule->num_cache_threads_to_create	= total_cache_threads;
 		mem_per_thread 								= line_size/current_rule->num_cache_threads_to_create;
@@ -3193,7 +3185,6 @@ int setup_cache_thread_context(void) {
 				continue;
 			}
 			/*smt	   											= get_smt_status(system_information.cores_in_instance[core]);*/
-			smt												= system_information.core_smt_array[core];
 			bound_cpu 										= get_next_cpu(CACHE, testcase, index, core ) ;
 			pnum											= 0;
 			if ( bound_cpu == E_CORE_EXCLUDED ) {
@@ -3205,7 +3196,11 @@ int setup_cache_thread_context(void) {
 			th_array[index].thread_type 					= CACHE;
 			th_array[index].current_rule					= current_rule;
 			th_array[index].start_class	 					= 0;
-			th_array[index].end_class	   					= cache_asc - 1;
+            if((system_information.pvr == POWER9_NIMBUS) || (system_information.pvr == POWER9_CUMULUS)) {
+                th_array[index].end_class                   = (cache_asc - 1)/2;
+            }else{
+                th_array[index].end_class                   = (cache_asc - 1);
+            }
 			th_array[index].walk_class_jump 				= 1;
 			th_array[index].cache_instance_under_test 		= j;
 			th_array[index].memory_starting_address_offset 	= 0;
@@ -3237,6 +3232,9 @@ int setup_cache_thread_context(void) {
 			j++;
 			/*index += get_smt_status(system_information.cores_in_instance[core]);*/
 			index += system_information.core_smt_array[core];
+			if(index >= system_information.number_of_logical_cpus){
+				index = (system_information.number_of_logical_cpus - 1);
+			}
 		}
 	} else if( testcase == CACHE_ROLL_WITH_PREF || testcase == CACHE_ROLL_ONLY) {  /* Roll over supported for P7 and above only */
 
@@ -3315,6 +3313,10 @@ int setup_cache_thread_context(void) {
 
 			j++;
 			index += system_information.core_smt_array[core];
+			/*in irregular smt config,have a boundary check and mark last thraed*/
+			if(index >= system_information.number_of_logical_cpus){
+				index = (system_information.number_of_logical_cpus - 1);
+			}
 			/*index += get_smt_status(system_information.cores_in_instance[core]);*/
 		}
 	}
@@ -3650,6 +3652,9 @@ int create_cache_threads(void) {
 
 					/*index += get_smt_status(system_information.cores_in_instance[core]);*/
 					index += system_information.core_smt_array[core];
+					if(index >= system_information.number_of_logical_cpus){
+						index = (system_information.number_of_logical_cpus - 1);
+					}
 					if(gang_size == 1){/*In case of equiliser only one thread need to be created*/
 						break;
 					}
@@ -3889,7 +3894,7 @@ int derive_prefetch_algorithm_to_use(int index) {
 
 int get_next_cpu(int thread_type, int test_case, int thread_no, int core_no) {
 	int cpu = FAILURE;
-	int smt,i, index_in_core,core_num,p9_cumulus_flag=0;
+	int smt,index_in_core,core_num,p9_cumulus_flag=0;
 	static int core_indexi_count[MAX_CORES_PER_CHIP] = {[0 ... (MAX_CORES_PER_CHIP -1)] = 1};
     static int cache_thread_count = 0;
 
@@ -4336,11 +4341,9 @@ void hexdump(FILE *f,const unsigned char *s,int l)
 int find_memory_requirement(void) {
 	struct ruleinfo *rule = &h_r[0];
 	int 			i, rc = SUCCESS;
-	int				tgt_cache;
 	int				pvr = system_information.pvr;
 	int				mem_needed;
 
-	tgt_cache = rule->tgt_cache;
 	for ( i=1; i<=num_testcases; i++ ) {
 		switch( pvr ) {
 			case POWER7:
@@ -5092,11 +5095,10 @@ int get_update_syschanges_hotplug()
 
 int find_EA_to_RA(unsigned long ea,unsigned long long* ra){
     const int __endian_bit = 1;
-    int i, c, pid, status;
+    int i, c,status;
     uint64_t read_val, file_offset;
     char path_buf [0x100] = {};
     FILE * f;
-    char *end;
     sprintf(path_buf, "/proc/self/pagemap");
 
     /*printf("Big endian? %d\n", is_bigendian());*/

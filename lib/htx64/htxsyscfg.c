@@ -32,13 +32,13 @@
 /* Global variables */
 GLOBAL_SYSCFG *global_ptr = NULL;
 int shm_id_htxsyscfg=-1;
-extern struct htx_data             *misc_htx_data;
 extern char                        msg[];
 
 int numberArray[MAX_CORES_PER_CHIP][3],numberArray_copy[MAX_CORES_PER_CHIP][3];
 int array_index;
 int 				syscfg_base_pg_idx;
 unsigned int 		syscfg_base_page_size;
+extern struct htx_data             *misc_htx_data;
 
 /* readind env variables to avoid hardcodings of paths */
 
@@ -1029,13 +1029,15 @@ int get_memory_pools(void) {
         	t[i].page_info_per_mempool[j].supported = FALSE;
     	}
 	}
-	sprintf(fname,"%smem_pool_details",tmp_path);
+	sprintf(fname,"%s/mem_pool_details",tmp_path);
 	sprintf(command,"%s/get_mem_pool_details.sh > %s",scripts_path,fname);
-	if ( (rc = system(command)) == -1 ) {
-		sprintf(msg,"%sget_mem_pool_details.sh failed\n",scripts_path);
-		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-		return -4;
-	}
+	errno = 0;
+	rc = system(command);
+    if (rc == -1){
+            sprintf(msg,"%sget_mem_pool_details.sh failed with errno = %d \n",scripts_path,errno);
+            hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg); 
+            /*return -4;*/ /* workaround for the race condition with the sigchld */
+    }
 	if ((fp=fopen(fname,"r"))==NULL){
 		sprintf(msg,"fopen of file %s failed with errno=%d",fname,errno);
 		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
@@ -1353,10 +1355,11 @@ int get_page_size_update(void)
     for(i=0; i<t->num_sizes; i++) {
         num=t->page_sizes[i];
         t->page_sizes[i]=1;
-
+        #if 0
         for(k=1; k <= num; k++) {   /*Page sizes supported*/
             t->page_sizes[i]=t->page_sizes[i]*2;
         }
+        #endif
 }
 #endif		/* End of __AWAN__ */
     return(0);
@@ -2781,7 +2784,6 @@ int repopulate_syscfg(struct htx_data *p_htx_data)
 {
     int rc = 0;
     int temp_shm_key=0;
-    misc_htx_data = p_htx_data;
 
     if ((misc_htx_data != NULL)  && ((strcmp (misc_htx_data->run_type, "OTH") == 0))) {
 		rc = init_syscfg_with_malloc();

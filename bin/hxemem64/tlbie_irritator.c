@@ -46,7 +46,7 @@ op_tlb_fptr tlb_thread_functions[MAX_TLB_FUNCTIONS]= {tlb_gen_random_cpus,tlb_ge
 
 int run_tlb_operaion()
 {
-    int rc = SUCCESS,num_th,page_index,tlb_oper_type;
+    int rc = SUCCESS,num_th,page_index,tlb_oper_type=RAND_TLB_OPER;
     unsigned int j1=12,*seed1;
     int num_threads = g_data.sys_details.cores * ((float)g_data.stanza_ptr->percent_hw_threads/100); 
     int seg = 0; /* only one seg*/
@@ -153,12 +153,11 @@ printf("cores=%d and threads = %d, val=%d\n",g_data.sys_details.cores,num_thread
 }
 
 void tlb_gen_random_cpus(void* th){
-    int i,rc=SUCCESS,num_pages,iter,cpu_index=0;
+    int i,rc=SUCCESS,iter;
     struct thread_data* t = (struct thread_data*)th;
     struct mem_exer_thread_info *local_ptr = &(mem_g.mem_th_data[t->thread_num]);
     t->testcase_thread_details = (void *)local_ptr;
-    unsigned int buf,*parse_write_shm_ptr,*parse_read_shm_ptr,*page_ptr,j1=(t->thread_num + 12), j2=(t->thread_num + 16);
-    struct shmid_ds shm_buf;
+    unsigned int buf,*parse_write_shm_ptr,*parse_read_shm_ptr,j1=(t->thread_num + 12), j2=(t->thread_num + 16);
     int bind_proc,seg = 0;/*seg = 0 always */
     int num_4k_pages = (g_data.stanza_ptr->seg_size[PAGE_INDEX_4K]) / (4*KB);
     int ptr_increment = (4*KB)/sizeof(int);
@@ -167,7 +166,6 @@ void tlb_gen_random_cpus(void* th){
     unsigned int *seed2 = &j2;
 
 
-printf("thread:%d, in random test\n",t->thread_num);
     local_ptr->seg_details[seg].page_size_index = PAGE_INDEX_4K;
     for (iter=0; iter < g_data.stanza_ptr->num_oper; iter++,j1++,j2++) {
         bind_proc = rand_r(seed1);
@@ -183,7 +181,6 @@ printf("thread:%d, in random test\n",t->thread_num);
         local_ptr->seg_details[seg].shm_size = g_data.stanza_ptr->seg_size[PAGE_INDEX_4K];
         parse_write_shm_ptr = (unsigned int *)local_ptr->seg_details[seg].shm_mem_ptr;
         parse_read_shm_ptr = (unsigned int *)local_ptr->seg_details[seg].shm_mem_ptr;
-        page_ptr = parse_write_shm_ptr;
 
         handle_cpu_binding(t,CPU_BIND);
         for (i = 0; i < num_4k_pages; i++) {
@@ -258,13 +255,12 @@ printf("thread:%d, in random test\n",t->thread_num);
 
 void tlb_gen_sequential_cores(void* th){
 
-    int rc=SUCCESS,ptr_increment,num_pages,iter,cpu_index=0;
+    int rc=SUCCESS,ptr_increment=0,num_pages=0,iter,cpu_index=0;
     struct thread_data* t = (struct thread_data*)th;
     struct mem_exer_thread_info *local_ptr = &(mem_g.mem_th_data[t->thread_num]);
     t->testcase_thread_details = (void *)local_ptr;
     unsigned int *parse_write_shm_ptr,*parse_read_shm_ptr,*page_ptr;
-    struct shmid_ds shm_buf;
-    int bind_proc,page_offset,seg = 0;/*seg = 0 always */
+    int bind_proc,page_offset=0,seg = 0;/*seg = 0 always */
     int pi = local_ptr->seg_details[seg].page_size_index;
 
     struct pattern_typ {
@@ -367,7 +363,7 @@ void tlb_gen_sequential_cores(void* th){
                             "Segment address=%llx,num oper=%d,Thread number = %d, CPU number bound with = %d\n",\
                             g_data.stanza_ptr->rule_id,g_data.rules_file_name,\
                             *((unsigned long long*)pattern_ptr),*(unsigned long long*)&temp_obj,(unsigned long long)parse_read_shm_ptr,\
-                            (unsigned long long)local_ptr->seg_details[seg].shm_mem_ptr,iter,t->thread_num,bind_proc);
+                            local_ptr->seg_details[seg].shm_mem_ptr,iter,t->thread_num,bind_proc);
                     displaym(HTX_HE_SOFT_ERROR, DBG_MUST_PRINT, "TLBIE:Miscompare Detected\n%s", msg_text);
                     exit(1);
                 }
@@ -397,7 +393,8 @@ void handle_cpu_binding(struct thread_data *t,int bind){
             /*replace below call with bind_to_cpu,common betweeen AIX/LINUX*/
         #ifndef __HTX_LINUX__
             t->kernel_tid = thread_self();
-            rc = bindprocessor(BINDTHREAD,t->kernel_tid,bind_proc);
+            /*rc = bindprocessor(BINDTHREAD,t->kernel_tid,bind_proc);*/
+            rc = htx_bind_thread(bind_proc,bind_proc);
         #else
             rc = htx_bind_thread(bind_proc,-1);
         #endif
@@ -424,11 +421,7 @@ void handle_cpu_binding(struct thread_data *t,int bind){
                 pthread_exit((void *)1);
             }
         }else if(bind == CPU_UNBIND){
-            #ifndef __HTX_LINUX__
-            rc = bindprocessor(BINDTHREAD, t->tid,-1);
-            #else
             rc = htx_unbind_thread();
-            #endif
             t->bind_proc = -1;
         }
             
@@ -438,10 +431,10 @@ void handle_cpu_binding(struct thread_data *t,int bind){
 int get_shared_memory_tlb(struct thread_data *t){
     struct mem_exer_thread_info *local_ptr = &(mem_g.mem_th_data[t->thread_num]);
     t->testcase_thread_details = (void *)local_ptr;
-    struct shmid_ds shm_buf;
     int tlbie_shm_id,*tlbie_shm_ptr,memflg,seg = 0;/*Always only one segment*/
     int pi = local_ptr->seg_details[seg].page_size_index;
     #ifndef __HTX_LINUX__
+    struct shmid_ds shm_buf;
     tlbie_shm_id = shmget(IPC_PRIVATE,g_data.stanza_ptr->seg_size[pi],IPC_CREAT | 0666);
     if(tlbie_shm_id == -1) {
         displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s: shmget errored out with errno:%d(%s) for thread no.: %d\n",

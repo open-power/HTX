@@ -57,8 +57,8 @@ unsigned long int               get_random_number_perf(int );
 
 void prefetch_irritator(void *arg)
 {
-    int i, rc, no_of_pages, tid , thread_no, tc, oper , number_of_operations;
-    unsigned long long  saved_seed, random_no , starting_address , memory_fetch_size;
+    int rc,tid ,thread_no,oper ,number_of_operations;
+    unsigned long long  random_no , starting_address , memory_fetch_size;
 	pthread_t ptid;
 	unsigned char *start_addr;
     struct thread_context *th = (struct thread_context *)arg;
@@ -101,7 +101,8 @@ void prefetch_irritator(void *arg)
         rc = htx_bind_thread(tid,pcpu);
     }
     #else
-        rc = bindprocessor(BINDTHREAD, thread_self(), tid);
+		rc = htx_bind_thread(tid,tid);
+        /*rc = bindprocessor(BINDTHREAD, thread_self(), tid);*/
     #endif
 		DEBUG_LOG("[%d] thread %d, binding to cpu %d \n",__LINE__,thread_no,tid);
 	    
@@ -129,7 +130,7 @@ void prefetch_irritator(void *arg)
 			/*sprintf(msg,"::physical cpu:%d for log cpu:%d\n",pcpu,tid);
             hxfmsg(&h_d, rc , HTX_HE_INFO, msg);*/
             #ifdef DEBUG
-            sprintf(msg,"[%d] Bindprocessor success [prefetch thread_bo %d]! cpu_no : %d , pthread id : 0x%x \n",__LINE__,thread_no,tid,ptid);
+            sprintf(msg,"[%d] Bindprocessor success [prefetch thread_bo %d]! cpu_no : %d , pthread id : 0x%llx \n",__LINE__,thread_no,tid,(long long)ptid);
             hxfmsg(&h_d, errno, HTX_HE_INFO, msg);
             #endif
         }
@@ -295,13 +296,8 @@ void prefetch_irritator(void *arg)
         }
 
     } /* End of for loop */
-	#ifdef __HTX_LINUX__
-        /* Restore original/default CPU affinity so that it binds to ANY available processor */
 
         rc = htx_unbind_thread();
-	#else
-        rc = bindprocessor(BINDTHREAD, thread_self(), PROCESSOR_CLASS_ANY);
-	#endif
         if(rc == -1) {
                 sprintf(msg, "%d: Unbinding from cpu:%d failed with errno %d \n",__LINE__, tid, errno);
                 hxfmsg(&h_d, errno, HTX_HE_SOFT_ERROR, msg);
@@ -329,7 +325,7 @@ int prefetch_randomise_dscr(unsigned long long random_number, unsigned int what,
    0          3839      40      41      42      43      44      45        5455	  5758      59      60      61      63
  */
 
-	unsigned long long 		local_random_number;
+	unsigned long long 	local_random_number;
 	unsigned long long	read_dscr;
 	int rc = 0;
 
@@ -346,7 +342,7 @@ int prefetch_randomise_dscr(unsigned long long random_number, unsigned int what,
 			mtspr_dscr(random_number);
 			th_array[thread_no].written_dscr_val = random_number;
 #ifdef DEBUG
-			printf("[%d] Original random number = 0x%x , After setting 58th bit = 0x%x\n",__LINE__,random_number,local_random_number);
+			printf("[%d] Original random number = 0x%llx , After setting 58th bit = 0x%llx\n",__LINE__,random_number,local_random_number);
 #endif
 			rc = 0;
 			break;

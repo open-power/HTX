@@ -233,17 +233,26 @@ int main(int argc, char *argv[])
     priv.sigvector.sa_handler = (void (*)(int)) SIGTERM_hdl;
     sigaction(SIGTERM, &priv.sigvector, (struct sigaction *) NULL);
 
-#ifdef __HTX_LINUX__
-/* Register SIGUSR2 for handling CPU hotplug */
-	priv.sigvector.sa_handler = (void (*)(int)) SIGUSR2_hdl;
-	sigaction(SIGUSR2, &priv.sigvector, (struct sigaction *) NULL);
-#else
-/* #ifdef    _DR_HTX_
-    Register SIGRECONFIG handler */
-    priv.sigvector.sa_handler = (void (*)(int)) SIGRECONFIG_handler;
-    (void) sigaction(SIGRECONFIG, &priv.sigvector,
-                     (struct sigaction *) NULL);
+    char *temp_string = getenv("HTX_DR_TEST");
+    int htx_dr_test = 0;
+    if (temp_string != NULL){
+        htx_dr_test = atoi(temp_string);
+    }
+	if(htx_dr_test != 1){
+	#ifdef __HTX_LINUX__
+	/* Register SIGUSR2 for handling CPU hotplug */
+		priv.sigvector.sa_handler = (void (*)(int)) SIGUSR2_hdl;
+		sigaction(SIGUSR2, &priv.sigvector, (struct sigaction *) NULL);
+	#else
+	/* #ifdef    _DR_HTX_
+		Register SIGRECONFIG handler */
+		priv.sigvector.sa_handler = (void (*)(int)) SIGRECONFIG_handler;
+		(void) sigaction(SIGRECONFIG, &priv.sigvector,
+						 (struct sigaction *) NULL);
 
+	#endif
+	}
+	#ifndef __HTX_LINUX__
 /* Register SIGCPUFIAL handler  */
 	priv.sigvector.sa_handler = (void (*)(int)) SIGCPUFAIL_handler;
 	(void) sigaction(SIGCPUFAIL, &priv.sigvector, (struct sigaction *) NULL);
@@ -349,7 +358,8 @@ if ((read_rules()) < 0 ) {
         {
 #ifndef __HTX_LINUX__
             /* Clear all bindings from the previous run, before the next */
-            bindprocessor(BINDPROCESS, getpid(), PROCESSOR_CLASS_ANY);
+            /*bindprocessor(BINDPROCESS, getpid(), PROCESSOR_CLASS_ANY);*/
+            htx_unbind_process();
 
 			/* If mem_DR_done flag is set then recalculate memory details and fill all mem structures.*/
 			if ( mem_DR_done ){
@@ -3475,7 +3485,7 @@ int do_the_bind_proc(int id,int bind_proc, int pcpu)
         rc = bindprocessor(BINDPROCESS, pid, bind_proc);
     } else {
         tid = thread_self();
-        rc = bindprocessor(BINDTHREAD, tid, bind_proc);
+        rc = htx_bind_thread(bind_proc,bind_proc);
 		if ( ti != UNBIND_ENTITY) {
         	mem_info.tdata_hp[ti].kernel_tid = tid;
     		mem_info.tdata_hp[ti].bind_proc = bind_proc;
@@ -5773,8 +5783,7 @@ int save_buffers(int ti, unsigned long rc, struct segment_detail sd, \
                                 expected_pat, \
                                 (unsigned long)(shm_size_ptr[j]),\
                                 (unsigned long) &msg_text[0],\
-                                0,0\
-                            );
+                                0,0);
         }
         #endif
 
