@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include "htxd.h"
 #include "htxd_ipc.h"
@@ -220,6 +221,15 @@ int htxd_option_method_shutdown_mdt(char **result, htxd_command *p_command)
 	if (htxd_get_equaliser_offline_cpu_flag() == 1) {
 		HTXD_TRACE(LOG_OFF, "Unload equaliser setting");
 		htxd_cleanup_equaliser_setting();
+	}
+    /*unset HTX_DR_TEST env variable*/
+	if(htxd_global_instance->is_dr_test_on == 1){
+    	if(unsetenv("HTX_DR_TEST") == -1){
+        	sprintf(temp_str, "unset of env HTX_DR_TEST failed with -1,errno:%d(%s)",errno,strerror(errno));
+    	}else{
+			sprintf(temp_str, "unset of env HTX_DR_TEST is Done successfuly!..\n");
+		}
+		htxd_send_message (temp_str, 0, HTX_SYS_INFO, HTXD_MDT_SHUTDOWN_MSG);
 	}
 
 	HTXD_TRACE(LOG_OFF, "shutdown execute post run scripts");

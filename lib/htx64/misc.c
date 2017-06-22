@@ -51,7 +51,7 @@ int do_trap_htx64(unsigned long, unsigned long, unsigned long, unsigned long, un
 cpu_set_t* allocate_cpu_mask(size_t *);
 int  print_sysfs_cpu(int,size_t,cpu_set_t*);
 
-struct htx_data             *misc_htx_data=NULL;
+extern struct htx_data             *misc_htx_data;
 char                        msg[1500];
 
 
@@ -73,10 +73,10 @@ int retry_open_calls(FILE** f_ptr,const char* str,const char* mode){
     return -errno;
 }
 
-void set_misc_htx_data(struct htx_data *p_htx_data)
+/*void set_misc_htx_data(struct htx_data *p_htx_data)
 {
     misc_htx_data = p_htx_data;
-}
+}*/
 
 
 
@@ -221,7 +221,13 @@ int get_real_address(void *ea, void *ra)
 /* Function to bind thread. */
 int htx_bind_thread(int lcpu, int pcpu)
 {
-	int rc;
+	int rc=0;
+    if(misc_htx_data != NULL){
+        if(misc_htx_data->htx_dr == 1){
+			htx_unbind_thread();
+            return rc;
+        }
+    }
 
 	rc = bind_thread(pthread_self(), lcpu, pcpu);
 	return rc;
@@ -293,7 +299,13 @@ int bind_thread(pthread_t tid, int lcpu, int pcpu)
 /* Function to bind process. */
 int htx_bind_process(int lcpu, int pcpu)
 {
-	int rc;
+	int rc=0;
+    if(misc_htx_data != NULL){
+        if(misc_htx_data->htx_dr == 1){
+			htx_unbind_process();
+            return rc;
+        }
+    }
 
 	rc = bind_process(getpid(), lcpu, pcpu);
 	return rc;

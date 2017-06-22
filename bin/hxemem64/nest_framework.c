@@ -21,7 +21,7 @@
 
 /*move below global vars to mem specific file later*/
 int AME_enabled = FALSE;
-char  page_size_name[MAX_PAGE_SIZES][8]={"4K","64K","2M","16M","16G"};/*RV2:add new supported pages*/
+char  page_size_name[MAX_PAGE_SIZES][8]={"4K","64K","2M","16M","16G"};
 struct nest_global g_data;
 extern struct mem_exer_info mem_g;
 
@@ -106,13 +106,7 @@ void reg_sig_handlers()
     g_data.sigvector.sa_handler = (void (*)(int))SIGSEGV_hdl;
     sigaction(SIGSEGV,&g_data.sigvector,(struct sigaction *) NULL);
 #endif
-#ifdef __HTX_LINUX__
-	/* Register SIGUSR2 for handling CPU hotplug */
-    g_data.sigvector.sa_handler = (void (*)(int)) SIGUSR2_hdl;
-    sigaction(SIGUSR2, &g_data.sigvector, (struct sigaction *) NULL);
-	
-#else
-
+#ifndef __HTX_LINUX__
 	/* Register SIGCPUFIAL handler  */
     g_data.sigvector.sa_handler = (void (*)(int)) SIGCPUFAIL_handler;
     (void) sigaction(SIGCPUFAIL, &g_data.sigvector, (struct sigaction *) NULL);
@@ -368,41 +362,33 @@ int get_system_details() {
 	/*####*** add true pvr details*/
 #endif
     if(g_data.test_type == MEM){/*collect mem details once all exerciser are started*/
-	/*REV:below calls need to be replaced with single lib call*/
-	rc=get_memory_size_update();
-    if ( rc ) {
-            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"get_memory_size__update() failed with rc=%d\n", rc);
-			return (rc);
-    }
-#ifdef __HTX_LINUX__
-    rc=get_page_size_update();
-    if ( rc ) {
-            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"get_page_size__update() failed with rc=%d\n", rc);
-			return (rc);
-    }
-#endif
+        /*REV:below calls need to be replaced with single lib call*/
+        rc=get_memory_size_update();
+        if ( rc ) {
+                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"get_memory_size__update() failed with rc=%d\n", rc);
+                return (rc);
+        }
+        rc = get_page_details();
+        if ( rc ) {
+                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"get_page_details() failed with rc=%d\n", rc);
+                return (rc);
+        }
 
-    rc = get_page_details();
-    if ( rc ) {
-            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"get_page_details() failed with rc=%d\n", rc);
-			return (rc);
-    }
-
-    #ifdef __HTX_LINUX__
-    rc = get_memory_pools();
-    if(rc < 0){
-		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:syscfg fun get_memory_pools() failed with rc = %d\n",
-			__LINE__,__FUNCTION__,rc);
-			return (rc);
-    }
-    #else
-	rc = get_memory_pools_update();
-	if(rc < 0){
-		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:syscfg fun get_memory_pools_update() failed with rc = %d\n",
-			__LINE__,__FUNCTION__,rc);
-			return (rc);
-	}
-    #endif
+        #ifdef __HTX_LINUX__
+        rc = get_memory_pools();
+        if(rc < 0){
+            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:syscfg fun get_memory_pools() failed with rc = %d\n",
+                __LINE__,__FUNCTION__,rc);
+                return (rc);
+        }
+        #else
+        rc = get_memory_pools_update();
+        if(rc < 0){
+            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:syscfg fun get_memory_pools_update() failed with rc = %d\n",
+                __LINE__,__FUNCTION__,rc);
+                return (rc);
+        }
+        #endif
     }
 	rc = get_memory_details(&sys_mem_info);
 	if(rc < 0){

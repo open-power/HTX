@@ -499,21 +499,46 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 		HTXD_TRACE(LOG_ON, "run started htxstats process");
 	}
 
-#ifdef __HTXD_DR__
+	char *temp_string =NULL;
+	htxd_global_instance->is_dr_test_on = 0;
 	/* start DR child process */
 	if(htxd_get_dr_child_pid() == 0) {
-		htxd_start_DR_child();
-		HTXD_TRACE(LOG_ON, "run started DR child process");
+		temp_string = getenv("HTX_DR_TEST");
+		if (temp_string != NULL){
+			htxd_global_instance->is_dr_test_on = atoi(temp_string);
+			if(htxd_global_instance->is_dr_test_on == 1){
+				sprintf(*result, "user has exported HTX_DR_TEST, htx will run in DR safe mode");
+			}else{
+				#ifdef __HTXD_DR__
+				sprintf(*result, "user has exported HTX_DR_TEST,but value is not set to 1, "
+				 "started DR child process");
+				htxd_start_DR_child();
+				HTXD_TRACE(LOG_ON, "run started DR child process");
+				#endif
+				#ifdef __HTX_LINUX__
+				/* start hotplug monitor */
+				if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
+					htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
+					HTXD_TRACE(LOG_ON, "run started hotplug monitor");
+				}
+				#endif
+			}
+		}else{
+			#ifdef __HTXD_DR__
+			htxd_start_DR_child();
+			sprintf(*result, "started DR child process");
+			HTXD_TRACE(LOG_ON, "run started DR child process");
+			#endif
+			#ifdef __HTX_LINUX__
+			/* start hotplug monitor */
+			if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
+				htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
+				HTXD_TRACE(LOG_ON, "run started hotplug monitor");
+			}
+			#endif
+		}
+		htxd_send_message (*result, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 	}
-#endif
-
-#ifdef __HTX_LINUX__
-	/* start hotplug monitor */
-	if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
-		htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
-		HTXD_TRACE(LOG_ON, "run started hotplug monitor");
-	}
-#endif
 
 	/* start equaliser process */
 	if( htxd_check_for_equaliser_start(ecg_manager) == TRUE) {

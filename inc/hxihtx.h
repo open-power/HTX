@@ -124,6 +124,7 @@ struct htx_data {
         int hotplug_cpu;
         int hotplug_mem;
         int hotplug_io;
+        int htx_dr;
     	unsigned int pthread_id;
     	unsigned int TestCaseNo;
     	unsigned int allocseed;
