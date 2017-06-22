@@ -1,24 +1,20 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/* 
- * Copyright 2003,2016 IBM International Business Machines Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
-static char sccsid[] = "@(#)65	1.10  src/htx/usr/lpp/htx/bin/hxerng/hxerng.c, exer_rng, htxubuntu 6/3/14 07:12:14";
+/* IBM_PROLOG_BEGIN_TAG                                                   */
+/* This is an automatically generated prolog.                             */
+/*                                                                        */
+/* htx72F src/htx/usr/lpp/htx/bin/hxerng/hxerng.c 1.14                    */
+/*                                                                        */
+/* Licensed Materials - Property of IBM                                   */
+/*                                                                        */
+/* COPYRIGHT International Business Machines Corp. 2011,2017              */
+/* All Rights Reserved                                                    */
+/*                                                                        */
+/* US Government Users Restricted Rights - Use, duplication or            */
+/* disclosure restricted by GSA ADP Schedule Contract with IBM Corp.      */
+/*                                                                        */
+/* IBM_PROLOG_END_TAG                                                     */
+/* static char sccsid[] = "%Z%%M%	%I%  %W% %G% %U%";                    */
 
-#include "hxerng.h"
+#include <hxerng.h>
 
 
 #define		PTHREAD_WAIT(a,b)		{ \
@@ -28,10 +24,8 @@ static char sccsid[] = "@(#)65	1.10  src/htx/usr/lpp/htx/bin/hxerng/hxerng.c, ex
 									}
 
 
-
 struct sigaction sigvector;
 struct htx_data hd;
-
 /* global data structure for each 1Mb slot status */
 short status[MAX_SLOTS]; /* Global array to keep status of any slot in big buffer : 0=Not Populated, 1=Populated but in bits, 2=converted to bytes, 3-17=so many tests done */
 short num_th[MAX_SLOTS]; /* Global array to keep track of how many tester threads are already created */
@@ -49,6 +43,7 @@ unsigned int pvr, shifted_pvr_hw, shifted_pvr_os;
 int core_num, dev_fd;
 short exit_flag = FALSE;
 short no_write = TRUE;
+void (*func_ptr)(unsigned long long *);
 FILE *dlog;
 
 #if 0
@@ -141,8 +136,6 @@ int main(int argc, char *argv[])
 	}
 #endif /* AWAN */
 
-	DPRINT(dlog, "1st print. Before calling hxfupdate with START.\n");
-	FFLUSH(dlog);
 	hxfupdate(START, &hd);
 
 	if ( exit_flag ) {
@@ -159,11 +152,9 @@ int main(int argc, char *argv[])
 	set_rng_gen();
 #endif
 
-	DPRINT(dlog, "Calling get_PVR.\n");
-	FFLUSH(dlog);
-
-	if ( get_PVR() ) {
-		sprintf(msg, "get_PVR() returned P7 or less. Unsupported Architecture!! Exiting...\n");
+	rc = get_PVR();
+	if ( rc ) {
+		sprintf(msg, "get_PVR() returned P7 or less. Unsupported Architecture!! get_PVR returned %d. Exiting...\n", rc);
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
 	}
@@ -171,32 +162,34 @@ int main(int argc, char *argv[])
 	FFLUSH(dlog);
 
 	rc = check_rng_available();
-	DPRINT(dlog, "rng available  = %d\n", rc);
-	FFLUSH(dlog);
-
 	if ( rc ) {
-		sprintf(msg, "Random Number Generator unit not available. Exiting...\n");
+		sprintf(msg, "Random Number Generator unit not available. check_rng_available returned %d. Exiting...\n", rc);
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
 	}
 
-	if ( allocate_mem() ) {
-		sprintf(msg, "Error in allocating shared memory. Exiting...\n");
+	rc = allocate_mem();
+	if ( rc ) {
+		sprintf(msg, "Error in allocating shared memory. allocate_mem returned %d. Exiting...\n", rc);
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
 	}
-	DPRINT(dlog, "Mem allocated successfully.\n");
-	FFLUSH(dlog);
 
-	if ( read_rf() ) {
-		sprintf(msg, "Error reading rule-file. Exiting...\n");
+	rc = apply_rf_default();
+	if ( rc ) {
+		sprintf(msg, "Error applying default rulefile parameters. read_rf returned %d. Exiting...\n", rc);
 		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 		exit(1);
 	}
-	DPRINT(dlog, "Rulefile reading done.\n");
-	FFLUSH(dlog);
 
+	rc = read_rf();
+	if ( rc ) {
+		sprintf(msg, "Error reading rule-file. read_rf returned %d. Exiting...\n", rc);
+		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+		exit(1);
+	}
 
+		
 	/* Setting thread attribute, mutex and conditional variables */
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -211,6 +204,8 @@ int main(int argc, char *argv[])
 	/*  Loop forever for REG mode. Exit on SIGTERM only. */
 	do {
 		int rule_no;
+		hd.test_id = 1; /* Hardcoding to 1 since rng rf has only one stanza. Update here if new stanza added to rf */
+		hxfupdate(UPDATE, &hd);
 
 		DPRINT(dlog, "Num of active rules = %d, total threads = %d\n", num_active_rules, (NUM_TESTS + EXTRA_THS));
 		FFLUSH(dlog);
@@ -247,8 +242,6 @@ int main(int argc, char *argv[])
 					exit(1);
 				}
 			}
-			DPRINT(dlog, "Threads created successfully.\n");
-			FFLUSH(dlog);
 
 			for ( i = 0; i < (NUM_TESTS + EXTRA_THS); i++ ) {
 				DPRINT(dlog, "Joining to th#%d\n", i);
@@ -260,8 +253,6 @@ int main(int argc, char *argv[])
 					hxfmsg(&hd, errno, HTX_HE_HARD_ERROR, msg);
 				}
 			}
-			DPRINT(dlog, "Threads joined successfully.\n");
-			FFLUSH(dlog);
 
 #else
 			/* This part will be invoked for standalone code (No open source NIST algo).
@@ -290,8 +281,6 @@ int main(int argc, char *argv[])
 			hxfupdate(UPDATE, &hd);
 		}
 		hxfupdate(FINISH, &hd);
-		DPRINT(dlog, "Rulefile completed.\n");
-		FFLUSH(dlog);
 
 	}while ( strcmp(dinfo.run_type, "REG") == 0 );
 
@@ -310,97 +299,22 @@ void sigusr1_hdl()
 	no_write = FALSE;
 }
 
+int check_rng_available()
+{
 #ifdef __HTX_LINUX__
-int check_rng_available()
-{
-	if ( (dev_fd = open("/dev/hwrng", O_RDONLY) ) == -1 ) {
-		return(-1);
+	if ( shifted_pvr_hw < 0x4e ) {
+		if ( (dev_fd = open("/dev/hwrng", O_RDONLY) ) == -1 ) {
+			return(-1);
+		}
+		return(0);
 	}
-
-	return(0);
-}
+	else {
+		return (0);
+	}
 #else
-int check_rng_available()
-{
 	return(0);
-}
 #endif /* __HTX_LINUX__ */
-
-#if 0
-int allocate_mem()
-{
-	int rc, i;
-	key_t key;
-	unsigned int shm_flags;
-	struct shmid_ds sbuf = { 0 };
-
-#ifndef __HTX_LINUX__
-	struct vminfo_psize vminfo = { 0 };
-	sbuf.shm_pagesize = 4096;
-#endif
-
-	shm_flags = ( IPC_CREAT | IPC_EXCL | S_IRWXU| S_IRWXG | S_IRWXO );
-
-	key = (BIT_SHM_KEY | ((0xfff & core_num) << 4) | (0xf & i));
-	if ( (rnd_bit_shm_id = shmget(key, (STREAM_SIZE * 16 / 8), shm_flags)) == -1 ) {
-			sprintf(msg, "shmget failed for ID:%lx, error\(%d\):%s\n", key, errno, strerror(errno));
-			hxfmsg(&hd, rc, HTX_HE_HARD_ERROR, msg);
-			return(rc);
-		}
-
-#ifndef __HTX_LINUX__
-		if ( (rc = shmctl(rnd_bit_shm_id[i], SHM_PAGESIZE, &sbuf)) == -1 ) {
-			sprintf(msg, "shmctl failed for ID:%lx, error\(%d\):%s\n", key, errno, strerror(errno));
-			hxfmsg(&hd, rc, HTX_HE_HARD_ERROR, msg);
-			return(rc);
-		}
-#endif
-
-		if ( (rnd_bit_shm_ptr[i] = shmat(rnd_bit_shm_id[i], (char *)0, 0)) == NULL ) {
-			sprintf(msg, "shmat failed for ID:%lx, error\(%d\):%s\n", key, errno, strerror(errno));
-			hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-			return(-1);
-		}
-
-		if ( (mlock(rnd_bit_shm_ptr[i], STREAM_SIZE)) == -1 ) {
-			sprintf(msg, "mlock failed for ID:%lx, error\(%d\):%s\n" key, errno, strerror(errno));
-			hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-			return(-1);
-		}
-	}
-
-	for ( i=0; i<3; i++ ) {
-		key = (BYTE_SHM_KEY | ((0xfff & core_num) << 4) | (0xf & i));
-		if ( (rnd_byte_shm_id[i] = shmget(key, (STREAM_SIZE), shm_flags)) == -1 ) {
-			sprintf(msg, "shmget failed for ID:%lx, error\(%d\):%s\n", key, errno, strerror(errno));
-			hxfmsg(&hd, rc, HTX_HE_HARD_ERROR, msg);
-			return(rc);
-		}
-
-#ifndef __HTX_LINUX__
-		if ( (rc = shmctl(rnd_byte_shm_id[i], SHM_PAGESIZE, &sbuf)) == -1 ) {
-			sprintf(msg, "shmctl failed for ID:%lx, error\(%d\):%s\n", key, errno, strerror(errno));
-			hxfmsg(&hd, rc, HTX_HE_HARD_ERROR, msg);
-			return(rc);
-		}
-#endif
-
-		if ( (rnd_byte_shm_ptr[i] = shmat(rnd_byte_shm_id[i], (char *)0, 0)) == NULL ) {
-			sprintf(msg, "shmat failed for ID:%lx, error\(%d\):%s\n", key, errno, strerror(errno));
-			hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-			return(-1);
-		}
-
-		if ( (mlock(rnd_bit_shm_ptr[i], STREAM_SIZE)) == -1 ) {
-			sprintf(msg, "mlock failed for ID:%lx, error\(%d\):%s\n" key, errno, strerror(errno));
-			hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-			return(-1);
-		}
-	}
-
-	return(0);
 }
-#endif
 
 int allocate_mem()
 {
@@ -638,6 +552,28 @@ int get_rule(int *line, FILE *fp, struct rule_parameters *r)
 			FFLUSH(dlog);
 		}
 
+		else if ( strcasecmp(keywd,"rnd_num_type") == 0) {
+			sscanf(s, "%*s %s", r->rnd_num_type);
+			if ( (strcasecmp(r->rnd_num_type, "conditioned") != 0) && (strcasecmp(r->rnd_num_type, "raw") != 0) ){
+				sprintf(msg,"line#%d : %s = %s. Input must be either conditioned or raw \n", *line, keywd, r->rnd_num_type);
+				hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+				return(-1);
+			}
+			DPRINT(dlog, "Param name = %s, Val = %s \n", keywd, r->rnd_num_type);
+			FFLUSH(dlog);
+		}
+
+		else if ( strcasecmp(keywd,"rnd_32") == 0) {
+			sscanf(s, "%*s %s", r->rnd_32);
+			if ( (strcasecmp(r->rnd_32, "yes") != 0) && (strcasecmp(r->rnd_32, "no") != 0) ){
+				sprintf(msg,"line#%d : %s = %s. Input must be either yes or no\n", *line, keywd, r->rnd_32);
+				hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+				return(-1);
+			}
+			DPRINT(dlog, "Param name = %s, Val = %s \n", keywd, r->rnd_32);
+			FFLUSH(dlog);
+		}
+
 		else {
 			sprintf(msg, "line# %d Unsupported keyword: %s", *line, keywd);
 			hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
@@ -645,32 +581,49 @@ int get_rule(int *line, FILE *fp, struct rule_parameters *r)
 		}
 
 		keywd_count++;
+
+		
+		if ( shifted_pvr_os >= 0x4e ){
+			if (strcasecmp(r->rnd_num_type, "conditioned") == 0){
+				if(strcasecmp(r->rnd_32, "yes") == 0)
+					func_ptr = &read_rn_32_bit;
+				else 
+					func_ptr = &read_rn_64_bit;
+			}	
+			else { 
+				func_ptr = &read_rn_raw;
+			}
+		}	
+		else {
+			func_ptr = &read_rn_for_p8_and_earlier;
+		}
 	}
 	return(0);
 }
 
+int apply_rf_default()
+{
+	int i;
+
+	for ( i=0; i<MAX_NUM_RULES; i++ ) {
+		sprintf(&(rule_list[i].rule_name[0]),"test%d", i);
+		rule_list[i].stream_len = 1048576;
+		rule_list[i].num_oper = 100;
+		sprintf(&(rule_list[i].rnd_num_type[0]), "conditioned");
+		sprintf(&(rule_list[i].rnd_32[0]), "no");
+	}
+
+	return(0);
+}
+	
+
 int get_PVR()
 {
-   /*
-    * In this function we will call AIX getPvr() function loaded in kernel extension.
-	* This function will give us the deatil of actual hardware that the code is running on.
-    */
-
-#ifdef __HTX_LINUX__
-	__asm __volatile ("mfspr %0, 287" : "=r" (pvr));
+	pvr = get_true_cpu_version();
 	shifted_pvr_hw = pvr >> 16;
-	shifted_pvr_os = shifted_pvr_hw;
-#else
-	pvr = (unsigned int) getPvr();
-	shifted_pvr_hw = pvr >> 16;
-	shifted_pvr_os = shifted_pvr_hw;
-
-	if ( shifted_pvr_hw == 0x3f && (_system_configuration.implementation == POWER_6) ) {
-		shifted_pvr_os = 0x3e;
-	}
-#endif
-	/* if ( shifted_pvr_hw >= 0x3f ) { */
-	if ( shifted_pvr_hw >= 0x3e ) {
+	pvr = get_cpu_version();
+	shifted_pvr_os = pvr >> 16;
+	if ( shifted_pvr_hw >= 0x4a ) {
 		return(0);
 	}
 	else {
@@ -684,9 +637,8 @@ int read_rn_func(void *tno) /* th0 function. Reads random number from hardware *
 {
 	unsigned long long rnd_no, *buf_ptr;
 	int slot_cnt, i, cnt=0;
-	int client_no = *((int *)tno);
 
-	DPRINT(dlog, "%s:thread#%d\n", __FUNCTION__, client_no);
+	DPRINT(dlog, "%s:thread#%d\n", __FUNCTION__, *((int *)tno));
 	FFLUSH(dlog);
 
 	/* start reading random numbers till
@@ -700,7 +652,6 @@ int read_rn_func(void *tno) /* th0 function. Reads random number from hardware *
 	/* Initialize buffer pointer */
 	buf_ptr = (unsigned long long *)rnd_bit_ptr;
 	slot_cnt = 0;
-
 	while ( slot_cnt < MAX_SLOTS && exit_flag == FALSE ) {
 		for ( i=0; i<((STREAM_SIZE/8)/8); i++ ) {
 			rnd_no = read_rn();
@@ -732,106 +683,101 @@ int read_rn_func(void *tno) /* th0 function. Reads random number from hardware *
 	return(0);
 }
 
+void read_rn_32_bit(unsigned long long *temp)
+{
+
+	unsigned long long rnd_no;
+	unsigned int all_ones_occured = 0;
+	do{
+		/* ### ASM1 ###*/
+		rnd_no = read_rn_32();
+		all_ones_occured++;
+	} while ( rnd_no == 0xFFFFFFFF && all_ones_occured < RNG_RETRY );
+
+	if ( all_ones_occured == RNG_RETRY ){
+		int local_val = RNG_RETRY;
+		sprintf(msg, "Received all 0xFFs even after %d retries. RNG maybe presumed to be offline. Exiting...\n", local_val);
+		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+		exit(1);
+	}
+	*temp = rnd_no;
+}
+
+void read_rn_64_bit(unsigned long long *temp)
+{
+	unsigned long long rnd_no;
+	unsigned int all_ones_occured = 0;
+	do{
+		/* ### ASM1 ###*/
+		rnd_no = read_rn_64_cond();
+		all_ones_occured++;
+	} while ( rnd_no == 0xFFFFFFFFFFFFFFFFULL && all_ones_occured < RNG_RETRY );
+
+	if ( all_ones_occured == RNG_RETRY ){
+		int local_val = RNG_RETRY;
+		sprintf(msg, "Received all 0xFFs even after %d retries. RNG maybe presumed to be offline. Exiting...\n", local_val);
+		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+		exit(1);
+	}
+	*temp = rnd_no;
+}
+
+
+void read_rn_raw(unsigned long long *temp)
+{
+	unsigned long long rnd_no;
+	unsigned int all_ones_occured = 0;
+	do{
+		/* ### ASM1 ###*/
+		rnd_no = read_rn_64_raw();
+		all_ones_occured++;
+	} while ( rnd_no == 0xFFFFFFFFFFFFFFFFULL && all_ones_occured < RNG_RETRY );
+
+	if ( all_ones_occured == RNG_RETRY ){
+		int local_val = RNG_RETRY;
+		sprintf(msg, "Received all 0xFFs even after %d retries. RNG maybe presumed to be offline. Exiting...\n", local_val);
+		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+		exit(1);
+	}
+	*temp = rnd_no;
+}
+
 #ifdef __HTX_LINUX__
+void read_rn_for_p8_and_earlier(unsigned long long *temp)
+{
+	unsigned long long rnd_no;
+	read(dev_fd, (void *)&rnd_no, sizeof(unsigned long long));
+	*temp = rnd_no;
+}
+#else
+void read_rn_for_p8_and_earlier(unsigned long long *temp)
+{
+        int rc, cnt;
+        struct hcall_in_params in;
+        struct h_cop_op_out out;
+
+        in.r3 = H_RANDOM;
+
+        h_cop_random_k((caddr_t)&in, (caddr_t)&out);
+        if ( out.rc == H_Hardware ) {
+                char info_msg[1024];
+                sprintf(info_msg, "Error while reading RNG. hcall() Returned H_Hardware. Exiting.\n");
+                hxfmsg(&hd, 1, HTX_HE_HARD_ERROR, info_msg);
+                clean_up();
+                exit(1);
+        }
+        else {
+                *temp = out.rand_no;
+        }
+}
+#endif /* __HTX_LINUX__ */
+
 unsigned long long read_rn()
 {
 	unsigned long long temp;
-
-	read(dev_fd, (void *)&temp, sizeof(unsigned long long));
-
+	func_ptr(&temp);
 	return(temp);
 }
-#else
-
-#if 0
-void set_rng_gen()
-{
-	/* #1
- 	 * All the #1 parts are just for testing.
- 	 * Those are to be removed once library interface for reading rng in AIX comes up.
- 	 * Till then using libc call to generate rng and test those.
- 	 */
-	long int time_val;
-
-	time_val = time(NULL);
-
-	srand48_r(time_val, &rnd_buf);
-}
-
-unsigned long long read_rn()
-{
-	/* #1
- 	 * All the #1 parts are just for testing.
- 	 * Those are to be removed once library interface for reading rng in AIX comes up.
- 	 * Till then using libc call to generate rng and test those.
- 	 */
-
-	unsigned long long temp_rng;
-	unsigned long temp;
-
-	mrand48_r(&rnd_buf, (long *)&temp);
-	temp_rng = (temp << 32);
-	mrand48_r(&rnd_buf, (long *)&temp);
-	temp_rng |= temp;
-
-	return(temp_rng);
-}
-#else /* if 0 */
-unsigned long long read_rn()
-{
-	int rc, cnt;
-	struct hcall_in_params in;
-	struct h_cop_op_out out;
-
-	in.r3 = H_RANDOM;
-
-#if 0
-	/* This function is called many number of times.
-	 * These many checks will bring down performance considerably.
-	 * So, writing another one without all these checks which will
-	 * consider that everything should run fine.
-	 */
-	do {
-		rc = h_cop_random_k(&in, &out);
-
-		if ( rc == 0 ) {
-			break;
-		}
-		else {
-			cnt++;
-		}
-	} while ( (rc !=0) && (cnt<100) );
-
-
-	if ( cnt == 100 ) {
-		return(-1);
-	}
-	else {
-		if ( out.rc == H_Success ) {
-			return(out.rand_no);
-		}
-		else {
-			return(-1);
-		}
-	}
-#endif
-
-	h_cop_random_k((char *)&in, (char *)&out);
-	if ( out.rc == H_Hardware ) {
-		char info_msg[1024];
-		sprintf(info_msg, "Error while reading RNG. hcall() Returned H_Hardware. Exiting.\n");
-		hxfmsg(&hd, 1, HTX_HE_HARD_ERROR, info_msg);
-		clean_up();
-		exit(1);
-	}
-	else {
-		return(out.rand_no);
-	}
-}
-
-#endif /* if 0 */
-#endif /* __HTX_LINUX__ */
-
 
 #ifdef __HTX_OPEN_SOURCE__
 int convert_bit_2_byte(void *tno)
@@ -2062,8 +2008,6 @@ int linear_complexity(void *tno)
 
 void clean_up()
 {
-	int i;
-
 	if ( dev_fd ) {
 		close(dev_fd);
 	}
