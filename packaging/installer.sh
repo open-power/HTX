@@ -169,7 +169,6 @@ then
         echo -e " [OK]" | tee -a ${INSTALL_LOG_FILE}
 fi
 echo -ne "\nAdding HTX Daemon(htxd) as service..." | tee -a ${INSTALL_LOG_FILE}
-echo -e "${INSTALL_PATH}/htx/etc/scripts/htx_setup.sh" > ${INSTALL_PATH}/htx/.bash_profile
 nimesis_present=`ps -ef | grep nimesis | grep -v grep | wc -l`
 if [ $nimesis_present -eq 0 ] && [ ! "$DONTSTARTHTXD" = 1 ]
 then
