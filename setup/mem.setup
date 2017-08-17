@@ -1,24 +1,12 @@
 #!/bin/bash
-# IBM_PROLOG_BEGIN_TAG 
-# This is an automatically generated prolog. 
-#  
-# htxubuntu src/htx/usr/lpp/htx/setup/mem.setup 1.5.4.36 
-#  
-# Licensed Materials - Property of IBM 
-#  
-# COPYRIGHT International Business Machines Corp. 2010 
-# All Rights Reserved 
-#  
-# US Government Users Restricted Rights - Use, duplication or 
-# disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
-#  
-# IBM_PROLOG_END_TAG 
 ###### This script is used to collect the required memory statistics for hxemem64 exerciser.
 ###### Collect the large and huge page memory required memory statistics 
 ###### into the file ${HTX_LOG_DIR}/freepages
 echo "Entering mem.setup.." >> $HTXNoise
 proc_ver=`grep 'Processor Version' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $4 }'`
-echo "mem.setup:proc_ver=$proc_ver" >> $HTXNoise
+true_proc_ver=`grep 'TRUE PVR Value' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $5 }'`
+true_proc_ver=$((true_proc_ver >> 16))
+echo "mem.setup:OS proc_ver=$proc_ver" >> $HTXNoise
 
 if [[ "$proc_ver" != "0x4e" && "$proc_ver" != "0x4f" ]]
 then
@@ -65,9 +53,19 @@ then
 
     if [ ! -x ${HTXBIN}/hxemem64_new ]
     then
-        echo "Old mem exer binary will be used" >> $HTXNoise
+	echo "Old mem exer binary will be used" >> $HTXNoise
         cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxemem64_new
         cp ${HTXBIN}/hxecentaur ${HTXBIN}/hxemem64
+    fi
+    if [ -x ${HTXBIN}/hxecache_old ]
+    then
+        echo "Old cache exer binary will be used" >> $HTXNoise
+        mv ${HTXBIN}/hxecache_old ${HTXBIN}/hxecache
+    fi
+else
+    if [ -x ${HTXBIN}/hxecache_new ]
+    then
+        mv ${HTXBIN}/hxecache_new ${HTXBIN}/hxecache
     fi
 fi
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
@@ -84,9 +82,11 @@ fi
 
 if [[ $Hugepagesize -eq 2048 ]]
 then
-    mult_factor=5
+    mult_factor_1=5
+    mult_factor_2=4
 else
-    mult_factor=1
+    mult_factor_1=1
+    mult_factor_2=1
 fi
 
 # Number of available processors on the system
@@ -176,12 +176,19 @@ then
 	    elif [[ "$proc_ver" = "0x4b" || "$proc_ver" = "0x4d" || "$proc_ver" = "0x4c" ]]
 	    then
 		#P8
-			pages_reserved_cache_per_instance=$((max_cpus_in_instance/maxSMT))
+	        if [[ $((true_proc_ver)) -eq 78 || $((true_proc_ver)) -eq 79 ]]
+            then
+                pages_reserved_cache_per_instance=$(($((max_cpus_in_instance/maxSMT))*2*mult_factor_1))
+                pages_reserved_cache_per_instance=$((pages_reserved_cache_per_instance*mult_factor_2))
+            else
+			    pages_reserved_cache_per_instance=$((max_cpus_in_instance/maxSMT))
+            fi
 		
 		elif [[ "$proc_ver" = "0x4e" || "$proc_ver" = "0x4f" ]]
 		then
 		#P9
-			pages_reserved_cache_per_instance=$(($((max_cpus_in_instance/maxSMT))*2*mult_factor)) #P9 cache size =10MB,1 cache thread for every (smt/2) threads. 
+			pages_reserved_cache_per_instance=$(($((max_cpus_in_instance/maxSMT))*2*mult_factor_1)) #P9 cache size =10MB,1 cache thread for every (smt/2) threads. 
+			pages_reserved_cache_per_instance=$((pages_reserved_cache_per_instance*mult_factor_2)) #considering 4 times of actual page requirement to find contigeous mem.
 		
 		fi
 
@@ -199,7 +206,7 @@ fi
 mem_16M=$num_proc
 if [ "$shared_processor_mode" = "no" ]
 then
-	if [[ "$proc_ver" = "0x4e" || "$proc_ver" = "0x4f" ]]
+	if [[ $((true_proc_ver)) -eq 78 || $((true_proc_ver)) -eq 79 ]]
 	then
 	#p9
 		if [[ $Hugepagesize -eq 16384 ]]
@@ -221,7 +228,7 @@ then
 	then
 		tlbie_16M=1
 	fi	
-    cache_buffer_pages=`expr $num_instances \* $mult_factor`
+    cache_buffer_pages=`expr $num_instances \* $mult_factor_1`
 fi
 leave_16M=`expr $cache_16M + $mem_16M + $tlbie_16M`
 leave_16G=0
@@ -293,7 +300,7 @@ then
         #Total 16M pages to be configured = existing size of 16M pages configured at present + 
      #                                                               extra 16M pages required 
         allocate_16M=$((num_16M_pages_at_present+allocate_16M))
-        echo "Creating 16MB pages using the following command"
+        echo "Creating Huge pages using the following command"
        
         echo "echo $allocate_16M > /proc/sys/vm/nr_hugepages"
         echo $allocate_16M > /proc/sys/vm/nr_hugepages

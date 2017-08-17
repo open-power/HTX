@@ -1,0 +1,48 @@
+* Rule 1 - L3 Rollover testcase with Prefetch running with default value in DSCR.
+* Rule 2 - L3 Rollover testcase with Prefetch running with Randomised values in DSCR.
+* Rule 3 - L3 Rollover testcase with Prefetch running with LSD bit set in DSCR.
+***************************************************************************************
+rule_id                 = L3_ROLL_PF_DEF_1
+cache_test_case         = CACHE_ROLL_WITH_PREF
+target_cache            = L3
+target_set              = -1
+width                   = 8
+num_oper                = 100
+num_writes              = 1
+num_read_comp           = 1
+prefetch_irritator      = 1
+prefetch_nstride        = 1
+prefetch_partial        = 1
+prefetch_transient      = 1
+prefetch_dcbtna         = 1
+dscr                    = DSCR_DEFAULT
+
+rule_id                 = L3_ROLL_PF_RAND_2
+cache_test_case         = CACHE_ROLL_WITH_PREF
+target_cache            = L3
+target_set              = -1
+width                   = 8
+num_oper                = 100
+num_writes              = 1
+num_read_comp           = 1
+prefetch_irritator      = 1
+prefetch_nstride        = 1
+prefetch_partial        = 1
+prefetch_transient      = 1
+prefetch_dcbtna         = 1
+dscr                    = DSCR_RANDOM
+
+rule_id                 = L3_ROLL_PF_LSDISABLE_3
+cache_test_case         = CACHE_ROLL_WITH_PREF
+target_cache            = L3
+target_set              = -1
+width                   = 8
+num_oper                = 100
+num_writes              = 1
+num_read_comp           = 1
+prefetch_irritator      = 1
+prefetch_nstride        = 1
+prefetch_partial        = 1
+prefetch_transient      = 1
+prefetch_dcbtna         = 1
+dscr                    = DSCR_LSDISABLE

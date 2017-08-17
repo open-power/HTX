@@ -66,9 +66,21 @@ if [ $proc_ver_dec -le 74 ];
 then
 	cache_sw_prefetch_rf="default.sw_prefetch"
 	cache_rf="default.p7"
-else
+elif [ $proc_ver_dec -ge 75 ] && [ $proc_ver_dec -le 77 ]
+then
 	cache_sw_prefetch_rf="default.sw_prefetch.p8"
 	cache_rf="default.p8"
+else
+	cache_sw_prefetch_rf="default.sw_prefetch.p9"
+	cache_rf="default.p9"
+fi
+
+# Set default combo rulefile based on architecture.
+if [ $proc_ver_dec -lt 78 ];
+then
+	fpu_combo_rf="fpu_cpu_combo.p8"
+else
+	fpu_combo_rf="fpu_cpu_combo.p9"
 fi
 
 
@@ -157,17 +169,19 @@ then
 	create_my_mdt $hxestorage_4K_rand_read > ${HTXMDT}/mdt.storage_4K_rand_read
 fi
 	
+create_my_mdt fpu:$fpu_combo_rf >  ${HTXMDT}/mdt.bu_combo_char
 #P9 and above shifts
 if [ $proc_ver_dec -ge 78 ]; then
 	echo "[devconfig]Creating P9(and above) specific mdts..." >> ${HTXNoise}
 	#nest shifts
 	create_my_mdt mem:default.mfg.nodelay > ${HTXMDT}/mdt.mem
 	create_my_mdt mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_tlbie
-	create_my_mdt sctu: cache:$cache_rf mem:default.char tlbie:tlbie > ${HTXMDT}/mdt.nest
-	create_my_mdt cache:$cache_sw_prefetch_rf mem:default.mfg > ${HTXMDT}/mdt.mem_nest
-	create_my_mdt fpu:fpu_cpu_combo.p8 mem:default.char > ${HTXMDT}/mdt.bu_char
+	create_my_mdt sctu: cache:$cache_rf tlbie:tlbie > ${HTXMDT}/mdt.nest
+	create_my_mdt cache:$cache_rf mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_nest
+	create_my_mdt fpu:$fpu_combo_rf mem:rules.char_1 > ${HTXMDT}/mdt.bu_char
 	create_my_mdt $hxestorage_default mem:default.mfg ven:default > ${HTXMDT}/mdt.mem.io
-	create_my_mdt $hxestorage_default ven:default mem:default.mfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+	create_my_mdt $hxestorage_default ven:default cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+	create_my_mdt cache:rules.noprefetch.p9 > ${HTXMDT}/mdt.cache.noprefetch
 
 # Core shifts
 
@@ -176,11 +190,15 @@ else
 	create_my_mdt mem:memmfg.nodelay > ${HTXMDT}/mdt.mem
 	create_my_mdt mem:memmfg.nodelay tlbie: > ${HTXMDT}/mdt.mem_tlbie
 	create_my_mdt sctu: cache:$cache_rf mem:memmfg tlbie:tlbie > ${HTXMDT}/mdt.nest
-	create_my_mdt cache:$cache_sw_prefetch_rf mem:memmfg > ${HTXMDT}/mdt.mem_nest
-	create_my_mdt fpu:fpu_cpu_combo.p8 mem:memmfg > ${HTXMDT}/mdt.bu_char
+	create_my_mdt cache:$cache_rf mem:memmfg > ${HTXMDT}/mdt.mem_nest
+	create_my_mdt fpu:$fpu_combo_rf mem:memmfg nvidia:default.char > ${HTXMDT}/mdt.bu_char
 	create_my_mdt $hxestorage_default mem:memmfg ven:default > ${HTXMDT}/mdt.mem.io
 	create_my_mdt $hxestorage_default ven:default mem:memmfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+	create_my_mdt cache:rules.noprefetch > ${HTXMDT}/mdt.cache.noprefetch
+	create_my_mdt cache:rules.l2_and_l3_bounce > ${HTXMDT}/mdt.cache.l2_and_l3_bounce
+	cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk default cpu fpu sctu >> ${HTXMDT}/mdt.bu_combo_char
 fi
+create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu_combo_char
 
 # P8 specific core, nest and IO workload/shifts
 if [ $proc_ver_dec -ge 75 ]; then
@@ -197,8 +215,12 @@ if [ $proc_ver_dec -ge 75 ]; then
 	create_my_mdt fpu:rules.sao cpu:rules.sao sctu:rules.64.SAO > ${HTXMDT}/mdt.sao
 
 	#nest shifts
-	create_my_mdt cache:rules.l2_bounce.p8 > ${HTXMDT}/mdt.cache.l2_bounce
-	create_my_mdt cache:default.eco.p8 > ${HTXMDT}/mdt.cache.dynamic_eco
+	if [ $proc_ver_dec -lt 78 ]; then
+		create_my_mdt cache:rules.l2_bounce.p8 > ${HTXMDT}/mdt.cache.l2_bounce
+		create_my_mdt cache:default.eco.p8 > ${HTXMDT}/mdt.cache.dynamic_eco
+	else
+		create_my_mdt cache:default.eco.p9 > ${HTXMDT}/mdt.cache.dynamic_eco
+	fi
 	create_shift_mem_L4test.awk L4 > ${HTXMDT}/mdt.l4
 	create_shift_mem_L4test.awk rules.MBA > ${HTXMDT}/mdt.mba
 	
@@ -247,11 +269,10 @@ create_my_mdt $hxestorage_web_server mem:rules.web_server > ${HTXMDT}/mdt.web_se
 create_my_mdt mem:rules.hpc_comp_node fpu:rules.hpc_comp_node $hxestorage_hpc_comp_node > ${HTXMDT}/mdt.hpc_comp_node # mdt for HPC compute node
 create_my_mdt $hxestorage_business_int_db_pk cpu:rules.business_int_db_pk > ${HTXMDT}/mdt.business_int_db_pk
 create_my_mdt ven:default > ${HTXMDT}/mdt.ventura
+
 #Nest shifts
 create_my_mdt mem:mem_16m_hwpf > ${HTXMDT}/mdt.mem.hw_prefetch
-create_my_mdt cache:rules.noprefetch > ${HTXMDT}/mdt.cache.noprefetch
 create_my_mdt cache:$cache_sw_prefetch_rf > ${HTXMDT}/mdt.cache.sw_prefetch
-create_my_mdt cache:rules.l2_and_l3_bounce > ${HTXMDT}/mdt.cache.l2_and_l3_bounce
 create_my_mdt mem:rules.dl1_reloads_from_caches > ${HTXMDT}/mdt.mem.dl1_reloads_from_caches
 create_my_mdt mem:rules.max_cache_hit > ${HTXMDT}/mdt.mem.max_cache_hit
 create_my_mdt mem:rules.max_cache_miss > ${HTXMDT}/mdt.mem.max_cache_miss
@@ -295,7 +316,7 @@ fi
 
 create_my_mdt fpu: cpu: > ${HTXMDT}/mdt.core
 # assuming core.GB (which is derived out of mdt.core_wo_cpu) does not run on P7 system. (hardcoding rulefile to fpu_cpu_combo.p8)
-create_my_mdt fpu:fpu_cpu_combo.p8 > ${HTXMDT}/mdt.core_wo_cpu
+create_my_mdt fpu:$fpu_combo_rf > ${HTXMDT}/mdt.core_wo_cpu
 
 
 # Core shifts
@@ -352,9 +373,6 @@ else
 fi	
 
 # Feature#938362. Adding cpu-fpu combo rule for characterization.
-create_my_mdt fpu:fpu_cpu_combo.p8 >  ${HTXMDT}/mdt.bu_combo_char
-cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk default cpu fpu sctu >> ${HTXMDT}/mdt.bu_combo_char
-create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu_combo_char
 
 if [[ -f ${HTX_HOME_DIR}/.internal ]];
 then
@@ -364,6 +382,24 @@ fi
 if [[ $BTF_SHIFT_ENV -ne 1 ]];
 then
 	mv ${HTXMDT}/mdt.everything ${HTXMDT}/mdt.all    
+fi
+
+#Append inter_node fabric link test stanza in mdt.bu_char
+if [ $proc_ver_dec -ge 78 ]; then
+	echo                                                                                            | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo "fabn:"                                                                                  | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo -e "\tHE_name = \"hxefabricbus\"                     "                                             | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo -e "\tadapt_desc = \"Node to Node\"                  "                                     | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo -e "\tdevice_desc = \"Memory BW\"                    "                                             | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo -e "\treg_rules = \"hxefabricbus/default.char\"        "                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo -e "\temc_rules = \"hxefabricbus/default.char\"        "                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo -e "\tcont_on_err = \"NO\"                         "                                       | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	echo                                                                                            | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+	 
+    cp ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.bu_char_tmp
+	cat ${HTXMDT}/mdt.bu_char_tmp $* | \
+	sed 's/rules\.char_1/rules\.char_2/' > ${HTXMDT}/mdt.bu_char
+	rm ${HTXMDT}/mdt.bu_char_tmp
 fi
 
 # Removing temp mdts created earlier for core.GB

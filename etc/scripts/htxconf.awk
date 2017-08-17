@@ -425,6 +425,10 @@ BEGIN {
 		no_pages_reserved_per_instance = 32;
 		rule_file_name=sprintf("default.p8");
 	}
+    	else if(proc_ver == "4e" || proc_ver == "4f" ) {
+	            rule_file_name=sprintf("default.p9");
+        }
+
 	if ( proc_os == "POWER6" ) {
 		rule_file_name=sprintf("default.p6");
 	}

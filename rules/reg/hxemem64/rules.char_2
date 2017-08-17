@@ -1,0 +1,52 @@
+* IBM_PROLOG_BEGIN_TAG 
+* This is an automatically generated prolog. 
+*  
+* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxemem64/rules.char_2 1.1 
+*  
+* Licensed Materials - Property of IBM 
+*  
+* COPYRIGHT International Business Machines Corp. 2017 
+* All Rights Reserved 
+*  
+* US Government Users Restricted Rights - Use, duplication or 
+* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
+*  
+* IBM_PROLOG_END_TAG 
+*****************************************************************************************
+**The first stanza is for the memory coverage with less time and second stanza attempts to drive max bandwidth. 90% of free 
+**memory will be exercised by threads [1-3] of cpus from every core.
+**Please read the documnetation htxmem64.readme for explaination of rule parameters.
+****************************************************************************************
+*******Global Rules**********
+global_startup_delay = 60
+global_alloc_mem_percent = 90
+global_disable_cpu_bind  = NO
+global_disable_filters = no
+*********************************
+rule_id = mem_test_1
+oper = mem
+pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
+switch_pat_per_seg = yes
+num_oper = 1
+num_writes = 1
+num_read_only = 0
+num_read_comp = 1
+width = 8
+affinity = local
+disable_cpu_bind = NO
+cpu_filter = N*P*C*T[1-3]
+mem_filter = N*P*[4K_100%,64K_100%,2M_100%,16M_100%]
+
+rule_id = stride_test_2
+oper = stride
+pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
+switch_pat_per_seg = yes
+num_oper = 1
+num_writes = 1
+num_read_only = 0
+num_read_comp = 1
+width = 8
+affinity = local
+disable_cpu_bind = NO
+cpu_filter = N*P*C*T[1-3]
+mem_filter = N*P*[4K_100%,64K_100%,2M_100%,16M_100%]

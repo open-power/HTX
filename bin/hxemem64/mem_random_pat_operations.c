@@ -52,7 +52,7 @@ int rand_operation_write_dword(int num_operations,void *seg_address,void *patter
     int i=0,rc=0;
     unsigned long *rw_ptr = (unsigned long *)seg_address;
     unsigned long *lseed      = (unsigned long *)seed;
-    unsigned long rand_no;
+    unsigned long rand_no=*(unsigned long*)seed;
     for (i=0;i<num_operations;i++){
         rand_no = get_random_no_64(lseed);
         *rw_ptr = rand_no;
@@ -84,7 +84,7 @@ int rand_operation_write_byte(int num_operations,void *seg_address,void *pattern
     int i=0,rc=0;
     unsigned char *rw_ptr = (unsigned char*)seg_address;
     unsigned long *lseed      = (unsigned long*)seed;
-    unsigned char rand_no; 
+    unsigned char rand_no=*(unsigned long*)seed;; 
     for (i=0;i<num_operations;i++){
         rand_no = get_random_no_8(lseed);
         *rw_ptr = rand_no;
@@ -100,10 +100,11 @@ int rand_operation_comp_dword(int num_operations,void *seg_address,void *pattern
     int i=0,rc=0;
     unsigned long *ptr   = (unsigned long *)seg_address;
     unsigned long *lseed = (unsigned long *)seed;
-    unsigned long rand_no; 
+    unsigned long rand_no = *(unsigned long*)seed; 
+    unsigned long temp_val;
     for (i=0;i<num_operations;i++){
         rand_no = get_random_no_64(lseed);
-        if(*ptr != rand_no) {
+        if( (temp_val = *ptr) != rand_no) {
             if(trap_flag){
                 #ifndef __HTX_LINUX__
                 trap(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long)rand_no,(unsigned long)ptr,(unsigned long)seg,(unsigned long)stanza);
@@ -111,6 +112,8 @@ int rand_operation_comp_dword(int num_operations,void *seg_address,void *pattern
                 do_trap_htx64(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long)rand_no,(unsigned long)ptr,(unsigned long)seg,(unsigned long)stanza,0);
                 #endif
             }
+            displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%lx\tactual data = 0x%lx\n",__LINE__,__FUNCTION__,
+                rand_no,temp_val);
             rc = i+1;
             break;
         }
@@ -127,9 +130,10 @@ int rand_operation_comp_word(int num_operations,void *seg_address,void *pattern_
     unsigned int *ptr   = (unsigned int*)seg_address;
     unsigned long *lseed = (unsigned long *)seed;
     unsigned int rand_no = *(unsigned long*)seed;
+    unsigned int temp_val;
     for (i=0;i<num_operations;i++){
         rand_no = get_random_no_32(lseed);
-        if(*ptr != rand_no) {
+        if( (temp_val = *ptr) != rand_no) {
             if(trap_flag){
                 #ifndef __HTX_LINUX__
                 trap(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long )rand_no,(unsigned long)ptr,(unsigned long)seg,(unsigned long)stanza);
@@ -137,6 +141,8 @@ int rand_operation_comp_word(int num_operations,void *seg_address,void *pattern_
                 do_trap_htx64(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long)rand_no,(unsigned long)ptr,(unsigned long)seg,(unsigned long)stanza,0);
                 #endif
             }
+            displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%x\tactual data = 0x%x\n",__LINE__,__FUNCTION__,
+                rand_no,temp_val);
             rc = i+1;
             break;
         }
@@ -153,9 +159,10 @@ int rand_operation_comp_byte(int num_operations,void *seg_address,void *pattern_
     unsigned char *ptr   = (unsigned char*)seg_address;
     unsigned long *lseed = (unsigned long *)seed;
     unsigned char rand_no = *(unsigned long*)seed;
+    unsigned char temp_val;
     for (i=0;i<num_operations;i++){
         rand_no = get_random_no_8(lseed);
-        if(*ptr != rand_no) {
+        if( (temp_val = *ptr) != rand_no) {
             if(trap_flag){
                 #ifndef __HTX_LINUX__
                 trap(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long)rand_no,(unsigned long)ptr,(unsigned long)seg,(unsigned long)stanza);
@@ -163,6 +170,8 @@ int rand_operation_comp_byte(int num_operations,void *seg_address,void *pattern_
                 do_trap_htx64(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long)rand_no,(unsigned long)ptr,(unsigned long)seg,(unsigned long)stanza,0);
                 #endif
             }
+            displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%x\tactual data = 0x%x\n",__LINE__,__FUNCTION__,
+                rand_no,temp_val);
             rc = i+1;
             break;
         }
@@ -193,6 +202,8 @@ int rand_operation_rim_dword(int num_operations,void *seg_address,void *pattern_
                 #endif
 
             }
+            displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%x\tactual data = 0x%x\n",__LINE__,__FUNCTION__,
+                rand_no,read_dw_data);
             rc = i+1;
             break;
         }
@@ -222,6 +233,8 @@ int rand_operation_rim_word(int num_operations,void *seg_address,void *pattern_p
                 do_trap_htx64(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long)rand_no,(unsigned long)w_ptr,(unsigned long)seg,(unsigned long)stanza,0);
                 #endif
             }
+            displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%x\tactual data = 0x%x\n",__LINE__,__FUNCTION__,
+                rand_no,read_data);
             rc = i+1;
             break;
         }
@@ -251,6 +264,8 @@ int rand_operation_rim_byte(int num_operations,void *seg_address,void *pattern_p
                 do_trap_htx64(0xBEEFDEAD,i,(unsigned long)seg_address,(unsigned long)rand_no,(unsigned long)w_ptr,(unsigned long)seg,(unsigned long)stanza,0);
                 #endif
             }
+            displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%x\tactual data = 0x%x\n",__LINE__,__FUNCTION__,
+                rand_no,read_data);
             rc = i+1;
             break;
         }

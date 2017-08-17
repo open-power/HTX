@@ -1,0 +1,20 @@
+* Rule 1 - L3 Rollover testcase without Prefetch,double word load and strore accesss
+* Rule 1 - L3 Rollover testcase without Prefetch,word load and strore accesss
+************************************************************************************
+rule_id                 = L3_ROLL_DWORD_1
+target_cache            = L3
+target_set              = -1
+width                   = 8
+num_oper                = 500
+num_writes              = 1
+num_read_comp           = 1
+cache_test_case         = CACHE_ROLL_ONLY
+
+rule_id                 = L3_ROLL_WORD_2
+target_cache            = L3
+target_set              = -1
+width                   = 4
+num_oper                = 500
+num_writes              = 1
+num_read_comp           = 1
+cache_test_case         = CACHE_ROLL_ONLY

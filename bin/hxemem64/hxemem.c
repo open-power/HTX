@@ -2764,7 +2764,7 @@ mem_info.pdata[2].free);
 
 #ifdef SET_PAGESIZE
     {   /* Block begins */
-    struct vminfo_psize info[4];
+    struct vminfo_psize info[5];
     int i,ret;
     char tmpstr[500];
     FILE *fp;
