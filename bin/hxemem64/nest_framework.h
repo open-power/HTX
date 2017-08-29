@@ -34,6 +34,9 @@
 #include <fcntl.h>
 #include <string.h>  /* memcpy .. etc */
 #include <sys/shm.h>
+#ifdef __HTX_LINUX__
+#include <asm/ioctl.h>
+#endif
 #include <limits.h>
 #include "hxihtx64.h"
 #include "htxsyscfg64.h"
@@ -58,6 +61,7 @@
 #define BIND_TO_THREAD      1
 #define UNBIND_ENTITY       -1
 #define UNSPECIFIED_LCPU    -1
+#define DEFAULT_INSTANCE    0
 #define MAX_STANZAS         41  /* Only 40 stanzas can be used */
 #define MAX_NX_TASK         20
 #define SW_PAT_OFF          0
@@ -94,6 +98,8 @@
 #define MB                  ((unsigned long long)(1024*KB))
 #define GB                  ((unsigned long long)(1024*MB))
 
+#define POWER7               0x3f
+#define POWER7P              0x4a
 #define POWER8_MURANO        0x4b
 #define POWER8_VENICE        0x4d
 #define POWER9_NIMBUS        0x4e
@@ -121,6 +127,35 @@
 #define DEF_SEG_SZ_2M		DEF_SEG_SZ_4K
 #define DEF_SEG_SZ_16M      DEF_SEG_SZ_4K
 #define DEF_SEG_SZ_16G      16*GB
+/*cache exer specific*/
+#define PAGE_FREE           0
+#define CACHE_PAGE          1
+#define PAGE_HALF_FREE      2
+#define PREFETCH_PAGE       3
+#define PREFETCH_MEM_SZ     8*MB
+
+/* Maximum HUGE pages to be allocated */
+#define MEM_MULT_FACTOR 4  /*extra memory mult factor to find desired contiguous memory*/
+#define MAX_HUGE_PAGES_PER_CACHE_THREAD 10
+#define MAX_CACHE_THREADS_PER_CORE      2
+#define MAX_CACHE_THREADS_PER_CHIP      (MAX_CACHE_THREADS_PER_CORE * MAX_CORES_PER_CHIP)
+#define MAX_HUGE_PAGES      (MAX_HUGE_PAGES_PER_CACHE_THREAD * MAX_CACHE_THREADS_PER_CHIP * MEM_MULT_FACTOR)
+/* Prefetch Algorithms */
+#define PREFETCH_OFF        0
+#define PREFETCH_IRRITATOR  1
+#define PREFETCH_NSTRIDE    2
+#define PREFETCH_PARTIAL    4
+#define PREFETCH_TRANSIENT  8
+#define PREFETCH_NA                         16
+#define RR_ALL_ENABLED_PREFETCH_ALGORITHMS  32
+#define MAX_PREFETCH_ALGOS  5
+#define MAX_PREFETCH_STREAMS        16
+#define PREFETCH_MEMORY_PER_THREAD (8*MB)
+
+/* DSCR types */
+#define DSCR_DEFAULT        0
+#define DSCR_RANDOM         1
+#define DSCR_LSDISABLE      2
 
 #define DBG_MUST_PRINT 0
 #define DBG_IMP_PRINT 1
@@ -156,14 +191,16 @@
 #else
 	#define debug(...)
 #endif
-enum test_type { MEM=0, CACHE, FABRICB, TLB };
-enum oper_type { OPER_MEM=0, OPER_DMA, OPER_RIM, OPER_TLB, OPER_MPSS, OPER_STRIDE, OPER_L4_ROLL, OPER_MBA, OPER_CORSA };
-enum run_mode_type { RUN_MODE_NORMAL=0, RUN_MODE_CONCURRENT, RUN_MODE_COHERENT };
+enum test_type { MEM=0,FABRICB,TLB,CACHE };
+enum mem_oper_type { OPER_MEM=0, OPER_DMA, OPER_RIM, OPER_TLB, OPER_MPSS, OPER_STRIDE, OPER_L4_ROLL, OPER_MBA, OPER_CORSA };
 enum caches	{ L1=0,L2,L3,L4 };
+enum cache_opers {NONE=0,OPER_CACHE,OPER_PREFETCH};
+enum cache_tests {CACHE_BOUNCE_ONLY=0,CACHE_BOUNCE_WITH_PREF,CACHE_ROLL_ONLY,CACHE_ROLL_WITH_PREF,PREFETCH_ONLY};
 enum affinity { LOCAL=1,REMOTE_CHIP,FLOATING,INTRA_NODE,INTER_NODE,ABOSOLUTE };
 
 #define WRC                     3
 #define MAX_PATTERN_TYPES       4
+#define MAX_TEST_TYPES          4
 #define MAX_OPER_TYPES          4
 #define MAX_MEM_ACCESS_TYPES    3 
 enum pattern_size_type { PATTERN_SIZE_NORMAL=0, PATTERN_SIZE_BIG, PATTERN_ADDRESS, PATTERN_RANDOM };
@@ -171,6 +208,8 @@ enum basic_oper {WRITE=0,READ,COMPARE,RIM};
 enum width_oper {DWORD=0,WORD,BYTE};
 
 typedef int (*op_fptr)(int,void*,void*,int,void*,void*,void*,void*);
+typedef int (*exer_mem_alloc_fptr)(void);
+typedef int (*exer_stanza_oper_fptr)(void);
 
 struct page_wise_seg_info {
 	unsigned long seg_num;
@@ -203,27 +242,12 @@ struct page_wise_data {
     unsigned int in_use_num_of_segments;
 };
 
-/*RV1: re check first 4 variable does make any sense at chip level mem details
-create a new system level meminfo and embed chip level meminfo ( another structure in to it)*/
 struct mem_info {
     unsigned long pspace_avail;/* total paging space available */ 
     unsigned long pspace_free; /* total paging space free */
     unsigned long total_mem_avail; /* Total memory (real) available */
     unsigned long total_mem_free;  /* Total memory (real) free */
     struct page_wise_data pdata[MAX_PAGE_SIZES];
-};
-
-/*This structure holds the srad related data */
-struct chip_mem_pool_info{
-	int has_cpu_and_mem;  /*flag,to check node has both cpus and  memory it,  0-only cpu or mem or no cpu and no mem.  1-has both cpu and mem*/
-	int chip_id;
-	int cpulist[MAX_CPUS_PER_SRAD];
-	int num_cpus;  /* No of cpus in this srad */
-	struct mem_info memory_details;
-	/*cpu filter specific data*/
-	int in_use_num_cpus;
-	int in_use_cpulist[MAX_CPUS_PER_SRAD];/* active cpus list for a chip after applying cpu filter*/
-	int is_chip_mem_in_use; /* based on memory filter update this var, FALSE  - mem not in use, TRUE  - in use*/
 };
 
 struct core_info{
@@ -247,6 +271,23 @@ struct node_info{
 	unsigned int lprocs[MAX_CPUS_PER_NODE];
     struct chip_info chip[MAX_CHIPS_PER_NODE];
 };
+/*This structure holds the srad related data */
+struct chip_mem_pool_info{
+	int has_cpu_and_mem;  /*flag,to check node has both cpus and  memory it,  0-only cpu or mem or no cpu and no mem.  1-has both cpu and mem*/
+	int chip_id;
+	int cpulist[MAX_CPUS_PER_SRAD];
+	int num_cpus;  /* No of cpus in this srad */
+	struct mem_info memory_details;
+    int num_cores;
+    struct core_info core_array[MAX_CORES_PER_CHIP];
+	/*cpu filter specific data*/
+	int in_use_num_cpus;
+    int inuse_num_cores;
+	int in_use_cpulist[MAX_CPUS_PER_SRAD];/* active cpus list for a chip after applying cpu filter*/
+	int is_chip_mem_in_use; /* based on memory filter update this var, FALSE  - mem not in use, TRUE  - in use*/
+    struct core_info inuse_core_array[MAX_CORES_PER_CHIP];
+};
+
 
 struct cache_details {
 	unsigned int cache_size;
@@ -265,7 +306,7 @@ struct sys_info {
 	int shared_proc_mode;
     int unbalanced_sys_config;/* will be set, when any chip in lapr has only mem or only cpu it,not both*/
 	struct node_info node[MAX_NODES];
-	struct cache_details cinfo[MAX_CACHES];/*RV1: cinfo ===> cache_info*/
+	struct cache_details cache_info[MAX_CACHES];
 	struct mem_info memory_details; /*RV1: dont need to keep all mem deatils at system level*/
 	int num_chip_mem_pools;
 	struct chip_mem_pool_info chip_mem_pool_data[MAX_CHIPS];
@@ -301,76 +342,90 @@ struct global_rule{
 	int 		 global_disable_filters;
 	int 		 global_num_threads; /* used only in case of disable_filters = yes*/
 };
-/*RV1: Keep mem specific parameters only, remove others*/
 struct rule_info {
-    char  rule_id[16];      /* Rule Id                                        */
-    char  pattern_id[9];   /* /htx/pattern_lib/xxxxxxxx                      */
-    int   num_oper;        /* number of operations to be performed           */
-                            /* 1 = default for invalid or no value            */
-    int   num_writes;       /* 1 is default value */
-    int   num_reads;        /* 1 is default value */
-    int   num_compares;     /* 1 is default value */
-    int   operation;        /* assigned to #defined values OPER_MEM.. etc    */
-    int   run_mode;         /* assigned to #defined values MODE_NORMAL.. etc */
-    int   misc_crash_flag;  /* 1 = crash_on_misc = ON and 0 = OFF */
-    int   attn_flag;        /* 1 = turn on attention , 0 = OFF */
-    int   compare_flag;     /* 1 = compare ON, 0 = compare OFF */
-    int   disable_cpu_bind;     /* 1 = BINDING OFF(YES in rule file), 0  = BINDING ON(NO in rule file) */
-    int   random_bind;      /* yes = random cpu bind on, no  = random cpu bind off */
-    int   switch_pat;       /* 2 = Run (ALL) patterns for each segment,
-                               1 = Switch pattern per segment is (ON)
-                                   use a different pattern for each new segment,
-                               0 = (OFF) Use the same pattern for all segments.
-                               Note: For this variable to be effective multiple
-                               patterns have to be specified */
-    char  oper[8];         /* DMA or MEM or RIM                              */
-    char  messages[4];     /* YES - put out info messages                    */
-                            /* NO - do not put out info messages              */
-    unsigned long seed;
-    int    num_threads; /* Number of threads */
-    int    percent_hw_threads; /* percentage of available H/W threads*/
-    char  compare[4];      /* YES - compare                                  */
-                            /* NO -  no compare                               */
-    int   width;           /* 1, 4, or 8 bytes at a time                     */
-	int   mem_percent;
-	int	  cpu_percent;
-    int   debug_level; /* Only 0 1 2 3 value .See the #define DBG_MUST_PRINT for more*/
-    char  crash_on_mis[4];    /* Flag to enter the kdb in case of miscompare,   */
-                    /* yes/YES/no/NO */
-    char  turn_attn_on[4];    /* Flag to enter the attn in case of miscompare,  */
-                        /* yes/YES/no/NO */
-    char pattern_nm[52];
-    int   num_patterns;
-    unsigned int pattern_size[MAX_STANZA_PATTERNS];
-    int   pattern_type[MAX_STANZA_PATTERNS]; /* pattern type (enum pattern_type) */
-    char  pattern_name[MAX_STANZA_PATTERNS][72];
-    char  *pattern[MAX_STANZA_PATTERNS];
-    int affinity;
+    char                    rule_id[16];                /* Rule Id                                        */
+	int                     stanza_num; 
+    char                    pattern_id[9];              /* /htx/pattern_lib/xxxxxxxx                      */
+    int                     num_oper;                   /* number of operations to be performed           */
+                                                        /* 1 = default for invalid or no value            */
+    int                     num_writes;                 /* 1 is default value */
+    int                     num_reads;                  /* 1 is default value */
+    int                     num_compares;               /* 1 is default value */
+    int                     operation;                  /* assigned to #defined values OPER_MEM.. etc    */
+    int                     run_mode;                   /* assigned to #defined values MODE_NORMAL.. etc */
+    int                     misc_crash_flag;            /* 1 = crash_on_misc = ON and 0 = OFF */
+    int                     attn_flag;                  /* 1 = turn on attention , 0 = OFF */
+    int                     compare_flag;               /* 1 = compare ON, 0 = compare OFF */
+    int                     disable_cpu_bind;           /* 1 = BINDING OFF(YES in rule file), 0  = BINDING ON(NO in rule file) */
+    int                     random_bind;                /* yes = random cpu bind on, no  = random cpu bind off */
+    int                     switch_pat;                 /* 2 = Run (ALL) patterns for each segment,
+                                                        1 = Switch pattern per segment is (ON)
+                                                           use a different pattern for each new segment,
+                                                        0 = (OFF) Use the same pattern for all segments.
+                                                        Note: For this variable to be effective multiple
+                                                        patterns have to be specified */
+    char                    oper[8];                    /* DMA or MEM or RIM                              */
+    char                    messages[4];                /* YES - put out info messages                    */
+                                                        /* NO - do not put out info messages              */
+    unsigned long           seed;
+    int                     num_threads;                /* Number of threads */
+    int                     percent_hw_threads;         /* percentage of available H/W threads*/
+    char                    compare[4];                 /* YES - compare                                  */
+                                                        /* NO -  no compare                               */
+    int                     width;                      /* 1, 4, or 8 bytes at a time                     */
+	int                     mem_percent;
+	int	                    cpu_percent;
+    int                     debug_level;                /* Only 0 1 2 3 value .See the #define DBG_MUST_PRINT for more*/
+    char                    crash_on_mis[4];            /* Flag to enter the kdb in case of miscompare,   */
+                                                        /* yes/YES/no/NO */
+    char                    turn_attn_on[4];            /* Flag to enter the attn in case of miscompare,  */
+                                                        /* yes/YES/no/NO */
+    char                    pattern_nm[52];
+    int                     num_patterns;
+    unsigned int            pattern_size[MAX_STANZA_PATTERNS];
+    int                     pattern_type[MAX_STANZA_PATTERNS]; /* pattern type (enum pattern_type) */
+    char                    pattern_name[MAX_STANZA_PATTERNS][72];
+    char                    *pattern[MAX_STANZA_PATTERNS];
+    int                     affinity;
+    /*
     char nx_mem_operations[72];
     int     number_of_nx_task;
-    /*struct nx_task_table nx_task[MAX_NX_TASK];  NX specific*/
     char nx_reminder_threads_flag[10];
     int nx_rem_th_flag;
     char nx_performance_data[10];
     int nx_perf_flag;
     char nx_async[10];
-    int nx_async_flag;
-    int stride_sz;
-    char mcs[8];
-    int mem_l4_roll;
-    long mcs_mask;
-    unsigned int bm_position;
-    unsigned int bm_length;
-    char tlbie_test_case[20];
-    char corsa_performance[10];
-    int corsa_perf_flag;
-	int mpss_seg_size;
-    long  seg_size[MAX_PAGE_SIZES];    /* segment size in bytes*/
-    int num_cpu_filters;
-    int num_mem_filters;
-    char cpu_filter_str[MAX_FILTERS][MAX_POSSIBLE_ENTRIES];
-    char mem_filter_str[MAX_FILTERS][MAX_POSSIBLE_ENTRIES];
-    struct filter_info filter;
+    int nx_async_flag;*/
+    int                     stride_sz;
+    char                    tlbie_test_case[20];
+    char                    corsa_performance[10];
+    int                     corsa_perf_flag;
+	int                     mpss_seg_size;
+    long                    seg_size[MAX_PAGE_SIZES];    /* segment size in bytes*/
+    int                     num_cpu_filters;
+    int                     num_mem_filters;
+    char                    cpu_filter_str[MAX_FILTERS][MAX_POSSIBLE_ENTRIES];
+    char                    mem_filter_str[MAX_FILTERS][MAX_POSSIBLE_ENTRIES];
+    struct                  filter_info filter;
+
+    /*cache exer specific*/
+    int                     tgt_cache;
+    int                     target_set;
+    int                     cache_test_case;                    /*CACHE_BOUNCE_ONLY,CACHE_BOUNCE_WITH_PREF,CACHE_ROLL_ONLY,CACHE_ROLL_WITH_PREF,PREFETCH_ONLY*/
+    unsigned int            pf_irritator;                       /* Prefetch irritator on/off                                    */
+    unsigned int            pf_nstride;                         /* Prefetch n-stride  on/off                                    */
+    unsigned int            pf_partial;                         /* Prefetch partial  on/off                                     */
+    unsigned int            pf_transient;                       /* Prefetch transient  on/off                                   */
+    unsigned int            pf_dcbtna;                          /* Prefetch DCBTNA on/off                                       */
+    unsigned int            pf_dscr;                            /* Prefetch Randomise DSCR on/off                               */
+    unsigned int            pf_conf;                            /* Prefetch configuration, a unique state of a combination of   */
+    unsigned int            prefetch_memory_size;               /* The amount of memory which will be prefetched.               */
+    unsigned int            cache_memory_size;                  /* The amount of memory that will be written by cache threads   */
+    int                     num_cache_threads_created;          /* Number of cache threads actually created in this rule.       */
+    int                     num_prefetch_threads_created;       /* Number of prefetch threads actually created in this rule.    */
+    int                     num_cache_threads_to_create;        /* Number of cache threads needed to be created in this rule.   */
+    int                     num_prefetch_threads_to_create;     /* Number of prefetch threads needed to be created in this rule.*/
+    int                     use_contiguous_pages;               /* TRUE or FALSE, indicates we are looking for contiguous pages */
 
 };
 
@@ -404,6 +459,33 @@ struct mem_exer_thread_info{
     struct page_wise_seg_info *seg_details;
 };
 	
+/****************************************************
+*Cache exerciser specific thread structure         *
+****************************************************/
+
+struct cache_exer_thread_info{
+    unsigned long long      pattern;
+    int                     oper_type;                        /* Possible values PREFETCH, CACHE, ALL*/
+    int                     prefetch_algorithm;                 /* Used by prefetch threads to determine which prefetch algorithm to run.   */
+    int                     start_class;
+    int                     end_class;
+    int                     walk_class_jump;
+    int                     offset_within_cache_line;
+    unsigned char           *contig_mem[MAX_HUGE_PAGES_PER_CACHE_THREAD];
+    unsigned char           *prefetch_memory_start_address;
+    int                     found_cont_pages;
+    int                     prefetch_streams;                   /* The maximum number of prefetch streams for the thread. Valid only for prefetch threads.  */
+    unsigned long long      read_dscr_val;                      /* The DSCR value that is read from SPR 3.                                                  */
+    unsigned long long      written_dscr_val;                   /* The DSCR value that is written to SPR 3.                                                 */
+    int                     pages_to_write;                     /* Number of HUGEB pages written by ( cache ) thread.                                       */
+    int                     num_mem_sets;                       /* Number of sets of contiguous memory to be written by ( cache ) thread.                   */
+    struct drand48_data     buffer;
+    long int                random_pattern;
+    long int                seedval;
+    unsigned int            prev_seed;
+    unsigned int            saved_seed;
+    unsigned long long      prefetch_scratch_mem[64/sizeof(unsigned long long)];
+};
 
 /*****************************************************
 *A single thread structure collective of all nest exers
@@ -414,7 +496,7 @@ struct thread_data {
     pthread_t tid;
     pthread_t kernel_tid;
     pthread_attr_t  thread_attrs;
-    int num_oper;
+    int current_num_oper;
     int bind_proc;	/* logical cpu number to bind*/
     int thread_type;     /*mem,cache,fabricbus,tlbie.. etc*/
 
@@ -470,6 +552,41 @@ struct fabb_exer_info {/* RFB1: keep a pointer of this strucure in global str*/
     struct dest_chip_details dest_chip[MAX_CPUS];
 
 };
+/********************************************************************
+*cache exerciser specific structures*
+********************************************************************/
+struct cache_mem_info {
+    int                 huge_page_index;
+    unsigned long       huge_page_size;
+    int                 prefetch_page_index;
+    unsigned long long  ra[MAX_HUGE_PAGES];
+    unsigned char       *ea[MAX_HUGE_PAGES];
+    unsigned char       *prefetch_ea;
+    int                 num_pages;
+    int                 page_status[MAX_HUGE_PAGES];
+};
+
+struct huge_page_info {
+    int page_num;
+    int in_use;
+    unsigned char *ea;
+};
+struct contiguous_mem_info{
+    int num_pages;
+    struct huge_page_info* huge_pg;
+    int in_use_mem_chunk;
+};
+struct cache_exer_info {
+    unsigned long contiguous_mem_required;
+    unsigned long worst_case_cache_memory_required;
+    unsigned long worst_case_prefetch_memory_required;
+    unsigned long max_possible_cache_threads;
+    unsigned long max_possible_prefetch_threads;
+    struct  cache_mem_info cache_pages;
+    struct  contiguous_mem_info *cont_mem;
+    int     num_cont_mem_chunks;
+    struct cache_exer_thread_info *cache_th_data;
+};
 
 struct nest_stats_info {
     unsigned long bytes_writ;
@@ -493,7 +610,7 @@ struct nest_global {
 	int cpu_DR_flag;
 	int mem_DR_flag;
 
-	int stanza_num; /* --- move to rule info */
+    int num_stanzas;
 	pthread_mutex_t tmutex;/*RV1: check to remove this*/
     int msg_n_err_logging_lock;/* Remove from and displaym function once updated with htx library */
 	FILE *rf_ptr;
@@ -543,6 +660,9 @@ int parse_cpu_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
 int parse_mem_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
 int allocate_mem_for_threads(void);
 void release_thread_resources(int);
+int remove_shared_memory(void);
+int apply_filters(void);
+void print_memory_allocation_seg_details(int);
 #ifdef __HTX_LINUX__
 extern void SIGUSR2_hdl(int, int, struct sigcontext *);
 #endif
@@ -618,3 +738,18 @@ int fill_fabb_segment_details(int);
 int modify_fabb_shmsize_based_on_cpufilter(int,int);
 int fill_fabb_thread_structure(struct chip_mem_pool_info*,int);
 int run_tlb_operaion(void);
+/*cache exer specific modules*/
+int fill_cache_exer_mem_req(void);
+int cache_exer_operations(void);
+void* prefetch_thread_function(void*);
+void* cache_thread_function(void*);
+int find_EA_to_RA(unsigned long ,unsigned long long* );
+int prefetch_randomise_dscr(unsigned long long , unsigned int , unsigned int);
+void  partial_dcbt(unsigned long long , unsigned long long , unsigned long long ,unsigned long long*);
+int do_prefetch( unsigned long long,unsigned long long,unsigned long long,unsigned int,unsigned long long,unsigned long long);
+int get_random_number_pref(int);
+int prefetch(unsigned long long, unsigned long long,unsigned long long);
+int transient_dcbt(unsigned long long,unsigned long long,unsigned long long);
+int prefetch_dcbtna(unsigned long long,unsigned long long,unsigned long long);
+int n_stride(unsigned long long,unsigned long long,unsigned long long,long long unsigned int *);
+int dump_miscompare_data(int,void*);

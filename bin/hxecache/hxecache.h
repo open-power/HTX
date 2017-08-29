@@ -117,8 +117,8 @@
 #define dcbtds_0xA(x) __asm ("dcbt 0,%0,0xA\n\t": : "r" (x))
 #endif
 
-#define mtspr_dscr(x) asm volatile ("mtspr 3, %0\n\t": "=r"(x))
-#define mfspr_dscr(x) asm volatile ("mfspr %0, 3\n\t": : "r"(x))
+#define mtspr_dscr(x) __asm volatile ("mtspr 3, %0\n\t": "=r"(x))
+#define mfspr_dscr(x) __asm volatile ("mfspr %0, 3\n\t": : "r"(x))
 
 /* Log levels */
 #define MINIMUM 0
@@ -448,7 +448,7 @@ int				update_hxecache_stats(int current_test_case);
 int 			calculate_mem_requirement_for_p7p(struct ruleinfo *rule_ptr);
 int 			calculate_mem_requirement_for_p7(struct ruleinfo *rule_ptr);
 int 			calculate_mem_requirement_for_p8(struct ruleinfo *rule_ptr);
-int             calculate_mem_requirement_for_p9(struct ruleinfo *);
+int 			calculate_mem_requirement_for_p9(struct ruleinfo *rule_ptr);
 unsigned int 	get_max_total_mem_req(void);
 unsigned int 	get_max_cache_mem_req(void);
 int 			wait_for_threads_termination(int current_test_case);

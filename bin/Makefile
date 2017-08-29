@@ -1,8 +1,8 @@
 include ../htx.mk
 
-SUBDIRS= hxssup hxsmsg hxstats htxd hxesamp show_syscfg  hxetlbie hxecentaur \
+SUBDIRS= hxssup hxsmsg hxstats htxd hxesamp show_syscfg  hxecentaur \
 	hxestorage hxecapi hxecom hxediag hxedapl hxemem64 hxetape hxesctu hxefpu64 hxecd  \
-	hxecache hxerng hxeasy hxefabricbus create_eq_cfg create_eq_mdt
+	hxecache hxerng hxeasy create_eq_cfg create_eq_mdt
 
 ifeq ($(HTX_RELEASE), $(filter ${HTX_RELEASE},"htxrhel72le" "htxrhel7" "htxubuntu"))
 	SUBDIRS+=hxecorsa

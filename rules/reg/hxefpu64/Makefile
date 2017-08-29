@@ -24,6 +24,8 @@ TARGET= \
         rules.vsx.vmx \
         rules.multi \
         rules.hpc_comp_node \
+	fpu_cpu_combo.p8 \
+	fpu_cpu_combo.p9 \
         hxefpu64.readme
 
 .PHONY: all clean

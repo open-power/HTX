@@ -34,6 +34,8 @@ TARGET= \
              mem.coral_pass1 \
              default \
              default.char \
+			 rules.char_1 \
+			 rules.char_2 \
              default.less \
              default.eq \
              default.mfg \

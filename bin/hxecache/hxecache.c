@@ -3153,8 +3153,10 @@ int setup_cache_thread_context(void) {
 	int			contiguous_pages 	= ceil( (double)current_rule->cont_memory_pool.contiguous_mem_required / (double) pg_size);
 	int			enabled_cores		= system_information.num_cores - current_rule->num_excluded_cores;
 
-	if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
-		enabled_cores = enabled_cores * 2;
+	if((system_information.pvr == POWER9_CUMULUS) || (system_information.pvr == POWER9_NIMBUS)){
+			if (DD1_FUSED_CORE == system_information.p9_dd1_bit){
+				enabled_cores = enabled_cores * 2;
+			}
 	}
 	if( testcase == CACHE_BOUNCE_ONLY || testcase == CACHE_BOUNCE_WITH_PREF ) {
 

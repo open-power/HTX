@@ -1,0 +1,28 @@
+* Rule 1 - L3 Rollover testcase without Prefetch
+* Rule 2 - L3 Rollover testcase with Prefetch running with default value in DSCR.
+*******************************************************************************************
+rule_id                 = L3_ROLL_1
+target_cache            = L3
+target_set              = -1
+width                   = 8
+num_oper                = 100
+num_writes              = 1
+num_read_comp           = 1
+cache_test_case         = CACHE_ROLL_ONLY
+cpu_filter		= N*P*C%50T*
+
+rule_id                 = L3_ROLL_PF_DEF_2
+target_cache            = L3
+target_set              = -1
+width                   = 8
+num_oper                = 100
+num_writes              = 1
+num_read_comp           = 1
+prefetch_irritator      = 1
+prefetch_nstride        = 1
+prefetch_partial        = 1
+prefetch_transient      = 1
+prefetch_dcbtna         = 1
+dscr                    = DSCR_DEFAULT
+cache_test_case         = CACHE_ROLL_WITH_PREF
+cpu_filter              = N*P*C%50T*

@@ -1,3 +1,21 @@
+/* IBM_PROLOG_BEGIN_TAG */
+/*
+ * Copyright 2003,2016 IBM International Business Machines Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/* IBM_PROLOG_END_TAG */
 #include "nest_framework.h"
 extern char page_size_name[MAX_PAGE_SIZES][8];
 extern struct nest_global g_data;
@@ -61,7 +79,7 @@ int memory_segments_calculation(){
 	char dump_file[100],temp_str[100];
 	FILE *fp;
 	/*DD1_NORMAL_CORE is 1 */
-    if((DD1_NORMAL_CORE == get_p9_core_type())&& (((g_data.sys_details.os_pvr == POWER9_NIMBUS)) || (g_data.sys_details.os_pvr == POWER9_CUMULUS))){
+    if((DD1_NORMAL_CORE == get_p9_core_type())&& (((g_data.sys_details.true_pvr == POWER9_NIMBUS)) || (g_data.sys_details.true_pvr == POWER9_CUMULUS))){
         div_factor = 2;
     }
     if((strncmp ((char*)(DEVICE_NAME+5),"fabn",4)) == 0){
@@ -144,7 +162,7 @@ int memory_segments_calculation(){
                             }
                     }
                     /*capture total L3 size for every chip*/
-                    fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cinfo[L3].cache_size);
+                    fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
                     absolute_chip++;
                 }
             }
@@ -207,7 +225,7 @@ int memory_segments_calculation(){
                         k = (k + sysptr->node[remote_node++].num_chips);
                     }   
                     /*capture total L3 size for every chip*/
-                    fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cinfo[L3].cache_size);
+                    fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
                     absolute_chip++;
                 }
             }
@@ -232,7 +250,7 @@ int fill_fabb_segment_details(int chip){
     struct page_wise_seg_info *seg_details;
     struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[0];
     
-    seg_size = (g_data.sys_details.cinfo[L3].cache_size * 2);
+    seg_size = (g_data.sys_details.cache_info[L3].cache_size * 2);
     num_segs = fab_g.segs_per_chip[chip];
     for(pi = 0;pi<MAX_PAGE_SIZES;pi++){
         if((mem_details_per_chip[chip].memory_details.pdata[pi].supported == TRUE) && (mem_details_per_chip[chip].memory_details.pdata[pi].free != 0)) {

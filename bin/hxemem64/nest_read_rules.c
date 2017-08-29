@@ -53,14 +53,11 @@ void set_defaults(void)
     r.debug_level = 0;
     r.num_patterns = 0;
     strcpy(r.pattern_name[0]," ");
-    r.nx_rem_th_flag = 1;
-    r.nx_perf_flag = 0;
-    r.nx_async_flag = 0;
     r.stride_sz = 128;
-    r.mem_l4_roll = 134217728;
+    /*r.mem_l4_roll = 134217728;
     r.bm_position = 7;
     r.bm_length = 2;
-    r.mcs_mask = -1;
+    r.mcs_mask = -1;*/
     r.seed = 0; 
     strcpy(r.tlbie_test_case,"RAND_TLB");
     strcpy(r.cpu_filter_str[0],"N*P*C*T*");
@@ -70,6 +67,17 @@ void set_defaults(void)
     for(int i=0;i<MAX_PAGE_SIZES;i++){
         r.seg_size[i] = -1;
     }
+    /*cache exer specific*/
+    r.tgt_cache = L3;
+    r.cache_test_case = CACHE_ROLL_ONLY;
+    r.target_set      = -1;
+    r.pf_irritator = 0;
+    r.pf_nstride = 0;
+    r.pf_partial = 0;
+    r.pf_transient = 0;
+    r.pf_dcbtna = 0;
+    r.pf_dscr = DSCR_DEFAULT;
+    r.pf_conf =  PREFETCH_OFF;
 }
 
 /*****************************************************************************
@@ -596,8 +604,23 @@ int get_rule(int * line, FILE *fp)
                   exit(1);
             } /* end else */
         }
-    else if ((strcmp(keywd,"RANDOM_BIND"))== 0)
-       {
+        else if ((strcmp(keywd,"CRASH_ON_MISC"))== 0)
+        {
+            char bp[20];
+            (void) sscanf(s,"%*s %s",bp);
+            if (strcmp(bp,"NO") == 0 ) {
+                r.misc_crash_flag= 0;
+            }else if (strcmp(bp,"YES") == 0) {
+                r.misc_crash_flag= 1;
+            }
+            else {
+                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s =%s "
+                         "(must be NO or YES)\n",*line, keywd, bp);
+                  exit(1);
+            } /* end else */
+        }
+        else if ((strcmp(keywd,"RANDOM_BIND"))== 0)
+        {
            char bm[20];
            (void) sscanf(s,"%*s %s",bm);
              if (strcmp(bm,"NO") == 0 ) {
@@ -1035,6 +1058,7 @@ int get_rule(int * line, FILE *fp)
             }
             else {
                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s (pattern not specified properly )\n",__LINE__,__FUNCTION__,*line,s);
+                exit(1);
             }         
         }
         else if ((strcmp(keywd,"MEM_FILTER"))==0){
@@ -1054,15 +1078,128 @@ int get_rule(int * line, FILE *fp)
             if (tmp_str) {
                  displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line# %s (more than "
                     "%d filters cannot be specified in a single rule\n",__LINE__,__FUNCTION__,s,MAX_FILTERS);
+                 exit(1);
             }
             if ( i ) {
                  r.num_mem_filters = i;
             }
             else {
                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s (pattern not specified properly )\n",__LINE__,__FUNCTION__,*line,s);
+                exit(1);
             }         
         }
-        else
+        /*cache specific rules*/
+        else if ((strcmp(keywd,"TARGET_CACHE"))==0){
+            char tmp[4];
+            (void) sscanf(s,"%*s %s",tmp);
+            if ( (strcmp(tmp,"L2") != 0) && ( strcmp(tmp,"L3") != 0) ) {
+                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s , possible values are L2 or L3 \n",__LINE__,__FUNCTION__,*line,s);
+                exit(1);
+            }else{
+                if ( strcmp(tmp,"L2") == 0 ) {
+                    r.tgt_cache = L2;
+                }else if ( strcmp(tmp,"L3") == 0 ) {
+                    r.tgt_cache = L3;
+                } 
+            }
+        }else if((strcmp(keywd,"TARGET_SET"))==0){
+            sscanf(s,"%*s %d",&r.target_set);
+        }else if((strcmp(keywd,"CACHE_TEST_CASE"))==0){
+           char ay[20];
+           (void) sscanf(s,"%*s %s",ay);
+            if (strcmp(ay,"CACHE_BOUNCE_ONLY") == 0 ) {
+                 r.cache_test_case = CACHE_BOUNCE_ONLY;
+            }else if(strcmp(ay,"CACHE_BOUNCE_WITH_PREF") == 0 ) {
+                r.cache_test_case = CACHE_BOUNCE_WITH_PREF;
+            }else if(strcmp(ay,"CACHE_ROLL_ONLY") == 0 ) {
+                r.cache_test_case = CACHE_ROLL_ONLY;
+            }else if(strcmp(ay,"CACHE_ROLL_WITH_PREF") == 0) {
+                r.cache_test_case = CACHE_ROLL_WITH_PREF;
+            } else if ( strcmp(ay,"PREFETCH_ONLY") == 0) {
+                r.cache_test_case = PREFETCH_ONLY;
+            }else{
+                    displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s ,Invalid value, Please choose anyof: "
+                        "CACHE_BOUNCE_ONLY,CACHE_BOUNCE_WITH_PREF,CACHE_ROLL_ONLY,CACHE_ROLL_WITH_PREF,PREFETCH_ONLY\n",
+                        __LINE__,__FUNCTION__,*line,s);
+                    exit(1);
+            }
+        }else if((strcmp(keywd, "PREFETCH_IRRITATOR")) == 0 ) {
+            sscanf(s,"%*s %d",&r.pf_irritator);
+            if(r.pf_irritator != 1 && r.pf_irritator != 0){
+                    displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s ,Invalid value,possible values are 1 or 0\n",
+                        __LINE__,__FUNCTION__,*line,s);
+                    exit(1);
+            }
+            r.pf_conf += (r.pf_irritator * PREFETCH_IRRITATOR);
+        }else if((strcmp(keywd, "PREFETCH_NSTRIDE")) == 0 ) {
+            sscanf(s,"%*s %d",&r.pf_nstride);
+            if(r.pf_nstride!= 1 && r.pf_nstride!= 0){
+                    displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s ,Invalid value,possible values are 1 or 0\n",
+                        __LINE__,__FUNCTION__,*line,s);
+                    exit(1);
+            }
+            if ( r.pf_nstride == 1 && g_data.sys_details.os_pvr == 0x3E) {
+                displaym(HTX_HE_INFO,DBG_MUST_PRINT,"prefetch n-stride not supported for P6\n");
+                r.pf_nstride = 0;
+            }
+            r.pf_conf += (r.pf_nstride * PREFETCH_NSTRIDE);
+        }else if((strcmp(keywd, "PREFETCH_PARTIAL")) == 0 ) {
+            sscanf(s,"%*s %d",&r.pf_partial);
+            if(r.pf_partial != 1 && r.pf_partial != 0){
+                    displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s ,Invalid value,possible values are 1 or 0\n",
+                        __LINE__,__FUNCTION__,*line,s);
+                    exit(1);
+            }
+            if ( r.pf_partial == 1 && g_data.sys_details.os_pvr == 0x3E) {
+                displaym(HTX_HE_INFO,DBG_MUST_PRINT,"prefetch partial not supported for P6\n");
+                r.pf_partial = 0;
+            }
+            r.pf_conf += (r.pf_partial * PREFETCH_PARTIAL);
+        }else if((strcmp(keywd, "PREFETCH_TRANSIENT")) == 0 ) {
+            sscanf(s,"%*s %d",&r.pf_transient);
+            if(r.pf_transient != 1 && r.pf_transient != 0){
+                    displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s ,Invalid value,possible values are 1 or 0\n",
+                        __LINE__,__FUNCTION__,*line,s);
+                    exit(1);
+            }
+            if ( r.pf_transient == 1 && g_data.sys_details.os_pvr == 0x3E) {
+                displaym(HTX_HE_INFO,DBG_MUST_PRINT,"prefetch transient not supported for P6\n");
+                r.pf_transient = 0;
+            }
+            r.pf_conf += (r.pf_transient * PREFETCH_TRANSIENT);
+        }else if((strcmp(keywd, "PREFETCH_DCBTNA")) == 0 ) {
+            sscanf(s,"%*s %d",&r.pf_dcbtna);
+            if(r.pf_dcbtna != 1 && r.pf_dcbtna != 0){
+                    displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s ,Invalid value,possible values are 1 or 0\n",
+                        __LINE__,__FUNCTION__,*line,s);
+                    exit(1);
+            }
+            if ( r.pf_dcbtna == 1 && g_data.sys_details.os_pvr < POWER8_MURANO) {
+                displaym(HTX_HE_INFO,DBG_MUST_PRINT,"prefetch transient not supported for P6\n");
+                r.pf_dcbtna = 0;
+            }
+            r.pf_conf += (r.pf_dcbtna * PREFETCH_NA);
+        }
+        else if ((strcmp(keywd, "DSCR")) == 0 ) {
+            char test[20];
+            sscanf(s, "%*s %s", test);
+        
+            if ( strcmp(test,"DSCR_DEFAULT") == 0) {
+                r.pf_dscr = DSCR_DEFAULT;
+            } else if ( strcmp( test, "DSCR_RANDOM") == 0) {
+                r.pf_dscr = DSCR_RANDOM;
+            } else if ( strcmp( test, "DSCR_LSDISABLE" ) == 0 ) {
+                r.pf_dscr = DSCR_LSDISABLE;
+            }else{
+                displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line#%d %s,dscr should have value of either DSCR_DEFAULT / DSCR_RANDOM / DSCR_LSDISABLE \n",
+                    __LINE__,__FUNCTION__,*line,s);
+                exit(1);
+            }
+            if(r.pf_dscr != DSCR_DEFAULT && g_data.sys_details.os_pvr < POWER8_MURANO) {
+                displaym(HTX_HE_INFO,DBG_MUST_PRINT,"Warning: DSCR is writable from user space only on P8 and above, current pvr = 0x%x. Ignoring.\n",g_data.sys_details.os_pvr);
+                r.pf_dscr = DSCR_DEFAULT;
+            }
+        }else
         {
             displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:line# %d keywd = %s "
                     "(invalid)\n",__LINE__,__FUNCTION__,*line,keywd);
@@ -1079,14 +1216,13 @@ int get_rule(int * line, FILE *fp)
                      " specified \n",__LINE__,__FUNCTION__,first_line);
              exit(1);
         }
-         else rc=0;
+        else rc=0;
     }
     else rc=EOF;
 
     if (rc != EOF ) {
-
-        if(((g_data.gstanza.global_disable_filters == 0) || ((g_data.sys_details.unbalanced_sys_config == 0) || (g_data.test_type == FABRICB))) && (g_data.sys_details.shared_proc_mode != 1)
-            && (g_data.test_type != TLB)){
+        if(((g_data.gstanza.global_disable_filters == 0) || ((g_data.sys_details.unbalanced_sys_config == 0) || (g_data.test_type == FABRICB) || (g_data.test_type == CACHE))) 
+             && (g_data.sys_details.shared_proc_mode != 1) && (g_data.test_type != TLB)){
             g_data.gstanza.global_disable_filters = 0;
 			/* calling cpu/mem  filter parsing modules*/
 			rc = parse_cpu_filter(r.cpu_filter_str);
@@ -1172,6 +1308,8 @@ int read_rules(void)
     strcpy(g_data.stanza_ptr->rule_id,"NONE");
 
     g_data.stanza_ptr=&g_data.stanza[0];
+    g_data.stanza_ptr->stanza_num = 0;
+    g_data.num_stanzas = 0;
     i = 0;
     while( strcmp(g_data.stanza_ptr->rule_id,"NONE") != 0)
     {
@@ -1199,6 +1337,7 @@ int read_rules(void)
         debug(HTX_HE_INFO,DBG_INFO_PRINT,"pres_stanza->width=%d\n",g_data.stanza_ptr->width);
         debug(HTX_HE_INFO,DBG_INFO_PRINT,"pres_stanza->debug_level=%d\n",g_data.stanza_ptr->debug_level);
         g_data.stanza_ptr++;
+        g_data.stanza_ptr->stanza_num = ++g_data.num_stanzas;
     } /* while (strcmp(.... ENDS */
 
 	fclose(g_data.rf_ptr);

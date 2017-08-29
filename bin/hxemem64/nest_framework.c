@@ -226,24 +226,25 @@ int read_cmd_line(int argc,char *argv[])
     2nd logical procesor
     */
 
-    /*RV2: override filters with below cpu number in case of EQUILIZER*/
+    i = DEFAULT_INSTANCE;
     sscanf(DEVICE_NAME,"%[^0-9]s",tmp);
     strcat(tmp,"%d");
 
-    i = UNSPECIFIED_LCPU;
     if ((j=sscanf(DEVICE_NAME,tmp,&i)) < 1) {
-        strcpy(msg,"read_cmd_line: No binding specified with the device name.\n");
+        strcpy(msg,"read_cmd_line: No chip instance is specified with device name, assuming it as 0 for cache exerciser\n");
         if(g_data.gstanza.global_debug_level == DBG_DEBUG_PRINT) {
             sprintf(msg,"%sDebug info:%s,i=%d,j=%d\n",msg,tmp,i,j);
         }
-        i = UNSPECIFIED_LCPU;
+        i = DEFAULT_INSTANCE;
     }
     else {
-        sprintf(msg,"Binding is specified proc=%i\n",i);
+        sprintf(msg,"specified chip instance is = %i\n",i);
     }
 
     if(g_data.standalone == 1) {
-        displaym(HTX_HE_INFO,DBG_IMP_PRINT,"%s",msg);
+        if ((strncmp ((char*)(DEVICE_NAME+5),"cach",4)) == 0){
+            displaym(HTX_HE_INFO,DBG_IMP_PRINT,"%s",msg);
+        }
     }
     /*g_data.bind_proc=i;*/
 	g_data.dev_id = i;
@@ -267,7 +268,8 @@ void get_test_type()
 		g_data.test_type = TLB;
 	}	
 	else {
-		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:unknown device name %s\n",__LINE__,__FUNCTION__,DEVICE_NAME);
+		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:unknown device name %s, supported htx nest devices are:"
+            "mem,cache<chip_num>,fabn,fabc,tlb\n",__LINE__,__FUNCTION__,DEVICE_NAME);
 		exit(1);
 	}
 		
@@ -286,17 +288,17 @@ void get_cache_details() {
         L3cache( &cpu_cache_information);
 #endif
 
-	g_data.sys_details.cinfo[L2].cache_size = cpu_cache_information.L2_size;
-	g_data.sys_details.cinfo[L2].cache_associativity=cpu_cache_information.L2_asc;;
-	g_data.sys_details.cinfo[L2].cache_line_size = cpu_cache_information.L2_line;
+	g_data.sys_details.cache_info[L2].cache_size = cpu_cache_information.L2_size;
+	g_data.sys_details.cache_info[L2].cache_associativity=cpu_cache_information.L2_asc;;
+	g_data.sys_details.cache_info[L2].cache_line_size = cpu_cache_information.L2_line;
 
-	g_data.sys_details.cinfo[L3].cache_line_size = cpu_cache_information.L3_line;
-	g_data.sys_details.cinfo[L3].cache_size = cpu_cache_information.L3_size;
-	g_data.sys_details.cinfo[L3].cache_associativity=cpu_cache_information.L3_asc;;
+	g_data.sys_details.cache_info[L3].cache_line_size = cpu_cache_information.L3_line;
+	g_data.sys_details.cache_info[L3].cache_size = cpu_cache_information.L3_size;
+	g_data.sys_details.cache_info[L3].cache_associativity=cpu_cache_information.L3_asc;;
 
-	g_data.sys_details.cinfo[L4].cache_line_size = 128;
-	g_data.sys_details.cinfo[L4].cache_size = 16 * MB;
-	g_data.sys_details.cinfo[L4].cache_associativity=16;
+	g_data.sys_details.cache_info[L4].cache_line_size = 128;
+	g_data.sys_details.cache_info[L4].cache_size = 16 * MB;
+	g_data.sys_details.cache_info[L4].cache_associativity=16;
 	
 }
 
@@ -353,14 +355,12 @@ int get_system_details() {
     }
 
     /* Get pvr information */
-#if defined(__HTX_LINUX__) && defined(AWAN)
-    sysptr->os_pvr = POWER8_MURANO; /* Hardcode p8 value for AWAN */
-#elif defined(__HTX_LINUX__) && !defined(AWAN)
-    /*system_information.pvr = get_pvr();*/
     sysptr->os_pvr=get_cpu_version();
     sysptr->os_pvr = (sysptr->os_pvr)>>16 ;
-	/*####*** add true pvr details*/
-#endif
+
+    sysptr->true_pvr = get_true_cpu_version();
+    sysptr->true_pvr = (sysptr->true_pvr)>>16;
+
     if(g_data.test_type == MEM){/*collect mem details once all exerciser are started*/
         /*REV:below calls need to be replaced with single lib call*/
         rc=get_memory_size_update();
@@ -431,6 +431,15 @@ int get_system_details() {
 		mem_details_per_chip[i].memory_details.total_mem_avail 	= sys_mem_info.mem_pools[i].mem_total;
 		mem_details_per_chip[i].memory_details.total_mem_free	= sys_mem_info.mem_pools[i].mem_free;
 		mem_details_per_chip[i].has_cpu_and_mem 			= sys_mem_info.mem_pools[i].has_cpu_or_mem;               /*flag,to check node has either cpus or memory */ 	
+        mem_details_per_chip[i].num_cores = 0;
+        for(int c =0; c < MAX_CORES_PER_CHIP; c++){
+            mem_details_per_chip[i].core_array[c].num_procs = 0;
+            mem_details_per_chip[i].inuse_core_array[c].num_procs = 0;
+            for(int cpu = 0;cpu < MAX_CPUS_PER_CORE;cpu++){
+                mem_details_per_chip[i].core_array[c].lprocs[cpu] = -1;
+                mem_details_per_chip[i].inuse_core_array[c].lprocs[cpu] = -1;
+            }    
+        }
         if(!mem_details_per_chip[i].has_cpu_and_mem){
             sysptr->unbalanced_sys_config = 1;
         }
@@ -497,11 +506,15 @@ int get_system_details() {
 				
 								sysptr->node[node].chip[chip].core[core].lprocs[lcpu] = global_ptr->syscfg.node[node].chip[chip].core[core].lprocs[lcpu];
 		   	   					sysptr->node[node].chip[chip].core[core].num_procs++;
+                                /*update chip_mem_pool structure ass well*/
+                                g_data.sys_details.chip_mem_pool_data[srad_counter].core_array[core].lprocs[lcpu] = global_ptr->syscfg.node[node].chip[chip].core[core].lprocs[lcpu];
+                                g_data.sys_details.chip_mem_pool_data[srad_counter].core_array[core].num_procs++;
 								debug(HTX_HE_INFO,DBG_DEBUG_PRINT,"sysptr->node[%d].chip[%d].core[%d].lprocs[%d]=%d\n",node,chip,
 								core,lcpu,sysptr->node[node].chip[chip].core[core].lprocs[lcpu]);
 
      			    		}
 		     		        sysptr->node[node].chip[chip].num_cores++;
+                            g_data.sys_details.chip_mem_pool_data[srad_counter].num_cores++;
 		   				}
 		   			}	
                     memcpy(&sysptr->node[node].chip[chip].mem_details,&g_data.sys_details.chip_mem_pool_data[srad_counter].memory_details,sizeof(struct mem_info));         	
@@ -723,6 +736,10 @@ int main(int argc, char *argv[])
 			break;
 	
 		case CACHE:
+            ret_code =  mem_exer_opearation();
+            if(ret_code != SUCCESS){
+                    exit(1);
+            }
 			break;
 
 		case FABRICB:
@@ -764,7 +781,7 @@ void print_partition_config(int msg_type){
         (memptr->total_mem_avail/MB),(memptr->total_mem_free/MB),memptr->pspace_avail,memptr->pspace_free);
 
     for(i=0; i<MAX_PAGE_SIZES; i++) {
-    if(memptr->pdata[i].supported) {
+        if(memptr->pdata[i].supported) {
             sprintf(msg_temp,"\tpage size:%lu(%s)\t total pages=%lu\tfree pages=%lu\n",memptr->pdata[i].psize,page_size_name[i],
                 (memptr->pdata[i].avail/memptr->pdata[i].psize),
                 (memptr->pdata[i].free/memptr->pdata[i].psize)); 
@@ -788,8 +805,11 @@ void print_partition_config(int msg_type){
         strcat(msg,msg_temp);
     } 
     for(i=0;i<sysptr->num_chip_mem_pools;i++){
+        if((g_data.test_type == CACHE) && (i != g_data.dev_id)){
+            continue;
+        }
         if(mem_details_per_chip[i].has_cpu_and_mem){
-            sprintf(msg_temp,"\nchip no:%d\n\tcpus:%d",i,mem_details_per_chip[i].num_cpus);
+            sprintf(msg_temp,"\nchip no:%d\n\tcores:%d\t\tcpus:%d",i,mem_details_per_chip[i].num_cores,mem_details_per_chip[i].num_cpus);
             strcat(msg,msg_temp);
             /*for(k=0;k<mem_details_per_chip[i].num_cpus;k++){
                 sprintf(msg_temp,":%d",mem_details_per_chip[i].cpulist[k]);
@@ -824,7 +844,10 @@ int fill_exer_huge_page_requirement(){
 	}else if(memptr->pdata[PAGE_INDEX_2M].supported){
 		huge_page_index = PAGE_INDEX_2M;
 		huge_page_size = (2 * MB);
-	}
+	}else{
+        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"[%d]%s:huge page size is neither 2M nor 16M\n",__LINE__,__FUNCTION__);
+        return 0;
+    }
     strcpy(log_dir,g_data.htx_d.htx_log_dir);
     strcat(log_dir,"/freepages");
 	if ((fp=fopen(log_dir,"r"))==NULL) {
@@ -867,10 +890,14 @@ int fill_exer_huge_page_requirement(){
                 case TLB:
 
                     break;
+
+                case CACHE:
+                    
+                     break;
                         
 				default:
-					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]wrong test type arg is passed to fun %s for filling huge page deatils from %s\n",
-							__LINE__,__FUNCTION__,log_dir);			
+					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]wrong test type arg is passed to fun %s for filling huge page(page id:%d,size=%d) deatils from %s\n",
+							__LINE__,__FUNCTION__,huge_page_index,huge_page_size,log_dir);			
 					return(FAILURE);
 			}		
 		fclose(fp);
