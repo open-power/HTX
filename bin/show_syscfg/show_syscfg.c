@@ -17,6 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+/* @(#)47       1.3.3.25  src/htx/usr/lpp/htx/bin/show_syscfg/show_syscfg.c, htxconf, htxubuntu 8/20/17 09:51:37 */
 #include "htxsyscfg64.h"
 
 int main(int argc, char* argv[])
@@ -25,12 +26,8 @@ int main(int argc, char* argv[])
     int rc,rc1,rc2;
     rc=rc1=rc2=0;
     unsigned int     pvr_value_os,pvr_value_true, proc_version, proc_revision;
-    SYS_CONF         Sysconf;
     SYS_STAT         Sys_stat; 
-    unsigned int     nodes = 0,chips = 0,cores =0;
-    unsigned int     Pvr,total_cpus,j,k,l;
-    htxsyscfg_cpus_t system_cpu_information;
-    unsigned int     Threads[MAX_THREADS];
+    unsigned int     Pvr,j,k;
 
     htxsyscfg_lpar_t t;
     htxsyscfg_core_t u;
@@ -76,11 +73,9 @@ int main(int argc, char* argv[])
 
     get_lpar_details(&t);
 
-char end_string[256] = {0};
-char vir_string[256] = {0};
-
 char cP6_Compat_String[256] = {0};
 char cp7_Compat_String[256] = {0};
+char cp8_Compat_String[256] = {0};
 
 
 if ( get_p6_compat_mode(Pvr) )
@@ -100,6 +95,16 @@ else
 {
 	strcpy (cp7_Compat_String, "False");
 }
+
+if ( get_p8_compat_mode(Pvr) )
+{
+        strcpy (cp8_Compat_String, "True");
+}
+else
+{
+        strcpy (cp8_Compat_String, "False");
+}
+
 
 get_env_details(&e);
 
@@ -129,9 +134,12 @@ get_env_details(&e);
         printf("OS PVR Value                            : 0x%x\n",pvr_value_os);
 		printf("TRUE PVR Value                          : 0x%x\n",pvr_value_true);
         printf("Processor Version                       : 0x%x\n",proc_version);
+	if(proc_version == PV_POWER9_NIMBUS || proc_version == PV_POWER9_CUMULUS) 
+		printf("Fused/Normal core type			: %s\n",(get_p9_core_type()? "Normal":"Fused"));
         printf("Processor Revision                      : 0x%x\n",proc_revision);
         printf("Power6Compatmode                        : %s\n",cP6_Compat_String);
         printf("Power7Compatmode                        : %s\n",cp7_Compat_String);
+        printf("Power8Compatmode                        : %s\n",cp8_Compat_String);
 
     }
 
@@ -157,8 +165,6 @@ get_env_details(&e);
 
     get_core_details(&u);
 
-    printf("Smt capable                             : %d\n",u.smtdetails.smt_capable);
-    printf("Smt enabled                             : %d\n",u.smtdetails.smt_enabled);
     printf("Smt threads                             : %d\n",u.smtdetails.smt_threads);
 	printf("Min smt threads                         : %d\n",u.smtdetails.min_smt_threads);
 	printf("Max smt threads                         : %d\n",u.smtdetails.max_smt_threads);
@@ -291,11 +297,28 @@ get_env_details(&e);
 		        }
 		}
 
+	printf("\n\n--------------------------CHIPS PER NODE-----------------------------\n");
+	signed int chips_in_node[MAX_CHIPS_PER_NODE];
+    int node_no;
+	for(node_no=0; node_no < Sys_stat.nodes; node_no++) {
+		rc = get_chips_in_node(node_no,chips_in_node);
+		if (rc == -1) {
+			printf("Something wrong. Check node number\n");
+			exit(1);
+		}
+		 printf("Chips in node %d (%d)\t\t\t:",node_no,rc);
+            for(i=0; i<rc;i++) {
+                printf("%5d",chips_in_node[i]);
+            }
+            printf("\n");
+        }
+
+	
+	
 	    printf("\n\n--------------------------CORES PER NODE-----------------------------\n");
     	signed int cores_in_node[MAX_CORES_PER_NODE];
     	signed int cpus_in_node[MAX_THREADS_PER_NODE];
     	int rc = -1;
-    	int node_no;
     	for(node_no=0; node_no < Sys_stat.nodes; node_no++) {
         	rc = get_cores_in_node(node_no,cores_in_node);
 			if (rc == -1) {
@@ -367,7 +390,6 @@ get_env_details(&e);
 
 
 		printf("\n\n--------------------------CPUS PER CORE-----------------------------\n");
-		SYS_CONF test;
 		signed int cpus_in_core[MAX_THREADS_PER_CORE];
 		int core_no;
 		rc=-1;
@@ -392,11 +414,13 @@ get_env_details(&e);
 					printf("\n");
 				}
 		}
-	}
-    rc2 = pthread_rwlock_unlock(&(global_ptr->syscfg.rw));
-    if (rc2 !=0  ) {
-        printf("\n unlock inside get_hardware_config failed with errno=%d\n",rc2);
-    }
+
+	    rc2 = pthread_rwlock_unlock(&(global_ptr->syscfg.rw));
+	    if (rc2 !=0  ) {
+			printf("\n unlock inside get_hardware_config failed with errno=%d\n",rc2);
+	    }
+
+    	}
 
     if((argc==2) && (strcmp(argv[1],"shm")==0)) {
 		printf("no detach in show_syscfg for shm");
