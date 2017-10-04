@@ -426,8 +426,6 @@ core structures
 
 typedef struct
 {
-      int smt_capable;           /* SMT capable or not */
-      int smt_enabled;           /* SMT enabled or not */
       int smt_threads;           /* SMT threads per cpu */
 	  int min_smt_threads;
 	  int max_smt_threads;
@@ -702,6 +700,7 @@ int get_hardware_config(SYS_CONF *sys_conf,unsigned int tot_cpus, unsigned int p
 
 int get_p6_compat_mode (unsigned int Pvr);
 int get_p7_compat_mode(unsigned int Pvr);
+int get_p8_compat_mode(unsigned int Pvr);
 int get_virtualization_type(void);
 int get_endianess (void);
 

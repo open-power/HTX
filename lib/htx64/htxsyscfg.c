@@ -648,25 +648,18 @@ int get_lpar_details(htxsyscfg_lpar_t *t)
 /*Retrieves smt details*/
 int get_smt_details_update(void)
 {
-    int r1;
     char dest[100];
 	htxsyscfg_smt_t *t;
     t =&(global_ptr->global_core.smtdetails);
 
-    t->smt_capable = 1; /* hardcode it to 1 for now. */
     if ( sys_mount_check() ) {
         return (-1);
     }
-	else {
-        r1 = get_cmd_op(dest, "ls /sys/devices/system/cpu/cpu0 | grep smt_snooze_delay | wc -l");
-        t->smt_enabled=atoi(dest);  /*System is smt capable and/or whether smt is enabled*/
-    }
-
     t->smt_threads     = global_ptr->global_core.smtdetails.smt_threads;
     t->min_smt_threads = global_ptr->global_core.smtdetails.min_smt_threads;/*min and max smt is because in case of hotplug supported env there is no fix cpu numbers per core*/
     t->max_smt_threads = global_ptr->global_core.smtdetails.max_smt_threads;
 
-    return ( r1 );
+    return 0;
 }
 
 int get_smt_details(htxsyscfg_smt_t *t)
@@ -1038,6 +1031,7 @@ int get_memory_pools(void) {
             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg); 
             /*return -4;*/ /* workaround for the race condition with the sigchld */
     }
+	
 	if ((fp=fopen(fname,"r"))==NULL){
 		sprintf(msg,"fopen of file %s failed with errno=%d",fname,errno);
 		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
@@ -1895,11 +1889,29 @@ int get_p7_compat_mode(unsigned int Pvr)
 printf("Pvr=%x,temp=%d\n", Pvr, temp);
 #endif
 
-    if ( ( Pvr == PV_POWER8_MURANO || Pvr == PV_POWER8_VENICE || Pvr == PV_POWER8_PRIME) && ( temp > 0 ) )
+    if ( ( Pvr == PV_POWER8_MURANO || Pvr == PV_POWER8_VENICE || Pvr == PV_POWER8_PRIME || Pvr == PV_POWER9_NIMBUS || Pvr == PV_POWER9_CUMULUS ) && ( temp > 0 ) )
 		return 1;
 	else
 		return 0;
 }
+
+int get_p8_compat_mode(unsigned int Pvr)
+{
+    unsigned int temp;
+    char dest[256] = {0};
+
+    temp = get_cmd_op(dest, "cat /proc/cpuinfo | grep -i POWER8 | wc -l");
+    temp = atoi(dest);
+
+#ifdef DEBUG
+printf("Pvr=%x,temp=%d\n", Pvr, temp);
+#endif
+    if ( ( Pvr == PV_POWER9_NIMBUS || Pvr == PV_POWER9_CUMULUS ) && ( temp > 0 ) )
+                return 1;
+        else
+                return 0;
+}
+
 
 /*provides endiamness and virtualization type of the architecture*/
 int get_env_details_update(void)
@@ -2101,7 +2113,7 @@ printf("entering function get_hardware_config,tot_cpus=%d, vir_typ(0=KVM_Guest, 
 
         #ifdef __HTX_LINUX__
             /* Restore original/default CPU affinity so that it binds to ANY available processor */
-            rc = htx_unbind_process();
+            rc = htx_unbind_thread();
         #else
         rc = bindprocessor(BINDPROCESS, getpid(), PROCESSOR_CLASS_ANY);
         #endif
@@ -2161,6 +2173,20 @@ printf("entering function get_hardware_config,tot_cpus=%d, vir_typ(0=KVM_Guest, 
     }
     physical_scfg.num_nodes = 0 ;
 
+    for(node = 0; node < MAX_NODE; node++) {
+        for(chip = 0; chip < MAX_CHIPS_PER_NODE; chip ++) {
+            for(core =0; core < MAX_CORES_PER_CHIP; core ++) {
+                for(proc = 0; proc < MAX_CPUS_PER_CORE; proc ++) {
+                    sys_conf->node[node].chip[chip].core[core].lprocs[proc] = -1;
+                                        sys_conf->node[node].chip[chip].core[core].pprocs[proc] = -1;
+                }
+                sys_conf->node[node].chip[chip].core[core].num_procs = 0;
+            }
+            sys_conf->node[node].chip[chip].num_cores = 0;
+        }
+        sys_conf->node[node].num_chips = 0;
+    }
+    sys_conf->num_nodes = 0 ;
     if(type != KVM_GUEST && type != PVM_PROC_SHARED_GUEST)/* for both KVM host and PVM*/
     {
         i = 0;
@@ -2707,30 +2733,30 @@ int get_true_cpu_revision(void)
 /* API to see if the chip is in fused or normal core mode   */
 /* DD1_NORMAL_CORE = 1 and DD1_FUSED_CORE = 0         */
 /* check for DD1_NORMAL_CORE or DD1_FUSED_CORE in exer*/
-
 int get_p9_core_type(void)
 {
     int pvr = 0;
     int dd1_bit = 0;
     pvr = global_ptr->global_pvr;
-	int pvr_full = (int)get_cpu_version();
+    int pvr_full = (int)get_true_cpu_version();
 	if (pvr == PV_POWER9_NIMBUS || pvr == PV_POWER9_CUMULUS){
-    	dd1_bit = ((pvr_full >> 20)  & 0x01); /* 19th bit in pvr signifies the fused/normal core mode*/
-		if( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"PVM_GUEST") == 0)
-    	    return(dd1_bit);
-	    else if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"NV") == 0)
-    	    return(DD1_NORMAL_CORE);
-	    else if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"KVM_GUEST") == 0)
-    	    return(DD1_NORMAL_CORE);
-    	else
-        	return(dd1_bit);
+		int pvr_revision = (pvr_full >> 8 & 0x0F) ; /* get the version value DD1 or DD2 */
+		dd1_bit = ((pvr_full >> 12)  & 0x01); /* 19th bit in pvr signifies the fused/normal core mode*/
+		if(pvr_revision  == 1 ){
+			if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"NV") == 0)
+				return(DD1_NORMAL_CORE);
+			else if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"KVM_GUEST") == 0)
+				return(DD1_NORMAL_CORE);
+			else
+				return(dd1_bit);
+		}
+		else if (pvr_revision  ==  2 ){
+			return(dd1_bit);
+       	}
 	}
 	else
-		return(DD1_NORMAL_CORE);
+		return(DD1_FUSED_CORE);
 }
-
-
-
 
 int get_num_of_nodes_in_sys(void)
 {
