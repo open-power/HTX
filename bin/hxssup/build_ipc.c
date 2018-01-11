@@ -53,6 +53,12 @@
 /*
  * Define all other un-supported signals as SIGUNUSED
  */
+
+/* Defining SIGUNUSED if not, since deprecated with glibc >= 2.26*/
+#ifndef SIGUNUSED
+#define SIGUNUSED 31
+#endif
+
 #ifdef	__HTX_LINUX__
 #define	SIGMAX	(SIGRTMAX)
 #define	SIGEMT	(SIGSEGV)
