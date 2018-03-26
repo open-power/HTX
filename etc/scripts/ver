@@ -44,10 +44,10 @@
   SYS_FW_LEVEL=`cat /proc/device-tree/openprom/model | cut -d ',' -f2 2>/dev/null || echo "Not Found"`
 
 # Clear screen
-[ $# -lt 1 ] && tput clear
+  [ "$1" = "clear" ] && tput clear
 
 # Display the gathered information
-	                     echo "       ver 1.5.4.3 - OS, HTX, Firmware and Machine details"
+                         echo "               ver - OS, HTX, Firmware and Machine details"
                          echo
 
 [ "$OS" ]             && echo "                           OS: $OS"
