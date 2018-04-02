@@ -34,6 +34,9 @@
   OS=`uname -o`
   [ -f /etc/SuSE-release ]   && OS_VERSION=`head -n 1 /etc/SuSE-release`;
   [ -f /etc/redhat-release ] && OS_VERSION=`cat /etc/redhat-release`;
+  [ -f /etc/os-release ] && {
+    OS_VERSION=`awk -F \" '/^NAME=/||/^VERSION=/ {printf("%s ", $2)}' /etc/os-release`
+  }
   [ -z "$OS_VERSION" ]       && OS_VERSION=`cat /etc/issue 2>/dev/null`
 
   KERNEL_VERSION=`uname -r`
