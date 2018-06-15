@@ -16,24 +16,14 @@
  */
 /* IBM_PROLOG_END_TAG */
 * %Z%%M%        %I%  %W% %G% %U%
-***********************************************************************
-* Rules files for 64 port adapter using hxeasy exerciser.
-* For more information on rules files options, read the default rules
-* file in this directory. Don't use baud rates < 150 for 64 port
-***********************************************************************
-* THIS IS A RULES FILE FOR A SINGLE PORT ON A 64 PORT ADAPTER.
-* IN ORDER TO TEST ALL PORTS, ONE OF THESE SHOULD BE RUN FOR EACH PORT
-RULE_ID =LION
-PATTERN_ID=HEX255
-NUM_OPER=10
-IGN_BRK=N
-BRK_INT=N
-IGN_PAR=N
-PAR_MARK=N
-IXON=n
-IXOFF=n
-CBAUD = 38400 19200 9600 4800 2400 1800 1200 600 300 150 
-CHSIZE=8 7 6 5
-CSTOPB=1 2
-PARODD=E O N
-NUM_CHARS=255
+
+* All CPU Instructions
+rule_id						test1
+num_oper					3000 
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100)]
+
