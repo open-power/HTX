@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/*static char sccsid[] = "%Z%%M%	%I%  %W% %G% %U%";*/
 
 #include "framework.h"
 
@@ -55,7 +54,7 @@ struct instruction_masks dfp_instructions_array[] = {
 /* dmulq	*/ {0xFC000044 , 0xffffffff , DFP_QUAD , 16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD , 21 , 0x20 , "dmulq", (sim_fptr)&simulate_dmulq ,DFP_AIRTH_QUAD, X_FORM_RT_RA_RB_eop_rc},
 /* dmulq.	*/ {0xFC000045 , 0xffffffff , DFP_QUAD , 16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD , 21 , 0x20 , "dmulq.", (sim_fptr)&simulate_dmulq_dot ,DFP_AIRTH_QUAD, X_FORM_RT_RA_RB_eop_rc},
 /* ddivq	*/ {0xFC000444 , 0xffffffff , DFP_QUAD , 16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD , 21 , 0x20 , "ddivq", (sim_fptr)&simulate_ddivq ,DFP_AIRTH_QUAD, X_FORM_RT_RA_RB_eop_rc},
-/* ddivq.	*/ {0xFC000445 , 0xffffffff , DFP_QUAD , 16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD , 21 , 0x20 , "ddivq.", (sim_fptr)&simulate_ddivq_dot ,DFP_AIRTH_QUAD, X_FORM_RT_RA_RB_eop_rc},
+/* ddivq.	*/ {0xFC000445 , 0xffffffff , DFP_QUAD , 16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD , 21 , 0x20 , "ddivq.", (sim_fptr)&simulate_ddivq_dot, DFP_AIRTH_QUAD, X_FORM_RT_RA_RB_eop_rc},
 
 /* DFP Compare Instructions */
 /* dcmpu	*/
@@ -92,7 +91,7 @@ struct instruction_masks dfp_instructions_array[] = {
 /* dquaiq.	*/{0xFC000087 , 0xffffffff , DFP_QUAD ,16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD ,21 , 0x23 , "dquaiq.", (sim_fptr)&simulate_dquaiq_dot ,DFP_QUAN_QUAD, Z_FORM_RT_D_RB_RMC_eop_rc},
 /* dqua		*/{0xEC000006 , 0xffffffff , DFP_LONG ,16 , DFP_LONG , 11 , DUMMY , DUMMY , DFP_LONG ,21 , 0x24 , "dqua", (sim_fptr)&simulate_dqua ,DFP_QUAN_LONG, Z_FORM_RT_D_RB_RMC_eop_rc},
 /* dqua. 	*/{0xEC000007 , 0xffffffff , DFP_LONG ,16 , DFP_LONG , 11 , DUMMY , DUMMY , DFP_LONG ,21 , 0x24 , "dqua.", (sim_fptr)&simulate_dqua_dot ,DFP_QUAN_LONG, Z_FORM_RT_D_RB_RMC_eop_rc},
-/* dquaq	*/{0xFC000006 , 0xffffffff , DFP_QUAD ,16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD ,21 , 0x24 , "dquaq ", (sim_fptr)&simulate_dquaq  ,DFP_QUAN_QUAD, Z_FORM_RT_D_RB_RMC_eop_rc},
+/* dquaq	*/{0xFC000006 , 0xffffffff , DFP_QUAD ,16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD ,21 , 0x24 , "dquaq ", (sim_fptr)&simulate_dquaq , DFP_QUAN_QUAD, Z_FORM_RT_D_RB_RMC_eop_rc},
 /* dquaq.	*/{0xFC000007 , 0xffffffff , DFP_QUAD ,16 , DFP_QUAD , 11 , DUMMY , DUMMY , DFP_QUAD ,21 , 0x24 , "dquaq.", (sim_fptr)&simulate_dquaq_dot ,DFP_QUAN_QUAD, Z_FORM_RT_D_RB_RMC_eop_rc},
 
 
@@ -861,7 +860,7 @@ int Decoder_Encoder(unsigned long long *Input, unsigned long long *Output, int c
 	union TheDecoded MyDecoded;
 	union The_CV TheCF;
 
-	unsigned long long *ToBDecoded, *Decoded,*Operand,TempIn[3], DecoderIn[3], EncoderIn[3], DecoderOut[3], *Source,*Target;
+	unsigned long long *ToBDecoded, *Decoded,*Operand,TempIn[3], /*DecoderIn[3],*/ EncoderIn[3], DecoderOut[3], *Source,*Target;
 	int i, retc=0;
 
 	bxcfLen_MASK[cno] = 0;
@@ -912,7 +911,7 @@ int Decoder_Encoder(unsigned long long *Input, unsigned long long *Output, int c
 		Decoded = &DecoderOut[0];
 		ToBDecoded = Operand;
 		for(i=0; i<=DFPType[cno];i++) {
-			DecoderIn[i]  = *Operand;
+			/*DecoderIn[i]  = *Operand;*/
 			DecoderOut[i] = 0;
 			Operand++;
 		}

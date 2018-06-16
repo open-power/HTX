@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* %Z%%M%	%I%  %W% %G% %U% */
 
 #ifndef _HTX_FRAMEWORK_H
 #define _HTX_FRAMEWORK_H
@@ -109,7 +108,9 @@ typedef enum
 	sthx,
 	stwx,
 	stdx,
-	cmp
+	cmp,
+	vmx_xor,
+	bc
 }dep_instr_list;
 
 
@@ -250,6 +251,7 @@ void dcbi(volatile unsigned int *);
 #define CLASS_VSX_IMM			0x8
 #define CLASS_VSX_LOAD_IMM		0x9
 #define CLASS_VSX_STORE_IMM		0xa
+#define CLASS_VSX_STORE_SIMD	0xb
 
 /* BFP Instruction Classes */
 #define CLASS_BFP_LOAD			0x10
@@ -282,6 +284,7 @@ void dcbi(volatile unsigned int *);
 #define CLASS_VMX_STORE                 0x31
 #define CLASS_VMX_NORMAL                0x32
 #define CLASS_VMX_NORMAL_3INPUTS        0x33
+#define CLASS_VMX_BCD                	0x34
 
 #define CLASS_CPU_LOAD				0x40
 #define CLASS_CPU_COND_LOG			0x41              /* conditional logical instructions */
@@ -438,6 +441,7 @@ unsigned long vsx_reg_file_mask;
 
 /* using instruction to store 128 bit contents to memory pointed by GPRs RA, RB */
 #define STORE_VMX_128(x)       ((0x7C0001CE) | (STORE_RA << 16) |  (STORE_RB << 11) | ((x & 0x1f) << 21))
+#define XOR_VMX_128(vt, va, vb) ((0x100004C4U) | ((vt & 0x1f) << 21) | ((va & 0x1f) << 16) | ((vb & 0x1f) << 11))
 
 #define	 NORMAL 		0
 #define	 DENORMAL		1
@@ -527,6 +531,12 @@ struct shm_buf {
     unsigned int page_size;
     unsigned int seg_size;
 };
+
+typedef struct op_dtype_info {
+    /*int num_types;*/				/* how many different OP_TYPES enabled */
+    /*int count[VSR_OP_TYPES];*/	/* usage count of each enabled type (weight) */
+    int num_vsr[VSR_OP_TYPES]; 		/* how many VSRs for an OP_TYPE */
+}dtype_info_t;
 
 struct vsr_node {
 	uint32 vsr_no;
@@ -623,16 +633,24 @@ struct client_data {
 #endif
 	pthread_t			tid;
 	pthread_attr_t		attr;
-	struct vsr_list		vsrs[VSR_OP_TYPES + 5];
+	struct vsr_list		vsrs[VSR_OP_TYPES];
 	db_fptr				value_gen[VSR_OP_TYPES][BFP_DATA_BIAS_TYPES];
 	struct drand48_data	rand_buf;
 	int32				original_seed;
 	uint32				prolog_size;
 	uint32				epilog_size;
 	uint32				num_ins_built;
+#if 0
 	uint8				vsr_reg_wt[VSR_OP_TYPES];
-	uint8				bfp_reg_wt[BFP_OP_TYPES + 1];
+	uint8				bfp_reg_wt[BFP_OP_TYPES];
 	uint8				vmx_reg_wt[BFP_OP_TYPES];
+#endif
+	/*int					total_num_dtype;*/
+	dtype_info_t		vsx_dtype;
+	dtype_info_t		bfp_dtype;
+	dtype_info_t		dfp_dtype;
+	dtype_info_t		vmx_dtype;
+
 	uint16				vsx_reg[NUM_VSRS-1]; /* NUM_VSRS - 1 because VSR 0 is not used */
 	/* will be passed to test case */
 	uint64 				time_stamps[MAX_NUM_SYNC_DWORDS];
@@ -781,14 +799,18 @@ extern struct server_data global_sdata[];
 #define FC_INST_STORE   	0x5
 #define FC_INST_LOAD_EH    	0x6
 
+/****************Control bits: 8 to 11 of instruction mask********************/
+/* bit 11: Only for P9: Filtre out all other instructions priopr to P9 for test */
+#define P9_ONLY								0x0010000000000000ULL
+/* bit 10: Instruction which does not have simulation support, or the simulation routines yet to be verified/Developed/fixed */
+#define HW_ONLY								0x0020000000000000ULL
+/* bit 09: Used to track instructions, which are using higher 32 VSRs (VSR#32 to 63) */
+#define HIGH32								0x0040000000000000ULL
+/*****************************************************************************/
+
 /*
  * Following are categories for Instructions masking
  */
-#define P9_ONLY								0x0010000000000000ULL
-
-/* Instruction which does not have simulation support, or the simulation routines yet to be verified or fixed */
-#define HW_ONLY								0x0020000000000000ULL
-
 #define VSX_CAT								0x0100000000000000ULL
 #define BFP_ONLY							0x0200000000000000ULL
 #define DFP_ONLY							0x0300000000000000ULL
@@ -844,6 +866,9 @@ extern struct server_data global_sdata[];
 #define P9_VSX_SCALAR_DP_MOVE_ONLY			(VSX_SCALAR_DP_MOVE_ONLY | P9_ONLY)
 #define P9_VSX_MISC_ONLY				 	(VSX_MISC_ONLY  | P9_ONLY)
 
+#define BFP_TEST_MASK		0x20000000000	| BFP_ONLY	| P9_ONLY
+#define VMX_TEST_MASK		0x40000000000	| VMX_ONLY	| P9_ONLY
+#define VSX_TEST_MASK		0x80000000000	| VSX_ONLY	| P9_ONLY
 
 #define VSX_LOAD_ALL VSX_SCALAR_SP_LOAD_ONLY | VSX_SCALAR_DP_LOAD_ONLY | VSX_VECTOR_SP_LOAD_ONLY | VSX_VECTOR_DP_LOAD_ONLY
 #define VSX_STORE_ALL VSX_SCALAR_SP_STORE_ONLY | VSX_SCALAR_DP_STORE_ONLY | VSX_VECTOR_SP_STORE_ONLY | VSX_VECTOR_DP_STORE_ONLY
@@ -1243,12 +1268,19 @@ int copy_prolog_p6(int );
 int is_reg_sp(uint32, int);
 int get_logical_to_physical(int cpu);
 #ifndef __HTX_LINUX__
-int bind_thread(uint32 cpu);
+int fpu_bind_thread(uint32 cpu);
+int fpu_unbind_thread(uint32 cpu);
 #endif
-int unbind_thread(uint32 cpu);
-int distribute_vsrs_based_on_ins_bias(int cno);
+int distribute_vsrs(int cno);
+int initialize_vsrs(int client_no);
+/*int distribute_vsrs_based_on_ins_bias(int cno);*/
 void generate_and_set_initial_seeds(int32);
+int update_ea_off_array(uint32 client_no);
 
+/* build routine prototypes */
+/* VSX
+ *----
+*/
 void class_vsx_load_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
 void class_vsx_store_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
 void class_vsx_test_ins_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
@@ -1258,7 +1290,11 @@ void class_vsx_move_gen(uint32 client_no, uint32 random_no, struct instruction_m
 void class_vsx_imm_gen(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index);
 void class_vsx_load_gen2(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index);
 void class_vsx_store_gen2(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index);
+void class_vsx_stxvll_gen(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index);
 
+/* BFP
+ *----
+*/
 void class_bfp_load_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
 void class_bfp_load_imm_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins,int);
 void class_bfp_store_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins,int);
@@ -1272,6 +1308,9 @@ void class_bfp_fpscr_bit_set_unset(uint32 client_no, uint32 random_no, struct in
 void class_bfp_qp_round_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
 void class_bfp_qp_test_data_class_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
 
+/* DFP
+ *----
+*/
 void class_dfp_load_imm_gen(uint32, uint32, struct instruction_masks *, int);
 void class_dfp_load_gen(uint32, uint32, struct instruction_masks *, int);
 void class_dfp_store_imm_gen(uint32, uint32, struct instruction_masks *, int);
@@ -1281,9 +1320,17 @@ void class_dfp_cmp_test_ins_gen(uint32, uint32, struct instruction_masks *, int)
 void class_dfp_qua_rmc_gen(uint32, uint32, struct instruction_masks *, int);
 void class_dfp_shift_gen(uint32, uint32, struct instruction_masks *, int);
 
+/* VMX
+ *----
+*/
 void class_vmx_load_gen(uint32, uint32, struct instruction_masks *, int);
 void class_vmx_store_gen(uint32, uint32, struct instruction_masks *, int);
 void class_vmx_normal_gen(uint32, uint32, struct instruction_masks *, int);
+void class_vmx_bcd_gen(uint32, uint32, struct instruction_masks *, int);
+
+/* CPU
+ *----
+*/
 void class_cpu_load_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
 void class_cpu_load_1_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);
 void class_cpu_cond_log_gen(uint32 client_no, uint32 random_no, struct instruction_masks *ins, int);

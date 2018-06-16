@@ -20,7 +20,6 @@ TARGET= bufupd.h \
                         hxihtx64.h \
                         scr_info64.h \
                         htxsyscfg64.h \
-                        hxerng.h \
                         getrule.h \
 			hxfcpp_wrap.H \
                         expirekey.h \

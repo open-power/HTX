@@ -2312,11 +2312,21 @@ int simulate_vcmpneb(uint32 * machine_code , struct testcase *test_case)
 }
 
 
+int simulate_vcmpneb_dot(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
+
 int simulate_vcmpnezb(uint32 * machine_code , struct testcase *test_case)
 {
 	return(0);
 }
 
+
+int simulate_vcmpnezb_dot(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
 
 int simulate_vcmpneh(uint32 * machine_code , struct testcase *test_case)
 {
@@ -2324,23 +2334,42 @@ int simulate_vcmpneh(uint32 * machine_code , struct testcase *test_case)
 }
 
 
+int simulate_vcmpneh_dot(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
+
 int simulate_vcmpnezh(uint32 * machine_code , struct testcase *test_case)
 {
 	return(0);
 }
 
 
+int simulate_vcmpnezh_dot(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
+
 int simulate_vcmpnew(uint32 * machine_code , struct testcase *test_case)
 {
 	return(0);
 }
 
+int simulate_vcmpnew_dot(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
 
 int simulate_vcmpnezw(uint32 * machine_code , struct testcase *test_case)
 {
 	return(0);
 }
 
+
+int simulate_vcmpnezw_dot(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
 
 int simulate_vclzlsbb(uint32 * machine_code , struct testcase *test_case)
 {
@@ -2576,11 +2605,21 @@ int simulate_vpermr(uint32 * machine_code , struct testcase *test_case)
 }
 
 
+int simulate_lxvl(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
+
 int simulate_lxvll(uint32 * machine_code , struct testcase *test_case)
 {
 	return(0);
 }
 
+
+int simulate_stxvl(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
 
 int simulate_stxvll(uint32 * machine_code , struct testcase *test_case)
 {
@@ -4071,6 +4110,11 @@ int simulate_lxv(uint32 * machine_code , struct testcase *test_case)
 
 
 int simulate_stxv(uint32 * machine_code , struct testcase *test_case)
+{
+	return(0);
+}
+
+int simulate_vmsumudm(uint32 * machine_code , struct testcase *test_case)
 {
 	return(0);
 }

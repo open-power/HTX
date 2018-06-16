@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-static char sccsid[] = "@(#)84	1.1  src/htx/usr/lpp/htx/bin/hxesamp/hxesamp.c, exer_samp, htxubuntu 11/2/09 03:42:44";
 
 #include "hxihtx.h"
 #include <signal.h>

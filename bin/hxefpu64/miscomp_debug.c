@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/*static char sccsid[] = "%Z%%M%    %I%  %W% %G% %U%";*/
 
 #include "miscomp_debug.h"
 
@@ -37,7 +36,7 @@ static struct instruction_masks dep_instructions_array[] = {
 /* stxsdx  */ {0x7C000598, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x2,  "stxsdx",  (sim_fptr)&simulate_stxsdx, VSX_SCALAR_DP_STORE_ONLY, FORM_XX1_XT_RA_RB},
 /* stxvd2x */ {0x7C000798, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2,  "stxvd2x",  (sim_fptr)&simulate_stxvd2x, VSX_VECTOR_DP_STORE_ONLY, FORM_XX1_XT_RA_RB},
 /* mffs    */ {0xFC00048E, 0, DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffs", (sim_fptr)&simulate_mffs, BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* stvx    */ {0x7C0001CE, 0, GR, 16, GR, 11, DUMMY, DUMMY, QGPR, 21, 0x31, "stvx", (sim_fptr)&simulate_stvx, VMX_STORE_ONLY, FORM_VT_VA_VB},
+/* stvx    */ {0x7C0001CE, 0, GR, 16, GR, 11, DUMMY, DUMMY, QGPR, 21, 0x31, "stvx", (sim_fptr)&simulate_stvx, VMX_STORE_ONLY | HIGH32, FORM_VT_VA_VB},
 /* stswi   */ {0x7C0005AA, 0, IMM_DATA, 11  , GR, 16, DUMMY, DUMMY , GR , 21 , 0x59, "stswi",  DUMMY, CPU_FIXED_STORE, X_FORM_RS_RA_NB_eop},
 /* oris    */ {0x64000000, 0, GR, 21, IMM_DATA,0 , DUMMY, DUMMY, GR, 16, 0x43, "oris", DUMMY, CPU_FIXED_LOGIC, D_FORM_RS_RA_UIM},
 /* dcbt    */ {0x7C00022C, 0, GR, 16, GR, 11, DUMMY, DUMMY,  IMM_DATA, 21 , 0x5D, "dcbt",   DUMMY, CPU_CACHE, X_FORM_TH_RA_RB},
@@ -63,12 +62,14 @@ static struct instruction_masks dep_instructions_array[] = {
 /* sthx    */ {0x7C00032E, 0, GR, 11, GR, 16, DUMMY, DUMMY,  GR, 21 , 0x55, "sthx" ,  DUMMY, CPU_FIXED_STORE, X_FORM_RS_RA_RB_eop},
 /* stwx    */ {0x7C00012E, 0, GR, 11, GR, 16, DUMMY, DUMMY,  GR, 21,   0x55, "stwx" ,  DUMMY, CPU_FIXED_STORE, X_FORM_RS_RA_RB_eop},
 /* stdx    */ {0x7C00012A, 0, GR, 11, GR, 16, DUMMY, DUMMY,  GR, 21,   0x55, "stdx" ,  DUMMY, CPU_FIXED_STORE, X_FORM_RS_RA_RB_eop},
-/* cmp     */ {0x7C000000, 0, GR, 11, IMM_DATA_1BIT, 21 , GR, 16, CR_T , 23 , 0x5A, "cmp",   DUMMY, CPU_FIXED_LOGIC, X_FORM_BF_L_RA_RB}
+/* cmp     */ {0x7C000000, 0, GR, 11, IMM_DATA_1BIT, 21 , GR, 16, CR_T , 23 , 0x5A, "cmp",   DUMMY, CPU_FIXED_LOGIC, X_FORM_BF_L_RA_RB},
+/* vxor    */ {0x100004C4, 0, QGPR, 16, QGPR, 11, DUMMY, DUMMY, QGPR, 21, 0x32, "vxor", (sim_fptr)&simulate_vxor, VMX_INT_LOGICAL_ONLY | HIGH32, FORM_VT_VA_VB},
+/* bc      */ {0x40000000, 0, IMM_DATA, 21, IMM_DATA, 16, DUMMY, DUMMY, IMM_DATA, 2, 0x5F, "bc", DUMMY, CPU_BRANCH, B_FORM_BO_BI_BD_AA_LK}
 };
 
 void decode_tc_instructions(int cno)
 {
-	int i, j, table_index = 0;
+	int i = 0, j = 0, k, table_index = 0;
 	uint32 *instr = NULL; 
 	instruction_masks *ins_tuple = NULL;
 	client_data *cptr;
@@ -122,10 +123,21 @@ void decode_tc_instructions(int cno)
 					else if ((ins_tuple->tgt_dtype == VECTOR_SP) || (ins_tuple->tgt_dtype == VECTOR_DP)) {
 						sprintf(mnemonic, "%sv%d", mnemonic, ptr->rt);
                     }
- 
-					if ( ins_tuple->op1_dtype != DUMMY ) {
-						sprintf(mnemonic,"%s,0x%x(r%d)", mnemonic, ptr->d, ptr->ra);
-					}
+
+					if (ins_tuple->op2_dtype == IMM_DATA_12BIT) {
+						cptr->dc_instr[j].tgt_val = GET_REGISTER_VALUE(((ptr->d >> 3) & 0x1), ptr->rt);
+						cptr->dc_instr[j].op_val[1] = (ptr->d >> 4);
+						cptr->dc_instr[j].op_val[1] = (cptr->dc_instr[j].op_val[1] << 4);
+						sprintf(mnemonic, "%s x%d,0x%x(r%d)", ins_tuple->ins_name, cptr->dc_instr[j].tgt_val, cptr->dc_instr[j].op_val[1], ptr->ra);
+					} else if (ins_tuple->op2_dtype == IMM_DATA_14BIT) {
+						cptr->dc_instr[j].op_val[1] = (ptr->d >> 2);
+						cptr->dc_instr[j].op_val[1] = (cptr->dc_instr[j].op_val[1] << 2);
+						sprintf(mnemonic, "%s v%d,0x%x(r%d)", ins_tuple->ins_name, ptr->rt, cptr->dc_instr[j].op_val[1], ptr->ra);
+					} 
+
+					/*if ( ins_tuple->op1_dtype != DUMMY ) {
+						sprintf(mnemonic,"%s,0x%x(r%d)", mnemonic, cptr->dc_instr[j].op_val[1], ptr->ra);
+					}*/
 
 					break;
 			}
@@ -397,7 +409,7 @@ void decode_tc_instructions(int cno)
                     cptr->dc_instr[j].op_val[0] = ptr->src1;
                     cptr->dc_instr[j].op_val[1] = ptr->src2;
 
-					sprintf(mnemonic, "%s x%d,r%d,r%d", ins_tuple->ins_name, vsr_t,ptr->src1, ptr->src2);
+					sprintf(mnemonic, "%s x%d,r%d,r%d", ins_tuple->ins_name, vsr_t, ptr->src1, ptr->src2);
 					break;
 			}
 
@@ -451,13 +463,24 @@ void decode_tc_instructions(int cno)
 					Form_XX2_XT_UIM4_XB *ptr;
 					ptr = (Form_XX2_XT_UIM4_XB *)instr;
 					vsr1 =  GET_REGISTER_VALUE(ptr->BX, ptr->src);
-					vsr_t = GET_REGISTER_VALUE(ptr->TX, ptr->target);
+					if (ins_tuple->tgt_dtype == GR) {
+						vsr_t =  ptr->target;
+						sprintf(mnemonic, "%s r%d", ins_tuple->ins_name, vsr_t);
+					} else {
+						vsr_t = GET_REGISTER_VALUE(ptr->TX, ptr->target);
+						sprintf(mnemonic, "%s x%d", ins_tuple->ins_name, vsr_t);
+					}
 
 					cptr->dc_instr[j].tgt_val = vsr_t; 
                     cptr->dc_instr[j].op_val[1] = vsr1;
-                    cptr->dc_instr[j].op_val[0] = ptr->uim4;
+					if (ins_tuple->op1_dtype != DUMMY) {
+                    	cptr->dc_instr[j].op_val[0] = ptr->uim4;
+						sprintf(mnemonic, "%s,x%d,%d", mnemonic, vsr1, ptr->uim4);
+					}
+					else {
+						sprintf(mnemonic, "%s,x%d", mnemonic, vsr1);
+					}
 
-					sprintf(mnemonic, "%s x%d,x%d,%d", ins_tuple->ins_name, vsr_t, vsr1, ptr->uim4);
 					break;
 			}
 
@@ -1484,6 +1507,16 @@ void decode_tc_instructions(int cno)
 		} else {
 			cptr->dc_instr[j].instr_type = INSTR_TYPE_OTHER;
 		}
+		if (ins_tuple->ins_cat_mask & HIGH32) {
+			for (k = 0; k < 3; k++) {
+				if (cptr->dc_instr[j].op_dtype[k] == VSR_DTYPE) {
+					cptr->dc_instr[j].op_val[k] += 32;
+				}
+			}
+			if (cptr->dc_instr[j].tgt_dtype == VSR_DTYPE) {
+				cptr->dc_instr[j].tgt_val += 32;
+			}
+		}
 		strncpy(cptr->dc_instr[j].mnemonic, mnemonic, strlen(mnemonic));
 		instr++;
 	}
@@ -1623,7 +1656,13 @@ struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype
 	
 	for (i = start_index; i > 0; i--) {
 		tgt_type = cptr->dc_instr[i].tgt_dtype;
-		if ((tgt_type == OTHER_DTYPE) || (cptr->dc_instr[i].instr_type == INSTR_TYPE_STORE) || cptr->dc_instr[i].marked) {
+		if ((tgt_type == OTHER_DTYPE) || (cptr->dc_instr[i].instr_type == INSTR_TYPE_STORE)) {
+	        continue;
+		}
+		if (cptr->dc_instr[i].marked) {
+			/*fprintf(dump, "Already marked: tgt_type# %d, reg value: %d\n", tgt_type, cptr->dc_instr[i].tgt_val);
+			fflush(dump);
+			*/
 	        continue;
 		}
 	    if ((cptr->dc_instr[i].tgt_val == reg_num) && (tgt_type == tgt_dtype)) {
@@ -1637,6 +1676,7 @@ struct reguse *create_instr_tree(FILE *dump, int cno, int reg_num, int tgt_dtype
 				} else if (cptr->dc_instr[i].miscmp->type & CMP_TYPE_LS) {
 					fprintf(dump, "Merged with Load Store Miscompare: Offset# 0x%x\n", cptr->dc_instr[i].miscmp->offset);
 				}
+				fflush(dump);
 	            return NULL;
 			}
 			reg_node = (struct reguse *)malloc(sizeof(struct reguse));

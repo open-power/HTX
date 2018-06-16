@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)72	1.4  src/htx/usr/lpp/htx/inc/nx_corsa.h, exer_mem64, htxubuntu 10/26/14 12:19:10 */
 
 #include <pthread.h>
 #include <stdio.h>
