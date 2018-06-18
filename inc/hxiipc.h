@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -244,10 +244,8 @@ struct htxshm_HE {
 	    unsigned long long   bad_others;        /* Total Number of Other Bad Op's  */
         unsigned long long   bad_reads;         /* Total Number of Bad Reads       */
         unsigned long long   bad_writes;        /* Total Number of Bad Writes      */
-        unsigned long long   bytes_read1;       /* Total Number of Bytes Read      */
-        unsigned long long   bytes_read2;       /* Total Number of Bytes Read      */
-        unsigned long long   bytes_writ1;       /* Total Number of Bytes Written   */
-        unsigned long long   bytes_writ2;       /* Total Number of Bytes Written   */
+        unsigned long long   bytes_read;       /* Total Number of Bytes Read      */
+        unsigned long long   bytes_writ;       /* Total Number of Bytes Written   */
         unsigned long long   good_others;       /* Total Number of Other Good Op's */
         unsigned long long   good_reads;        /* Total Number of Good Reads      */
         unsigned long long   good_writes;       /* Total Number of Good Writes     */

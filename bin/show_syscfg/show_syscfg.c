@@ -18,6 +18,7 @@
 /* IBM_PROLOG_END_TAG */
 
 /* @(#)47       1.3.3.25  src/htx/usr/lpp/htx/bin/show_syscfg/show_syscfg.c, htxconf, htxubuntu 8/20/17 09:51:37 */
+
 #include "htxsyscfg64.h"
 
 int main(int argc, char* argv[])
@@ -133,6 +134,7 @@ get_env_details(&e);
         printf("---------------------------PVR details---------------------------\n");
         printf("OS PVR Value                            : 0x%x\n",pvr_value_os);
 		printf("TRUE PVR Value                          : 0x%x\n",pvr_value_true);
+		printf("TRUE PVR ver                            : 0x%x\n",Pvr);
         printf("Processor Version                       : 0x%x\n",proc_version);
 	if(proc_version == PV_POWER9_NIMBUS || proc_version == PV_POWER9_CUMULUS) 
 		printf("Fused/Normal core type			: %s\n",(get_p9_core_type()? "Normal":"Fused"));

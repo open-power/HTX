@@ -40,6 +40,7 @@ int 				syscfg_base_pg_idx;
 unsigned int 		syscfg_base_page_size;
 extern struct htx_data             *misc_htx_data;
 
+int get_chip_info(int instance);
 /* readind env variables to avoid hardcodings of paths */
 
 /* to read the entries for core exclusion from /tmp/syscfg_excluded_cores.txt file */
@@ -984,10 +985,11 @@ int get_memory_size(htxsyscfg_memsize_t *t)
 ********************************/
 int get_memory_pools(void) {
 
-	htxsyscfg_mempools_t *t;
+	htxsyscfg_mempools_t *t, temp;
+	int sradidx;
 	FILE *fp=0;
 	char command[200],fname[100];
-	int i,j,rc,cpu,lcpu,huge_page_size;
+	int i,j,rc,cpu,lcpu,huge_page_size, lock1, lock2;
 	int tot_pools = -1;
 	unsigned long total_pages, free_pages;
 	total_pages = free_pages = 0;
@@ -1011,6 +1013,13 @@ int get_memory_pools(void) {
 		strcpy(scripts_path,getenv("HTXSCRIPTS"));
 	}
 
+    lock1=pthread_rwlock_wrlock(&(global_ptr->global_memory.rw));
+
+    if (lock1!=0  ) {
+            sprintf(msg,"global_ptr->global_memory.rw_lock3() failed with rc=%d\n", lock1);;
+            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+            return(lock1);
+    }
 
 	 t =&(global_ptr->global_memory.mem_pools)[0];
 
@@ -1090,12 +1099,28 @@ int get_memory_pools(void) {
 				return -4;
 			}
 			t[i].procs_per_pool[cpu] = lcpu;
-			/*printf("%d:",t[i].procs_per_pool[cpu]);*/
+			t[i].node_num = get_chip_info(lcpu);
+			/*printf("\n lcpu = %d:, node_num = %d",t[i].procs_per_pool[cpu], t[i].node_num);*/
 		}
 		/*printf("\n");*/
 		if( fscanf(fp,"\n")){};
 	}
 	fclose(fp);
+	sradidx = i;
+
+    for (i = 0; i < sradidx-1 ; i++)
+    {
+        for (j = 0; j < (sradidx-1-i); j++)
+        {
+            if (t[j].node_num > t[j + 1].node_num)
+            {
+                temp = t[j];
+                t[j] = t[j + 1];
+                t[j + 1] = temp;
+            }
+        }
+    }
+
     if(tot_pools > 0) {
 		global_ptr->global_memory.num_numa_nodes = tot_pools;
     }
@@ -1103,6 +1128,14 @@ int get_memory_pools(void) {
 		sprintf(msg,"global_memory.num_numa_nodes giving value of %d \n",global_ptr->global_memory.num_numa_nodes);
 		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 	}
+
+    lock2=pthread_rwlock_unlock(&(global_ptr->global_memory.rw));
+    if (lock2!=0  ) {
+            sprintf(msg,"global_ptr->global_memory.rw_unlock() failed with rc=%d\n", lock2);
+            hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
+            return(lock2);
+    }
+
 	return (tot_pools);
 }
 
@@ -2743,8 +2776,23 @@ int get_p9_core_type(void)
 		int pvr_revision = (pvr_full >> 8 & 0x0F) ; /* get the version value DD1 or DD2 */
 		dd1_bit = ((pvr_full >> 12)  & 0x01); /* 19th bit in pvr signifies the fused/normal core mode*/
 		if(pvr_revision  == 1 ){
-			if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"NV") == 0)
+
+			if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"NV") == 0) {
+#ifdef BML
+				FILE *file;
+				if((file = fopen("/proc/device-tree/cpus/PowerPC,POWER9@0/ibm,fused-core","r"))!=NULL)
+				{
+					fclose(file);
+					return(DD1_FUSED_CORE);
+				}
+				else
+				{
+					return(DD1_NORMAL_CORE);
+				}
+#else
 				return(DD1_NORMAL_CORE);
+#endif
+			}
 			else if ( strcasecmp(global_ptr->global_lpar.env_details.virt_typ,"KVM_GUEST") == 0)
 				return(DD1_NORMAL_CORE);
 			else
@@ -3018,6 +3066,36 @@ int get_core_info(int *core_number_list, int instance)
     return (ret);
 }
 
+
+int get_chip_info(int instance)
+{
+    int              i,j,k,l;
+    int              chip_num;
+	int              chip=0,core=0,index=0,ret=-1;
+
+    /* Loop through the syscfg structure  */
+    /* Loop through chips until the chip  */
+    /* number equals the instance of chip */
+    /* we are interested. While the core  */
+    /* number is always incremented. In   */
+    /* this way, when we reach our chip,  */
+    /* the core numbers are actually the  */
+    /* cores in the chip                  */
+    for( i=0 ; i<global_ptr->syscfg.num_nodes ; i++) {
+        for( j=0 ; j<global_ptr->syscfg.node[i].num_chips ; j++, chip++) {
+            for( k=0 ; k<global_ptr->syscfg.node[i].chip[j].num_cores ; k++, core++) {
+            	for( l=0 ; l<global_ptr->syscfg.node[i].chip[j].core[k].num_procs ; l++) {
+					if( instance == global_ptr->syscfg.node[i].chip[j].core[k].lprocs[l]) {
+	                    chip_num = chip;
+						/*printf("instance = %d, chip_num=%d \n ", instance,chip_num);*/
+					}
+                }
+            }
+        }
+    }
+    return (chip_num);
+}
+
 /* Returns number of CPUs using sysfs on BML-AWAN */
 /* procfs is not available on BML-AWAN runs */
 
@@ -3253,15 +3331,6 @@ int update_syscfg(void)
             hxfmsg(misc_htx_data, 0, HTX_HE_INFO, msg);
     }
 
-    r19 = get_memory_pools();
-    if(r19 > 0) {
-		global_ptr->global_memory.num_numa_nodes = r19;
-	}
-	else{
-		sprintf(msg,"global_memory.num_numa_nodes giving value of %d \n",global_ptr->global_memory.num_numa_nodes);
-		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
-	}
-
 /*	r7=get_memory_details_update();
 	if ( r7 ) {
 			sprintf(msg,"get_memory_details_update() failed with rc=%d\n", r7);
@@ -3274,7 +3343,6 @@ int update_syscfg(void)
 			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
 			return(lock4);
     }
-
 
 	/* *******************************cache details update ******************************* */
 	lock5=pthread_rwlock_wrlock(&(global_ptr->global_cache.rw));
@@ -3337,6 +3405,16 @@ int update_syscfg(void)
 			sprintf(msg,"global_ptr->syscfg.rw_unlock() failed with rc=%d\n", lock8);
 			hxfmsg(misc_htx_data, -1, HTX_HE_HARD_ERROR, msg);
 			return(lock8);
+	}
+
+	/* *******************************memory details update ******************************* */
+    r19 = get_memory_pools();
+    if(r19 > 0) {
+		global_ptr->global_memory.num_numa_nodes = r19;
+	}
+	else{
+		sprintf(msg,"global_memory.num_numa_nodes giving value of %d \n",global_ptr->global_memory.num_numa_nodes);
+		hxfmsg(misc_htx_data, -1, HTX_HE_SOFT_ERROR, msg);
 	}
 	/* *******************************hardware stat details update ************************* */
 

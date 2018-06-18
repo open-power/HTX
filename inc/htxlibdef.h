@@ -189,6 +189,11 @@ extern "C" {
 int htx_message(struct htx_data *data, char* msg_send);
 }
 
+
+extern "C" {
+int exer_err_halt_status(struct htx_data *data);
+}
+
 #else
 
 /*
@@ -297,6 +302,8 @@ int htx_message(struct htx_data *data, char* msg_send);
 int htx_get_msg(struct htx_data *data, char *msg_send);
 
 struct tm *htx_localtime_r (const time_t *timep, struct tm *result);
+
+int exer_err_halt_status(struct htx_data *data);
 
 int do_trap_htx64(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long,unsigned long,unsigned long);
 #endif

@@ -619,6 +619,7 @@ if(p_shm_HE->log_vpd==1)
 		if( semctl(sem_id, (exer_halt_sops[0].sem_num + 2), GETVAL, &sembuffer) != 1) {
 			arg.val = 1;
 			semctl(sem_id, (exer_halt_sops[0].sem_num + 2), SETVAL, arg);
+			p_shm_HE->halt_flag = 1;
 		}
 		while( ((p_shm_hdr)->shutdown == 0) && (semop(sem_id, system_halt_sops, 1) == -1) && (errno == EINTR) );
 		if( semctl(sem_id, (exer_halt_sops[0].sem_num + 2), GETVAL, &sembuffer) != 0) {
@@ -1011,10 +1012,8 @@ Unable to find %s in HTX shared memory structure.\n",
   p_shm_HE->bad_others = 0;
   p_shm_HE->bad_reads = 0;
   p_shm_HE->bad_writes = 0;
-  p_shm_HE->bytes_read1 = 0;
-  p_shm_HE->bytes_read2 = 0;
-  p_shm_HE->bytes_writ1 = 0;
-  p_shm_HE->bytes_writ2 = 0;
+  p_shm_HE->bytes_read = 0;
+  p_shm_HE->bytes_writ = 0;
   p_shm_HE->good_others = 0;
   p_shm_HE->good_reads = 0;
   p_shm_HE->good_writes = 0;
@@ -1252,10 +1251,10 @@ int htx_update(struct htx_data *data)
       p_shm_HE->bad_others += data->bad_others;
       p_shm_HE->bad_reads += data->bad_reads;
       p_shm_HE->bad_writes += data->bad_writes;
-      addw(p_shm_HE->bytes_read1,p_shm_HE->bytes_read2,data->bytes_read);
-      addw(p_shm_HE->bytes_writ1,p_shm_HE->bytes_writ2,data->bytes_writ);
-      p_shm_HE->data_trf_rate1 = (((float)(p_shm_HE->bytes_writ1) / p_shm_HE->run_time) * 1000000000) + ((float)(p_shm_HE->bytes_writ2 ) / p_shm_HE->run_time);
-      p_shm_HE->data_trf_rate2 = (((float)p_shm_HE->bytes_read1 / p_shm_HE->run_time) * 1000000000) + ((float)p_shm_HE->bytes_read2 / p_shm_HE->run_time);
+      p_shm_HE->bytes_read += data->bytes_read;
+      p_shm_HE->bytes_writ += data->bytes_writ;
+      p_shm_HE->data_trf_rate1 = (((double)p_shm_HE->bytes_writ / p_shm_HE->run_time) );
+      p_shm_HE->data_trf_rate2 = (((double)p_shm_HE->bytes_read / p_shm_HE->run_time) );
       p_shm_HE->good_others += data->good_others;
       p_shm_HE->good_reads += data->good_reads;
       p_shm_HE->good_writes += data->good_writes;
@@ -1903,3 +1902,16 @@ int dupdev_cmp ( int index, char * my_exerid )
    }
    return 0;
 }
+
+int exer_err_halt_status(struct htx_data *data)
+{
+	if ((strcmp (data->run_type, "REG") == 0) ||(strcmp (data->run_type, "EMC") == 0)){
+        if( (p_shm_HE->no_of_errs > 0) || (p_shm_HE->halt_flag == 1) && ( p_shm_HE->cont_on_err == 0) )
+			return 1; /* all threads of the exer needs to get blocked */
+        else
+			return 0; /* all conditions favourable, allow the exer to continue execution */
+	}
+	else
+		return 1;
+}
+

@@ -22,7 +22,7 @@
 #include <htx_local.h>
 #include <hxihtx64.h>
 #include <stdlib.h>
-#include <unistd.h>
+
 
 /*
  * NAME: hxfmsg()
