@@ -23,8 +23,8 @@
 #pragma mc_func dcbf    { "7C0018AC" }          /* dcbf r3 */
 #endif
 
-int pat_operation_write_dword(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
-    int i=0,rc=0,pat_itr=0;
+int pat_operation_write_dword(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     unsigned long *rw_ptr          = (unsigned long *)seg_address;
     unsigned long *loc_pattern_ptr = (unsigned long *)pattern_ptr;
@@ -41,9 +41,9 @@ int pat_operation_write_dword(int num_operations,void *seg_address,void *pattern
     return (rc);
 }
 
-int pat_operation_write_word(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
+int pat_operation_write_word(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
 
-    int i=0,rc=0,pat_itr=0;
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     unsigned int *rw_ptr          = (unsigned int*)seg_address;
     unsigned int *loc_pattern_ptr = (unsigned int*)pattern_ptr;
@@ -60,9 +60,9 @@ int pat_operation_write_word(int num_operations,void *seg_address,void *pattern_
     return (rc);
 }
 
-int pat_operation_write_byte(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
+int pat_operation_write_byte(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
 
-    int i=0,rc=0,pat_itr=0;
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     char *rw_ptr          = (char*)seg_address;
     char *loc_pattern_ptr = (char*)pattern_ptr;
@@ -78,9 +78,9 @@ int pat_operation_write_byte(int num_operations,void *seg_address,void *pattern_
     }
     return (rc);
 }
-int pat_operation_comp_dword(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
+int pat_operation_comp_dword(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
 
-    int i=0,rc=0,pat_itr=0;
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     unsigned long *ptr = (unsigned long *)seg_address, *loc_pattern_ptr = (unsigned long *)pattern_ptr;
     unsigned long temp_val1,temp_val2;
@@ -109,9 +109,9 @@ int pat_operation_comp_dword(int num_operations,void *seg_address,void *pattern_
     return (rc);
 }
         
-int pat_operation_comp_word(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
+int pat_operation_comp_word(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
 
-    int i=0,rc=0,pat_itr=0;
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     unsigned int *ptr = (unsigned int*)seg_address, *loc_pattern_ptr = (unsigned int*)pattern_ptr;
     unsigned int temp_val1,temp_val2;
@@ -140,9 +140,9 @@ int pat_operation_comp_word(int num_operations,void *seg_address,void *pattern_p
     return (rc);
 }
 
-int pat_operation_comp_byte(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
+int pat_operation_comp_byte(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed) {
 
-    int i=0,rc=0,pat_itr=0;
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     unsigned char *ptr = (unsigned char *)seg_address, *loc_pattern_ptr = (char*)pattern_ptr;
     unsigned char temp_val1,temp_val2;
@@ -171,8 +171,8 @@ int pat_operation_comp_byte(int num_operations,void *seg_address,void *pattern_p
     return (rc);
 }
 
-int  pat_operation_rim_dword(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed){
-    int i=0,rc=0,pat_itr=0;
+int  pat_operation_rim_dword(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed){
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     unsigned long *w_ptr = (unsigned long *)seg_address, *loc_pattern_ptr = (unsigned long *)pattern_ptr;
     unsigned long read_dw_data,temp_val;
@@ -204,8 +204,8 @@ int  pat_operation_rim_dword(int num_operations,void *seg_address,void *pattern_
     return (rc);
 }
 
-int pat_operation_rim_word(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed){
-    int i=0,rc=0,pat_itr=0;
+int pat_operation_rim_word(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed){
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     unsigned int *w_ptr = (unsigned int*)seg_address, *loc_pattern_ptr = (unsigned int*)pattern_ptr;
     unsigned int read_data,temp_val;
@@ -238,8 +238,8 @@ int pat_operation_rim_word(int num_operations,void *seg_address,void *pattern_pt
     return (rc);
 }
 
-int pat_operation_rim_byte(int num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed){
-    int i=0,rc=0,pat_itr=0;
+int pat_operation_rim_byte(unsigned long num_operations,void *seg_address,void *pattern_ptr,int trap_flag,void *seg,void *stanza,void *pattern_sz_ptr,void* seed){
+    unsigned long i=0,rc=0,pat_itr=0;
     unsigned int  pat_size = *(unsigned int*)pattern_sz_ptr;
     char *w_ptr = (char*)seg_address, *loc_pattern_ptr = (char*)pattern_ptr;
     char read_data,temp_val;

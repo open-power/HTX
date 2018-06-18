@@ -330,7 +330,9 @@ int get_rule(int * line, FILE *fp)
         sscanf(s,"%s",keywd);
 
         if((strcmp(keywd,"GLOBAL_ALLOC_MEM_PERCENT"))== 0) {
-            sscanf(s,"%*s %d",&g_data.gstanza.global_alloc_mem_percent); 
+			int mem_percent;
+            sscanf(s,"%*s %d",&mem_percent); 
+			g_data.gstanza.global_alloc_mem_percent = (double)mem_percent;
             if((g_data.gstanza.global_alloc_mem_percent < -1) && (g_data.gstanza.global_alloc_mem_percent >= 100)){
                 displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %s"
                         " must be greater than 0 and less than 100",*line,keywd,r.rule_id);
@@ -430,18 +432,33 @@ int get_rule(int * line, FILE *fp)
         else if ((strcmp(keywd,"GLOBAL_STARTUP_DELAY")) == 0)
         {
             sscanf(s, "%*s %d", &g_data.gstanza.global_startup_delay);
-            if ((g_data.gstanza.global_startup_delay < 0) || (g_data.gstanza.global_startup_delay > 120)) {
+            if (g_data.gstanza.global_startup_delay < 0){ 
                 displaym(HTX_HE_HARD_ERROR, DBG_MUST_PRINT, "line# %d %s = %d "
-                        " (startup_delay must be >= 0 and <= 120 seconds)\n",
+                        " (startup_delay must be >= 0) \n",
                          *line, keywd, g_data.gstanza.global_startup_delay);
                 exit(1);
             }              /* endif */
         }
+		else if ((strcmp(keywd,"GLOBAL_FABRIC_LINKS_DRIVE")) == 0)
+		{
+            char bp[20];
+            (void) sscanf(s,"%*s %s",bp);
+            if (strcmp(bp,"THREADS") == 0 ) {
+				g_data.gstanza.global_fab_links_drive_type = THREADS_FAB;	
+			}else if (strcmp(bp,"CORES") == 0 ) {
+				g_data.gstanza.global_fab_links_drive_type = CORES_FAB;
+			}else{
+				displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %s"
+					", it must be either of CORES or THREADS\n",
+					*line, keywd,bp);
+				exit(1);
+			}
+		}
         else if ((strcmp(keywd,"RULE_ID")) == 0) {
                 sscanf(s,"%*s %s",r.rule_id);
-                if ((strlen(r.rule_id)) > 24) {
+                if ((strlen(r.rule_id)) > 26) {
                     displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"line# %d %s = %s"
-                            " (must be 8 characters or less)\n",*line,keywd,\
+                            " (must be 24  characters or less)\n",*line,keywd,\
                             r.rule_id);
                     exit(1);
                 } /* endif */
@@ -555,12 +572,14 @@ int get_rule(int * line, FILE *fp)
                 r.operation=OPER_DMA;
             } else if ( strcmp(r.oper,"RIM") == 0 ) {
                 r.operation=OPER_RIM;
-            } else if ( strcmp(r.oper,"TLB") == 0 ) {
-                r.operation=OPER_TLB;
             } else if ( strcmp(r.oper,"MPSS") == 0) {
                 r.operation=OPER_MPSS;
             } else if (strcmp(r.oper, "STRIDE") == 0) {
                 r.operation=OPER_STRIDE;
+            } else if (strcmp(r.oper, "RAND_MEM") == 0) {
+                r.operation=OPER_RAND_MEM;
+            } else if (strcmp(r.oper, "LATENCY_TEST") == 0) {
+                r.operation=LATENCY_TEST;
             } else if (strcmp(r.oper, "L4_ROLL") == 0) {
                 r.operation=OPER_L4_ROLL;
             } else if (strcmp(r.oper, "MBA") == 0) {
@@ -568,7 +587,7 @@ int get_rule(int * line, FILE *fp)
             }
             else {
                  displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT, "line# %d %s =%s \
-                         (must be MEM/DMA/RIM/TLB/MPSS/STRIDE)\n",*line,\
+                         (must be MEM/DMA/RIM/MPSS/STRIDE/RAND_MEM/LATENCY_TEST)\n",*line,\
                          keywd, r.oper);
                   exit(1);
             } /* end else */
@@ -1288,6 +1307,7 @@ int read_rules(void)
 	g_data.gstanza.global_disable_filters = 1;
     g_data.gstanza.global_alloc_huge_page = 1;
 	g_data.gstanza.global_num_threads = -1;
+	g_data.gstanza.global_fab_links_drive_type = THREADS_FAB;
     mem_g.memory_allocation = ALLOCATE_MEM;
     if(!g_data.standalone) {
         g_data.gstanza.global_debug_level = 0;

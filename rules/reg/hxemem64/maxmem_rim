@@ -1,4 +1,3 @@
-**      @(#)61  1.2  src/htx/usr/lpp/htx/rules/reg/hxemem64/maxmem_rim, exer_mem64, htxubuntu 2/25/04 06:20:44
 ******************************************************
 * write out all zeros to memory...
 rule_id = rim_0x00

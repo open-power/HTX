@@ -1,14 +1,37 @@
 #!/bin/bash
+
+# IBM_PROLOG_BEGIN_TAG
+#
+# Copyright 2003,2016 IBM International Business Machines Corp.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# IBM_PROLOG_END_TAG
+
 ###### This script is used to collect the required memory statistics for hxemem64 exerciser.
 ###### Collect the large and huge page memory required memory statistics 
 ###### into the file ${HTX_LOG_DIR}/freepages
 echo "Entering mem.setup.." >> $HTXNoise
 proc_ver=`grep 'Processor Version' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $4 }'`
-true_proc_ver=`grep 'TRUE PVR Value' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $5 }'`
-true_proc_ver=$((true_proc_ver >> 16))
-echo "mem.setup:OS proc_ver=$proc_ver" >> $HTXNoise
+true_proc_ver=`grep 'TRUE PVR ver' ${HTX_LOG_DIR}/htx_syscfg | awk '{ print $5 }'`
+true_proc_ver=`printf %d $true_proc_ver`
+echo "mem.setup:OS proc_ver=$proc_ver, true pvr=$true_proc_ver" >> $HTXNoise
 
-if [[ "$proc_ver" != "0x4e" && "$proc_ver" != "0x4f" ]]
+ln -sf ${HTXBIN}/hxemem64_new ${HTXBIN}/hxetlbie
+ln -sf ${HTXBIN}/hxemem64_old ${HTXBIN}/hxecentaur
+ln -sf ${HTXBIN}/hxemem64_new ${HTXBIN}/hxefabricbus_new
+if [ $true_proc_ver -lt 78 ];
 then
     #P8 or less
     if [ -r ${HTXREGRULES}/hxemem64/mem_16m_hwpf_old ]
@@ -51,22 +74,14 @@ then
         mv ${HTXREGRULES}/hxemem64/rules.web_server_old ${HTXREGRULES}/hxemem64/rules.web_server
     fi
 
-    if [ ! -x ${HTXBIN}/hxemem64_new ]
-    then
-	echo "Old mem exer binary will be used" >> $HTXNoise
-        cp ${HTXBIN}/hxemem64 ${HTXBIN}/hxemem64_new
-        cp ${HTXBIN}/hxecentaur ${HTXBIN}/hxemem64
-    fi
-    if [ -x ${HTXBIN}/hxecache_old ]
-    then
-        echo "Old cache exer binary will be used" >> $HTXNoise
-        mv ${HTXBIN}/hxecache_old ${HTXBIN}/hxecache
-    fi
+	echo "mem.setup:Old mem and cache exer binaries will be used" >> $HTXNoise
+	ln -sf ${HTXBIN}/hxemem64_old ${HTXBIN}/hxemem64
+    ln -sf ${HTXBIN}/hxecache_old ${HTXBIN}/hxecache
+	ln -sf ${HTXBIN}/hxefabricbus_old ${HTXBIN}/hxefabricbus
 else
-    if [ -x ${HTXBIN}/hxecache_new ]
-    then
-        mv ${HTXBIN}/hxecache_new ${HTXBIN}/hxecache
-    fi
+	ln -sf ${HTXBIN}/hxemem64_new ${HTXBIN}/hxemem64
+    ln -sf ${HTXBIN}/hxecache_new ${HTXBIN}/hxecache
+	ln -sf ${HTXBIN}/hxefabricbus_new ${HTXBIN}/hxefabricbus
 fi
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
 if [[ $Hugepagesize -lt 2048 ]]
@@ -346,9 +361,9 @@ echo "avail_16M=$avail_16M,avail_16G=$avail_16G,free_16M=$free_16M,free_16G=$fre
 echo "mem_16M=$mem_16M" >>  ${HTX_LOG_DIR}/freepages
 echo "cache_16M=$cache_16M" >>  ${HTX_LOG_DIR}/freepages
 echo "tlbie_16M=$tlbie_16M" >> ${HTX_LOG_DIR}/freepages
-#Increasing /proc/sys/kernel/shmmax value to 1GB,considering cache exer worst case requirement for chip with 16cores.
-echo "mem.setup:Setting /proc/sys/kernel/shmmax to 1GB"
-echo 1073741824 > /proc/sys/kernel/shmmax
+#Increasing /proc/sys/kernel/shmmax value to 2GB,considering cache exer worst case requirement for chip with 24cores in p9.
+echo "mem.setup:Setting /proc/sys/kernel/shmmax to 2GB"
+echo 2147483648 > /proc/sys/kernel/shmmax
 
 # Writing $shmall_4K to /proc/sys/kernel/shmall
 # so that memory exerciser can allocate upto 90%

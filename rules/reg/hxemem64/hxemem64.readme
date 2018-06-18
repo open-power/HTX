@@ -1,4 +1,6 @@
 README for hxemem64
+Important Note: Most of new features in documentation are mainly for new memory exerciser(supports only P9 and above architecture)
+				If user wants tweak new rule files(default.*, rules.latency) on P8, Please use the binary "hxemem64_new". 
 (1) Goal:
 ---------
 The goal of hxemem64 exerciser is to stress test the nest portion of POWER systems (L3,X-bus,A-bus,Centaur,memory subsystem) in a multitasking environment.
@@ -93,6 +95,21 @@ When oper =STRIDE, it will introduce a stride in the memory access pattern.
 The stride size for accessing the memory is defined through a rulefile parameter "stride_sz". 
 By default, its value is 128 byte(1 cacheline).
 The main intention of this test case is to have more cache misses i.e. L1/L2/L3 misses. 
+
+5)RAND_MEM
+When oper = RAND_MEM, memory access pattern will be random within a segment. A random number generator 
+function is used generate to get random addresses aligned to cache line within a segment.
+For each num_oper, (segment_size / cache_line_size) number of memory accesses are performed.
+
+6)LATENCY_TEST
+When oper = LATENCY_TEST, exerciser reports the read and write memory latency numbers to user.
+It is highly recommended to have command line run for this test case. Once htx setup is done, please use
+below command line for LATENCY_TEST.
+
+$HTXBIN/hxemem64 /dev/mem OTH $HTXREGRULES/hxemem64/rules.latency
+
+Note: 1) Latency numbers are found by averaging out million accesses in a 1GB segment. 
+	  2) Please use binary "$HTXBIN/hxemem64_new"  If test is to be performed on P8 or below systems.
 
 Patterns:
 Pattern is the data which is written to memory by the exerciser for performing the memory ops. 

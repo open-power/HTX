@@ -24,7 +24,7 @@ int do_stride_operation(int t){
     struct segment_detail sd;
     void *shr_mem_cur_ptr;
     int num_oper=0,nw=0,nr=0,nc=0;
-    int no_of_strides, oper_per_stride;
+    unsigned long no_of_strides, oper_per_stride;
     static int main_misc_count = 0;
     int miscompare_count, trap_flag;
     unsigned long seg_seed, seed;
@@ -62,6 +62,7 @@ int do_stride_operation(int t){
             sd.sub_seg_num=0;
             sd.sub_seg_size=0;
             seg_seed = seed;
+            local_ptr->seg_details[seg].in_use = 1;
 
             if( g_data.stanza_ptr->pattern_type[pi] == PATTERN_ADDRESS ) {
                 sd.width = LS_DWORD;
@@ -78,15 +79,16 @@ int do_stride_operation(int t){
             while(nw>0 || nr>0 || nc>0){
                 if(nw>0){
                     seed = seg_seed;
+					srand48_r(seed,&local_ptr->buffer);
                     switch (sd.width) {
                         case LS_DWORD:
-                            rc = write_dword(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi, &seed);
+                            rc = write_dword(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi,local_ptr);
                             break;
                         case LS_WORD:
-                            rc = write_word(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi, &seed);
+                            rc = write_word(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi,local_ptr);
                             break;
                         case LS_BYTE:
-                            rc = write_byte(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi, &seed);
+                            rc = write_byte(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi,local_ptr);
                             break;
                     }
                     nw--;
@@ -95,6 +97,8 @@ int do_stride_operation(int t){
                     goto exit;                
                 }
                 if(nr>0){
+                    seed = seg_seed;
+					srand48_r(seed,&local_ptr->buffer);
                     switch (g_data.stanza_ptr->width) {
                         case LS_DWORD:
                             rc = read_dword(shr_mem_cur_ptr, no_of_strides, oper_per_stride);
@@ -113,15 +117,16 @@ int do_stride_operation(int t){
                 }
                 if(nc>0){
                     seed = seg_seed;
+					srand48_r(seed,&local_ptr->buffer);
                     switch (g_data.stanza_ptr->width) {
                         case LS_DWORD:
-                            rc = read_comp_dword(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi, &seed,trap_flag,&sd);
+                            rc = read_comp_dword(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi,trap_flag,&sd);
                             break;
                         case LS_WORD:
-                            rc = read_comp_word(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi, &seed,trap_flag,&sd);
+                            rc = read_comp_word(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi,trap_flag,&sd);
                             break;
                         case LS_BYTE:
-                            rc = read_comp_byte(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi, &seed,trap_flag,&sd);
+                            rc = read_comp_byte(shr_mem_cur_ptr, no_of_strides, oper_per_stride, pi,trap_flag,&sd);
                             break;
                     }
 					if(rc != SUCCESS){
@@ -186,10 +191,10 @@ int do_stride_operation(int t){
 /*******************************************************************************
  *  fucntions to store a double word for nstride test case
  *******************************************************************************/
-int write_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, unsigned long *seed)
+int write_dword(void *addr, unsigned long no_of_strides, int oper_per_stride, int pi, struct mem_exer_thread_info *th)
 {
-    unsigned long rand_no, *ptr = (unsigned long *) addr;
-    int k, l=0, m, n=0, i;
+    unsigned long m,l=0,rand_no,*ptr = (unsigned long *) addr;
+    int k,n=0, i;
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
@@ -197,9 +202,8 @@ int write_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, unsi
                 if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_ADDRESS) {
                      ptr[l + i] = (unsigned long)(ptr + l + i);
                 } else if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_RANDOM) {
-                    rand_no  = get_random_no_64(seed);
+                    rand_no  = get_random_no_64(&th->buffer);
                     ptr[l + i] = rand_no;
-                    *seed = (unsigned long) rand_no;
                 } else {
                     ptr[l + i] = *((unsigned long *)(g_data.stanza_ptr->pattern[pi] + i)); /* access pattern */
                 }
@@ -215,12 +219,12 @@ int write_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, unsi
 /*******************************************************************************
  *  fucntions to read a double word for nstride test case
  *******************************************************************************/
-int read_dword(void *addr, int no_of_strides, int oper_per_stride)
+int read_dword(void *addr, unsigned long no_of_strides, int oper_per_stride)
 {
     volatile unsigned long buf;
     unsigned long *ptr = (unsigned long *) addr;
-    unsigned long consume_data=0;
-    int k, l=0, m, n=0;
+    unsigned long m,l=0,consume_data=0;
+    int k,n=0;
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
@@ -238,10 +242,12 @@ int read_dword(void *addr, int no_of_strides, int oper_per_stride)
 /*******************************************************************************
  *  fucntions to read/Comp a double word for nstride test case
  *******************************************************************************/
-int read_comp_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, unsigned long *seed,int trap_flag,struct segment_detail *seg)
+int read_comp_dword(void *addr, unsigned long no_of_strides, int oper_per_stride, int pi,int trap_flag,struct segment_detail *seg)
 {
-    unsigned long buf, expected_val, *ptr = (unsigned long *) addr;
-    int k, l=0, m, n=0, rc = 0, i;
+    unsigned long m,l=0,buf, expected_val, *ptr = (unsigned long *) addr;
+    int k,n=0, rc = 0, i;
+    struct segment_detail* sd = (struct segment_detail*) seg;
+    struct mem_exer_thread_info *th = &(mem_g.mem_th_data[sd->owning_thread]);
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
@@ -250,8 +256,7 @@ int read_comp_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, 
                 if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_ADDRESS) {
                     expected_val = (unsigned long)(ptr + l + i);
                 } else if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_RANDOM) {
-                    expected_val = (unsigned long)get_random_no_64(seed);
-                    *seed = (unsigned long) expected_val;
+                    expected_val = (unsigned long)get_random_no_64(&th->buffer);
                 } else {
                     expected_val = *((unsigned long *)(g_data.stanza_ptr->pattern[pi] + i)); /* access pattern */
                 }
@@ -263,6 +268,8 @@ int read_comp_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, 
                         do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr,0);
                     #endif
                     }
+                    displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%lx\tactual data = 0x%lx(addr:%p\n",__LINE__,__FUNCTION__,
+                        expected_val,buf,&ptr[l + i]);
                     rc = l + i + 1;
                     return rc;
                 }
@@ -278,19 +285,19 @@ int read_comp_dword(void *addr, int no_of_strides, int oper_per_stride, int pi, 
 /*******************************************************************************
  *  fucntions to store a word for nstride test case
  *******************************************************************************/
-int write_word(void *addr, int no_of_strides, int oper_per_stride, int pi, unsigned long *seed)
+int write_word(void *addr, unsigned long no_of_strides, int oper_per_stride, int pi, struct mem_exer_thread_info *th)
 {
     unsigned int rand_no, *ptr = (unsigned int *) addr;
-    int k, l=0, m, n=0, i;
+    unsigned long m,l=0;
+    int k,n=0, i;
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
             /*for(i=0; i < g_data.stanza_ptr->pattern_size[pi]; i+=g_data.stanza_ptr->width) {*/ /* Loop for pattern_size */
 			for(i=0; i < (g_data.stanza_ptr->pattern_size[pi]/g_data.stanza_ptr->width);i++){
                 if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_RANDOM) {
-                    rand_no = (unsigned int)get_random_no_32(seed);
+                    rand_no = (unsigned int)get_random_no_32(&th->buffer);
                     ptr[l + i] = rand_no;
-                    *seed = (unsigned long) rand_no;
                 } else {
                     ptr[l + i] = *((unsigned int *)(g_data.stanza_ptr->pattern[pi] + i)); /* access pattern */
                 }
@@ -306,12 +313,12 @@ int write_word(void *addr, int no_of_strides, int oper_per_stride, int pi, unsig
 /*******************************************************************************
  *  fucntions to read a word for nstride test case
  *******************************************************************************/
-int read_word(void *addr, int no_of_strides, int oper_per_stride)
+int read_word(void *addr, unsigned long no_of_strides, int oper_per_stride)
 {
     volatile unsigned int buf;
     unsigned int *ptr = (unsigned int *) addr;
-    unsigned long consume_data=0;
-    int k, l=0, m, n=0;
+    unsigned long m,consume_data=0,l=0;
+    int k,n=0;
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
@@ -329,18 +336,21 @@ int read_word(void *addr, int no_of_strides, int oper_per_stride)
 /*******************************************************************************
  *  fucntions to read/Comp a word for nstride test case
  *******************************************************************************/
-int read_comp_word(void *addr, int no_of_strides, int oper_per_stride, int pi, unsigned long *seed,int trap_flag,struct segment_detail *seg)
+int read_comp_word(void *addr, unsigned long no_of_strides, int oper_per_stride, int pi, int trap_flag,struct segment_detail *seg)
 {
     unsigned int buf, expected_val, *ptr = (unsigned int *) addr;
-    int k, l=0, m, n=0, rc = 0, i;
+    unsigned long m,l=0;
+    int k,n=0, rc = 0, i;
+    struct segment_detail* sd = (struct segment_detail*) seg;
+    struct mem_exer_thread_info *th = &(mem_g.mem_th_data[sd->owning_thread]);
+
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
 			for(i=0; i < (g_data.stanza_ptr->pattern_size[pi]/g_data.stanza_ptr->width);i++){
                 buf = ptr[l + i];
                 if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_RANDOM) {
-                    expected_val = (unsigned int)get_random_no_32(seed);
-                    *seed = (unsigned long) expected_val;
+                    expected_val = (unsigned int)get_random_no_32(&th->buffer);
                 } else {
                     expected_val = *((unsigned int *)(g_data.stanza_ptr->pattern[pi] + i)); /* access pattern */
                 }
@@ -352,6 +362,8 @@ int read_comp_word(void *addr, int no_of_strides, int oper_per_stride, int pi, u
 						do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr,0);
 					#endif
 					}
+                    displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%x\tactual data = 0x%x(addr:%p)\n",__LINE__,__FUNCTION__,
+                        expected_val,buf,&ptr[l + i]);
                     rc = l + i + 1;
                     return rc;
                 }
@@ -367,18 +379,18 @@ int read_comp_word(void *addr, int no_of_strides, int oper_per_stride, int pi, u
 /*******************************************************************************
  *  fucntions to store a byte for nstride test case
  *******************************************************************************/
-int write_byte(void *addr, int no_of_strides, int oper_per_stride, int pi, unsigned long *seed)
+int write_byte(void *addr, unsigned long no_of_strides, int oper_per_stride, int pi, struct mem_exer_thread_info *th)
 {
     char rand_no, *ptr = (char *) addr;
-    int k, l=0, m, n=0, i;
+    unsigned long m,l=0;
+    int k,n=0, i;
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
 			for(i=0; i < (g_data.stanza_ptr->pattern_size[pi]/g_data.stanza_ptr->width);i++){
                 if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_RANDOM) {
-                    rand_no = (char)get_random_no_8(seed);
+                    rand_no = (char)get_random_no_8(&th->buffer);
                     ptr[l + i] = rand_no;
-                    *seed = (unsigned long) rand_no;
                 } else {
                     ptr[l + i] = *((char *)(g_data.stanza_ptr->pattern[pi] + i)); /* access pattern */
                 }
@@ -394,12 +406,12 @@ int write_byte(void *addr, int no_of_strides, int oper_per_stride, int pi, unsig
 /*******************************************************************************
  *  fucntions to read a byte for nstride test case
  *******************************************************************************/
-int read_byte(void *addr, int no_of_strides, int oper_per_stride)
+int read_byte(void *addr, unsigned long no_of_strides, int oper_per_stride)
 {
     volatile char buf;
     char  *ptr = (char *) addr;
-    int k, l=0, m, n=0;
-    unsigned long consume_data=0;
+    int k,n=0;
+    unsigned long m,consume_data=0,l=0;
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
@@ -417,18 +429,21 @@ int read_byte(void *addr, int no_of_strides, int oper_per_stride)
 /*******************************************************************************
  *  fucntions to read/Comp a byte for nstride test case
  *******************************************************************************/
-int read_comp_byte(void *addr, int no_of_strides, int oper_per_stride, int pi, unsigned long *seed,int trap_flag,struct segment_detail *seg)
+int read_comp_byte(void *addr, unsigned long no_of_strides, int oper_per_stride, int pi,int trap_flag,struct segment_detail *seg)
 {
     char buf, expected_val, *ptr = (char *) addr;
-    int k, l=0, m, n=0, rc = 0, i;
+    int k,n=0, rc = 0, i;
+    struct segment_detail* sd = (struct segment_detail*) seg;
+    struct mem_exer_thread_info *th = &(mem_g.mem_th_data[sd->owning_thread]);
+    unsigned long m,l=0;
+
 
     for (k=0; k < oper_per_stride; k++) { /* Outer loop for the no. of load/store oper. within a given stride */
         for (m=0; m < no_of_strides; m++) {  /* Inner loop for the no. of stride in a given segment */
 			for(i=0; i < (g_data.stanza_ptr->pattern_size[pi]/g_data.stanza_ptr->width);i++){
                 buf = ptr[l + i];
                 if (g_data.stanza_ptr->pattern_type[pi] == PATTERN_RANDOM) {
-                    expected_val = (char)get_random_no_8(seed);
-                    *seed = (unsigned long) expected_val;
+                    expected_val = (char)get_random_no_8(&th->buffer);
                 } else {
                     expected_val = *((char *)(g_data.stanza_ptr->pattern[pi] + i)); /* access pattern */
                 }
@@ -440,6 +455,8 @@ int read_comp_byte(void *addr, int no_of_strides, int oper_per_stride, int pi, u
                         do_trap_htx64(0xBEEFDEAD,(l+i),(unsigned long)addr,(unsigned long)expected_val,(unsigned long)(ptr + l + i),(unsigned long)seg,(unsigned long)g_data.stanza_ptr,0);
                     #endif
                     }
+                    displaym(HTX_HE_SOFT_ERROR,DBG_MUST_PRINT,"[%d]%s:1st read_comp failure,expected data = 0x%x\tactual data = 0x%x (addr:%p)\n",__LINE__,__FUNCTION__,
+                        expected_val,buf,&ptr[l + i]);
                     rc = l + i + 1;
                     return rc;
                 }

@@ -6,6 +6,7 @@
 global_startup_delay = 0
 global_disable_cpu_bind  = NO
 global_disable_filters = no
+global_fabric_links_drive = cores
 *********************************
 rule_id = inter_node_fab_test
 oper = stride

@@ -1,4 +1,3 @@
-* IBM_PROLOG_BEGIN_TAG 
 * It considers less memory as low as one 4k and 64K page per thread, accesses same
 * memory on next read opeartions to maximize cache hits
 ****************************************************************

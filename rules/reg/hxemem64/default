@@ -18,7 +18,7 @@ affinity = local
 rule_id = mem_remote_2
 oper = mem
 num_oper = 1
-pattern_id = RANDOM HEXFF(8)
+pattern_id = 0x3C3C3C3C3C3C3C3C HEXFF(8)
 width = 4
 affinity = remote_chip
 
@@ -43,9 +43,10 @@ oper = rim
 num_oper = 1
 pattern_id = 0x3333333333333333
 width = 8
-cpu_filter = N*P*C*T50%
-mem_filter = N*P*[4k_10%,64K_10%,2M_100%,16M_100%]
-seg_size_16M = 2097152
+cpu_filter = N*P*C*T*
+mem_filter = N*P*[4k_40%,64K_40%]
+cpu_percent = 99
+mem_percent = 99
 seg_size_4K  = 2097152
 seg_size_64K = 2097152
 
