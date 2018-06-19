@@ -30,6 +30,9 @@
 #include "htxsyscfg64.h"
 
 
+#define NUMERIC       0
+#define STRING        1
+
 #define MAX_DEV_IN_ROW      10
 #define MAX_DEV_INPUT       4
 #define MAX_LINE_SIZE       1024
@@ -61,11 +64,14 @@ struct dev_exer_map map_array[] = {{"mem", "hxemem64", "64bit", "memory"},
                                {"divds", "hxeewm", "", "energy workload"},
                                {"fdaxpy", "hxeewm", "", "energy workload"},
                                {"mdaxpy", "hxeewm", "", "energy workload"},
+                               {"daxpy", "hxeewm", "", "energy workload"},
+                               {"mwr", "hxeewm", "", "energy workload"},
+                               {"mrd", "hxeewm", "", "energy workload"},
+                               {"triad", "hxeewm", "", "energy workload"},
                                {"ddot", "hxeewm", "", "energy workload"},
                                {"pv", "hxeewm", "", "energy workload"}
                               };
-int line_num = 0, offline_cpu = 0, startup_time_delay;
-int log_duration, time_quantum, pattern_length;
+int line_num = 0;
 int pvr, num_devs = 0;
 char scripts_dir[128];
 static int num_mem_instances = 0;
@@ -145,6 +151,7 @@ int main(int argc, char **argv)
                 (strcmp(keywd, "startup_time_delay") == 0) ||
                 (strcmp(keywd, "log_duration") == 0) ||
                 (strcmp(keywd, "offline_cpu") == 0) ||
+                (strcmp(keywd, "cpu_util") == 0) ||
                 (strcmp(keywd, "pattern_length") == 0)) {
                 continue;
            } else {
@@ -205,13 +212,12 @@ void create_device_entries(FILE *fp, char *dev_name_str, struct dev_exer_map cur
 
 int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
 {
-    int i, j, k, num_entries, num_cpus;
+    int i, j, num_entries;
     int node, chip, core, cpu;
-    char dev_name_str[16], rule_file_name[64], cmd_str[128];
+    char dev_name_str[16], rule_file_name[64];
     char filter_str[2][128];
     struct dev_exer_map cur_dev_map;
     struct dev_info cur_dev_input;
-    int granularity, resource_list[MAX_CPUS];
     struct resource_filter_info filter;
 
     strcpy (filter_str[0], resource_str);
@@ -241,7 +247,6 @@ int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
             /* sprintf(dev_name_str, "%s%c", dev_input[i].dev_name, mem_instance_str[num_mem_instances]); */
             sprintf(dev_input[i].rule_file_name, "default.eq.%s", dev_name_str);
             num_mem_instances++;
-            num_cpus = 1;
             strcpy(rule_file_name, cur_dev_map.exer);
             strcat(rule_file_name, "/");
             strcat(rule_file_name, dev_input[i].rule_file_name);
@@ -303,10 +308,10 @@ void create_numeric_entry(FILE *fp, char *param_name, char *param_value, char *d
     fprintf(fp, "\t%s = %s %s%s\n", param_name, param_value, comment, desc);
 }
 
-int get_string_value(char *eq_file, char *string)
+int get_string_value(char *eq_file, char *string, char type, char *str_val)
 {
     int val = 0;
-    char buf[32], str[256];
+    char str[256];
     FILE *tmp_fp;
 
     sprintf(str, "cat %s | grep %s | grep -v '#' | awk '{ print $NF}'", eq_file, string);
@@ -315,8 +320,10 @@ int get_string_value(char *eq_file, char *string)
         printf("Error for popen in create_eq_mdt. Exiting...");
         exit(1);
     }
-    if (fgets(buf,24,tmp_fp) != NULL) {
-        sscanf(buf, "%d", &val);
+    if (fgets(str_val,24,tmp_fp) != NULL && type == NUMERIC) {
+        sscanf(str_val, "%d", &val);
+    } else {
+        str_val[strlen(str_val) -1] = '\0';
     }
     pclose(tmp_fp);
     return val;
@@ -324,16 +331,19 @@ int get_string_value(char *eq_file, char *string)
 
 void create_default_stanza(FILE *fp, char *eq_file)
 {
-    char str[128], *tmp_str;
+    char str[128], *tmp_str, cpu_util[64] = "";
+    int log_duration, time_quantum, pattern_length;
+    int offline_cpu = 0, startup_time_delay;
 
-    time_quantum = get_string_value(eq_file, "time_quantum");
-    startup_time_delay = get_string_value(eq_file, "startup_time_delay");
-    log_duration = get_string_value(eq_file, "log_duration");
-    pattern_length = get_string_value(eq_file, "pattern_length");
+    time_quantum = get_string_value(eq_file, "time_quantum", NUMERIC, str);
+    startup_time_delay = get_string_value(eq_file, "startup_time_delay", NUMERIC, str);
+    log_duration = get_string_value(eq_file, "log_duration", NUMERIC, str);
+    pattern_length = get_string_value(eq_file, "pattern_length", NUMERIC, str);
     if (pattern_length == 0) {
         pattern_length = DEFAULT_PATTERN_LENGTH;
     }
-    offline_cpu = get_string_value(eq_file, "offline_cpu");
+    get_string_value(eq_file, "cpu_util", STRING, cpu_util);
+    offline_cpu = get_string_value(eq_file, "offline_cpu", NUMERIC, str);
 
     fprintf(fp, "default:\n");
     create_string_entry(fp, "HE_name", "", "* Hardware Exerciser name, 14 char");
@@ -367,6 +377,9 @@ void create_default_stanza(FILE *fp, char *eq_file)
     create_numeric_entry(fp, "eq_startup_time_delay", str, "* Equaliser startup time delay");
     sprintf(str, "%d", log_duration);
     create_numeric_entry(fp, "eq_log_duration", str, "* Equaliser log duration");
+    if (strcmp (cpu_util, "") != 0) {
+        create_string_entry(fp, "cpu_util", cpu_util, "* System level cpu utilization");
+    }
     sprintf(str, "%d", pattern_length);
     create_numeric_entry(fp, "eq_pattern_length", str, "* Equaliser default pattern length");
     strcpy(str, eq_file);
@@ -390,7 +403,7 @@ int parse_line(char s[])
 
 int get_line(char line[], int lim, FILE *fp)
 {
-        int c = 0, rc, err_no;
+        int rc, err_no;
         char *p, msg[256];
 
         p = fgets(line, lim, fp);

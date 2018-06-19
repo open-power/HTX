@@ -54,7 +54,7 @@ int proc_rule(struct htx_data *ps, struct ruleinfo *pr, char *wbuf, char *rbuf, 
   tbuf = tbuf_malloc;
 #else                     /* Linux */
   /* Page align the tmp buffer for linux raw IO */
-  tbuf = HTX_PAGE_ALIGN(tbuf_malloc);
+  tbuf = (char *)HTX_PAGE_ALIGN(tbuf_malloc);
 #endif
 
   init_seed(seed);                /* init seed for random number generator */
@@ -66,9 +66,11 @@ int proc_rule(struct htx_data *ps, struct ruleinfo *pr, char *wbuf, char *rbuf, 
   if ( strcmp(pr->oper, "RC") == 0 ) {      /* init write buff for oper RC */
                                    /* get HTXPATTERNS environment variable */
      strcpy(path, ""); /* Linux will need this initialization */
-     if ( (int)strlen((char *) strcpy(path,
-                                      (char *) getenv("HTXPATTERNS"))) == 0 )
-        strcpy(path, "../pattern/");                       /* default ONLY */
+     if ((char *) getenv("HTXPATTERNS") != NULL) {
+                 strcpy(path, (char *) getenv("HTXPATTERNS"));
+     } else {
+         strcpy(path, "../pattern/");                       /* default ONLY */
+     }
      strcat (path, pr->pattern_id);
      rc = hxfpat(path, wbuf, pr->dlen);
      if ( rc == 1 ) {

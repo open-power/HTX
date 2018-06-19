@@ -25,11 +25,9 @@
  *   FUNCTIONS: none
  *
  ******************************************************************************/
+
 #include <stdio.h>
-#ifndef __HTX_LINUX__ /* AIX */
-	#include <sys/scdisk.h>
-	#include <sys/scsi_buf.h>
-#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
@@ -43,6 +41,22 @@
 #include <stdlib.h>
 
 #include "hxihtx.h"
+
+#ifndef __HTX_LINUX__     /* AIX */
+
+#include <sys/cfgodm.h>
+#include <sys/devinfo.h>
+#include <sys/cdrom.h>
+#include <sys/ide.h>
+#include <sys/scdisk.h>
+#include <sys/scsi_buf.h>
+#include <sys/scsi.h>
+#include <sys/mode.h>
+#else                     /* Linux */
+#include <ctype.h>
+#include <scsi/sg.h>
+#include <linux/cdrom.h>
+#endif
 
 #define MAX_BLKNO 269250               /* maximum block number                */
 #define MIN_BLKNO 050570               /* minimum block number                */
@@ -64,14 +78,6 @@
 #define dvd_LASTLBA     4169951
 
 #define cd_TOC_ENTRY_LBA  264675
-
-#ifndef __HTX_LINUX__
-extern char *sys_errlist[]; /* system defined err msgs, indexed by errno      */
-#else
-extern const char *const sys_errlist[]; /* system defined err msgs,
-                                           indexed by errno */
-#endif
-extern int sys_nerr;        /* max value for errno                            */
 
 struct ruleinfo {
   int   op_in_progress;     /* operation in progress used with SIGTERM shutdwn*/
@@ -114,33 +120,15 @@ struct ruleinfo {
 
 /* Header files different for AIX and Linux */
 
-#ifndef __HTX_LINUX__     /* AIX */
-
-#include <sys/cfgodm.h>
-#include <sys/devinfo.h>
-#include <sys/cdrom.h>
-#include <sys/ide.h>
-#include <sys/scdisk.h>
-#include <sys/scsi.h>
-#include <sys/mode.h>
-
-#else                     /* Linux */
-
-#include <ctype.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <scsi/sg.h>
-#include <linux/cdrom.h>
-/* #include <asm/page.h> */
+#ifdef __HTX_LINUX__     /* Linux */
 
 /* Macro to page align pointer to next page boundary */
-
 #ifdef __DEFINE_PAGE_MACROS__
 #define PAGE_SIZE 4096
 #define PAGE_MASK (~(PAGE_SIZE-1))
 #endif
 
-#define HTX_PAGE_ALIGN(_X_) (char *)((((unsigned long)_X_)+PAGE_SIZE-1)&PAGE_MASK)
+#define HTX_PAGE_ALIGN(_X_) ((((unsigned long)_X_)+PAGE_SIZE-1)&PAGE_MASK)
 
 /* MODE DEFINITIONS */
 
@@ -149,45 +137,13 @@ struct ruleinfo {
 #define CD_MODE2_FORM2     0x3
 #define CD_DA              0x4
 
-#endif
-
+typedef off64_t  offset_t;
 
 /* Linux compatibility layer for AIX-HTX function calls */
-#ifdef __HTX_LINUX__
-
-/* Crash-on-miss should call xmon through miscex */
 
 /* Drop extended attributes with openx */
 #define openx(_P1_, _P2_, _P3_, _P4_) open(_P1_, _P2_)
 
-typedef off64_t  offset_t;
-
-/* POSIX Compliant macros for string functions */
-#include <string.h>
-
-#if 0
-#define strlen(_X_)\
-        (  (_X_) ? strlen(_X_) : (size_t) NULL )
-
-#define strcpy(_D_,_S_)\
-        ( (_D_) ? (_S_) ? strcpy(_D_,_S_) : (_D_) : NULL )
-
-#define strncpy(_D_,_S_,_N_)\
-        ( (_D_) ? (_S_) ? strncpy(_D_,_S_, _N_) : (_D_) : NULL )
-
-#define strcat(_D_,_S_)\
-        ( (_D_) ? (_S_) ? strcat(_D_,_S_) : (_D_) : NULL )
-
-#define strncat(_D_,_S_,_N_)\
-        ( (_D_) ? (_S_) ? strncat(_D_,_S_, _N_) : (_D_) : NULL )
-
-#define strcmp(_S1_,_S2_)\
-        ( (int) ( (_S1_) ? (_S2_) ? strcmp(_S1_,_S2_) : 1 : -1 ) )
-
-#define strncmp(_S1_,_S2_,_N_)\
-        ( (int) ( (_S1_) ? (_S2_) ? strncmp(_S1_,_S2_,_N_) : 1 : -1  ) )
-
-#endif
 #endif
 
 /* Function declarations */
@@ -225,4 +181,6 @@ int read_subchannel(struct htx_data *, struct ruleinfo *, int, int *);
 #ifndef __HTX_LINUX__
 int halt_audio_cdrom(int);
 int play_audio_msf(struct htx_data *, struct ruleinfo *, int, int *, struct cd_audio_cmd *);
+void init_iocmd (struct sc_iocmd *);
+void init_viocmd (struct scsi_iocmd *);
 #endif

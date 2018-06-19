@@ -90,13 +90,17 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    /* Get the base page size. Based on this, we will either use default.mem.eq.4k OR */
-    /* default.mem.eq.64k rule file.                                                  */
-    rc = get_memory_details(&v);
-    if (v.page_details[PAGE_INDEX_4K].supported) {
-        strcpy(mem_eq_rulefile, "default.mem.eq.4k");
-    } else if (v.page_details[PAGE_INDEX_64K].supported) {
-        strcpy(mem_eq_rulefile, "default.mem.eq.64k");
+    if (pvr <= 77) { /* For P8 and Below */
+        /* Get the base page size. Based on this, we will either use default.mem.eq.4k OR */
+        /* default.mem.eq.64k rule file.                                                  */
+        rc = get_memory_details(&v);
+        if (v.page_details[PAGE_INDEX_4K].supported) {
+            strcpy(mem_eq_rulefile, "default.mem.eq.4k");
+        } else if (v.page_details[PAGE_INDEX_64K].supported) {
+            strcpy(mem_eq_rulefile, "default.mem.eq.64k");
+        }
+    } else {
+        strcpy(mem_eq_rulefile, "default.eq");
     }
 
     /***************************************************************************************/
@@ -179,7 +183,7 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    /* Below 3 mdts are created for P8 with SMT 8 */
+    /* Below 2 mdts are created for P8 with SMT 8 */
     if ((pvr == 75 || pvr == 76 || pvr == 77) && (smt_threads == 8)) { /* only for P8 */
         sprintf(cfg_file, "%s/htx_ewm_p8_8fd_char.cfg", eq_cfg_path);
         open_file(cfg_file);
@@ -194,7 +198,8 @@ int main(int argc, char **argv)
         make_entry(time_quantum, wof_test);
         create_cfg_p8_rdp_switch();
         fclose(fp);
-
+    }
+    if (pvr >= 75) {
         sprintf(cfg_file, "%s/htx_ewm_p8_swicthing_cmp.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 800;
@@ -846,7 +851,12 @@ void create_cfg_cpu_mem_50()
     int i;
     int num_nodes, num_chips, num_cores;
 
-    fprintf (fp, "\tN0P0C0T0\t\tmem[mem.eq.50:0:0:1010]\n");
+    if (pvr <= 77) {
+        fprintf (fp, "\tN0P0C0T0\t\tmem[mem.eq.50:0:0:1010]\n");
+    } else {
+        fprintf (fp, "\tN0P0C0T0\t\tmem[%s:0:0:1010]\n", mem_eq_rulefile);
+    }
+    
     fprintf (fp, "\tN0P0C0T1\t\tcpu[default.cpu.eq:0:0:0101]\n");
     for (i = 2; i < smt_threads; i++) {
         if (i % 2 == 0) {

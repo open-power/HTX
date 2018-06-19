@@ -43,7 +43,6 @@ extern int crash_on_mis;
 /**************************************************************************/
 #include <time.h>
 #include <string.h>
-#include <stdio.h>
 
 void bldbuf(unsigned short *wbuf, unsigned int dlen, int buf_size,
        char *pattern_id, int *blkno)
@@ -105,7 +104,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
             int *blkno, char wbuf[], char rbuf[])
 {
   int           c, mis_flag = FALSE;
-  char          s[3], ctime[9], path[128];
+  char          s[3], ctime[9], path[128], log_dir[64];
   char          work_str[512], msg1[MAX_TEXT_MSG];
   static int    cnt_flag = FALSE;
   register long i, j;
@@ -153,7 +152,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
       if ( strcmp(pr->mode, "M2F2") != 0 ) {
           cnt++;
           if ( cnt < 10 ) {
-             strcpy(path, DUMP_PATH);
+             strcpy(path, ps->htx_exer_log_dir);
              strcat(path, "htx");
              strcat(path, &(ps->sdev_id[5]));
              strcat(path, ".cbuf");
@@ -162,7 +161,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
              hxfsbuf(wbuf, pr->dlen, path, ps);
              sprintf(work_str, "Compare buffer saved in %s\n", path);
              strcat(msg1, work_str);
-             strcpy(path, DUMP_PATH);
+             strcpy(path, log_dir);
              strcat(path, "htx");
              strcat(path, &(ps->sdev_id[5]));
              strcat(path, ".rbuf");
@@ -210,7 +209,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
           m2f2[m2f2_cnt].offset = i;
           (void) time(&m2f2[m2f2_cnt].dtime);
           m2f2_cnt++;
-          strcpy(path, DUMP_PATH);
+          strcpy(path, log_dir);
           strcat(path, "m2f2");
           strcat(path, &(ps->sdev_id[5]));
           strcat(path, ".cbuf");
@@ -220,7 +219,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
           hxfsbuf(wbuf, pr->dlen, path, ps);
           sprintf(work_str, "M2F2 Compare buffer saved in %s\n", path);
           strcat(msg1, work_str);
-          strcpy(path, DUMP_PATH);
+          strcpy(path, log_dir);
           strcat(path, "m2f2");
           strcat(path, &(ps->sdev_id[5]));
           strcat(path, ".rbuf");
@@ -250,7 +249,7 @@ char cmpbuf(struct htx_data *ps, struct ruleinfo *pr, int loop,
 					setleds( 0x2010 );
 						trap(0xBEEFDEAD, wbuf, rbuf, i, ps, pr);
 				#else
-                                                                do_trap_htx64( 0xBEEFDEAD, (unsigned long)wbuf, (unsigned long)rbuf, (unsigned long)i, (unsigned long)ps, (unsigned long)pr, 0, 0);
+								do_trap_htx64( 0xBEEFDEAD, (unsigned long)wbuf, (unsigned long)rbuf, (unsigned long)i, (unsigned long)ps, (unsigned long)pr, 0, 0);
 				#endif
 			   }
 

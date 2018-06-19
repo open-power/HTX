@@ -45,13 +45,13 @@ void info_msg (struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno, c
 /**************************************************************************/
 /* send message to HTX                                                    */
 /**************************************************************************/
-void prt_msg( struct htx_data *ps, struct ruleinfo *pr, int loop,int *blkno, int err, int sev, char *text)
+void prt_msg (struct htx_data *ps, struct ruleinfo *pr, int loop,int *blkno, int err, int sev, char *text)
 {
   char msg[550];
 
   info_msg(ps, pr, loop, blkno, msg);
   strcat(msg, text);
-     strcat(msg, strerror(err));
+  strcat(msg, strerror(err));
   hxfmsg(ps, err, sev, msg);
   return;
 } 
