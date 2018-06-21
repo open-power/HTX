@@ -26,12 +26,11 @@
 
 #include "hxsmsg.h"           
                                                
-#include <unistd.h>
 
 #include <sys/resource.h>
 #include <sys/time.h>
+#include <unistd.h>
 #include <sys/wait.h>
-#include <sys/types.h>
 
 
 /*

@@ -18,8 +18,10 @@
 /* IBM_PROLOG_END_TAG */
 
 #include "hxediag.h"
+#include <sys/types.h>
+#include <sys/wait.h>
 
-
+int check_device_link_state(char *);
 volatile unsigned int exit_flag = 0;
 /******************************************************************
  * Entry Point : 
@@ -186,6 +188,14 @@ main(int argc, char ** argv) {
     }
 
 	if(device_type == ETHERNET || device_type == ROCE) { 
+
+
+		rc = check_device_link_state(dev_name);
+		if(rc < 1) {
+			sprintf(htx_d.msg_text, "%s: unable to up interface link, return code <%d>, exiting!! \n", dev_name, rc); 
+			hxfmsg(&htx_d, 0, HTX_HE_HARD_ERROR, htx_d.msg_text);
+		}
+		
 		/*********************************************************************
 	 	 *  Open device to be queried 
 	 	 * *******************************************************************/  
@@ -494,6 +504,13 @@ main(int argc, char ** argv) {
 					}	
                 	sprintf(htx_d.msg_text, " Following IB Tests would be done for GlacierPark 1PORT Adapter: \nBER TEST : %s\n, HCA_SELT TEST : %s \n", ber_test, hca_selftest);
                     hxfmsg(&htx_d, 0, HTX_HE_INFO,  htx_d.msg_text);
+				} else if(device_name == LASSEN) {
+					if (current_stanza->test == IB_BER_TEST) {
+						sprintf(ber_test, "/usr/bin/ibdiagnet -i %s -lw 4x -ls 25 -P all=1 -ber_test --ber_thresh 1000000000000 -pm_pause_time 10 --skip nodes_info --screen_num_errs 1000 -o /var/tmp/ibdiagnet2/%s 2>&1", device, device);
+            	        if(DEBUG) printf("ber_test command = %s \n", ber_test);
+					}
+						sprintf(htx_d.msg_text, " Following IB Tests would be done for Lassen Adapter: \nBER TEST : %s\n, IB_BER_TEST  : %s \n", ber_test, hca_selftest);
+						hxfmsg(&htx_d, 0, HTX_HE_INFO,  htx_d.msg_text);
 				} else { 
 					sprintf(htx_d.msg_text, " Hxediag doesnot recognize this device, device_name=%#x\n",device_name); 
 					hxfmsg(&htx_d, 0, HTX_HE_HARD_ERROR, htx_d.msg_text);
@@ -521,8 +538,7 @@ main(int argc, char ** argv) {
         				free (test);
         				free(strings);
         				return(rc);
-    				}	
-	
+    				}		
 	                rc = update_result(test, strings->len, supported_test, current_stanza->mask, &result, &htx_d);
     	            if(rc == -EOPNOTSUPP) {
         	            sprintf(htx_d.msg_text, "Unrecongnized test, exiting test... \n");
@@ -1074,12 +1090,22 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 				self_test->loopback_test.pass ++; 
 			} 
 			self_test->loopback_test.total ++; 
+		} else if(strstr(supported_test[i], "HEALTH")) { 
+			/**********************************************
+ 			* Same behavior as external loopback 
+ 			* ********************************************/
+			if(test->data[i]) {
+				self_test->health_test.fail ++; 
+			} else { 
+				self_test->health_test.pass ++; 
+			} 
+			self_test->health_test.total ++; 
 		} else { 
 		    sprintf(htx_d->msg_text, "Unrecognized test=%s, this program needs to be updated \n", supported_test[i]);
         	hxfmsg(htx_d, rc, HTX_HE_HARD_ERROR, htx_d->msg_text);
 			return(-EOPNOTSUPP); 
 		} 
-		if(rc && test->data[i]) { 
+		if(rc && test->data[i]) { 	
 			sprintf(message, "\n%s ",supported_test[i]); 
 			strcat(message1, message); 
 		}
@@ -1250,7 +1276,7 @@ rf_read_rules(const char rf_name[], struct rule_info rf_info[], unsigned int * n
             } else {
                 if(DEBUG) printf("\n mask - %x ", current_ruleptr->mask);
             }
-        }else if ((strcmp(keywd, "test")) == 0) { 
+		} else if ((strcmp(keywd, "test")) == 0) { 
 			sscanf(line, "%*s %s", tmp); 			 
 			if((strcmp(tmp, "online")) == 0) { 
 				current_ruleptr->test = 0; 
@@ -1315,6 +1341,8 @@ rf_read_rules(const char rf_name[], struct rule_info rf_info[], unsigned int * n
 				device_name= SHINER; 
 			} else if(strcmp(tmp, "glacierpark_1port") == 0) { 
 				device_name = GLACIERPARK_1PORT; 
+			} else if(strcmp(tmp, "lassen") == 0) { 
+				device_name = LASSEN; 
 			} else { 
 				sprintf(msg, "\n DEVICE_NAME can be HYDEPARK, GLACIERPARK, TRAVIS_3EN, SHINER, input = %s \n", tmp); 
 				hxfmsg(htx_d, 0, HTX_HE_HARD_ERROR, msg);
@@ -1394,23 +1422,84 @@ get_cmd_result(char cmd[], char result[], int size, struct htx_data * htx_d) {
 }
 
 
+int run_from_child_process(char *ptr_cmd, struct htx_data * htx_d)
+{
+	pid_t	child_pid;
+	pid_t	wait_return;
+	int status;
+	int token_count = 0;	
+	char *temp_ptr;
+	char *arg_list[50] = {NULL};
+	char	command[512];
+	char command_line[1024];
+	int return_code;
+	int i;
+	int re_try_count = 1;	
+	#define re_try_limit 10
+
+
+	strcpy(command_line, ptr_cmd);
+
+	child_pid = fork();
+	if(child_pid == -1) {
+		return -1;
+	}
+	if(child_pid == 0) {
+		temp_ptr = strtok(command_line, " ");
+		strcpy(command, temp_ptr);
+		while( temp_ptr != NULL) {
+			if(strcmp(temp_ptr, "2>&1") != 0) {
+				arg_list[token_count] = temp_ptr;
+				token_count++;
+			}
+			temp_ptr = strtok(NULL, " ");
+		}
+		arg_list[token_count] = NULL;
+		for(i = 0; i < 50; i++) {
+			if(DEBUG) printf("arg_list[%d] = %s\n", i, arg_list[i]);
+		}
+	
+		return_code = execv(command, arg_list);
+		if(DEBUG) printf("execv failed with command <%s>, return_code = %d, errno = %d", command, return_code, errno);
+		return -2;
+	} else {
+		do {
+			wait_return = waitpid(child_pid, &status, 0);
+			sleep(1);
+			re_try_count++;
+		} while(wait_return == -1 && errno == EINTR && re_try_count < re_try_limit);
+		if (wait_return == -1) {	
+			sprintf(htx_d->msg_text, "Error found, wait return code = %d, errno = %d\n", wait_return, errno); 
+			hxfmsg(htx_d, errno, HTX_HE_HARD_ERROR, htx_d->msg_text); 
+			return -3;
+		}
+		if (WIFEXITED(status)) {
+			return WEXITSTATUS(status);
+		}
+	}
+	return -4;
+}
+
 int
 get_cmd_rc(char cmd[], struct htx_data * htx_d) {
 
-	int rc = system(cmd); 
+	int rc = 0;
+
+
+	rc = run_from_child_process(cmd, htx_d); 
 
 	if(DEBUG) printf(" %s : running cmd : %s \n", __FUNCTION__,  cmd); 
 
-	if(rc == -1) { 
-		sprintf(htx_d->msg_text, "Error with system() call, Reason : child process could not be created.cmd=%s \n", trim(cmd)); 
+	if(rc < 0) { 
+		sprintf(htx_d->msg_text, "Error found, error code = %d, Reason : child process could not be created.cmd=%s \n", rc, trim(cmd)); 
 		hxfmsg(htx_d, rc, HTX_HE_HARD_ERROR, htx_d->msg_text); 
 		return(rc); 
-	} else if(WEXITSTATUS(rc) == 127) { 
+	} else if(rc == 127) { 
 		sprintf(htx_d->msg_text, "command=%s,  not found, rc = %d \n", trim(cmd), WEXITSTATUS(rc)); 
 		hxfmsg(htx_d, 127, HTX_HE_HARD_ERROR, htx_d->msg_text);
-        return(WEXITSTATUS(rc));
+        	return rc;
 	} else { 
-		return(WEXITSTATUS(rc)); 
+		return rc; 
 	} 
 
 	return(0); 
@@ -1457,3 +1546,31 @@ trim(char * str) {
 
     return str;
 }
+
+
+int check_device_link_state(char *device_full_name)
+{
+
+	int return_code = 0;
+	char device_name[256]; 
+	char command_string[1024];
+	FILE *fp_popen;
+
+
+	strcpy(device_name, basename(device_full_name));
+	sprintf(command_string, "[ $(ip link show up %s | wc -l) = \"0\" ] && ip link set %s up ", device_name, device_name);
+	system(command_string);
+	sleep(2);
+
+	sprintf(command_string,"ip link show up %s | wc -l", device_name);
+	fp_popen = popen(command_string, "r");
+	if(fp_popen == NULL) {
+		return -1;
+	}
+
+	fscanf(fp_popen, "%d", &return_code);	
+		
+	pclose(fp_popen);
+	return return_code;
+}
+

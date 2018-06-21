@@ -3043,7 +3043,6 @@ int htxscreen_main_menu(void)
 							initialize_response_object(&response_object);
 							shutdown_socket_fd = htxclient_create_socket();
 							htxclient_connect(shutdown_socket_fd, command_object.sut_hostname, command_object.daemon_port_number);
-							sprintf(command_object.ecg_name, "%s/mdt/%s", global_htx_home_dir, global_selected_mdt_name);
 							htxclient_prepare_command_string(&command_object, command_string);
 							htxclient_send_command(shutdown_socket_fd, command_string);
 

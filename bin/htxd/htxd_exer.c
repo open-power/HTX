@@ -246,8 +246,6 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
 	goto getout;
     } /* if */
 
-    (void) remove(p_temp_filename);  /* cleanup temp file */
-
     if (rc == 1) { /* nothing for this pattern, leave quietly */
 	rc = 0;
 	goto getout;
@@ -365,15 +363,12 @@ int htxd_run_HE_script(char *pattern, char *device_name, int *conf_emsg)
  */
     getout:
 
-      (void) remove(p_temp_filename);  /* cleanup temp file */
-    free(p_temp_filename);
     free(cmdOutput);
     free(msg_text);
     free(script_cmd);
     free(script_list_file);
     free(cmd_string);
 
-    p_temp_filename = NULL;
     cmdOutput = NULL;
     msg_text = NULL;
     script_cmd = NULL;

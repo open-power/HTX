@@ -544,6 +544,7 @@ int htxd_reset_exer_pid(pid_t child_pid, char *exit_reason)
 	int exer_position_in_exer_table;
 	char exit_detail_string[512];
 	char temp_str[100];
+	char error_msg[4048];
 
 	p_exer_table = htxd_get_exer_table();
 	if(p_exer_table == NULL) {
@@ -564,7 +565,10 @@ int htxd_reset_exer_pid(pid_t child_pid, char *exit_reason)
 		} else if ( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period_expired ) {
 			sprintf(temp_str, " because of run time (%ld seconds) is completed", (long) (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->test_run_period);
 			strcat(exit_detail_string, temp_str);
-		}
+		} else if( (strncmp(exit_reason, "exit(127) ", 9) == 0) && (strcmp((p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->HE_name, "hxenvidia") == 0) ){
+			sprintf(error_msg, "Full HTX exerciser enablement when GPU's are present requires prerequisite installation of the following rpm packages, to prevent HTX from reporting device driver (DD) errors:\n\n'yum install kernel-devel kernel-headers gcc make gcc-c++ numactl openssh-server wget net-tools libX11-devel mesa-libGLU-devel freeglut-devel ntpdate'\n");
+			htxd_send_message(error_msg, 0, HTX_HE_HARD_ERROR, HTX_SYS_MSG);
+		}	
 
 		if( (htxd_ecg_shutdown_flag == FALSE) && (htxd_shutdown_flag == FALSE) ) {
 			if ( ( (p_exer_table[exer_position_in_exer_table].ecg_exer_addr.HE_addr)->user_term) ||

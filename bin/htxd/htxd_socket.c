@@ -332,6 +332,11 @@ int htxd_send_response(int new_fd, char *command_result, int command_type, int c
 	if(command_type == HTXCMDLINE_COMMAND) {
 	buffer_length = strlen(command_result) + 10 + 10 + 10;
 		response_buffer = malloc(buffer_length);
+		if(response_buffer == NULL) {
+			sprintf(trace_string, "1.htxd_send_response: malloc returned with NULL, errono <%d>", errno);
+			HTXD_TRACE(LOG_ON, trace_string);
+			return -2;
+		}
 		memset(response_buffer, 0, buffer_length);
 		sprintf(response_buffer, "%010d%010d%s", command_return_code,(int)strlen(command_result), command_result);
 		number_of_bytes_to_send = strlen(response_buffer);
@@ -347,7 +352,14 @@ int htxd_send_response(int new_fd, char *command_result, int command_type, int c
 			cumulative_number_of_bytes_sent += number_of_bytes_sent;
 		}
 	} else if(command_type == HTXSCREEN_COMMAND) {
-		response_buffer = malloc( (10 * 1024) + 30 );
+		buffer_length = (10 * 1024) + 30;	
+		response_buffer = malloc(buffer_length);
+		if(response_buffer == NULL) {
+			sprintf(trace_string, "2.htxd_send_response: malloc returned with NULL, errono <%d>", errno);
+			HTXD_TRACE(LOG_ON, trace_string);
+			return -2;
+		}
+		memset(response_buffer, 0, buffer_length);
 		sprintf(response_buffer, "%010d%010d", command_return_code, (10 * 1024));
 		memcpy(response_buffer + 20, command_result, 10 * 1024);
 		number_of_bytes_to_send = (10 * 1024) + 20;
@@ -363,7 +375,9 @@ int htxd_send_response(int new_fd, char *command_result, int command_type, int c
 		}
 	}
 	
-	free(response_buffer);	
+	if(response_buffer != NULL) {	
+		free(response_buffer);	
+	}
 	
 	return result;
 }

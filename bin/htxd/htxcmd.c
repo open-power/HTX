@@ -37,11 +37,11 @@ void htxcmd_display_usage(char *error_text)
 	}
 	printf("Usage: htxcmdline [-sut <host name>] [-port <port number>] OPTIONS\n");
 	printf("\tFollowing are the OPTIONS\n");
-	printf("\t-set_eeh [<EEH flag( 1 0r 0)>]\n");
+	printf("\t-set_eeh [<EEH flag( 1 or 0)>]\n");
 	printf("\t-set_kdblevel [<kdb level flag ( 1 or 0)>]\n");
 	printf("\t-set_htx_env <variable> <value>\n");
 	printf("\t-get_htx_env <variable>\n");
-	printf("\t-bootme [ on | off | status ]\n");
+	printf("\t-bootme [ on | off | status | help ]\n");
 	printf("\t-createmdt\n");
 	printf("\t-listmdt\n");
 	printf("\t-refresh\n");

@@ -170,6 +170,7 @@ int htxcmd_get_daemon_port_number(int argument_count, char *argument_vector[], i
 int htxcmd_get_command_name(int argument_count, char *argument_vector[], htxcmd_command *p_command_object)
 {
 	int i;
+	char error_string[512];
 
 	p_command_object->command_name[0] = '\0';
 
@@ -190,6 +191,20 @@ int htxcmd_get_command_name(int argument_count, char *argument_vector[], htxcmd_
 		exit(1);
 	}
 	htxcmd_validate_command_name(p_command_object);
+
+	i++;
+	while(i < argument_count) {
+		if( ( (strcmp(argument_vector[i], "-cmd")) != 0) && ( (strcmp(argument_vector[i], "-set_htx_env")) != 0)  ){
+			if(argument_vector[i][0] == '-') {
+				if( ( (strcmp(argument_vector[i], MDT_NAME_OPTION) ) != 0) && ( (strcmp(argument_vector[i], ECG_NAME_OPTION) ) != 0) ) {
+					sprintf(error_string, "Error : invalid option %s is provided, please check usage", argument_vector[i]);
+					htxcmd_display_usage(error_string);
+					exit(1);	
+				}
+			}
+		}
+		i++;
+	}
 
 	return 0;
 } 

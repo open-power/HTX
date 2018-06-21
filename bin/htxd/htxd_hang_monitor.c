@@ -37,6 +37,7 @@
 #include "htxd_util.h"
 #include "htxd_instance.h"
 
+#define LOG_ENTRY_COUNT 6  /* 5 + 1 */
 
 
 extern htxd *htxd_global_instance;
@@ -46,7 +47,6 @@ int htxd_hang_monitor_ecg(htxd_ecg_info *p_ecg_info_to_hang_monitor, char *comma
 {
 	struct htxshm_HE *p_HE;
 	int i;
-	int return_code = 0;
 	time_t epoch_time_now;
 	long elasped_time;
 	long max_update_lapse;
@@ -83,25 +83,34 @@ int htxd_hang_monitor_ecg(htxd_ecg_info *p_ecg_info_to_hang_monitor, char *comma
 
 			elasped_time = epoch_time_now - p_HE->tm_last_upd;
 			max_update_lapse = (long) (p_HE->max_run_tm + p_HE->idle_time);
-			if (elasped_time > max_update_lapse) {
+			if ((elasped_time > max_update_lapse) && (elasped_time < (LOG_ENTRY_COUNT * max_update_lapse) ) ) {
 				hung_toggle = (elasped_time / max_update_lapse) % 2;
-				if (p_HE->hung_flag != hung_toggle) {
+				if (p_HE->hung_flag != hung_toggle) { 
 					p_HE->hung_flag = hung_toggle;
+					p_HE->hung_exer = 1;
 					sprintf(hang_monitor_log_entry, "%s for %s is HUNG!\n"
 						"Max run time (set in mdt) = %d seconds.\n"
 						"Current elasped time = %d seconds.",
 						p_HE->HE_name, p_HE->sdev_id,
 						p_HE->max_run_tm,
 						(int) elasped_time);
+					htxd_send_message(hang_monitor_log_entry, 0, HTX_HE_SOFT_ERROR, HTX_SYS_MSG);
 				}
 			} else {
-				p_HE->hung_flag = 0;
+				if (elasped_time < max_update_lapse) {
+					p_HE->hung_flag = 0;
+					if (p_HE->hung_exer == 1) {
+						sprintf(hang_monitor_log_entry, "%s for %s is now RUNNING!\n", p_HE->HE_name, p_HE->sdev_id);
+						htxd_send_message(hang_monitor_log_entry, 0, HTX_HE_SOFT_ERROR, HTX_SYS_MSG);
+						p_HE->hung_exer = 0;
+					}
+				}
 			}
 		}
 		p_HE++;
 	}
 
-	return return_code;
+	return 0;
 }
 
 

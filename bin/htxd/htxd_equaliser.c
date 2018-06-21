@@ -269,7 +269,7 @@ void update_exer_info()
                             sys_detail.nodes[node_num].chips[chip_num].cores[core_num].cpus[cpu_num].exer_info_index[num_tests_configured] = k;
                             num_tests_configured++;
                             if (test_config.sys_util_flag == 0) {
-                                strcpy(util_pattern, (p_htxshm_HE + k)->cpu_utilization);
+                                strcpy(util_pattern, (p_htxshm_HE)->cpu_utilization);
                                 update_config_detail(k, util_pattern);
                             } else {
                                 test_config.exer_config[k].config.utilization_pattern = sys_cpu_util_pattern[lcpu];

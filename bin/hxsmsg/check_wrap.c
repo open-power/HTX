@@ -24,10 +24,10 @@
  */
 
 
-#include "hxsmsg.h"
-
-#include <unistd.h>
 #include <sys/types.h>
+#include <unistd.h>
+
+#include "hxsmsg.h"
 
 /*
  * check_wrap() error code #defines
