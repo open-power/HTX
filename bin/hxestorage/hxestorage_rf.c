@@ -27,6 +27,7 @@
 extern void user_msg(struct htx_data *ps, int err, int io_err_flag, int sev, char *text);
 
 extern int sync_cache_flag, discard_enabled, randomize_sync_cache, total_BWRC_threads, max_thread_cnt, total_max_thread_cnt;
+extern int turn_attention_on;
 int seeds_were_saved = 0, num_sub_blks_psect = 0;
 char fsync_flag ='N';
 struct device_info dev_info;
@@ -504,7 +505,7 @@ int parse_keywd(char *str, char *value[])
 /************************************************************************/
 int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *line, unsigned long long maxblk, unsigned int blksize)
 {
-    int i=0, j, num_keywds, queue_depth, BWRC_threads;
+    int i=0, j, num_oper_index, num_keywds, queue_depth, BWRC_threads;
     char *input_rule[MAX_INPUT_PARAMS], varstr[32];
     char keywd[32], chr_ptr[3][32], *val, *ptr;
     char tmp_str[64], msg[MSG_TEXT_SIZE];
@@ -625,7 +626,7 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
     } else if (strcasecmp(keywd, "OPER") == 0) {
         rule->num_oper_defined = parse_keywd(str, &input_rule[0]);
         BWRC_threads = 0;
-        for (i=0; i < rule->num_oper_defined; i++) {
+        for (i=0, num_oper_index = 0; i < rule->num_oper_defined; i++) {
             if ((strcasecmp(input_rule[i], "R") == 0) ||
                 (strcasecmp(input_rule[i], "S") == 0) ||
                 (strcasecmp(input_rule[i], "RC") == 0) ||
@@ -642,26 +643,43 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
                 (strcasecmp(input_rule[i], "CAWW") == 0) ||
                 (strcasecmp(input_rule[i], "CAWR") == 0) ||
                 (strcasecmp(input_rule[i], "XCMD") == 0) ||
+            #ifdef __CAPI_FLASH__
+                (strcasecmp(input_rule[i], "U") == 0) ||
+            #else
                 (strcasecmp(input_rule[i], "D") == 0) ||
                 (strcasecmp(input_rule[i], "DRC") == 0) ||
+            #endif
                 (strchr (input_rule[i], '[') != NULL)) {
+            #ifdef __CAPI_FLASH__
+                if (strcasecmp(input_rule[i], "U") == 0) {
+                    if (discard_enabled == 0) {
+                        sprintf(msg, "unmap is not enabled for the device. Rule line# %d has unmap oper\n"
+                                     "defined. Will ignore it.\n", *line);
+                        user_msg(ps, 0, 0, INFO, msg);
+                        continue;
+                    }
+                }
+            #else
+                if ((strcasecmp(input_rule[i], "DRC") == 0) || (strcasecmp(input_rule[i], "D") == 0)) {
+                    discard_enabled = 1;
+                }
+            #endif
                 strcpy(rule->oper[i], input_rule[i]);
+                num_oper_index++;
                 if (strcasecmp(input_rule[i], "BWRC") == 0) {
                     BWRC_threads++;
                 } else {
                     rule->is_only_BWRC_stanza = 'N';
                 }
-                if ((strcasecmp(input_rule[i], "DRC") == 0) || (strcasecmp(input_rule[i], "D") == 0)) {
-                    discard_enabled = 1;
-                }
             } else {
                 sprintf(msg, "line# %d %s = %s is incorrect. Only allowed values are:\n"
-                             "R,S,W,RC,RS,RW,WR,WS,WRC,BWRC,CARR,CARW,CAWR,CAWW or XCMD.\n",
+                             "R,S,W,RC,RS,RW,WR,WS,WRC,BWRC,D, DRC,CARR,CARW,CAWR,CAWW or XCMD.\n",
                              *line, keywd, input_rule[i]);
                 user_msg(ps, 0, 0, SOFT, msg);
                 return -1;
             }
         }
+        rule->num_oper_defined = num_oper_index;
         if (rule->is_only_BWRC_stanza == 'N' && BWRC_threads != 0) {
                 rule->num_BWRC_threads = BWRC_threads;
                 total_BWRC_threads += BWRC_threads;
@@ -996,7 +1014,7 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
         if (strcasecmp(varstr, "YES") == 0) {
             run_on_misc = 'Y';
         }
-    } else if ( strcmp(varstr, "MISC_CMD") == 0 ) {
+    } else if ( strcasecmp(keywd, "MISC_CMD") == 0 ) {
         sscanf(str, "%*s %[^\n]s",  misc_run_cmd);
     } else if (strcasecmp(keywd, "RUN_REREAD") == 0) {
         sscanf(str, "%*s %s", varstr);
@@ -1038,6 +1056,13 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
             sprintf(msg, "line# %d keywd = %s (invalid). Valid values are YES/NO.\n", *line, keywd);
             user_msg(ps, 0, 0, SOFT, msg);
             return -1;
+        }
+    } else if (strcasecmp(keywd, "ENABLE_ATTN") == 0) {
+        sscanf(str, "%*s %s", varstr);
+        if (strcasecmp(varstr, "YES") == 0) {
+            turn_attention_on = 1;
+        } else if (strcasecmp(varstr, "NO") == 0) {
+            turn_attention_on = 0;
         }
     } else if (strcasecmp(keywd, "SYNC_CACHE") == 0) {
         sscanf(str, "%*s %s", varstr);
@@ -1086,7 +1111,7 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
                 return -1;
             }
         } else {
-        	sprintf(msg, "line# %d %s = %s (must be PHYSICAL_LUN/VIRTUAL_LUN/CBLK_CLOSE_LUN ) \n", line, keywd, varstr);
+        	sprintf(msg, "line# %d %s = %s (must be PHYSICAL_LUN/VIRTUAL_LUN/CBLK_CLOSE_LUN ) \n", *line, keywd, varstr);
             user_msg(ps, 0, 0, SOFT, msg);
             return -1;
         }
@@ -1095,7 +1120,7 @@ int parse_rule_parameter(struct htx_data *ps, char *str, void *stanza_ptr, int *
     	sscanf(str, "%*s %s", varstr);
         chunk_size = atoi(varstr);
         if(chunk_size < 0) {
-        	sprintf(msg, "line# %d %s = %s (must be positive integer) \n", line, keywd, chunk_size);
+        	sprintf(msg, "line# %d %s = %lx (must be positive integer) \n", *line, keywd, chunk_size);
             user_msg(ps, 0, 0, SOFT, msg);
             return -1;
         }

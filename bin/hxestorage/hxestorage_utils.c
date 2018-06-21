@@ -713,9 +713,15 @@ void bld_header (struct htx_data *htx_ds, struct thread_context *tctx, unsigned 
 int bldbuf (struct htx_data *htx_ds, struct thread_context *tctx, unsigned short write_stamping)
 {
     int rc = 0;
+#ifdef __CAPI_FLASH__
+    if ((enable_state_table == NO) && (strcasecmp(tctx->oper, "U") != 0)) {
+        rc = bld_buf(htx_ds, tctx, write_stamping);
+    }
+#else
     if (enable_state_table == NO) {
         rc = bld_buf(htx_ds, tctx, write_stamping);
     }
+#endif
     return rc;
 }
 
@@ -878,7 +884,7 @@ void generate_pattern5 (unsigned short *buf, int bufsize)
 void generate_pattern7 (char *buf, int bufsize, unsigned int line_length)
 {
 	/*********************************************************
-	 * algorithm 7 chosen. This algorithm will generate the buffer depending
+	 * algorithm 7 choosen. This algorithm will generate the buffer depending
 	 * on the width of the scsi bus. Say the width is 16 bits so the data
 	 * transfer should be ffff 0000 ffff 0000 ... This will generate the
  	 * highest electrical stress on the scsi bus.
@@ -1201,7 +1207,7 @@ void info_msg(struct htx_data *htx_ds, struct thread_context *tctx, unsigned lon
 
 	if (tctx->cur_seek_type == RANDOM) { /* Random access addresses */
 		sprintf(msg_text,
-			"%s  numopers=%lld  loop=%lld  blk=%#llx transfer size=%lld\n "
+			"%s  numopers=%lld  loop=%lld  blk=%#llx tansfer size=%lld\n "
 			"min_blkno=%#llx max_blkno=%#llx oper=%s, RANDOM access\n"
 			"Seed Values= %d, %d, %d\n"
 			"Data Pattern Seed Values = %d, %d, %d\n",
@@ -1255,7 +1261,9 @@ void prt_msg(struct htx_data *htx_ds, struct thread_context *tctx, int loop,
 {
   	char msg[MSG_TEXT_SIZE], msg1[128];
 	char err_str[ERR_STR_SZ];
+#ifndef __HTX_LINUX__
     int rc = 0;
+#endif
 
 	/* If continue on err is set to yes means continue on all IO error.
      * if set to DATACHECK, continue only for READ and stop for any other type of error.
@@ -1266,8 +1274,7 @@ void prt_msg(struct htx_data *htx_ds, struct thread_context *tctx, int loop,
     } else {
         if ( dev_info.crash_on_anyerr ) {
 	    #ifdef __HTX_LINUX__
-                do_trap_htx64( 0xDEADDEED, (unsigned long)loop, (unsigned long)tctx->blkno, (unsigned long)htx_ds, (unsigned long)tctx, 0, 0, 0);
-
+	        do_trap_htx64( 0xDEADDEED, (unsigned long)loop, (unsigned long)tctx->blkno, (unsigned long)htx_ds, (unsigned long)tctx, 0, 0, 0);
 	    #else
 	        trap( 0xDEADDEED, loop, tctx->blkno, htx_ds, tctx);
 	    #endif
@@ -1280,21 +1287,25 @@ void prt_msg(struct htx_data *htx_ds, struct thread_context *tctx, int loop,
 		sprintf(msg1, "errno: %d(%s)\n", err, err_str);
 		strcat(msg, msg1);
 	}
-	rc = pthread_mutex_lock(&log_mutex);
+#ifndef __HTX_LINUX__
+    rc = pthread_mutex_lock(&log_mutex);
 	if (rc) {
         STRERROR_R(rc, err_str, ERR_STR_SZ);
         sprintf(msg, "Mutex lock failed in function prt_msg, rc %d (%s)", rc, err_str);
         user_msg(htx_ds, rc, 0, HARD, msg);
         exit(1);
     }
+#endif
     hxfmsg(htx_ds, err, sev, msg);
-	rc = pthread_mutex_unlock(&log_mutex);
+#ifndef __HTX_LINUX__
+    rc = pthread_mutex_unlock(&log_mutex);
 	if (rc) {
         STRERROR_R(rc, err_str, ERR_STR_SZ);
         sprintf(msg, "Mutex unlock failed in function prt_msg, rc %d (%s)", rc, err_str);
         user_msg(htx_ds, rc, 0, HARD, msg);
         exit(1);
     }
+#endif
     return;
 }
 
@@ -1304,7 +1315,9 @@ void prt_msg(struct htx_data *htx_ds, struct thread_context *tctx, int loop,
 void user_msg(struct htx_data *htx_ds, int err, int io_err_flag, int sev, char *text)
 {
 	char msg1[128], msg[MSG_TEXT_SIZE], err_str[ERR_STR_SZ];
+#ifndef __HTX_LINUX__
     int rc = 0;
+#endif
 
 	/* If continue on err is set to yes means continue on all IO error
 	 * if set to DATACHECK, continue only for READ and stop for any other type of error.
@@ -1315,7 +1328,7 @@ void user_msg(struct htx_data *htx_ds, int err, int io_err_flag, int sev, char *
     } else {
         if ((sev == HARD) && (dev_info.crash_on_anyerr)) {
 	        #ifdef __HTX_LINUX__
-                do_trap_htx64(0xDEADDEED, (unsigned long)htx_ds, 0, 0, 0, 0, 0, 0);
+	        do_trap_htx64(0xDEADDEED, (unsigned long)htx_ds, 0, 0, 0, 0, 0, 0);
 	        #else
 		    trap(0xDEADDEED, htx_ds);
 	        #endif
@@ -1327,21 +1340,25 @@ void user_msg(struct htx_data *htx_ds, int err, int io_err_flag, int sev, char *
 		sprintf(msg1, "errno: %d (%s)\n", err, err_str);
 		strcat(msg, msg1);
 	}
-	rc = pthread_mutex_lock(&log_mutex);
+#ifndef __HTX_LINUX__
+    rc = pthread_mutex_lock(&log_mutex);
 	if (rc) {
         STRERROR_R(rc, err_str, ERR_STR_SZ);
         sprintf(msg, "Mutex lock failed in function user_msg, rc %d (%s)", rc, err_str);
         hxfmsg(htx_ds, rc, HARD, msg);
         exit(1);
     }
-  	hxfmsg(htx_ds, err, sev, msg);
-	rc = pthread_mutex_unlock(&log_mutex);
+#endif
+    hxfmsg(htx_ds, err, sev, msg);
+#ifndef __HTX_LINUX__
+    rc = pthread_mutex_unlock(&log_mutex);
 	if (rc) {
         STRERROR_R(rc, err_str, ERR_STR_SZ);
         sprintf(msg, "Mutex unlock failed in function user_msg, rc %d (%s)", rc, err_str);
         hxfmsg(htx_ds, rc, HARD, msg);
         exit(1);
     }
+#endif
 }
 
 #ifndef __HTX_LINUX__
@@ -1567,8 +1584,8 @@ void seg_lock(struct htx_data *htx_ds, struct thread_context *tctx, unsigned lon
 	int i,j, k = 0, l = 0, rc, locked = 0, lba_limit_found=0;
 	char msg[256], err_str[ERR_STR_SZ];
 	int match_found;
-	unsigned long long seg_llba;    /* Individual segment llba value */
-	unsigned long long seg_flba;    /* Individual segment flba value */
+	unsigned long long seg_llba;/* Individual segment llba value */
+	unsigned long long seg_flba;/* Individual segment flba value */
 
 	/* tid = pthread_self(); */
 	for(i = 0; i < 4; i++) {
@@ -1900,7 +1917,7 @@ void hang_monitor (struct htx_data *htx_ds)
                         }
                         if (dev_info.crash_on_hang) {
                         #ifdef __HTX_LINUX__
-                                do_trap_htx64(0xBEEFDEAD, (seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, (unsigned long)msg1, (unsigned long)htx_ds, 0, 0);
+                                do_trap_htx64(0xBEEFDEAD, (unsigned long)(seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, (unsigned long)msg1, (unsigned long)htx_ds, 0, 0);
                         #else
                                 trap(0xBEEFDEAD, (seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, msg1, htx_ds);
                         #endif
@@ -2104,9 +2121,9 @@ void update_state_table (unsigned long long block_num, int num_blks)
 
 void segment_table_init() {
 	int i = 0;                      /* Loop Variable */
-	int prev = 0;                   /* Temp Variable used to assign LBA Limits */
+	unsigned long long prev = 0;    /* Temp Variable used to assign LBA Limits */
 	int total_max_thread_cnt = 0;   /* Highest thread count defined in rule file stanza + Maximum BWRC thread count */
-	int seg_table_size[52];		/* Segment table size defined in terms of LBA count */
+	unsigned long long seg_table_size[52];		/* Segment table size defined in terms of LBA count */
 
 	total_max_thread_cnt = max_thread_cnt + total_BWRC_threads;
 

@@ -47,12 +47,12 @@ extern char fsync_flag;
 
 
 #define BITS_USED               12
-#define THREAD_ID_MASK          0xFFF0000000000000ULL
-#define INDEX_MASK              0x000FFFFFFFFFFFFFULL
+#define THREAD_ID_MASK          0xFFF00000
+#define INDEX_MASK              0x000FFFFF
 
 #define GENERATE_TAG(__thread_id__, __index__) 	 ( {               \
-    uint64_t mask = 0;                                              \
-    mask |= __thread_id__ << (sizeof(uint64_t) - BITS_USED);         \
+    uint32_t mask = 0;                                              \
+    mask |= __thread_id__ << ((sizeof(uint32_t) * 8) - BITS_USED);         \
     mask |= __index__;                                              \
     mask;                                                   \
     } );
@@ -61,13 +61,6 @@ extern char fsync_flag;
 
 
 #endif
-
-
-struct cache_thread {
-    int th_num;
-    int parent_th_num;
-    struct htx_data cache_htx_ds;
-};
 
 /*************************/
 /* Function Declarations */
@@ -119,6 +112,7 @@ int open_lun(struct htx_data *htx_ds, const char * capi_device, struct thread_co
 int close_lun(struct htx_data *htx_ds, struct thread_context * );
 int cflsh_write_operation(struct htx_data * htx_ds, struct thread_context *tctx, int loop );
 int cflsh_read_operation(struct htx_data * htx_ds, struct thread_context *tctx, int loop );
+int cflsh_unmap_operation(struct htx_data * htx_ds, struct thread_context *tctx, int loop );
 int cflsh_awrite_operation(struct htx_data * htx_ds, struct thread_context *tctx, int loop );
 int cflsh_aread_operation(struct htx_data * htx_ds, struct thread_context *tctx, int loop );
 int cflsh_aresult_operation(struct htx_data * htx_ds, struct thread_context *tctx, int loop );

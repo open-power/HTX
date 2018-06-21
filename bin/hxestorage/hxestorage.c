@@ -25,12 +25,15 @@
 #include "io_oper.h"
 
 time_t time_mark;
-pthread_t hang_monitor_thread, sync_cache_th;
+pthread_t hang_monitor_thread, sync_cache_th, stats_update_th;
 
 pthread_attr_t thread_attrs_detached;    /* threads created detached */
 pthread_cond_t  create_thread_cond_var, do_oper_cond_var;
 pthread_cond_t threads_finished_cond_var;
-pthread_mutex_t thread_create_mutex, cache_mutex, log_mutex, fencepost_mutex, dump_mutex;
+pthread_mutex_t thread_create_mutex, cache_mutex, stats_mutex, fencepost_mutex, dump_mutex;
+#ifndef __HTX_LINUX__
+pthread_mutex_t log_mutex;
+#endif
 
 struct device_info dev_info;
 
@@ -44,18 +47,18 @@ int eeh_retries = 1, turn_attention_on = 0, read_rules_file_count;
 volatile char exit_flag = 'N', signal_flag = 'N', int_signal_flag = 'N';
 char misc_run_cmd[256] = "", run_on_misc = 'N';
 struct thread_context *non_BWRC_threads_mem = NULL, *BWRC_threads_mem = NULL;
-struct htx_data data;
+struct htx_data data, global_htx_d;
 
 char *mmap_ptr= NULL;
 int mmap_fd, mmap_offset = 0;
 
 #ifdef __CAPI_FLASH__
-oper_fptr oper_list[TESTCASE_TYPES][MAX_OPER_COUNT] = {{cflsh_read_operation, cflsh_write_operation, compare_buffers, NULL,NULL, NULL},
+oper_fptr oper_list[TESTCASE_TYPES][MAX_OPER_COUNT] = {{cflsh_read_operation, cflsh_write_operation, compare_buffers, cflsh_unmap_operation,NULL, NULL},
                                                        {cflsh_aread_operation, cflsh_awrite_operation, NULL, NULL, NULL, NULL},
                                                       };
-int 	lun_type = UNDEFINED;
-char	capi_device[MAX_STR_SZ];
-size_t 	chunk_size = DEFAULT_CHUNK_SIZE;
+int lun_type = UNDEFINED;
+char capi_device[MAX_STR_SZ];
+size_t chunk_size = DEFAULT_CHUNK_SIZE;
 volatile chunk_id_t shared_lun_id = NULL_CHUNK_ID;
 #else
 oper_fptr oper_list[TESTCASE_TYPES][MAX_OPER_COUNT] = {{&read_disk, &write_disk, &compare_buffers, &discard, NULL, NULL},
@@ -110,8 +113,11 @@ int main(int argc, char *argv[])
     pthread_mutex_init(&thread_create_mutex, DEFAULT_MUTEX_ATTR_PTR);
     pthread_mutex_init(&cache_mutex, DEFAULT_MUTEX_ATTR_PTR);
     pthread_mutex_init(&fencepost_mutex, DEFAULT_MUTEX_ATTR_PTR);
-    pthread_mutex_init(&log_mutex, DEFAULT_MUTEX_ATTR_PTR);
+    pthread_mutex_init(&stats_mutex, DEFAULT_MUTEX_ATTR_PTR);
     pthread_mutex_init(&dump_mutex, DEFAULT_MUTEX_ATTR_PTR);
+#ifndef __HTX_LINUX__
+    pthread_mutex_init(&log_mutex, DEFAULT_MUTEX_ATTR_PTR);
+#endif
 
     pthread_cond_init(&create_thread_cond_var, DEFAULT_COND_ATTR_PTR);
     pthread_cond_init(&do_oper_cond_var, DEFAULT_COND_ATTR_PTR);
@@ -133,6 +139,11 @@ int main(int argc, char *argv[])
     hxfupdate(START, &data);
     sprintf(msg, "%s %s %s %s \n", data.HE_name, data.sdev_id, data.run_type, dev_info.rules_file_name);
     user_msg(&data, 0, 0, INFO, msg);
+
+    /* globla_htx_d will be used by stats thread. So, this need to be updated
+     * from data.
+     */
+     memcpy(&global_htx_d, &data, sizeof(struct htx_data));
 
     /*************************************************************************/
     /* Sanity check:                                                         */
@@ -341,19 +352,34 @@ int main(int argc, char *argv[])
             chunk_size = dev_info.maxblk + 1;
         #else
             chunk_id_t chunk_id = NULL_CHUNK_ID;
+        #ifdef __HTX_LINUX__
+            chunk_attrs_t attr;
+        #endif
 
-            chunk_id = cblk_open(capi_device, MAX_THREADS, O_RDWR, NULL, 0);
+            chunk_id = cblk_open(capi_device, MAX_THREADS, O_RDWR, 0, 0);
             if(chunk_id == NULL_CHUNK_ID) {
                 sprintf(msg, "main : Cannot get a valid chunk_id, capi_device = %s, errno = %d \n", capi_device, errno);
                 user_msg(&data, errno, 0, HARD, msg);
                 exit(1);
 	        }
-            rc = cblk_get_lun_size(chunk_id, &dev_info.maxblk, 0);
+            rc = cblk_get_lun_size(chunk_id, (unsigned long *)&dev_info.maxblk, 0);
             if(rc ) {
                 sprintf(msg, "cblk_get_size failed with rc = %d, errno = %d \n", rc, errno);
                 user_msg(&data, errno, 0, HARD, msg);
                 return(1);
             }
+        #ifdef __HTX_LINUX__
+            rc = cblk_get_attrs (chunk_id, &attr, 0);
+            if (rc) {
+                sprintf(msg, "cblk_get_attrs failed with rc = %d, errno = %x \n", rc, errno);
+                user_msg(&data, errno, 0, HARD, msg);
+                exit(1);
+            }
+
+            if (attr.flags1 & CFLSH_ATTR_UNMAP) {
+                discard_enabled = 1;
+            }
+        #endif
             rc = cblk_close(chunk_id, CBLK_SCRUB_DATA_FLG);
             if(rc) {
                 sprintf(msg, "cblk_close failed with rc = %d, errno = %x \n", rc, errno);
@@ -493,6 +519,21 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    /*******************************************************/
+    /******     Create stats updation thread         *******/
+    /*******************************************************/
+    rc = pthread_create(&stats_update_th, &thread_attrs_detached, (void *(*)(void *))stats_update_thread, NULL);
+    if (rc != 0) {
+        sprintf(msg, "pthread_create failed for stats update thread. errno set is: %d\n", rc);
+        user_msg(&data, rc, 0, HARD, msg);
+        /* Free BWRC memory also if allocated */
+        if (BWRC_threads_mem != NULL) {
+            free (BWRC_threads_mem);
+            BWRC_threads_mem = NULL;
+        }
+        exit(1);
+    }
+
     /******************************************************/
     /*******    Start processing of stanza          *******/
     /******************************************************/
@@ -502,7 +543,7 @@ int main(int argc, char *argv[])
         for (rule_no = 0; rule_no < num_rules_defined; rule_no++) {
             /* DPRINT("%s:%d - Running stanza: %d\n", __FUNCTION__, __LINE__, rule_no + 1); */
             data.test_id = rule_no + 1;
-            hxfupdate(UPDATE, &data);
+            HTX_STATS_UPDATE (UPDATE , &data);
 
             skip_flag = 0;
             /******************************************************************/
@@ -685,7 +726,7 @@ int main(int argc, char *argv[])
         sprintf(msg, "Pass #%d, rule file %s completed.\nCollision count = %d.", read_rules_file_count,
                 dev_info.rules_file_name, collisions);
         user_msg(&data, 0, 0, INFO, msg);
-        hxfupdate(FINISH, &data);
+        HTX_STATS_UPDATE (FINISH, &data);
         read_rules_file_count++;
     } while ((strcmp(data.run_type, "REG") == 0) && (exit_flag == 'N') && (int_signal_flag == 'N'));
 
@@ -977,9 +1018,11 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                 if (rc) {
                 	goto cleanup_dma_buffers;
                 }
+#if 0
                 if ((oper_loop % 50) == 0) {
                     hxfupdate(UPDATE, htx_ds); /* update htx statistics */
                 }
+#endif
                 set_blkno(htx_ds, tctx);
 
                 offset = (offset + tctx->offset) % 64;
@@ -1117,14 +1160,18 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                         }
                     }
 
+#if 0
                     if ((hot % 50) == 0) {
                         hxfupdate(UPDATE, htx_ds); /* update htx statistics */
                     }
+#endif
                 } /* End hotness loop */
 
+#if 0
                 if ((oper_loop % 20) == 0) {
                     hxfupdate(UPDATE, htx_ds); /* update htx statistics */
                 }
+#endif
                 if (tctx->transfer_sz.increment != 0) {
                     random_dlen(tctx);
                 }
@@ -1270,13 +1317,17 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                     }
                 } /* End for i < nreads_left loop */
 
+#if 0
                 if ((hot % 50) == 0) {
                     hxfupdate(UPDATE, htx_ds); /* update htx statistics */
                 }
+#endif
             } /* End for hotness loop */
+#if 0
             if ((oper_loop % 20) == 0) {
                 hxfupdate(UPDATE, htx_ds); /* update htx statistics */
             }
+#endif
             /*****************************************************/
             /* Get the length if size is not fixed. To maintain  */
             /* read/write ratio, length will always be same in   */
@@ -1433,9 +1484,11 @@ int execute_performance_test (struct htx_data *htx_ds, struct thread_context *tc
             if (rc) {
 				 goto cleanup_dma_buffers ;
             }
+#if 0
             if (oper_loop % 50 == 0) {
                 hxfupdate(UPDATE, htx_ds); /* update htx statistics */
             }
+#endif
             set_blkno(htx_ds, tctx);
             malloc_count = (malloc_count + 1) % tctx->num_mallocs;
             oper_loop++;
@@ -1465,9 +1518,11 @@ int execute_performance_test (struct htx_data *htx_ds, struct thread_context *tc
             if (rc) {
             	goto cleanup_dma_buffers ;
             }
+#if 0
             if (oper_loop % 100 == 0) {
                 hxfupdate(UPDATE, htx_ds); /* update htx statistics */
             }
+#endif
             malloc_count = (malloc_count + 1) % tctx->num_mallocs;
             oper_loop++;
         }
@@ -1606,6 +1661,64 @@ void * execute_thread_context (void *th_context)
         exit(rc);
     }
     pthread_exit(NULL);
+}
+
+/**********************************************/
+/*    Thread function to update the stats     */
+/**********************************************/
+void stats_update_thread()
+{
+    struct htx_data htx_d;
+    int time_spent, rc = 0;
+    char msg[128];
+
+    memcpy(&htx_d, &data, sizeof(struct htx_data));
+
+    user_msg(&htx_d, rc, 0, INFO, "created stats thread\n");
+    while (1) {
+        time_spent = 0;
+        while ((time_spent++) < STATS_UPDATE_INTERVAL) {
+            sleep(1);
+            if (exit_flag == 'Y' || exit_flag == 'y') {
+                break;
+            }
+        }
+        rc = pthread_mutex_lock (&stats_mutex);
+        if (rc) {
+            sprintf(msg, "Mutex lock failed for stats thread, rc = %d\n", rc);
+            user_msg(&htx_d, rc, 0, HARD, msg);
+            exit(1);
+        }
+        htx_d.test_id = data.test_id;
+        htx_d.good_reads = global_htx_d.good_reads;
+        htx_d.good_writes = global_htx_d.good_writes;
+        htx_d.bytes_read = global_htx_d.bytes_read;
+        htx_d.bytes_writ = global_htx_d.bytes_writ;
+
+        htx_d.bad_writes = global_htx_d.bad_writes;
+        htx_d.bad_reads = global_htx_d.bad_reads;
+
+        global_htx_d.good_reads = 0;
+        global_htx_d.good_writes = 0;
+        global_htx_d.bytes_read = 0;
+        global_htx_d.bytes_writ = 0;
+        global_htx_d.bad_writes = 0;
+        global_htx_d.bad_reads = 0;
+
+        rc = pthread_mutex_unlock (&stats_mutex);
+        if (rc) {
+            sprintf(msg, "Mutex unlock failed for stats thread, rc = %d\n", rc);
+            user_msg(&htx_d, rc, 0, HARD, msg);
+            exit(1);
+        }
+
+        if (htx_d.good_reads > 0 || htx_d.good_writes  > 0 || htx_d.bytes_read > 0 || htx_d.bytes_writ > 0) {
+            HTX_STATS_UPDATE(UPDATE, &htx_d);
+        }
+        if (exit_flag == 'Y' || exit_flag == 'y') {
+            pthread_exit((void *) 0);
+        }
+    }
 }
 
 /********************************************************************/
@@ -1840,8 +1953,13 @@ int populate_operations(struct thread_context *tctx)
             } else if (tctx->oper[i] == 'C' || tctx->oper[i] == 'c' || tctx->oper[i] == 'V') {
                 tctx->operations[tctx->oper_count++] = oper_list[tctx->testcase][C];
                 tctx->compare_enabled = 'y';
+        #ifdef __CAPI_FLASH__
+            } else if (tctx->oper[i] == 'U' || tctx->oper[i] == 'u') {
+                tctx->operations[tctx->oper_count++] = oper_list[tctx->testcase][U];
+        #else
             } else if (tctx->oper[i] == 'D' || tctx->oper[i] == 'd') {
                 tctx->operations[tctx->oper_count++] = oper_list[tctx->testcase][D];
+        #endif
                 tctx->num_discards = 1;
             } else if (tctx->oper[i] == '[') {
                 j = i + 1;
@@ -1880,8 +1998,10 @@ int populate_operations(struct thread_context *tctx)
 /**********************************************************/
 void update_blkno(struct htx_data *htx_ds, struct ruleinfo *ruleptr, struct thread_context *tctx)
 {
+    #ifndef __CAPI_FLASH__
     int th_num, remaining_blks;
     unsigned long long num_blks_per_thread;
+    #endif
     struct thread_context *current_tctx;
 
     if (ruleptr->BWRC_th_mem_index != -1) {
