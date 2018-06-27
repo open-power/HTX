@@ -56,13 +56,13 @@
 #define MMIO_DMY1_ADDR    0x0000010
 #define MMIO_TRACE_ADDR   0x3FFFFF8
 
-#define CACHE_LINE_SIZE 	128 
+#define CACHE_LINE_SIZE 	128
 
-#ifdef DEBUGON 
-	#define DEBUG  1 
-#else 
-	#define DEBUG  0 
-#endif 
+#ifdef DEBUGON
+	#define DEBUG  1
+#else
+	#define DEBUG  0
+#endif
 
 /*
  * Rule file path length
@@ -74,35 +74,35 @@
  */
 #define MAX_STRING              MSG_TEXT_SIZE
 
-/* 
- * Dumping Miscompare Information 
- */ 
+/*
+ * Dumping Miscompare Information
+ */
 #define MAX_MISCOMPARES 		8
 #define MAX_MSG_DUMP 			0x10
 
-/* 
- * Max stanza count 
+/*
+ * Max stanza count
 */
-#define MAX_STANZA            	32 
+#define MAX_STANZA            	32
 
 /*
- * Each thread needs these arguments, clubbed together in same structure... 
- */ 
-struct thno_htxd { 
-	struct htx_data htx_d; 
-	uint32_t thread_no;  
-	uint32_t helper_thread_no;  
-}; 
+ * Each thread needs these arguments, clubbed together in same structure...
+ */
+struct thno_htxd {
+	struct htx_data htx_d;
+	uint32_t thread_no;
+	uint32_t helper_thread_no;
+};
 
 /*
  * Rule info strcuture used to store parsed rule file data
  */
-struct rule_info {  
-    char 		rule_id[MAX_STRING];  
-    uint32_t 	compare:1;  
+struct rule_info {
+    char 		rule_id[MAX_STRING];
+    uint32_t 	compare:1;
 	uint32_t 	num_oper;
-    uint32_t 	buffer_cl;  
-    uint32_t 	timeout;  
+    uint32_t 	buffer_cl;
+    uint32_t 	timeout;
 	uint32_t    aligned;
 };
 struct rule_info rule_data[MAX_STANZA];

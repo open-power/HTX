@@ -1,0 +1,41 @@
+* @(#)33	1.1  src/htx/usr/lpp/htx/rules/reg/hxestorage/storage.coral.pass2, exer_storage, htxrhel7 8/24/17 05:21:14 
+* Rule file for testing coral system 
+
+rule_id = rule_1
+pattern_id = #003
+oper = bwrc
+num_oper = 0
+num_threads = 8
+direction = UP DOWN
+starting_block = BOT TOP
+transfer_size = 256K
+num_mallocs = 1
+seek_breakup_prcnt = 0
+section = yes
+skip = -99999999
+
+*---------------------------------------------------------------------------*
+*- STANZA 2: Sleep for 1 minutes.                                          -*
+*-           This lets the background thread (STANZA 1) initialize an area -*
+*-           of the disk before the other rule stanzas start.              -*
+*---------------------------------------------------------------------------*
+rule_id = rule_2
+oper = S
+sleep = 60000000
+skip = -99999999
+
+*-----------------------------------------------------------------------------*
+*- STANZA 3: Creates num of threads equal to queue depth. Each thread doing  -*
+*- doing 300 num_oper with RC or RWRC operation with xfer size between 1     -*
+*- block to 256K.                                                            -*
+*-----------------------------------------------------------------------------*
+rule_id = rule_3
+pattern_id= #003
+num_oper = 300
+num_threads = 1qd
+seek_breakup_prcnt = 0 100
+oper = RC RWRC
+direction = UP UP DOWN DOWN
+starting_block = BOT BOT TOP TOP
+transfer_size = [1BLK-256K,-1]
+num_mallocs = 2

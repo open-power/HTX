@@ -1,0 +1,90 @@
+*******************************************************************************
+* Brief description of each Rules file parameter :
+* ------------------------------------------------
+*
+* 1) RULE_ID :
+*        This parameter is used to assign unique name to each of the rule stanza
+*        in the rule file. The value should be of type character string.
+*        Default - MEMCOPY0.
+* 2) TESTCASE :
+*        Controls which mode to run the testcase.
+*        Memcopy AFU supports COPY and Interrupt test.
+*
+*        COPY: Copies given number of bytes from the source address to the
+*                        destination address.
+*
+* 3) COMPARE :
+*        This parameter indicates whether to compare source and destination buffer.
+*        This parameter is only supported with COPY test-case, for interrupt test
+*        this parameter is ignored.
+*        Possible Values = TRUE or FALSE
+*        Default - TRUE.
+*
+* 4) NUM_THREADS :
+*        Number of threads to be spawned. Each exerciser thread creates and attaches
+*        one User Context to AFU, so this parameter can be used to control number of context
+*        to create.
+*        Possible Values = Positive Integer <= 32(Memcopy AFU has 32 copy engines).
+*        Default - 32.
+*
+* 5) NUM_OPER :
+*        This parameter indicates number of times test(specified by TEST parameter)
+*        has to be performed. For COPY test buffer size changes in each iteration.
+*        Possible Values = Input should be positive real number.
+*        Default - 10.
+*
+* 6) BUFSIZE :
+*        This parameter controls the maximum buffer size that can be copied from
+*        source to destination. Memcopy AFU supports maximum of 2048 bytes for
+*        copy. This parameter is only supported with COPY test-case
+*        Default - 128.
+*******************************************************************************
+
+*****************************************************************************
+* Stanza1 - COPY TEST,
+*           Creates 16 contexts, issues COPY command to AFU for buffer
+*           size 128 bytes.
+*****************************************************************************
+rule_id = CAPI1
+testcase = COPY 
+compare = TRUE
+bufsize = 128
+NUM_OPER = 512
+NUM_THREADS = 16 
+
+*****************************************************************************
+* Stanza2 - COPY TEST,
+*           Creates 32 contexts, issues COPY command to AFU for buffer
+*           size 128 bytes.
+*****************************************************************************
+rule_id = CAPI2
+testcase = COPY 
+compare = TRUE
+bufsize = 128
+NUM_OPER = 4096
+NUM_THREADS = 32
+
+*****************************************************************************
+* Stanza3 - COPY TEST,
+*           Creates 16 contexts, issues COPY command to AFU for buffer
+*           size 1024 bytes.
+*****************************************************************************
+rule_id = CAPI3
+testcase = COPY 
+compare = TRUE
+bufsize = 1024
+NUM_OPER = 1024
+NUM_THREADS = 16
+
+
+*****************************************************************************
+* Stanza4 - COPY TEST,
+*           Creates 32 contexts, issues COPY command to AFU for buffer
+*           size 1024 bytes.
+*****************************************************************************
+rule_id = CAPI4
+testcase = COPY
+compare = TRUE
+bufsize = 1024
+NUM_OPER = 4096
+NUM_THREADS = 32 

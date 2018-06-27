@@ -1,0 +1,12 @@
+* @(#)34	1.1  src/htx/usr/lpp/htx/rules/reg/hxestorage/storage.coral.pass1, exer_storage, htxrhel7 8/24/17 05:26:49 
+* Rule file for testing coral system doing minimal basic testing
+
+rule_id = rule_1
+pattern_id = #003
+oper = wrc
+num_oper = 80
+num_threads = 1qd
+transfer_size = [1BLK-256K,-1]
+num_mallocs = 1
+seek_breakup_prcnt = 0 100
+section = yes

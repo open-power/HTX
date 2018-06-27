@@ -1,24 +1,6 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * Copyright 2003,2016 IBM International Business Machines Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *               http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
-
+static char sccsid[] = "@(#)71	1.1  src/htx/usr/lpp/htx/bin/hxecapi_afu_dir/get_rule.c, exer_capi, htxrhel7 10/20/16 01:09:59";
 /****************************************************************************
-*File Name:            get_rule.c
+*File Name:            get_rule_capi.c
 *File Description:     Contains code to parse rule file.
 ****************************************************************************/
 
@@ -26,12 +8,12 @@
 
 /****************************************************************************
 *Function Name:        parse_line
-*Function Description: This routine takes specified string as input.
+*Function Description: This routine takes specified string as input.  
 *                      It returns what pattern of string it is.
 *Function arguments:   string
 *Return Value:         0 indicates comment line in rule file.
 *                      1 indicates some white spaces and newline.
-*                      Otherwise, indicates there may be valid test case
+*                      Otherwise, indicates there may be valid test case 
 *                      parameter.
 ****************************************************************************/
 
@@ -57,12 +39,12 @@ static int parse_line(char s[])
 
 /****************************************************************************
 *Function Name:        get_line
-*Function Description: This routine reads a line into the
-*                      specified string.  It returns the length of the
-*                      string.  If the length is 1 the line is blank.  When
-*                      it reaches EOF the length is set to 0,
+*Function Description: This routine reads a line into the      
+*                      specified string.  It returns the length of the      
+*                      string.  If the length is 1 the line is blank.  When 
+*                      it reaches EOF the length is set to 0,               
 *Function arguments:   rule file descriptor, string, length
-*Return Value:         0 to indicate EOF.
+*Return Value:         0 to indicate EOF. 
 *                      1 to indicate blank line.
 *                      Otherwise, the length of the line.
 ****************************************************************************/
@@ -93,11 +75,11 @@ static int get_line(FILE *fd, char *s, int lim)
 static void SetDefaults(struct rule_info *rule_ptr)
 {
     strcpy(rule_ptr->rule_id,DEFAULT_RULE_ID);
-    rule_ptr->compare      	= DEFAULT_CMP_VALUE;
-	rule_ptr->num_oper	   	= DEFAULT_NUM_OPER;
-	rule_ptr->buffer_cl		= DEFAULT_BUFFER_CACHELINE_VALUE;
-	rule_ptr->timeout		= DEFAULT_TIMEOUT_VALUE;
-	rule_ptr->aligned		= DEFAULT_ALIGNMENT;
+    rule_ptr->testcase     =    DEFAULT_TEST_CASE;
+    rule_ptr->bufsize       =    DEFAULT_BUFVAL_VALUE;
+    rule_ptr->compare      =    DEFAULT_CMP_VALUE;
+    rule_ptr->num_threads  =    DEFAULT_NUM_THREADS;
+	rule_ptr->num_oper	   =	DEFAULT_NUM_OPER;
 }
 
 /****************************************************************************
@@ -122,13 +104,13 @@ int get_rule_capi(struct htx_data * htx_d, char rules_file_name[], uint32_t * nu
     static int 	line = 0;						/* Rule file line count */
     FILE   		*fptr;          				/* file pointer */
 
-    /* Opening capi rule file */
+    /* Opening capi rule file */ 
 	if ( (fptr = fopen(rules_file_name, "r")) == NULL ) {
         sprintf(msg, "Error opening %s file\n", rules_file_name);
         hxfmsg(htx_d, errno, HTX_HE_SOFT_ERROR, msg);
         return -1;
     }
-
+    
     keywd_count = 0;
 
     /* Reads rule file data repeatedly until EOF */
@@ -158,9 +140,9 @@ int get_rule_capi(struct htx_data * htx_d, char rules_file_name[], uint32_t * nu
             continue;
         } else {
             if ( s[0] != '*' ) { /* '*' represents comments in rule file */
-                for ( j = 0; s[j] != '\n'; j++ ) {
+                for ( j = 0; s[j] != '\n'; j++ ) { 
     				/* Formate string
-                	 * Eg: Input String:  testcase = COPY
+	                 * Eg: Input String:  testcase = COPY 
     	             *     Output String: TESTCASE   COPY
         	         */
                     s[j] = toupper(s[j]);
@@ -168,31 +150,49 @@ int get_rule_capi(struct htx_data * htx_d, char rules_file_name[], uint32_t * nu
                         s[j] = ' ';
                     }
                 }
-				/*
-				 * Start of a new stanza, Assigns default values to
-				 * rule_info structure
+				/* 
+				 * Start of a new stanza, Assigns default values to 
+				 * rule_info structure 
 				 */
-                if ( keywd_count == 0 ) {
-            		flag = 0;
-                    SetDefaults(&rule_data[i]);
+                if ( keywd_count == 0 ) {  
+            		flag = 0;			
+                    SetDefaults(&rule_data[i]); 
     				(* num_stanza)++; 	/* Total Number of Stanzas */
                 }
-
+    
                 keywd_count++;
 
                 sscanf(s, "%s", keywd);
-                /*
-				 * If tag match is found update rule_info structure
+                /* 
+				 * If tag match is found update rule_info structure 
 				 */
                 if ( (strcmp(keywd, RULE_TAG)) == 0 ) {
-                    sscanf(s, "%*s %s", rule_data[i].rule_id) ;
-					if(strlen(rule_data[i].rule_id) < 0 || strlen(rule_data[i].rule_id) > MAX_STRING) {
-                    	sprintf(msg, "line# %d %s - Rule_id should be less than %d. ", line, keywd, MAX_STRING);
+                    sscanf(s, "%*s %s", rule_data[i].rule_id) ; 
+					if(strlen(rule_data[i].rule_id) < 0 || strlen(rule_data[i].rule_id) > MAX_STRING) { 
+                    	sprintf(msg, "line# %d %s - Rule_id should be less than %d. ", line, keywd, MAX_STRING); 
                         hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
 						error = 'y';
 					}
+		    	} else if ( (strcmp(keywd, TESTCASE_TAG)) == 0 ) {
+                    sscanf(s, "%*s %s", temp); 
+	                if ((strcmp(temp, "COPY")) == 0 ) {
+    	            	rule_data[i].testcase = MEMCOPY_COMMAND_COPY;
+        	        } else if ((strcmp(temp, "INTERRUPT")) == 0 ) {
+            	    	rule_data[i].testcase = MEMCOPY_COMMAND_INTERRUPT;
+                    } else {
+                    	sprintf(msg, "line# %d %s = %s (must be COPY or INTERRUPT or COPY_ON_CACHELINE) \n", line, keywd, temp);
+	                    hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
+    	                error = 'y';
+                    }
+         		} else if ( (strcmp(keywd, BUFVAL_TAG)) == 0 ) {
+					sscanf(s, "%*s %d", &rule_data[i].bufsize);
+					if((rule_data[i].bufsize < 0) || (rule_data[i].bufsize > MAX_COPY_SIZE) ) {
+                        sprintf(msg,  "line# %d  %s bufsize = %d (must be >= 0 and <= %d) \n", line, keywd, rule_data[i].bufsize, MAX_COPY_SIZE);
+                        hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
+                        error = 'y';
+                    }		
 	    	    } else if ( (strcmp(keywd, COMPARE_TAG)) == 0 ) {
-					sscanf(s, "%*s %s", temp);
+					sscanf(s, "%*s %s", temp); 
 	                if ( (strcmp(temp, "TRUE")) == 0 ) {
     	            	rule_data[i].compare = TRUE;
         	        } else if ( (strcmp(temp, "FALSE")) == 0 ) {
@@ -202,31 +202,17 @@ int get_rule_capi(struct htx_data * htx_d, char rules_file_name[], uint32_t * nu
 	                    hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
     	                error = 'y';
                     }
-	            } else if ( (strcmp(keywd, NUM_OPER_TAG)) == 0 ) {
-                    sscanf(s, "%*s %d", &rule_data[i].num_oper);
-                    if(rule_data[i].num_oper < 0 ) {
-                    	sprintf(msg, "line# %d %s = %d (must be >= 1 ) \n", line, keywd, rule_data[i].num_oper);
+		        } else if ( (strcmp(keywd, NUM_THREADS_TAG)) == 0 ) {
+                    sscanf(s, "%*s %d", &rule_data[i].num_threads);
+                    if(rule_data[i].num_threads < 1 || rule_data[i].num_threads > MAX_THREADS) {   
+                    	sprintf(msg, "line# %d %s = %d (must be >= 1 and <= 32)", line, keywd, rule_data[i].num_threads);
                         hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
-                        error = 'y';
+                        error = 'y'; 
                     }
-                }else if ( (strcmp(keywd, BUFFER_CL_TAG)) == 0 ) {
-					sscanf(s, "%*s %d", &rule_data[i].buffer_cl);
-					if(!(rule_data[i].buffer_cl > 0 && rule_data[i].buffer_cl < 48)) {
-						sprintf(msg, "Buffer cacheline value should be in range [ 1 - 48 ] cachelines.\n");
-						hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
-                        error = 'y';
-					}
-				}else if ( (strcmp(keywd, TIMEOUT_TAG)) == 0 ) {
-					sscanf(s, "%*s %d", &rule_data[i].timeout);
-					if(!(rule_data[i].timeout > 0 && rule_data[i].timeout < 120)) {
-						sprintf(msg, "Timeout value should be in range [ 1 - 120 ] seconds.\n");
-						hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
-                        error = 'y';
-					}
-				}else if ( (strcmp(keywd, ALIGNMENT_TAG)) == 0 ) {
-                    sscanf(s, "%*s %d", &rule_data[i].aligned);
-                    if(!(rule_data[i].aligned == 1)) {
-                        sprintf(msg, "Alignment value should be 1.\n");
+	            } else if ( (strcmp(keywd, NUM_OPER_TAG)) == 0 ) {
+                    sscanf(s, "%*s %d", &rule_data[i].num_oper); 
+                    if(rule_data[i].num_oper < 0 ) { 
+                    	sprintf(msg, "line# %d %s = %d (must be >= 1 ) \n", line, keywd, rule_data[i].num_oper); 
                         hxfmsg(htx_d, 0, HTX_HE_SOFT_ERROR, msg);
                         error = 'y';
                     }
@@ -248,7 +234,7 @@ int get_rule_capi(struct htx_data * htx_d, char rules_file_name[], uint32_t * nu
 
 /****************************************************************************
 *Function Name:        print_rule_file_data
-*Function Description: prints parsed rule file
+*Function Description: prints parsed rule file 
 *Function arguments:   stanza count
 *Return Value:         void
 ****************************************************************************/
@@ -265,9 +251,10 @@ void print_rule_file_data(int num_stanz)
     /* Printing parsed data */
     for(i = 0; i < num_stanz; i++) {
         printf("RULE ID is %s\n",rule_data[i].rule_id);
+        printf("TEST CASE is %d\n",rule_data[i].testcase);
+        printf("BUF VAL is %d\n",rule_data[i].bufsize);
         printf("COMPARE is %d\n",rule_data[i].compare);
+        printf("NUM THREADS is %d\n",rule_data[i].num_threads);
         printf("NUM OPER is %d\n",rule_data[i].num_oper);
-        printf("BUFFER CL is %d\n\n",rule_data[i].buffer_cl);
-        printf("Timeout is %d\n\n",rule_data[i].timeout);
     }
 }
