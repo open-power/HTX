@@ -1,3 +1,13 @@
+* @(#)45        1.1  src/htx/usr/lpp/htx/rules/reg/hxecpu/default.p7, exer_fpu, htx72L 2/2/17 00:49:52
+* Rule file for hxefpu64 exerciser running on P6
+* For details of rule keywords, please refer README.hxefpu64
+* in /usr/lpp/htx/rules/reg/hxefpu64 dir on test machine.
+*
+* NOTE: Rule keyword & associated value should be all in one
+*	line _only_. Currently '\n' (newline) is used as
+*	delimiter to differentiate between keywords.
+* Types of CPU instructions: load,storage,branch,cache,external,SPR,rotate,logic,arth,conditional,store
+*
 * All types of CPU Instructions except thread priority instructions
 rule_id						test1
 num_oper					5000 
