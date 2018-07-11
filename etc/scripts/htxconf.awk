@@ -62,22 +62,52 @@ BEGIN {
 # CMVC_RELEASE is exported from htx_setup.sh
     CMVC_RELEASE = snarf("echo $CMVC_RELEASE"); 
     
+# Get HTX_LOG_DIR export variable
+    LOG_DIR = snarf("echo $HTX_LOG_DIR");
+    
+    
+# Get HTX_LOG_DIR export variable
+    HOME_DIR = snarf("echo $HTX_HOME_DIR");    
+    
+# Get HTXREGRULES export variable
+    REG_RULES = snarf("echo $HTXREGRULES");
+    
+# Get HTXREGRULES export variable
+    SCRIPTS_DIR = snarf("echo $HTXSCRIPTS");
+    
+# Get HTXnoise file to prints logs from thie script
+    HTXnoise_file = snarf("echo $HTXNoise");
+
+# Get the current excutable script name 
+    script_name = basename(ENVIRON["_"]);
+    
 # Get PVR of processor 
-    proc_ver = snarf("grep Version ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}' | awk -Fx '{print $2}' " );
+    cmd = sprintf("grep Version %s/htx_syscfg | awk -F: '{print $2}' | awk -Fx '{print $2}'", LOG_DIR);
+    proc_ver = snarf(cmd);
     proc_os = snarf("cat /proc/cpuinfo | grep cpu | sort -u | awk '{ print $3 }'");
 
+    cmd =  sprintf("grep 'TRUE PVR ver' %s/htx_syscfg | awk -F: '{print $2}' | awk -Fx '{print $2}'", LOG_DIR);
+    true_pvr = snarf(cmd);
+
+# Get P8CompatMode
+    cmd = sprintf("grep Power8Compatmode %s/htx_syscfg | awk -F: '{print $2}'", LOG_DIR);
+    p8_compat_mode = snarf(cmd);
+
 # Get number of cores in system
-    num_cores = snarf("awk -F : '/Number of Cores/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg");
+    cmd = sprintf("awk -F : '/Number of Cores/ {print $2}' %s/htx_syscfg", LOG_DIR);
+    num_cores = snarf(cmd);
 
 # Get the number of chips in the system
-    num_chips = snarf("awk -F : '/Number of chips/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg");
+    cmd = sprintf("awk -F : '/Number of chips/ {print $2}' %s/htx_syscfg", LOG_DIR);
+    num_chips = snarf(cmd);
 
 # Determine CPU type. 
     proc=snarf("uname -m");
     power7=snarf("cat /proc/cpuinfo | grep POWER7 | wc -l");
 
 # Determine system SMT.
-    smt_threads = snarf("awk -F: '/Smt threads/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg");
+    cmd = sprintf("awk -F: '/Smt threads/ {print $2}' %s/htx_syscfg", LOG_DIR);
+    smt_threads = snarf(cmd);
     hw_smt = smt_threads;
 
 # Determine logical cpus.
@@ -86,20 +116,19 @@ BEGIN {
    
 # Determine Processor mode (Shared or Dedicated).
     spm = 1;
-    shared_processor_mode = snarf("awk -F : '/shared_processor_mode/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg")
+    cmd = sprintf("awk -F : '/shared_processor_mode/ {print $2}' %s/htx_syscfg", LOG_DIR);
+    shared_processor_mode = snarf(cmd)
     if (shared_processor_mode == " no") 
-	 	spm = 0;
+	 spm = 0;
 	
 # Determine system Endianness
-    endian = snarf("cat ${HTX_LOG_DIR}/htx_syscfg | grep -i Endianness | cut -f2 -d:");
+    cmd = sprintf("cat %s/htx_syscfg | grep -i Endianness | cut -f2 -d:", LOG_DIR);
+    endian = snarf(cmd);
 
-# Create axon exercser stanza in htxrhel5 if PVR is 0x70 (Cell Blade)
-    create_axon_stanza = 0
-
+    printf ("[%s]: Running part.pl. All the logs for this will go to %s/part.pl.log\n", script_name, LOG_DIR) >> HTXnoise_file;
     system("${HTXSCRIPTS}/part.pl >/dev/null"); 
-    system("${HTXSCRIPTS}/htxinfo.pl > ${HTXLINUXLEVEL} ");
-    system("(echo 1 > /proc/sys/kernel/kdb) 2> /dev/null");
-    system("mkdir ${HTX_LOG_DIR}/htxraw 2> /dev/null ");
+    system("${HTXSCRIPTS}/htxinfo.pl > ${HTX_HOME_DIR}/htxlinuxlevel ");
+    system("(echo 1 > /proc/sys/kernel/kdb) 2>> $HTXNoise");
  
 ######################## MDTs CREATION LOGIC START ############################
 # always generate these mdt entries 
@@ -123,26 +152,28 @@ BEGIN {
     halt_level("1"); 
     start_halted("n");
     dup_device("n");
-    log_vpd("n"); 
+    log_vpd("y"); 
 
     create_memory_stanzas(); 
 
 	num_lines = ""; 
-	num_lines = snarf("cat ${HTX_LOG_DIR}/rawpart | wc | awk 'NR==1 {print $1}'"); 
+	cmd = sprintf("cat %s/rawpart | wc | awk 'NR==1 {print $1}'", LOG_DIR);
+	num_lines = snarf(cmd); 
 	num_cd_lines = ""; 
-	num_cd_lines = snarf("cat ${HTX_LOG_DIR}/cdpart | wc | awk 'NR==1 {print $1}'"); 
+	cmd = sprintf("cat %s/cdpart | wc | awk 'NR==1 {print $1}'", LOG_DIR);
+	num_cd_lines = snarf(cmd); 
 	num_dvdr_lines = ""; 
-	num_dvdr_lines = snarf("cat ${HTX_LOG_DIR}/dvdrpart 2> /dev/null | wc | awk 'NR==1 {print $1}'"); 
+	cmd = sprintf("cat %s/dvdrpart 2> /dev/null| wc | awk 'NR==1 {print $1}'", LOG_DIR);
+	num_dvdr_lines = snarf(cmd); 
 	num_dvdw_lines = ""; 
-	num_dvdw_lines = snarf("cat ${HTX_LOG_DIR}/dvdwpart 2> /dev/null | wc | awk 'NR==1 {print $1}'"); 
-	num_fd_lines = ""; 
-	num_fd_lines = snarf("cat ${HTX_LOG_DIR}/fdpart | wc | awk 'NR==1 {print $1}'"); 
+	cmd = sprintf("cat %s/dvdwpart 2> /dev/null | wc | awk 'NR==1 {print $1}'", LOG_DIR);
+	num_dvdw_lines = snarf(cmd); 
 	num_td_lines = ""; 
-	num_td_lines = snarf("cat ${HTX_LOG_DIR}/tdpart | wc | awk 'NR==1 {print $1}'"); 
+	cmd = sprintf("cat %s/tdpart | wc | awk 'NR==1 {print $1}'", LOG_DIR);
+	num_td_lines = snarf(cmd); 
 	num_mp_lines = ""; 
-	num_mp_lines = snarf("cat ${HTX_LOG_DIR}/mpath_parts  2> /dev/null | wc | awk 'NR==1 {print $1}'");	
-	num_lines_lv = ""; 
-	num_lines_lv = snarf("cat ${HTX_LOG_DIR}/lvpart 2> /dev/null | wc | awk 'NR==1 {print $1}'"); 
+	cmd = sprintf("cat %s/mpath_parts  2> /dev/null | wc | awk 'NR==1 {print $1}'", LOG_DIR);
+	num_mp_lines = snarf(cmd);	
 	
 	tmp = ""; 
 	dev = ""; 
@@ -168,7 +199,7 @@ BEGIN {
 	}
 # Check if CDROM drive is found on system 
 	for(count=0; count < num_cd_lines; count++) { 
-	    command = sprintf("cat ${HTX_LOG_DIR}/cdpart 2> /dev/null | awk 'NR==%d {print $1}'", (count+1)); 
+	    command = sprintf("cat %s/cdpart 2> /dev/null | awk 'NR==%d {print $1}'", LOG_DIR, (count+1)); 
 	    cdrom = snarf(command); 
 		if ( vios_setup == "1" )
 	    	mkstanza("hxecd","vscsi","CD",cdrom,"hxecd","cdrom.vios");
@@ -178,31 +209,31 @@ BEGIN {
  
 # Check if DVDROM drive is found on system 
 	for(count=0; count < num_dvdr_lines; count++) { 
-	    command = sprintf("cat ${HTX_LOG_DIR}/dvdrpart 2> /dev/null | awk 'NR==%d {print $1}'", (count+1)); 
+	    command = sprintf("cat %s/dvdrpart 2> /dev/null | awk 'NR==%d {print $1}'", LOG_DIR, (count+1)); 
 	    dvd = snarf(command); 
-		if ( vios_setup == "1" )
-		    mkstanza("hxecd","vscsi","DVD ROM",dvd,"hxecd","dvdrom.p1");
-		else
-		    mkstanza("hxecd","scsi","DVD ROM",dvd,"hxecd","dvdrom.p1");
+	if ( vios_setup == "1" )
+	    mkstanza("hxecd","vscsi","DVD ROM",dvd,"hxecd","dvdrom.p1");
+	else
+	    mkstanza("hxecd","scsi","DVD ROM",dvd,"hxecd","dvdrom.p1");
 	}
 # Check if DVDRAM drive is found on system 
 	for(count=0; count < num_dvdw_lines; count++) { 
-	    command = sprintf("cat ${HTX_LOG_DIR}/dvdwpart 2> /dev/null | awk 'NR==%d {print $1}'", count+1); 
+	    command = sprintf("cat %s/dvdwpart 2> /dev/null | awk 'NR==%d {print $1}'", LOG_DIR, count+1); 
 	    dvd = snarf(command);
-		snarf("rm -rf ${HTX_LOG_DIR}/htx_chk_disk >/dev/null 2>&1");
-		command = sprintf("${HTXSCRIPTS}/check_disk /dev/%s > /dev/null 2>&1; echo $? > ${HTX_LOG_DIR}/htx_chk_disk", dvd);
+		snarf("rm -rf /tmp/htx_chk_disk >/dev/null 2>&1");
+		command = sprintf("%s/check_disk /dev/%s > /dev/null 2>&1; echo $? > /tmp/htx_chk_disk", SCRIPTS_DIR, dvd);
 		snarf(command);
-		exit_code=snarf("cat ${HTX_LOG_DIR}/htx_chk_disk");
-		snarf("rm -rf ${HTX_LOG_DIR}/htx_chk_disk >/dev/null 2>&1");
+		exit_code=snarf("cat /tmp/htx_chk_disk");
+		snarf("rm -rf /tmp/htx_chk_disk >/dev/null 2>&1");
 		if (exit_code == "1") { 
 			continue; 
 		}
-	    mkstanza("hxestorage","scsi","DVD RAM",dvd,"hxestorage","default.dvd"); 
+		mkstanza("hxestorage","scsi","DVD RAM",dvd,"hxestorage","default.dvd"); 
 	}
  
 	if(num_mp_lines) { 
 		for(i=1; i<(num_mp_lines+1); i++) { 
-			tmp=sprintf("cat ${HTX_LOG_DIR}/mpath_parts 2> /dev/null | awk 'NR==%d {print $1}'",i);
+			tmp=sprintf("cat %s/mpath_parts 2> /dev/null | awk 'NR==%d {print $1}'",LOG_DIR, i);
 			path=snarf(tmp);  
 			dev=sprintf("%s", path); 
 			disk_type="";
@@ -219,19 +250,19 @@ BEGIN {
 	}  
 	
 	for(i=1;i<(num_lines+1);i++) { 
-	    tmp=sprintf("cat ${HTX_LOG_DIR}/rawpart 2> /dev/null | awk 'NR==%d {print $1}'",i); 
-	    dev=snarf(tmp); 
-	    tmp=sprintf("cat ${HTX_LOG_DIR}/rawpart | awk 'NR==%d {print $1}'",i); 
-	    dev2=snarf(tmp);
-		snarf("rm -rf ${HTX_LOG_DIR}/htx_chk_disk >/dev/null 2>&1");
-		command = sprintf("${HTXSCRIPTS}/check_disk /dev/%s > /dev/null 2>&1; echo $? > ${HTX_LOG_DIR}/htx_chk_disk", dev);
+		tmp=sprintf("cat %s/rawpart 2> /dev/null | awk 'NR==%d {print $1}'",LOG_DIR, i); 
+		dev=snarf(tmp); 
+		tmp=sprintf("cat %s/rawpart | awk 'NR==%d {print $1}'",LOG_DIR, i); 
+		dev2=snarf(tmp);
+		snarf("rm -rf /tmp/htx_chk_disk >/dev/null 2>&1");
+		command = sprintf("%s/check_disk /dev/%s > /dev/null 2>&1; echo $? > /tmp/htx_chk_disk", SCRIPTS_DIR, dev);
 		snarf(command);
-		exit_code=snarf("cat ${HTX_LOG_DIR}/htx_chk_disk");
-		snarf("rm -rf ${HTX_LOG_DIR}/htx_chk_disk >/dev/null 2>&1");
+		exit_code=snarf("cat /tmp/htx_chk_disk");
+		snarf("rm -rf /tmp/htx_chk_disk >/dev/null 2>&1");
 		if (exit_code == "1") { 
 			continue;
 		}
-	    if(dev2 == cdrom) continue;  
+		if(dev2 == cdrom) continue;  
  
 		if(dev ~ "sd") { 
 			tmp=sprintf("echo %s | tr -d '[0-9]'", dev);
@@ -248,29 +279,10 @@ BEGIN {
 			mkstanza("hxestorage","scsi","scsi-vols",dev2,"hxestorage","default.hdd","default.hdd"); 
 		} else if(disk_type == 0) {  
 			mkstanza("hxestorage","scsi","scsi-vols",dev2,"hxestorage","default.ssd","default.ssd");
-	    } else {	 
+		} else {
 			mkstanza("hxestorage","ide","ide-vols",dev2,"hxestorage","default.hdd","default.hdd"); 
-	    } 
+		} 
  	} 
-	for(i=1; i<(num_lines_lv+1);i++) { 
-	    tmp=sprintf("cat ${HTX_LOG_DIR}/lvpart 2> /dev/null | awk 'NR==%d {print $1}'",i); 
-	    dev=snarf(tmp); 
-	    tmp=sprintf("cat ${HTX_LOG_DIR}/lvpart | awk 'NR==%d {print $1}'",i); 
-	    dev2=snarf(tmp); 
- 
-	    if(dev2 == cdrom) continue; 
- 
-	    disk_type="";
-	    tmp=sprintf("cat /sys/block/%s/queue/rotational 2> /dev/null", dev);
-	    disk_type=snarf(tmp);
-	    
-	    # if disk_type is 1, means HDD. Otherwise, SSD
-	    if(disk_type == 1) {
-	    	mkstanza("hxestorage","scsi","scsi-vols",dev2,"hxestorage","default.hdd","default.hdd"); 
-	    } else {
-	    	mkstanza("hxestorage","scsi","scsi-vols",dev2,"hxestorage","default.ssd","default.ssd"); 
-	    }
-	} 
  
 	command = ""; 
 	result = ""; 
@@ -279,15 +291,15 @@ BEGIN {
 	tmp = ""; 
 
 	for(count=0;count <num_td_lines ;count++) { 
-	    tmp = sprintf("cat ${HTX_LOG_DIR}/tdpart | awk 'NR==%d {print $1}'",count+1); 
-	    dvname = snarf(tmp); 
+		tmp = sprintf("cat %s/tdpart | awk 'NR==%d {print $1}'",LOG_DIR, count+1); 
+		dvname = snarf(tmp); 
 
-	    if( dvname != "" ) { 
+		if( dvname != "" ) { 
 			mkstanza("hxetape","scsi","scsi-tape",dvname,"hxetape","scsd","scsd"); 
-	    } 
-	    else { 
+		} 
+		else { 
 			break; 
-	    } 
+		} 
 	} 
 
 # Detect normal serial ports 
@@ -369,7 +381,7 @@ BEGIN {
 	}
 
 # SCTU Stanza creation.  
-# Create SCTU Stanzas for lpars with dedicated cpus.
+# Create SCTU Stanzas only for lpars with dedicated cpus.
 # Effective smt_per_gang is calculated per gang of 2 cores and servers created accordingly.
 
 	if ( spm == 0 ) {
@@ -390,7 +402,7 @@ BEGIN {
 		for(g=0; g < num_core_gangs; g++) {
 			line1 = g*2 + 1;
 			line2 = g*2 + 2;
-			cmd = sprintf("awk '(NR >= %d && NR <= %d)' ${HTX_LOG_DIR}/core_config | cut -d '(' -f 2 | cut -c 1 | sort -n -r | awk '(NR==2)'", line1, line2);
+			cmd = sprintf("awk '(NR >= %d && NR <= %d)' %s/core_config | cut -d '(' -f 2 | cut -c 1 | sort -n -r | awk '(NR==2)'", line1, line2, LOG_DIR);
 			smt_per_gang = snarf(cmd);
 			for(s=0; s < smt_per_gang; s++) {
 				dev_num = s + g*hw_smt;
@@ -400,10 +412,14 @@ BEGIN {
                 }
                 dev_name=sprintf("sctu%d", dev_num);
 
-				mkstanza("hxesctu","cache","coherence test",dev_name,"hxesctu",rule_file,rule_file);
+				mkstanza("hxesctu","cache","coherence test",dev_name,"sctu", rule_file, rule_file);
 			}
 		}
+	} else {
+		printf("[%s]: System is in shared processor mode, No sctu devices will be created\n", script_name) >> HTXnoise_file;
 	}
+# NOTE: the rfdir field (#5) will not be used to create the relative path for the rules file. 
+#       the he_name field(#1) is used. not sure why this was designed like this....  
 
 # HXECACHE Stanza
 
@@ -421,9 +437,13 @@ BEGIN {
 		no_pages_reserved_per_instance = 64;
 		rule_file_name=sprintf("default.p7");
 	}
-	else if(proc_ver == "4b" || proc_ver == "4c" || proc_ver == "4d" ) {
-		no_pages_reserved_per_instance = 32;
-		rule_file_name=sprintf("default.p8");
+	else if(proc_ver == "4b" || proc_ver == "4d" || proc_ver == "4c" ) {
+        if(true_pvr == "4e" || true_pvr == "4f" ) {
+            rule_file_name=sprintf("default.p9");
+        } else {
+		    no_pages_reserved_per_instance = 32;
+		    rule_file_name=sprintf("default.p8");
+        }
 	}
     	else if(proc_ver == "4e" || proc_ver == "4f" ) {
 	            rule_file_name=sprintf("default.p9");
@@ -441,7 +461,8 @@ BEGIN {
 		# spm = Shared Processor Mode
 		# In case of BML, hardcode spm to 0
 
-		cache_16M=snarf("cat ${HTX_LOG_DIR}/freepages | grep cache_16M | awk -F= '{print $2}'");
+		cmd = sprintf("cat %s/freepages | grep cache_16M | awk -F= '{print $2}'", LOG_DIR);
+		cache_16M=snarf(cmd);
 
 		if(cache_16M != 0 && spm==0) {
 			if( proc_ver == "3e" || ( proc_ver == "3f" && proc_os == "POWER6" ) ) {
@@ -450,7 +471,8 @@ BEGIN {
 					dev_name=sprintf("cache%d",y++);
 					mkstanza("hxecache_p6","","Processor Cache",dev_name,"hxecache_p6",rule_file_name,rule_file_name);
 				}
-				snarf("ln -sf ${HTXREGRULES}/hxecache ${HTXREGRULES}/hxecache_p6");
+				cmd = sprintf("ln -sf %s/hxecache %s/hxecache_p6", REG_RULES, REG_RULES);
+				snarf(cmd);
 			}
 			else {
 				for(x=0;x<num_chips;x+=1) {
@@ -463,22 +485,26 @@ BEGIN {
 
     # Determine rule file for fpu  and cpu devices.
 
-    if ( (proc_ver == "3e") || (proc_ver == "3f" && proc_os == "POWER6") ) {
-        # /* P6 || P6 Compat mode */
-        rule_file = "default.p6";
-    }
-    else if ( proc_ver == "3f" || proc_ver == "4a" ) {
-        # /* P7 and P7+*/
-        rule_file = "default.p7";
-    }
-    else if ( proc_ver == "4b" || proc_ver == "4d" || proc_ver == "4c" ) {
-        # /* P8 Murano and Venice */
-        rule_file = "default.p8";
-    }
-    else if ( proc_ver == "4e" || proc_ver == "4f" ) {
-        # /* P9 Nimbus and Cumulus */
-        rule_file = "default.p9";
-    }
+	if ( (proc_ver == "3e") || (proc_ver == "3f" && proc_os == "POWER6") ) {
+		# /* P6 || P6 Compat mode */
+		fpu_rule_file = "default.p6";
+		cpu_rule_file = "default.p6";
+	}
+	else if ( proc_ver == "3f" || proc_ver == "4a" ) {
+		# /* P7 and P7+*/
+		fpu_rule_file = "default.p7";
+		cpu_rule_file = "default.p7";
+	}
+	else if ( proc_ver == "4b" || proc_ver == "4d" || proc_ver == "4c" ) {
+		# /* P8 Murano and Venice */
+		fpu_rule_file = "default.p8";
+		cpu_rule_file = "default.p8";
+	}
+	else if ( proc_ver == "4e" || proc_ver == "4f" ) {
+		# /* P9 Nimbus and Cumulus */
+		fpu_rule_file = "default.p9";
+		cpu_rule_file = "default.p9";
+	}
 
     # hxefpu64 and hxecpu stanza creation.
     if (spm == 1) {
@@ -489,21 +515,25 @@ BEGIN {
 
     for(i = 0; i < num_devices; i++) {
         dev_name = sprintf("fpu%d", i);
-        mkstanza("hxefpu64", "core", "floating_point", dev_name, "fpu", rule_file, rule_file);
+		mkstanza("hxefpu64", "core", "floating_point", dev_name, "fpu", fpu_rule_file, fpu_rule_file);
     }
 
     for(i = 0; i < num_devices; i++) {
         dev_name = sprintf("cpu%d", i);
-        mkstanza("hxecpu", "processor", "processor", dev_name, "cpu", rule_file, rule_file);
+		mkstanza("hxecpu", "processor", "processor", dev_name, "cpu", cpu_rule_file, cpu_rule_file);
     }
 
 
-    # RNG exerciser stanza creation.	
-    rng_present = snarf("ls /dev/hwrng 2>/dev/null | wc -l");
-	
-    if(rng_present) {
+	# RNG exerciser stanza creation.
+	if ( proc_ver == "4a" || proc_ver == "4b" || proc_ver == "4c" || proc_ver == "4d" ) {
+		rng_present = snarf("ls /dev/hwrng 2>/dev/null | wc -l");
+		if(rng_present) {
+			mkstanza("hxerng", "chip", "Misc", "rng", "hxerng", "rules.default", "");
+		}
+	}
+	else {
 		mkstanza("hxerng", "chip", "Misc", "rng", "hxerng", "rules.default", "");
-    }
+	}
 
     # Corsa exerciser stanza creation.
 
@@ -615,9 +645,6 @@ BEGIN {
 	close(cmd);
 
    	ibm_internal = snarf("ls -l ${HTX_HOME_DIR}/.internal 2> /dev/null | wc -l");
-	if (ibm_internal) {
-        system("${HTXSCRIPTS}/htxconf_internal.awk");
-    }
 }
 
 
@@ -715,6 +742,10 @@ function snarf(cmd) {
     snarf_input=""; 
     cmd | getline snarf_input; close(cmd); return snarf_input; 
 } 
+function basename(file) {
+    sub(".*/", "", file)
+    return file
+}
 
 # use mkstanza() to generate the basic stanza, arguments are: 
 #     hename,                           # "hxecd" 
@@ -727,20 +758,23 @@ function snarf(cmd) {
 # 
 
 function mkstanza(hxe,a,d,dev,rfdir,reg,emc) { 
+# for 4.1, rules file directory is same as exerciser name 
     rfdir = hxe 
     printf("\n")
     printf("%s:\n",dev);
 
 # make exerciser entry 
-	if(he[dev]) { 
-		HE_name(he[dev]); 
-		rfdir = he[dev]; 
-		sub(/^hxe/,"",rfdir); 
-		rfdir = he[dev]; 
-	}
-	else { 
-		if (hxe) HE_name(hxe); 
-	}
+    if(he[dev]) { 
+	HE_name(he[dev]); 
+# for 3.2, rules file directory is exerciser name minus leading "hxe" 
+	rfdir = he[dev]; 
+	sub(/^hxe/,"",rfdir); 
+# for 4.1, rules file directory is same as exerciser name 
+	rfdir = he[dev]; 
+    }
+    else { 
+	if (hxe) HE_name(hxe); 
+    }
 
 # make adapter and device description entries 
     if (a) adapt_desc(a) 
@@ -758,15 +792,14 @@ function mkstanza(hxe,a,d,dev,rfdir,reg,emc) {
 		    string_stanza("emc_rules",sprintf("%s/%s",rfdir,emc),"emc"); 
 	}
 # make start_halted entry 
-	if(flag[dev] == "-h") {
-		string_stanza("start_halted","y","exerciser halted at startup"); 
-	}
+    if(flag[dev] == "-h") 
+	string_stanza("start_halted","y","exerciser halted at startup"); 
 }
 
 function create_memory_stanzas() { 
 
 	ams=0
-	if ( proc_ver == "4e" || proc_ver == "4f" ) {
+	if ( true_pvr == "4e" || true_pvr == "4f" )  {
 		if (CMVC_RELEASE != "htxltsbml") {
 			ams=snarf("cat /proc/ppc64/lparcfg | grep cmo_enabled | awk -F= '{print $2}'")
 			if (ams == "1") {

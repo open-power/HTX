@@ -20,8 +20,16 @@
 # IBM_PROLOG_END_TAG
 #########################################################################
 
-[ "$HTXLPP" ] || { echo "you must be logged in as htx to execute this command" && exit
-}
+  if [[ -z ${HTX_HOME_DIR} ]] ; then
+    htx_install_path=`cat /var/log/htx_install_path`
+    if [ -f $htx_install_path/etc/scripts/htx_env.sh ]; then
+        . $htx_install_path/etc/scripts/htx_env.sh
+    else
+        echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
+        echo "Either file is empty or does not contain correct install path. Hence exiting..."
+        exit 1
+    fi
+  fi
 
 ########
 # usage -- show command usage
@@ -135,7 +143,7 @@ isdev() {
 ########
 # isexer -- check exerciser name parameter
 isexer() {
-    [ -f /usr/lpp/htx/bin/$1 ] || return 1
+    [ -f ${HTXBIN}/$1 ] || return 1
     EXER=$1
 }
 

@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # IBM_PROLOG_BEGIN_TAG
-# 
+#
 # Copyright 2003,2016 IBM International Business Machines Corp.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# 		 http://www.apache.org/licenses/LICENSE-2.0
+#                http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,13 +19,14 @@
 #
 # IBM_PROLOG_END_TAG
 
+
 if [[ -z ${HTX_HOME_DIR} ]] ; then
     htx_install_path=`cat /var/log/htx_install_path`
     if [ -f $htx_install_path/etc/scripts/htx_env.sh ]; then
         . $htx_install_path/etc/scripts/htx_env.sh
     else
         echo "/var/log/htx_install_path file is supposed to have HTX install directoy path."
-        echo "Either file is empty or does not contain correct install path. Hence exiting..."
+        echo "Either file is empty or does not contain correct install path. Hence exiting..."    
         exit 1
     fi
 fi
@@ -104,7 +105,15 @@ do
   xyzlink)
    cat ${HTXMDT}mdt.xyzlink | create_mdt_with_devices.awk ${devs[$c]} | create_mdt_without_devices.awk default >> $mf
   ;;
-      
+
+  fabn)
+   cat ${HTXMDT}mdt.inter_node | create_mdt_with_devices.awk ${devs[$c]} | create_mdt_without_devices.awk default >>$mf  	
+  ;;
+
+  fabc)
+   cat ${HTXMDT}mdt.inter_chip | create_mdt_with_devices.awk ${devs[$c]} | create_mdt_without_devices.awk default >> $mf
+  ;;
+            
   iba)
     cat ${HTXMDT}mdt.hca | create_mdt_with_devices.awk ${devs[$c]} | create_mdt_without_devices.awk default >> $mf
     cat ${HTXMDT}mdt.hca.wrap | create_mdt_with_devices.awk ${devs[$c]} | create_mdt_without_devices.awk default>>$mf
