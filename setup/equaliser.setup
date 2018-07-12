@@ -1,18 +1,21 @@
 #!/bin/ksh
 
+script_name=`basename $0`
+
 # Check if the equaliser configuration file is present
 
 if [[ -z ${HTX_HOME_DIR} ]];
 then
-    HTX_HOME_DIR=`cat /var/log/htx_install_path 2> /dev/null`;
+    HTX_HOME_DIR=`cat /var/log/htx_install_path 2>> $HTXNoise`;
 
     if [[ -f ${HTX_HOME_DIR}/etc/scripts/htx_env.sh ]];
     then
         . ${HTX_HOME_DIR}/etc/scripts/htx_env.sh;
     else
-        echo "htx_env.sh could not be found at ${HTX_HOME_DIR}/etc/scripts/"
-        echo "Please make sure HTX is installed and installation path is"
-        echo "updated in /var/log/htx_install_path. Exiting"
+        msg="[$script_name]: htx_env.sh could not be found at ${HTX_HOME_DIR}/etc/scripts/ \n" 
+        msg+="Please make sure HTX is installed and installation path is \n"
+        msg+="updated in /var/log/htx_install_path. Exiting..." 
+        echo $msg | tee -a $HTXNoise
         exit 1
     fi
 fi
@@ -25,11 +28,10 @@ proc_ver_dec=`printf %d $proc_ver`
 #################################
 create_mdt()
 {
-    echo " Creating Equaliser mdt file $2 "
+    echo " [$script_name]: Creating Equaliser mdt file $2 " | tee -a $HTXNoise
     ${HTXPATH}/bin/create_eq_mdt $1 $2
-    echo " Backing up Equaliser config file in /tmp"
+    echo " Backing up Equaliser config and mdt file in /tmp"
     cp $1 /tmp/
-    echo " Backing up Equaliser mdt file in /tmp"
     cp $2 /tmp/
 }
 #############################
@@ -44,13 +46,13 @@ create_mdt()
 shared_proc_mode=`cat ${HTX_LOG_DIR}/htx_syscfg | grep shared_processor_mode | awk -F: '{print $2}'`
 if [[ "$shared_proc_mode" = " yes" ]];
 then
-    echo "System is in shared processor mode. Will not create any equaliser cfg and mdt."
+    echo "[$script_name]: System is in shared processor mode. Will not create any equaliser cfg and mdt." | tee -a $HTXNoise
     exit
 fi
 
 #=============================================================
 # Creating all the cfg files.
-# These files will be generated or P7 and above.
+# These files will be generated for P7 and above.
 #=============================================================
 
 # Remove all old cfg files.
@@ -59,6 +61,15 @@ do
     rm $file
 done
 
+# Remove old cfgs in old_cfgs directory also. This is only a temporary thing to support old format of cfg
+# with eservd and hxssup.
+for file in `/bin/ls $HTXPATH/old_cfgs/[a-zA-Z]*.cfg 2>/dev/null`
+do
+    rm $file
+done
+
+ln -s $HTXPATH/htx_eq.cfg $HTXPATH/old_cfgs/htx_eq.cfg
+
 #create links for cfg defined in trial_cfgs directory (if any present)
 for file in `/bin/ls $HTXPATH/trial_cfgs/[a-zA-Z]*.cfg 2>/dev/null`
 do
@@ -66,9 +77,16 @@ do
     ln -s $file $HTXCFGPATH/$file_name
 done
 
+for file in `/bin/ls $HTXPATH/old_trial_cfgs/[a-zA-Z]*.cfg 2>/dev/null`
+do
+    file_name=`basename $file`
+    ln -s $file $HTXPATH/old_cfgs/$file_name
+done
+
 if [[ $proc_ver_dec -ge 63 ]]
 then
     ${HTXPATH}/bin/create_eq_cfg
+    ${HTXPATH}/old_cfgs/create_old_eq_cfg
 fi
 
 for file in `/bin/ls $HTXCFGPATH/[a-zA-Z]*.cfg 2>/dev/null`

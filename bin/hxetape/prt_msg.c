@@ -17,28 +17,15 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)13	1.11  src/htx/usr/lpp/htx/bin/hxetape/prt_msg.c, exer_tape, htxubuntu 5/24/04 17:57:43 */
-
 /******************************************************************************
  * COMPONENT_NAME: exer_tape
  *
  * MODULE NAME: prt_msg.c
  *
  * FUNCTIONS: info_msg()     - formats variables into an information message
- *            prt_msg()      - sends formatted information messages to HTX 
+ *            prt_msg()      - sends formatted information messages to HTX
  *            prt_msg_asis() - sends messages asis to bypass system error msgs
  *
- * Release/Change activity:                                            
- *    DATE    |PROGRAMMER    |DESCRIPTION                              
- *    --------+--------------+---------------------------------------- 
- *    08/01/88| T. Homer     | initial release                         
- *    06/12/92| R. Cherry    | general clean-up: phtx_info, prule_info 
- *    06/15/92| R. Cherry    | block number not being updated in       
- *            |              | wr/rd to end of tape operations.        
- *    07/01/92| R. Cherry    | skip records need to take into account  
- *            |              | the smit blocksize.                     
- *    12/02/92| R. Cherry    | prt_msg_asis created to allow bypassing 
- *            |              | system error message text.              
  *****************************************************************************/
 #include <string.h>
 #include <stdio.h>
@@ -56,20 +43,20 @@ static  char msg[1024];
 /* info_msg() - Format current rule information into the msg string       */
 /**************************************************************************/
 void
-info_msg(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop, 
+info_msg(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
 				struct blk_num_typ *pblk_num, char *msg_text)
 {
    int byt_len;     /* length in bytes of (number of blocks * BLK_SIZE) */
 
    byt_len = 0;
-   if ( pblk_num->in_rule > 0 )   
+   if ( pblk_num->in_rule > 0 )
       byt_len = prule_info->num_blks * BLK_SIZE;
    sprintf(msg_text, " %s:  Loop#: %d   Rule Blks: %d   File Blks: %d   "
-                     "Bytes: %d   Pattern: %s\n", 
+                     "Bytes: %d   Pattern: %s\n",
            prule_info->rule_id, loop, pblk_num->in_rule, pblk_num->in_file,
            byt_len, prule_info->pattern_id);
    return;
-} 
+}
 
 /**************************************************************************/
 /* prt_msg() - Send message to HTX along with deciphered system error msg */
@@ -83,12 +70,12 @@ prt_msg(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
    strncat(msg, strerror(err), (sizeof(msg) - strlen(msg)) );
    hxfmsg(phtx_info, err, sev, msg);
    return;
-} 
+}
 
 /**************************************************************************/
 /* prt_msg_asis() - Send message to HTX as-is to bypass system error msgs */
 /**************************************************************************/
-void 
+void
 prt_msg_asis(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
 				struct blk_num_typ *pblk_num, int err, int sev, char *text)
 {
@@ -96,5 +83,5 @@ prt_msg_asis(struct htx_data *phtx_info, struct ruleinfo *prule_info, int loop,
    strncat(msg, text, (sizeof(msg) - strlen(msg)) );
    hxfmsg(phtx_info, err, sev, msg);
    return;
-} 
+}
 

@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)33       1.4.4.2  src/htx/usr/lpp/htx/bin/hxetape/Atape.h, exer_tape, htxubuntu 8/5/11 08:52:04 */
 /**************************************************************************/
 
 #ifndef ATAPE_H

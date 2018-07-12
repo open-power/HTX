@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)34       1.5.4.1  src/htx/usr/lpp/htx/bin/hxetape/4mm_auto.h, exer_tape, htxubuntu 6/15/10 06:14:52 */
 /*
  * 4mm_auto.h
  *

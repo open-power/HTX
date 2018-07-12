@@ -1,14 +1,14 @@
 #!/usr/bin/perl
 
 # IBM_PROLOG_BEGIN_TAG
-# 
+#
 # Copyright 2003,2016 IBM International Business Machines Corp.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# 		 http://www.apache.org/licenses/LICENSE-2.0
+#              http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,6 @@
 # limitations under the License.
 #
 # IBM_PROLOG_END_TAG
-
 
 use Fcntl;
 use File::Basename;
@@ -32,11 +31,61 @@ require $ENV{"HTXSCRIPTS"}."/ioctl.ph";
 sub CD_LASTLBA  	{ 269250; }
 sub DVD_ROM_LASTLBA  	{ 4169951; }
 
-# Set debug flag to 1 for debug info
+# To get function name
+sub __FUNC__ {
+    $func = "";
+    $func = (caller 1)[3] ;
+    if($func ne ""){
+        $func;
+    }
+    else{
+        "main";
+    }
+}
+
+#################################################################################
+### Function name:        debug_log
+### Function arguments:   Function name, Line Number, Data
+### Function description: Print/Save data in particular format. Enable
+###                       $print_on_screen for on screen logs. Default Behaviour:
+###                       Stores log in /tmp/hxestorage/part.log file
+#################################################################################
+
+sub debug_log {
+        local($func_name,$line_num,$print_data) = @_;
+        $print_line = "";
+        $tag = "part.pl";
+        $res=`date +"%d-%m-%Y %X"`;
+        chop($res);
+        if($print_on_screen)
+        {
+                print "$print_data";
+        }
+        else
+        {
+                $print_line = "[" . $res . "] [" . $tag . "] [" . $func_name . "] [" . $line_num . "]  " . $print_data;
+                print DEBUG_LOG ("$print_line");
+        }
+}
+
+
+# 1. Enable detailed on screen log information. Default - disabled.
+$print_on_screen="";
+
+
+# part.pl debug log file. format: part.log
+$part_logfile=$ENV{"HTX_LOG_DIR"} . "/part.pl.log";
+
+#Opening part.pl debug log file
+unless (open (DEBUG_LOG,">$part_logfile")) {
+    die ("Can't open $part_logfile file!\n");
+}
+
+
+
 # Initialise 'rawcnt' variable from 1 as we do not bind any device to raw node 0,
 # being it a special node, containing some control information.
 
-$debug=0;
 $cnt=0;
 $rawcnt=1;
 $cd_dvd_cnt=0;
@@ -54,22 +103,28 @@ $KERNEL_26="true";
 #Check for BML 
 $is_bml=0; 
 $is_ubuntu=0;
+$is_rhel7le=0;
+
 $version_file=$ENV{"HTXETC"}."/version"; 
 if(-e $version_file) { 
 	$htx_release=`cat $version_file 2>/dev/null` ;  
 	chomp($htx_release); 
 	if($htx_release =~ /htxltsbml/) { 
 		$Is_bml=1; 
-		print (" BML detected release =$htx_release \n") if($debug); 
+		&debug_log(__FUNC__,__LINE__,"BML detected release =$htx_release \n"); 
 	} elsif($htx_release =~ /htxubuntu/){  
 		$is_ubuntu=1; 
-		print (" Debain Ubuntu release = $htx_release \n") if($debug);
+		&debug_log(__FUNC__,__LINE__,"Debain Ubuntu release = $htx_release \n");
 	} else { 
 		$is_ubuntu=0; 
 		$is_bml=0; 
 	} 
 } 
 
+$output=`rpm -qa 2> /dev/null | grep htx`;
+if($output =~ /htxrhel72le/) {
+    $is_rhel7le=1;
+}
 
 # /proc/partition acts an input for all the block devices
 # configured on this system, open it once and read in..
@@ -91,16 +146,16 @@ foreach $line (@block_device_info) {
     push(@proc_partition, $block_dev);
 }
 close(IN_FILE);
-printf("Block device configured on system- @proc_partition\n") if($debug);
+&debug_log(__FUNC__,__LINE__,"Block device configured on system- @proc_partition\n");
 
 $found_cd_dvd=0;
 
 if($is_bml){
-	print "\nRunning BML Version of \'part\' script\n\n" if($debug);
+	&debug_log(__FUNC__,__LINE__,"\nRunning BML Version of \'part\' script\n\n");
 } elsif($is_ubuntu) { 
-	print "\nRunning Debian Ubuntu Version of \'part\' script\n\n" if($debug);
+	&debug_log(__FUNC__,__LINE__,"\nRunning Debian Ubuntu Version of \'part\' script\n\n");
 } else { 
-	print "\nRunning Distro Version of \'part\' script\n\n" if($debug);
+	&debug_log(__FUNC__,__LINE__,"Running Distro Version of \'part\' script\n\n");
 }
 $rawpart_file=$ENV{"HTX_LOG_DIR"}."/rawpart";
 unless (open (RAW_PART,">$rawpart_file")) {
@@ -126,11 +181,8 @@ if( !$KERNEL_26 ){
 &get_FD_info();
 &get_parts_to_exclude();
 
-if($debug) {
-	print "Collecting Hard Disk info\n";
-}
-
-print("proc_partition=@proc_partition\n") if($debug);
+&debug_log(__FUNC__,__LINE__,"Collecting Hard Disk info\n");
+&debug_log(__FUNC__,__LINE__,"proc_partition=@proc_partition\n");
 
 foreach $part (@proc_partition){
 	
@@ -138,9 +190,7 @@ foreach $part (@proc_partition){
 	if(!$part) {
 	    next;
 	}
-	if($debug) {
-	    print "checking $part\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"checking $part\n");
 	$partition=0;
 	$used=0;
 	$file_system=0;
@@ -151,9 +201,7 @@ foreach $part (@proc_partition){
 	{
 		if($part eq $parts_to_exclude[$i])
 		{
-			if($debug) {
-				print "$part - Found in exclude list\n";
-			}
+			&debug_log(__FUNC__,__LINE__,"$part - Found in exclude list\n");
 			$used=1;
 			last;
 		}
@@ -171,7 +219,7 @@ foreach $part (@proc_partition){
         $partition=@match_parts;
         
         if($partition > 1) {
-            print("$part has partitions=$partition, skipping disk .. \n") if($debug);
+    		&debug_log(__FUNC__,__LINE__,"$part has partitions=$partition, skipping disk .. \n");
             next;
         }
         
@@ -206,21 +254,17 @@ foreach $part (@proc_partition){
 	if($file_system == 1) {
 		next; 
 	}
-	if($debug) {
-		print "**** Disk = $part --> USABLE for hxestorage ****\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"**** Disk = $part --> USABLE for hxestorage ****\n");
 	&make_entry(*RAW_PART,$part, "raw");
 }
-if($debug) {
-	print "Done\n\n";
-}
+&debug_log(__FUNC__,__LINE__,"Done\n\n");
 close(RAW_PART);
 # To enable multipath testing this file should be created 
 $mpath_parts_file=$ENV{"HTX_LOG_DIR"}."/mpath_parts";
 `rm -f $mpath_parts_file 2 >/dev/null`; 
 &get_multipath_info(); 
 
-if($is_ubuntu) { 
+if($is_ubuntu || $is_rhel7le) { 
 	# sdXX detected could be CAPI Flash, give preference to hxesurelock. 
 	$cflash_parts_file=$ENV{"HTX_LOG_DIR"}."/cflash_parts";
 	`rm f $cflash_parts_file 2>/dev/null`;
@@ -242,10 +286,7 @@ exit(0);
 
 sub get_CD_DVD_info 
 {
-	if($debug) {
-		print "Collecting SCSI CD, DVD info\n";
-	}
-
+	&debug_log(__FUNC__,__LINE__,"Collecting SCSI CD, DVD info\n");
 	$cdpart_file=$ENV{"HTX_LOG_DIR"}."/cdpart";
 	unless(open(CD_PART,">$cdpart_file")) {
 		die("Open failed for file $cdpart_file\n");
@@ -267,17 +308,13 @@ sub get_CD_DVD_info
 	foreach $drive (@cd_dvd_drives) 
 	{
 		chomp($drive);
-		if($debug){
-			print "checking $drive\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"checking $drive\n");
 		if($drive =~ /^sr/) 
 		{
 		
 			$ret=`file -s /dev/$drive | grep filesystem | wc -l`;
 			if($ret == 1) {
-				if ($debug) {
-					print "$drive contain a filesystem. So, excluding it\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$drive contain a filesystem. So, excluding it\n");
 				$cd_dvd[$cd_dvd_cnt++]=$drive;
 				$found_cd_dvd=1;
 				next;
@@ -288,16 +325,12 @@ sub get_CD_DVD_info
 			
 			$ret=$ret>>8;
 
-			if($debug) {
-				print "getDVD returned $ret for $drive\n";
-			}
+			&debug_log(__FUNC__,__LINE__,"getDVD returned $ret for $drive\n");
 		
 			# CDROM Media	
 			
 			if($ret==8) { 
-				if($debug) {
-					print "$drive is SCSI CDROM\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$drive is SCSI CDROM\n");
 				$cd_dvd[$cd_dvd_cnt++]=$drive;	
  				&make_entry(*CD_PART,$drive, "raw"); 
 				$found_cd_dvd=1;
@@ -306,9 +339,7 @@ sub get_CD_DVD_info
 			# DVDROM Media
 			
 			if($ret==10) { 
-				if($debug) {
-					print "$drive is SCSI DVDROM\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$drive is SCSI DVDROM\n");
 				$cd_dvd[$cd_dvd_cnt++]=$drive;	
 				&make_entry(*DVDR_PART,$drive, "raw");
 				$found_cd_dvd=1;
@@ -317,9 +348,7 @@ sub get_CD_DVD_info
 			# DVDRAM Media
 			
 			if($ret==12) { 
-				if($debug) {
-					print "$drive is SCSI DVDRAM\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$drive is SCSI DVDRAM\n");
 				$cd_dvd[$cd_dvd_cnt++]=$drive;	
 				&make_entry(*DVDW_PART,$drive, "raw");
 				$found_cd_dvd=1;
@@ -332,24 +361,17 @@ sub get_CD_DVD_info
 	foreach $drive (@cd_dvd_drives)
 	{
 		chomp($drive);
-		if($debug){
-                        print "checking $drive\n";
-                }
+		&debug_log(__FUNC__,__LINE__,"checking $drive\n");
 
 		$ret=system("$DVD_binary /dev/$drive 2>&1");
 
 		$ret=$ret>>8;
 		
-		if($debug) {
-                                print "getDVD returned $ret for $drive\n";
-                        }
-
+		&debug_log(__FUNC__,__LINE__,"getDVD returned $ret for $drive\n");
                         # CDROM Media
 
                         if($ret==8) {
-                                if($debug) {
-                                        print "$drive is SCSI CDROM\n";
-                                }
+				&debug_log(__FUNC__,__LINE__,"$drive is SCSI CDROM\n");
                                 $cd_dvd[$cd_dvd_cnt++]=$drive;
                                 &make_entry(*CD_PART,$drive, "raw");
                         }
@@ -357,9 +379,7 @@ sub get_CD_DVD_info
                         # DVDROM Media
 
                         if($ret==10) {
-                                if($debug) {
-                                        print "$drive is SCSI DVDROM\n";
-                                }
+				&debug_log(__FUNC__,__LINE__,"$drive is SCSI DVDROM\n");
                                 $cd_dvd[$cd_dvd_cnt++]=$drive;
                                 &make_entry(*DVDR_PART,$drive, "raw");
                         }
@@ -367,9 +387,7 @@ sub get_CD_DVD_info
                         # DVDRAM Media
 
                         if($ret==12) {
-                                if($debug) {
-                                        print "$drive is SCSI DVDRAM\n";
-                                }
+				&debug_log(__FUNC__,__LINE__,"$drive is SCSI DVDRAM\n");
                                 $cd_dvd[$cd_dvd_cnt++]=$drive;
                                 &make_entry(*DVDW_PART,$drive, "raw");
                         }
@@ -378,9 +396,7 @@ sub get_CD_DVD_info
 		
 
 
-	if($debug) {
-		print "Done\n\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Done\n\n");
 
 	# Look for IDE CD-ROM's into /proc/ide .
 
@@ -390,23 +406,17 @@ sub get_CD_DVD_info
 	# which is a superset, and all info should be here for ide cd/dvd's. 
 
 
-	if($debug) {
-		print "Collecting IDE CD, DVD info\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Collecting IDE CD, DVD info\n");
 	@ide_devices=`ls -l /proc/ide 2> /dev/null | grep hd | awk '{print \$9}'`;
 	foreach $device (@ide_devices)
 	{
 		chomp($device);
-		if($debug) { 
-			print "checking $device\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"checking $device\n");
 	# Now check media
 		
 		$media=`cat /proc/ide/$device/media 2>/dev/null`;
 		chomp($media);
-		if($debug) {
-			print "media type shown is $media for $device\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"media type shown is $media for $device\n");
 		if($media eq "cdrom")
 		{
 	
@@ -428,9 +438,7 @@ sub get_CD_DVD_info
 			$IDE_SCSI_DRIVER=`cat /proc/ide/$device/driver | grep ide-scsi`;
 			
 			if($IDE_SCSI_DRIVER) {
-				if($debug) {
-					print "$device is being used by ide-scsi driver as SCSI drive\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$device is being used by ide-scsi driver as SCSI drive\n");
 				$cd_dvd[$cd_dvd_cnt++]=$device;
 				next;
 			}
@@ -461,10 +469,7 @@ sub get_CD_DVD_info
 		     #  $sect_size=unpack("L",$sect_size);
 			$sect_size=unpack("L!",$sect_size);
 			
-			if($debug){
-				print "no_blks = $no_blks\n";
-				print "sect_size = $sect_size\n";
-			}
+			&debug_log(__FUNC__,__LINE__,"no_blks = $no_blks\nsect_size = $sect_size\n");
 
 			if($sect_size == 2048){
                     		$no_blks = $no_blks / 4;
@@ -475,34 +480,25 @@ sub get_CD_DVD_info
                 
                 	if( $lastlba >= &DVD_ROM_LASTLBA )
                 	{
-				if($debug) {
-					print "$device is IDE DVDROM\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$device is IDE DVDROM\n");
 				$cd_dvd[$cd_dvd_cnt++]=$device;	
                     		&make_entry(*DVDR_PART,$device, "raw");
 		
 			} elsif ( $lastlba <= &CD_LASTLBA  )
                		{
-				if($debug) {
-					print "$device is IDE CDROM\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$device is IDE CDROM\n");
 				$cd_dvd[$cd_dvd_cnt++]=$device;	
 		   		&make_entry(*CD_PART,$device, "raw");
 			} else 
 			{
-				if($debug) {
-					print "$device is IDE DVDRAM\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$device is IDE DVDRAM\n");
 				$cd_dvd[$cd_dvd_cnt++]=$device;	
 		   		&make_entry(*DVDW_PART,$device, "raw");
 			} 
 		}
 
 	}
-	if($debug) {
-		print "Done\n\n";
-	}
-	
+	&debug_log(__FUNC__,__LINE__,"Done\n\n");	
 	close(CD_PART);
 	close(DVDR_PART);
 	close(DVDW_PART);
@@ -514,9 +510,7 @@ sub get_CD_DVD_info
 
 sub get_FD_info  
 {
-	if($debug) {
-		print "Collecting Floppy info\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Collecting Floppy info\n");
 	$fdpart_file=$ENV{"HTX_LOG_DIR"}."/fdpart";
 	unless (open (FD_PART,">$fdpart_file")) {
 		die ("Open failed for file $fdpart_file\n");
@@ -528,9 +522,7 @@ sub get_FD_info
 		chomp($device);	
 		if ($device eq "fd")
 		{
-			if($debug) {
-				print "Found Floppy $device in /proc/devices\n"; 
-			}
+			&debug_log(__FUNC__,__LINE__,"Found Floppy $device in /proc/devices\n");
 			$device= "$device" . "0";
 			&make_entry(*FD_PART,$device, "raw");
 			$floppy[$fdcnt++]=$device;
@@ -548,33 +540,25 @@ sub get_FD_info
 	foreach $part (@proc_parts)
 	{
 		chomp($part);
-		if($debug) {
-			print "checking $part \n";
-		}
+		&debug_log(__FUNC__,__LINE__,"checking $part \n");
 		$found=0;
 		$found=&check_floppy($part);
 		if($found==1){
-			if($debug){
-				print "Found Floppy $part in /proc/partitions $part\n"; 
-			}
+			&debug_log(__FUNC__,__LINE__,"Found Floppy $part in /proc/partitions $part\n");
 			&make_entry(*FD_PART,$part, "raw");
 			$floppy[$fdcnt++]=$part;
 			@floppy_parts=&get_parts($part); 
 			foreach $var (@floppy_parts)
 			{
 				chomp($var);
-				if($debug) {
-					print "$var is partition of floppy $part\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$var is partition of floppy $part\n");
 				$floppy[$fdcnt++]=$var;
 			}
 		} else { 
 			next;
 		}
 	}
-	if($debug) {
-		print "Collecting Floppy info .. Done... \n\n"; 
-	}
+	&debug_log(__FUNC__,__LINE__,"Collecting Floppy info .. Done... \n\n");
 	close(FD_PART);
 } 
 
@@ -586,17 +570,13 @@ sub check_floppy
 {
 	($name) = @_;
 	if($name !~ /^[hsm]d/) {
-		if($debug) {
-			print "$name is a logical volume\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"$name is a logical volume\n");
 		return 0;
 	}
 	if ($name =~ /\d\b/)
 	{
 	# Partition present hence it may be a Hard Disk
-		if($debug) {
-			print "$name is a partition\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"$name is a partition\n");
 		return 0;
 	}
 	unless(open (DEV_FILE, "/dev/$name")) {
@@ -612,9 +592,7 @@ sub check_floppy
      #  $no_blks=unpack("L",$no_blks);	
 	$no_blks=unpack("L!",$no_blks);	
 	close(DEV_FILE);
-	if($debug) {
-		print "no of blocks for $name is $no_blks\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"no of blocks for $name is $no_blks\n");	
 	if($no_blks < 0xFA0)
 	{
 		return 1;
@@ -632,35 +610,27 @@ sub get_parts_to_exclude
 
 # Exclude swap partitions
 		
-	if($debug) {
-		print "Collecting partitions_to_exclude info\n";
-		print "\nSwap partitions:\n"
-	}
+	&debug_log(__FUNC__,__LINE__,"Collecting partitions_to_exclude info\n\n");
+	&debug_log(__FUNC__,__LINE__,"Swap partitions:\n");
 	
 	@swap_parts=`cat /proc/swaps | awk '{print \$1}' | grep /dev`;
 	foreach $part (@swap_parts)
 	{
 		chomp($part);
 		$part =~ s/\/dev\///;
-		if($debug){
-			print "$part\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"$part\n");
 		$parts_to_exclude[$cnt++]=$part;
 	}
 
 # Exclude system partitions
 
-	if($debug) {
-		print "\nSystem partitions:\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"System partitions:\n");
 	@sys_parts=`cat /etc/mtab | awk '{print \$1}' | grep /dev`;
 	foreach $part (@sys_parts)
 	{
 		chomp($part);
 		$part =~ s/\/dev\///;
-		if($debug){
-			print "$part\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"$part\n");
 		$parts_to_exclude[$cnt++]=$part;
 	}
 
@@ -668,7 +638,7 @@ sub get_parts_to_exclude
 # Also, excludes Extended partitions. used_as field will be "lba" for extended partitions.
 
 	if($is_bml == 0) { 
-		print ("\nPPC PReP Boot Partitions:\n") if($debug);
+		&debug_log(__FUNC__,__LINE__,"\nPPC PReP Boot Partitions:\n");
 	# Fdisk is absolete now, it doesn't reads GPT,so better use parted utility. 	
 	#		@PPC_PReP_boot_parts=`fdisk -l 2>&1 | awk '/PPC/ { print \$1}'`; 	
 	#		foreach $name (@PPC_PReP_boot_parts)
@@ -683,7 +653,7 @@ sub get_parts_to_exclude
 	#		}
 		&get_disk_info_parted(); 	
 		$num_disks=$num_disk+1; 
-		print("num_disks=$num_disks \n") if($debug); 
+		&debug_log(__FUNC__,__LINE__,"num_disks=$num_disks \n");
 		for($i=0;$i<$num_disks ;$i++) {
         		#Murali Iyer : In this case nvme0n1 is a base device and "root" is on "nvme0n1p1" and entire "nvme0n1" needs to be avoided to protect load source.
         		# So if exclude any partition of nvme disk, we put whole disk in exclude list.
@@ -692,37 +662,31 @@ sub get_parts_to_exclude
         		if($disk_info[$i]{name}=~/nvme/) {
         		    $is_nvme_device = 1;
         		}
-        		print("Disk $disk_info[$i]{name}, has $disk_info[$i]{num_partitions} partitions\n") if($debug);
-        		#if($disk_info[$i]{num_partitions} >= 1) {
-        		#    $dev_name=basename($disk_info[$i]{name});
-        		#    print("Excluding disk=$dev_name as it has partitions\n") if($debug);
-        		#    $parts_to_exclude[$cnt++]=$dev_name;
-        		#}
+    			&debug_log(__FUNC__,__LINE__,"Disk $disk_info[$i]{name}, has $disk_info[$i]{num_partitions} partitions\n");
         		for($j=0;$j<$disk_info[$i]{num_partitions};$j++) {
-               		 	print("partition $disk_info[$i]{$j}{partition_name}, fs_type=$disk_info[$i]{$j}{fs_type}, used_as=$disk_info[$i]{$j}{used_as} \n") if($debug);
+		    		&debug_log(__FUNC__,__LINE__,"partition $disk_info[$i]{$j}{partition_name}, fs_type=$disk_info[$i]{$j}{fs_type}, used_as=$disk_info[$i]{$j}{used_as} \n");
 				# If partition is already used by system we exclude it .. 
 					if($disk_info[$i]{$j}{used_as} !~ /RAW/i) { 
-						print("Excluding part=$disk_info[$i]{$j}{partition_name} because its used as $disk_info[$i]{$j}{used_as} \n") if($debug); 
+						&debug_log(__FUNC__,__LINE__,"Excluding part=$disk_info[$i]{$j}{partition_name} because its used as $disk_info[$i]{$j}{used_as} \n"); 
 						$parts_to_exclude[$cnt++]=$disk_info[$i]{$j}{partition_name}; 
 						if($is_nvme_device) {
 						    $disable_this_nvme_device = 1;
 						}
 					} elsif($disk_info[$i]{$j}{fs_type} !~ /NA/i) { 
 						#if partition has file system on it we exclude it .. 	
-						print("Excluding part=$disk_info[$i]{$j}{partition_name} because it has filesystem, fs_type=$disk_info[$i]{$j}{fs_type} \n") if($debug);
+						&debug_log(__FUNC__,__LINE__,"Excluding part=$disk_info[$i]{$j}{partition_name} because it has filesystem, fs_type=$disk_info[$i]{$j}{fs_type} \n");
 						$parts_to_exclude[$cnt++]=$disk_info[$i]{$j}{partition_name}; 
 						if($is_nvme_device) {
 						    $disable_this_nvme_device = 1;
 						}
 					} else { 
-						print("#### Detected !!!! Test Candidate Storage Media=$disk_info[$i]{$j}{partition_name} 
-										because used_as=$disk_info[$i]{$j}{used_as} and fs_type=$disk_info[$i]{$j}{fs_type} \n") if($debug); 
+						&debug_log(__FUNC__,__LINE__,"#### Detected !!!! Test Candidate Storage Media=$disk_info[$i]{$j}{partition_name}because used_as=$disk_info[$i]{$j}{used_as} and fs_type=$disk_info[$i]{$j}{fs_type} \n");
 					}
         		}
         		if($disable_this_nvme_device) {
-        		     print("disabling Disk $disk_info[$i]{name} completely \n") if($debug);
+        		     &debug_log(__FUNC__,__LINE__,"disabling Disk $disk_info[$i]{name} completely \n");
         		     for($j=0;$j<$disk_info[$i]{num_partitions};$j++) {
-        		         print("Excluding part=$disk_info[$i]{$j}{partition_name} because disable_this_nvme_device=$disable_this_nvme_device \n") if($debug);
+         				 &debug_log(__FUNC__,__LINE__,"Excluding part=$disk_info[$i]{$j}{partition_name} because disable_this_nvme_device=$disable_this_nvme_device \n");
         		         $parts_to_exclude[$cnt++]=$disk_info[$i]{$j}{partition_name};
         		     }
         		 }
@@ -733,9 +697,7 @@ sub get_parts_to_exclude
 # Linux uses the  partitions of block size 1 to maintain partition table 
 # so they should not be exercised.
 	
-	if($debug){
-		print "\nExtended Partitions of block size 1:\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Extended Partitions of block size 1:\n");
 	@proc_part_lines=`cat /proc/partitions | awk '(NR>2)'`;
 	foreach $line (@proc_part_lines)
 	{
@@ -748,18 +710,14 @@ sub get_parts_to_exclude
 		} else {
 			$part=`echo $line | awk '{ print \$4}'`;
 			chomp($part);
-			if($debug) {
-				print "$part\n";
-			}
+			&debug_log(__FUNC__,__LINE__,"$part\n");
 			$parts_to_exclude[$cnt++]=$part;
 		}
 	}
 
 # Exclude partitions used by Volume Groups
 
-	if($debug){
-		print "\nPartitions used by Volume Groups:\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Partitions used by Volume Groups:\n");
 
 	@lv_parts=`pvdisplay 2>/dev/null | awk '/PV Name/ { print \$3 }'`;
 	foreach $part (@lv_parts) 
@@ -772,22 +730,16 @@ sub get_parts_to_exclude
 			@p_dev=&check_mpath($part); 
 			foreach $dev (@p_dev) { 
 				chomp($dev); 
-				if($debug) {
-                	print "$dev\n";
-                }
+				&debug_log(__FUNC__,__LINE__,"$dev\n");
 				$parts_to_exclude[$cnt++]=$dev; 
 			}
 		} else { 
-			if($debug) {
-				print "$part\n";
-			}
+			&debug_log(__FUNC__,__LINE__,"$part\n");
 			$parts_to_exclude[$cnt++]=$part;
 		}
 	}
 
-	if($debug){
-		print "\nPartitions showing Volume Group, CD-DVD, Floppy, AIX or MAC Disk:\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Partitions showing Volume Group, CD-DVD, Floppy, AIX or MAC Disk:\n");
 
 	@proc_parts=`cat /proc/partitions | awk '(NR>2) { print \$4}'`;
 	foreach $part (@proc_parts)
@@ -796,10 +748,8 @@ sub get_parts_to_exclude
 	
 	# Exclude Volume Groups 
 	# if you have a new device type which doesn't shows up as search done below, add a condition ... 
-		if(($part !~ /^[hsm]d/) && ($part !~ /^rsxx.$/) &&($part !~ /^nvme/)) {
-			if($debug) {
-				print "$part is a Volume Group\n";
-			}
+		if(($part !~ /^[hsm]d/) && ($part !~ /^rsxx.$/) && ($part !~ /^nvme/) && ($part !~ /^dm-/) && ($part !~ /^mpath/)) {
+			&debug_log(__FUNC__,__LINE__,"$part is a Volume Group\n");
 			$parts_to_exclude[$cnt++]=$part;
 			next;
 		}
@@ -811,9 +761,7 @@ sub get_parts_to_exclude
 			if($cd_dvd[$i] eq $part)
 			{
 				$parts_to_exclude[$cnt++]=$part;
-				if($debug) {
-					print "$part is a CD/DVD partition\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$part is a CD/DVD partition\n");
 				last;	
 			}
 		}
@@ -824,9 +772,7 @@ sub get_parts_to_exclude
 			if($floppy[$i] eq $part)
 			{
 				$parts_to_exclude[$cnt++]=$part;
-				if($debug) {
-					print "$part is a floppy partition\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$part is a floppy partition\n");
 				last;
 			}
 		}
@@ -848,37 +794,29 @@ sub get_parts_to_exclude
 			next;
 		}
 	  	$disk_id=unpack("I",$disk_id);
-		if($debug) { 
-			print "disk - $part disk_id - $disk_id\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"disk - $part disk_id - $disk_id\n");
 		if(($disk_id == 0xc9c2d4c1) || (($disk_id & 0xFFFF0000) == 0x45520000))
 		{
 			$parts_to_exclude[$cnt++]=$part;
-			if($debug){ 
-				if($disk_id == 0xc9c2d4c1){
-					print "$part is AIX Disk\n";
-				}
-				if(($disk_id & 0xFFFF0000) == 0x45520000){
-					print "$part is MAC Disk\n";
-				}
+			if($disk_id == 0xc9c2d4c1){
+				&debug_log(__FUNC__,__LINE__,"$part is AIX Disk\n");
+			}
+			if(($disk_id & 0xFFFF0000) == 0x45520000){
+				&debug_log(__FUNC__,__LINE__,"$part is MAC Disk\n");
 			}
 			@parts_of_AIX_MAC_disk=&get_parts($part);
 			foreach $var (@parts_of_AIX_MAC_disk)
 			{
 				chomp($var);	
 				$parts_to_exclude[$cnt++]=$var;
-				if($debug) {
-					print "$var is partition of AIX/MAC disk $part\n";
-				}
+				&debug_log(__FUNC__,__LINE__,"$var is partition of AIX/MAC disk $part\n");
 			}
 		}
 	}
 
 	# Exclude partitions used by RAID drives 
 
-	if($debug){
-		print "\nPartitions used by RAID drives:\n";
-        }
+	&debug_log(__FUNC__,__LINE__,"Partitions used by RAID drives:\n");
 
     	@raid_drive_parts=`cat /etc/raidtab 2>/dev/null | awk '(\$1=="device") { print \$2 }'`;
     	foreach $part (@raid_drive_parts)
@@ -886,9 +824,7 @@ sub get_parts_to_exclude
         	chomp($part);
         	$part =~ s/\/dev\///;
         	$parts_to_exclude[$cnt++]=$part;
-        	if($debug){
-            		print "$part\n";
-        	}
+		&debug_log(__FUNC__,__LINE__,"$part\n");
     	}
 
 		@raid_drive_parts=`cat /proc/mdstat 2>/dev/null | awk '(\$3=="active") { print \$5 }'`;
@@ -897,9 +833,7 @@ sub get_parts_to_exclude
                 chomp($part);
                 $part =~ s/\[[0-9]*\]//;
                 $parts_to_exclude[$cnt++]=$part;
-                if($debug){
-                        print "$part\n";
-                }
+        		&debug_log(__FUNC__,__LINE__,"$part\n");
         }
 
         @raid_drive_parts=`cat /proc/mdstat 2>/dev/null | awk '(\$3=="active") { print \$6 }'`;
@@ -908,9 +842,7 @@ sub get_parts_to_exclude
                 chomp($part);
                 $part =~ s/\[[0-9]*\]//;
                 $parts_to_exclude[$cnt++]=$part;
-                if($debug){
-                        print "$part\n";
-                }
+        		&debug_log(__FUNC__,__LINE__,"$part\n");
         }
 
         # Simple sanity Check if we havn't left any disk
@@ -921,7 +853,7 @@ sub get_parts_to_exclude
             chomp($line);
             ($device, $type) = split(/:/, $line);
 			($waste,$fs_type) = split(/=/,$type);
-            print("device=$device of type=$fs_type Detected !! \n") if($debug);
+    		&debug_log(__FUNC__,__LINE__,"device=$device of type=$fs_type Detected !! \n");
 			unless($fs_type) { 
 				next; 	
 			}	
@@ -931,14 +863,17 @@ sub get_parts_to_exclude
 				print ("dev_name = $dev_name \n"); 
 				$found = 0; 
 				for($counter=0; $counter < $cnt; $counter++) {
+					if ($parts_to_exclude[$counter] eq "") {
+					    next;
+					}
 					if($dev_name =~ /$parts_to_exclude[$counter]/) { 
-						print (" We are good, $dev_name already excluded \n") if($debug); 
+						&debug_log(__FUNC__,__LINE__,"We are good, $dev_name already excluded \n");
 						$found = 1; 
 						last; 
 					}	
 				}
 				if($found == 0) { 
-					print (" Err !! $dev_name not in exclude list. Adding it to excludes \n") if($debug);
+					&debug_log(__FUNC__,__LINE__,"Err !! $dev_name not in exclude list. Adding it to excludes \n");
 					$parts_to_exclude[$cnt++]=$dev_name;  
 				}
 
@@ -946,50 +881,55 @@ sub get_parts_to_exclude
 
         }
 
-		#Exclude Mpaths here .. 
-	   	#Check if multipath daemon is running.
-    	$res=`ps -ef | grep multipathd | grep -v grep | awk ' {print \$2}'`;
-    	chomp($res);
-    	unless($res) {
-       		print("multipathd not running \n");
-       		return;
-    	}
-	#Get the MPaths configured
-	printf("## Excluding mpaths Here ##\n") if($debug); 
+	#Exclude device mapper devices here
+	#Get the devices configured.
+    	&debug_log(__FUNC__,__LINE__,"## Excluding mapper devices Here ##\n"); 
     	@mpaths=`dmsetup ls | awk -F '(' '{ print \$1 }'`;
     	foreach $path (@mpaths) {
        		chomp($path);        
        		$path =~ s/\s+$//;
        		# Check for validity of this mpath first ....
-		print(" Checking exclude for mpath = $path \n") if($debug); 
+		&debug_log(__FUNC__,__LINE__,"Checking exclude for path = $path \n"); 
        		$abs_path="/dev/mapper/" . $path ;
 		$res=`ls -l /dev/mapper | grep "$path"`;
 		if ($res) {
+		    $alternate_dev=`ls -l /dev/mapper | grep "$path" | awk '{print \$NF}'`;
+		    chomp($alternate_dev);
+		    $alternate_dev=basename($alternate_dev);
 		    # first of all check if mpath has partitions. exclude mpath itself.
 		    # Then check any system partition on it
 		    $mpath_partition=`kpartx -l $abs_path 2>/dev/null | wc -l`;
 		    if ($mpath_partition >= 1) {
-		        print("mpath $abs_path has partitions. SO, excluding it...\n" ) if ($debug);
+			&debug_log(__FUNC__,__LINE__,"mpath $abs_path has partitions. SO, excluding it...\n" );
 		        $parts_to_exclude[$cnt++]=$path;
+		        $parts_to_exclude[$cnt++]=$alternate_dev;
 		    }
 		    #Now check if mpath or any of its partitions has boot disk
-		    $res=`parted "$abs_path" print 2>/dev/null | awk  '/PPC/ || /Linux/ || /linux/ || /boot/ || /prep/' | grep -v \"device-mapper\"`;
+		    $res=`parted "$abs_path" print 2>/dev/null | awk  '/PPC/ || /Linux/ || /linux/ || /boot/ || /prep/' || /swap/' | grep -v \"device-mapper\"`;
 #		    $res=`fdisk -l "$abs_path"  2>/dev/null | awk  '/PPC/ || /Linux/ '` ; 
 		    chomp($res); 
 		    if($res) { 
-			print(" Mpath=$path, has valid Volume group \nres=$res \n. Excluding ..... \n") if($debug) ; 
-			$parts_to_exclude[$cnt++]=$path; 			
+			&debug_log(__FUNC__,__LINE__,"Mpath=$path, has valid Volume group \nres=$res \n. Excluding ..... \n"); 
+			$parts_to_exclude[$cnt++]=$path;
+			$parts_to_exclude[$cnt++]=$alternate_dev;
 			#if it has partition then add them as well. 
 			@mpath_partitions=`kpartx -l $abs_path 2>/dev/null| awk ' { print \$1 }'`;
-			print("path = $abs_path has partitions \n @mpath_partitions \n") if($debug);
+			&debug_log(__FUNC__,__LINE__,"path = $abs_path has partitions \n @mpath_partitions \n");
        		        foreach $mpath_partition (@mpath_partitions) {
 			    chomp($mpath_partition); 
 			    if($mpath_partition =~ /failed/) {
                		        last;
            		    }
-			    print(" Mpath=$path, partition=$mpath_partition.  Excluding ..... \n") if($debug) ; 
+		       	    &debug_log(__FUNC__,__LINE__,"Mpath=$path, partition=$mpath_partition.  Excluding ..... \n"); 
 			    $parts_to_exclude[$cnt++]=$mpath_partition; 
 			} 
+			@mpath_partitions=` ls -l /dev/mapper | grep "$path" | grep part | awk '{print \$NF}'`;
+			foreach $mpath_partition (@mpath_partitions) {
+			    chomp($mpath_partition);
+			    $mpath_partition=basename($mpath_partition);
+			    &debug_log(__FUNC__,__LINE__,"Mpath=$path, alternate_dev partition=$mpath_partition.  Excluding ..... \n");
+			    $parts_to_exclude[$cnt++]=$mpath_partition;
+			}
 			print("Exclude disks behind this partition \n"); 
 			@sd_devices=get_sd_device($path); 
 			$num_devices=@sd_devices; 
@@ -1008,12 +948,12 @@ sub get_parts_to_exclude
         @partitions="";
         $num_parts=0;
         foreach $part (@parts_to_exclude) {
-            printf(" Finding partition in $device ") if($debug);
+	    &debug_log(__FUNC__,__LINE__,"Finding partition in $device ");
             $device="/dev/". $part;
             @partn=`kpartx -l $device 2>/dev/null| awk ' { print \$1 }'`;
             foreach $dev (@partn) {
                 chomp($dev);
-                printf(" $dev \t") if($debug);
+		&debug_log(__FUNC__,__LINE__,"$dev \t");
                 $partitions[$num_parts++]=$dev;
             }
 #           printf("\n");
@@ -1022,9 +962,7 @@ sub get_parts_to_exclude
             $parts_to_exclude[$cnt++]=$partn;
         }
 
-		if($debug) {
-			print "Done\n\n";
-		}
+		&debug_log(__FUNC__,__LINE__,"Done\n\n");
 
 }
 
@@ -1036,10 +974,8 @@ sub check_filesystem
 {
 	($test_part)=@_;
 	`mkdir /tmp/mnt_check 2>/dev/null `;
-	if($debug) {
-		print "checking filesystem on $test_part\n";
-		print "mount /dev/$test_part /tmp/mnt_check\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"checking filesystem on $test_part");
+	&debug_log(__FUNC__,__LINE__,"mount /dev/$test_part /tmp/mnt_check\n");
 
 # We use mount command, if it fails it means that either there is no filesystem
 # on the partition or linux kernel does not understand it. So it implies 
@@ -1047,9 +983,7 @@ sub check_filesystem
 	
 	$ret=system("mount /dev/$test_part /tmp/mnt_check 2>&1 ");
 	$ret=$ret >> 8;
-	if($debug) {
-		print "mount returned $ret for $test_part\n"
-	}
+	&debug_log(__FUNC__,__LINE__,"mount returned $ret for $test_part\n");
 	if($ret==32){
 		`rm -rf /tmp/mnt_check 2>/dev/null`;
 		return 0;
@@ -1077,7 +1011,7 @@ sub make_entry
 	local($FILE,$dev, $type)=@_ ;
 
 	if($type =~ m/mpath/i) {
-		print("binding /dev/mapper/$dev to /dev/$dev \n") if($debug);
+		&debug_log(__FUNC__,__LINE__,"binding /dev/mapper/$dev to /dev/$dev \n");
         `ln -s /dev/mapper/$dev /dev/$dev 2>/dev/null`;
         $rmlink="rm -f /dev/$dev";
         print RAW_LINKS "$rmlink\n";
@@ -1087,9 +1021,7 @@ sub make_entry
 		print $FILE "$dev\n";
 	} else { 
 		if($type != m/mpath/i) {
-			if($debug) {
-				print "binding /dev/$dev to /dev/raw/raw$rawcnt\n";
-			}
+			&debug_log(__FUNC__,__LINE__,"binding /dev/$dev to /dev/raw/raw$rawcnt\n");
 			`raw /dev/raw/raw$rawcnt /dev/$dev >/dev/null`;
 			`ln -s /dev/raw/raw$rawcnt /dev/raw/r$dev >/dev/null`;
 			$rawcnt++;
@@ -1111,15 +1043,11 @@ sub create_raw_nodes
 	$major_no = `ls -l /dev/raw |  awk '{print \$5}' | grep , | awk '(NR==1)'`;
 	chomp($major_no);
 	$major_no =~ s/,//;
-	if($debug) {
-		print "creating raw nodes in /dev/raw directory with major no $major_no\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"creating raw nodes in /dev/raw directory with major no $major_no\n");
 	for($i=0; $i<=255; $i++)
 	{
 		$ret=`mknod /dev/raw/raw$i c $major_no $i 2>&1`;
-		if($debug) {
-			print $ret;
-		}
+		&debug_log(__FUNC__,__LINE__,"$ret");
 	}
 }
 
@@ -1197,9 +1125,7 @@ sub get_parts
 
 sub get_TD_info
 {
-	if($debug) {
-		print "Collecting Tape info\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Collecting Tape info\n");
 	$tdpart_file=$ENV{"HTX_LOG_DIR"}."/tdpart";
 	unless(open(TD_PART,">$tdpart_file")) {
 		die("Open failed for file $tdpart_file\n");
@@ -1209,10 +1135,7 @@ sub get_TD_info
 	for($i=0; $i<$no_tape_drives;$i++)	
 	{
 		$ret=`mt -f /dev/st$i status 2>/dev/null`;
-		if($debug){
-			print "mt -f /dev/st$i status\n";
-			print "$ret";
-		}
+		&debug_log(__FUNC__,__LINE__,"mt -f /dev/st$i status\n$ret");
 		if($ret)
 		{
  	# Tape is a character device. So don't bind
@@ -1220,18 +1143,14 @@ sub get_TD_info
         # for it without appending 'r'.
 	# See defect 433319
 	
-			if($debug){
-				print "Found Tape drive st$i\n";
-			}
+			&debug_log(__FUNC__,__LINE__,"Found Tape drive st$i\n");
 			print TD_PART "st$i\n";
 		} 
 		#else {
 		#	last;
 		#}
 	}
-	if($debug){
-		print "Done\n\n";
-	}
+	&debug_log(__FUNC__,__LINE__,"Done\n\n");
 	close(TD_PART);
 }
 
@@ -1242,19 +1161,17 @@ sub get_TD_info
 sub check_mpath 
 {
 	($mpath)=@_;
-	if($debug) { 
-		print(" Finding devices for mpath = $mpath \n"); 
-	} 
+	&debug_log(__FUNC__,__LINE__,"Finding devices for mpath = $mpath \n"); 
 	($mapper, $alias) = split(/\//, $mpath); 
 	$wwid=`dmsetup info -c | awk ' /$alias/ { print \$8}' | sed 's/.*mpath-//g'`; 	      
 	chomp($wwid);
 	#get the parent device from multipath cmd. 
 	$parent=`multipath -ll  | awk ' /$wwid/ { print \$1}'` ; 
-	print(" Alias = $alias, wwid= $wwid, parent = $parent \n") if($debug);
+	&debug_log(__FUNC__,__LINE__,"Alias = $alias, wwid= $wwid, parent = $parent \n");
 	@phy_dev=&get_sd_device($parent); 
 	foreach $dev (@phy_dev) { 
 		chomp($dev); 
-		print("Found Physical devices = $dev \n") if($debug); 
+		&debug_log(__FUNC__,__LINE__,"Found Physical devices = $dev \n"); 
 	}
 	return(@phy_dev);
 
@@ -1281,9 +1198,7 @@ sub get_sd_device
 sub get_multipath_info
 {
 
-	if($debug) { 
-		print(" \n Collecting Multipath Info "); 
-	} 
+	&debug_log(__FUNC__,__LINE__,"\n Collecting Multipath Info "); 
 	#Check if multipath daemon is running. 	
 	$res=`ps -ef | grep multipathd | grep -v grep | awk ' {print \$2}'`; 
 	chomp($res); 
@@ -1312,7 +1227,10 @@ sub get_multipath_info
 	foreach $path (@mpaths) { 
 		chomp($path); 
 		$path =~ s/\s+$//;
-		print("$path found ..\n") if($debug);
+		$alternate_path=`ls -l /dev/mapper | grep "$path" | awk '{print \$NF}'`;
+		chomp($alternate_path);
+		$alternate_path=basename($alternate_path);
+		&debug_log(__FUNC__,__LINE__,"$path found . alternate path: $alternate_path..\n");
 		foreach $dev (@parts_to_exclude) {
         	chomp($dev);
             	unless($dev){
@@ -1320,8 +1238,13 @@ sub get_multipath_info
             }
 
             if($path eq $dev) {
-		print("$path, $dev not added coz found in exlcude list !!!! \n") if($debug); 
+		&debug_log(__FUNC__,__LINE__,"$path, $dev not added coz found in exlcude list !!!! \n"); 
 		$dont_add =  1; 
+                last;
+            }
+            if($alternate_path eq $dev) {
+                &debug_log(__FUNC__,__LINE__,"alternate_path $altername_path, $dev not added coz found in exlcude list !!!! \n");
+                $dont_add =  1;
                 last;
             }
         }
@@ -1332,7 +1255,7 @@ sub get_multipath_info
 	#These multipaths will lead to multipath disks. 
 	#I need to verify whether whether we can run hxestorage on it or not.
 	# Compare each with raw_parts :-). 
-	print("Searching for path = $path \n") if($debug); 
+	&debug_log(__FUNC__,__LINE__,"Searching for path = $path \n"); 
 	@res=`multipath -ll "$path" | grep sd[a-z]`; 
 	foreach $line (@res) { 
 		chomp($line); 
@@ -1341,7 +1264,7 @@ sub get_multipath_info
 			chomp($elmnt);
 			$dont_add_dev = 0;
 			if($elmnt =~/sd/) { 
-				print(" path = $path, $elmnt, ") if($debug); 
+				&debug_log(__FUNC__,__LINE__,"path = $path, $elmnt, "); 
 				foreach $dev (@parts_to_exclude) { 
 					chomp($dev);
 					unless($dev){
@@ -1349,11 +1272,11 @@ sub get_multipath_info
 					} 
 					if($dev eq $elmnt) { 
 						$dont_add_dev =  1; 
-						print("found: $elmnt, $dev\n") if debug;
+						&debug_log(__FUNC__,__LINE__,"found: $elmnt, $dev\n");
 						last; 
 					}
 				}
-				print(" dont_add_dev = $dont_add_dev ") if($debug); 
+				&debug_log(__FUNC__,__LINE__,"dont_add_dev = $dont_add_dev "); 
 				if($dont_add_dev) { 
 					next; 
 				}
@@ -1365,7 +1288,7 @@ sub get_multipath_info
 						last; 
 					}  
 				} 
-				print(" ,duplicate=$duplicate \n") if($debug); 
+				&debug_log(__FUNC__,__LINE__,"duplicate=$duplicate \n"); 
 				if($duplicate) { 
 					$duplicate = 0; 
 					next;
@@ -1384,10 +1307,12 @@ sub get_multipath_info
 					$duplicate_path = 0; 
 					next; 
 				}				
-				print(" Found Device $elmnt in path=$path \n") if($debug); 
+				&debug_log(__FUNC__,__LINE__,"Found Device $elmnt in path=$path \n"); 
 				if($i ==  $num_paths) { 
 					$tot_paths[$num_paths] = $path; 
 					$num_paths++; 
+					$tot_paths[$num_paths] = $alternate_path;
+					$num_paths++;
 				}
 			}
 		}
@@ -1396,7 +1321,7 @@ sub get_multipath_info
 		# use that instead. 
 
 		if ($dont_add == 0) {
-			print("Length of mpath name length($path) \n") if($debug);
+			&debug_log(__FUNC__,__LINE__,"Length of mpath name length($path) \n");
 			if(length($path) >= 15) {
 				$alternate_dev=`ls -l /dev/mapper | grep "$path" | awk '{print \$NF}'`;
                 	        chomp($alternate_dev);
@@ -1413,7 +1338,7 @@ sub get_multipath_info
                 	                $alternate_dev=$path;
                 	            }
                 	        }
-                        	print("Mpath name too big !!! using $alternate_dev instead of $path \n") if($debug);
+				&debug_log(__FUNC__,__LINE__,"Mpath name too big !!! using $alternate_dev instead of $path \n");
                         	print MPATH_PART "$alternate_dev  \n";
                         	print("**** Multipath = $alternate_dev --> USABLE by hxestorage ***** \n");
 
@@ -1453,17 +1378,17 @@ close(MPATH_PART);
 		} 
 		foreach $raw (@raw_parts) { 
 			chomp($raw);
-			print("raw_parts = $raw, dev = $dev \n") if($debug); 
+			&debug_log(__FUNC__,__LINE__,"raw_parts = $raw, dev = $dev \n"); 
 			if($dev eq $raw ) {  
-				print("removing $dev from rawparts as already exercised thru multipath's \n") if($debug); 
+				&debug_log(__FUNC__,__LINE__,"removing $dev from rawparts as already exercised thru multipath's \n");
 				splice(@raw_parts, $i, 1);	
 			}
 			#Check for partitions on $dev as well, 
-			print("Device $dev has partitions @partitions \n") if($debug); 
+			&debug_log(__FUNC__,__LINE__,"Device $dev has partitions @partitions \n");
 		    for($j=0;$j<$num_part;$j++) {
                 chomp($partitions[$j]);
                 if($raw eq $partitions[$j]) {
-					print("removing $dev from raw parts \n") if($debug); 
+					&debug_log(__FUNC__,__LINE__,"removing $dev from raw parts \n"); 
 					splice(@raw_parts, $i, 1);	
                     last;
                 }
@@ -1471,6 +1396,25 @@ close(MPATH_PART);
 			$i++; 
 		} 			
 	}
+	
+    # Also, none of the mpath device or its alternate device should be in rawpart file.
+    foreach $dev (@tot_paths) {
+        chomp($dev);
+        if($dev eq "NULL") {
+            next;
+        }
+        $i = 0;
+        foreach $raw (@raw_parts) {
+            chomp($raw);
+            if($dev eq $raw ) {
+                &debug_log(__FUNC__,__LINE__,"removing $dev from rawparts as already exercised thru multipath's \n");
+                splice(@raw_parts, $i, 1);
+                last;
+            }
+            $i++;
+        }
+    }
+	
     unless(open(RAWPART, ">$rawpart_file")) {
         die("Open failed for file $rawpart_file \n");
     }
@@ -1479,14 +1423,12 @@ close(MPATH_PART);
 		print RAWPART ("$dev \n");
 	}
 	close(RAWPART); 	 
-	if($debug) { 
-		print (" done \n"); 	
-	}
+	&debug_log(__FUNC__,__LINE__,"done \n");
 }
 sub
 get_cflash_info () { 
 
-	print("\nCollecting CAPI Flash Information \n") if($debug); 
+	&debug_log(__FUNC__,__LINE__,"\nCollecting CAPI Flash Information \n"); 
 
 	%surelock_dev=""; 
 
@@ -1534,7 +1476,7 @@ get_cflash_info () {
 	foreach $path (@num_paths)  { 
 		chomp($path);
 		#Get Surelock device mapping info
-		print("Searching for CXL devices in $path \n") if(debug); 
+		&debug_log(__FUNC__,__LINE__,"Searching for CXL devices in $path \n"); 
         $block_dev=`ls $path/block`;
         $surelock_dev=`ls $path/scsi_generic`;
 		$block_dev=&trim($block_dev);	
@@ -1547,7 +1489,7 @@ get_cflash_info () {
 		$lunid = substr($lun_identifier, 1);
 		$lunid = &trim($lunid); 	
 		if(length($lunid) == 0) { 
-			printf("Surelock : Ignored surelock=$surelock_dev because no block_dev=$block_dev, num_cxldevs=$num_cxldevs, lunid=$lunid \n") if($debug); 
+			&debug_log(__FUNC__,__LINE__,"Surelock : Ignored surelock=$surelock_dev because no block_dev=$block_dev, num_cxldevs=$num_cxldevs, lunid=$lunid \n"); 
 			next;
 		}
 		$is_duplicate = 0; 
@@ -1568,18 +1510,18 @@ get_cflash_info () {
         $surelock_dev[$num_cxldevs]{added}      = 0;
         $surelock_dev[$num_cxldevs]{lunid}      = $lunid;
 		if($is_duplicate == 1) { 
-			print("Surelock : Found duplicate block=$block_dev, surelock=$surelock_dev, 
-					mode=$mode, num_cxldevs=$num_cxldevs, with block dev=$surelock_dev[$count]{block}, and surelock_dev=$surelock_dev[$count]{surelock} \n") if($debug);
+			&debug_log(__FUNC__,__LINE__,"Surelock : Found duplicate block=$block_dev, surelock=$surelock_dev,
+                                        mode=$mode, num_cxldevs=$num_cxldevs, with block dev=$surelock_dev[$count]{block}, and surelock_dev=$surelock_dev[$count]{surelock} \n");
 			$surelock_dev[$num_cxldevs]{duplicate} = 1; 	
 		} else { 
 			$surelock_dev[$num_cxldevs]{duplicate} = 0; 
-			print("Surelock : Found Unique block=$surelock_dev[$num_cxldevs]{block}, surelock=$surelock_dev[$num_cxldevs]{surelock}, 
-					mode=$mode, num_cxldevs=$num_cxldevs, lunid=$surelock_dev[$num_cxldevs]{lunid} \n") if($debug); 
+			&debug_log(__FUNC__,__LINE__,"Surelock : Found Unique block=$surelock_dev[$num_cxldevs]{block}, surelock=$surelock_dev[$num_cxldevs]{surelock},
+                                        mode=$mode, num_cxldevs=$num_cxldevs, lunid=$surelock_dev[$num_cxldevs]{lunid} \n"); 
 		} 
 		$num_cxldevs++; 
 	}	
 	if($num_cxldevs == 0) { 
-		print("No Surelock device found, num_cxldevs=$num_cxldevs \n") if($debug); 
+		&debug_log(__FUNC__,__LINE__,"No Surelock device found, num_cxldevs=$num_cxldevs \n");
 		# Write back the what ever was existing and return.  
 		foreach $rawpart (@raw_parts) { 
 			chomp($rawpart); 
@@ -1595,7 +1537,7 @@ get_cflash_info () {
 		}
 		return;
 	} else { 
-		print("Num Surelock devs = $num_cxldevs\n\n\n") if($debug); 
+		&debug_log(__FUNC__,__LINE__,"Num Surelock devs = $num_cxldevs\n\n\n");
 	}
 	# Check in rawpart if entry exists .. 
 	$rawpart_match = 0; 
@@ -1610,13 +1552,13 @@ get_cflash_info () {
 		}
 		if($rawpart_match == 0 ) {  
 			print RAWPART ("$raw_parts[$i]\n"); 		
-			printf ("Adding $raw_parts[$i] to RAWPART \n") if($debug); 
+			&debug_log(__FUNC__,__LINE__,"Adding $raw_parts[$i] to RAWPART \n"); 
 		} elsif(($surelock_dev[$j]{added} == 0) && ($surelock_dev[$j]{duplicate} == 0) )  { 
 			print CFLASH_PART ("$surelock_dev[$j]{surelock}\n");  
-			print ("Adding $surelock_dev[$j]{surelock} to CFLASH_PART \n") if($debug); 
+			&debug_log(__FUNC__,__LINE__,"Adding $surelock_dev[$j]{surelock} to CFLASH_PART \n"); 
 			$surelock_dev[$j]{added} = 1; 	
 		} else { 
-			print("block=$surelock_dev[$j]{block}, surelock=$surelock_dev[$j]{surelock} not added, coz added=$surelock_dev[$j]{added} and duplicate=$surelock_dev[$j]{duplicate} \n") if($debug); 
+			&debug_log(__FUNC__,__LINE__,"block=$surelock_dev[$j]{block}, surelock=$surelock_dev[$j]{surelock} not added, coz added=$surelock_dev[$j]{added} and duplicate=$surelock_dev[$j]{duplicate} \n"); 
 		}
 	}	
 	# Check in mpath if this device is slave .. 
@@ -1637,17 +1579,17 @@ get_cflash_info () {
 					last; 
 				}
 			}
-			print("mpath=$mpath, mpath_match=$mpath_match, slaves=@mpath_blockdev, surelock_block=$surelock_dev[$j]{block}, j = $j\n") if($debug);
+			&debug_log(__FUNC__,__LINE__,"mpath=$mpath, mpath_match=$mpath_match, slaves=@mpath_blockdev, surelock_block=$surelock_dev[$j]{block}, j = $j\n");
 			if($mpath_match == 0) {
 				printf("Adding $mpath back to MPATH_PARTs \n"); 
 				print MPATH_PART ("$mpath\n");  
 			} else { 
             	if(($surelock_dev[$j]{added} == 0) && ($surelock_dev[$j]{duplicate} == 0)) {
-					printf("Adding surelock=$surelock_dev[$j]{surelock} is part of mpath=$mpath, block=$surelock_dev[$j]{block} hence adding to CFLASH_PART \n") if($debug);
+					&debug_log(__FUNC__,__LINE__,"Adding surelock=$surelock_dev[$j]{surelock} is part of mpath=$mpath, block=$surelock_dev[$j]{block} hence adding to CFLASH_PART \n");
                     print CFLASH_PART ("$surelock_dev[$j]{surelock} \n");
                     $surelock_dev[$j]{added} = 1;
 				} else { 
-                	print("surelock=$surelock_dev[$j]{surelock},block=$surelock_dev[$j]{block}  not added, coz added=$surelock_dev[$j]{added} and duplicate=$surelock_dev[$j]{duplicate}  \n") if($debug);
+        			&debug_log(__FUNC__,__LINE__,"surelock=$surelock_dev[$j]{surelock},block=$surelock_dev[$j]{block}  not added, coz added=$surelock_dev[$j]{added} and duplicate=$surelock_dev[$j]{duplicate}  \n");
                 }
 			}
 		}
@@ -1665,7 +1607,7 @@ get_cflash_info () {
     }
 
 	close(CFLASH_PART); 
-	printf("Collecting CAPI Flash Information ... Completed!!! \n\n\n") if($debug); 
+	&debug_log(__FUNC__,__LINE__,"Collecting CAPI Flash Information ... Completed!!! \n\n\n"); 
 } 
 
 
@@ -1677,7 +1619,7 @@ get_disk_info_parted() {
 	$partition_name="";
 	$num_partitions=0;
 
-	print("Collecting Disk Information from GNU parted command \n") if($debug);  
+	&debug_log(__FUNC__,__LINE__,"Collecting Disk Information from GNU parted command \n"); 
 	@input=`parted -msl 2> /dev/null`;
 	foreach $line (@input) {
 
@@ -1697,7 +1639,7 @@ get_disk_info_parted() {
                 if($line =~ /dev/) {
                         # Actual Disk Information
                         $num_disk++;
-                        printf(" Disk name=%s \n", $parted_fields[0]) if($debug);
+		            	&debug_log(__FUNC__,__LINE__,"Disk name= $parted_fields[0]\n");
                         $num_partitions=0;
                         $dev_name=$parted_fields[0];
                         $disk_info[$num_disk]{name}=$parted_fields[0];
@@ -1725,7 +1667,7 @@ get_disk_info_parted() {
                         $disk_info[$num_disk]{num_partitions}++;
                         $num_partitions++;
 
-                        print("partition_name=$partition_name, fs_type= $fs_type, used_as=$used_as \n") if($debug);
+            			&debug_log(__FUNC__,__LINE__,"partition_name=$partition_name, fs_type= $fs_type, used_as=$used_as \n");
                 }
         }
 

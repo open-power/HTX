@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)05       1.22.1.1  src/htx/usr/lpp/htx/bin/hxetape/get_rule.c, exer_tape, htxubuntu 12/11/09 07:10:16 */
-
 /******************************************************************************
  * COMPONENT_NAME: exer_tape
  *
@@ -28,21 +26,6 @@
  *             set_defaults() sets default values into ruleinfo struct.
  *             get_line() used to read a line of data from stdin.
  *
- * CHANGE LOG:
- *    DATE    |PROGRAMMER    |DESCRIPTION
- *    --------+--------------+----------------------------------------
- *    10/05/88| T. Homer     | initial release
- *    11/26/91| R. Cherry    | new owner pick-up level.
- *    06/12/92| R. Cherry    | general clean-up: phtx_info, prule_info
- *    07/01/92| R. Cherry    | skip records need to take into account
- *            |              | the smit blocksize.
- *    11/10/93| R. Cherry    | added DBUG OPER keyword to allow setting
- *            |              | debug mode sampling in 4mm4gb device.
- *    10/20/93| D. Stauffer  | Add new keywords to rules file to be
- *            |              | able to handle the changer mechanism.
- *     5/08/97| D. Stauffer  | Add new operation, REOT, to read to end of tape.
- *     1/15/98| D. Stauffer  | No check to make sure number of blocks does
- *            |              | not exceed a buffer size.
  *****************************************************************************/
 
 #include <stdio.h>
