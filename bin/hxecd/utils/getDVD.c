@@ -151,7 +151,6 @@ int ioctl_fn (char *sg)
         unsigned char cmdblk[10];
         struct sg_header *sg_hd;
         unsigned char outbuf[96 + SCSI_OFF];
-        char tmp_str[1200];
         int out_size, cmd_len,in_size,status=0;
         char scsi_dev[20];
         unsigned char *tmp;
@@ -345,9 +344,11 @@ struct sg_scsi_id sid;
         if( (bus_num == sid.host_no) && (scsi_id == sid.scsi_id) && (sid_lun == sid.lun) && (sid_channel == sid.channel)) {
                 found = 1;
                 strcpy(sgname,sg);
-                if ( query == 1 )
+                if ( query == 1 ) {
                         printf("\nDev = %s, bus %d, id %d, lun %d, ch %d\n", sg, sid.host_no, sid.scsi_id, sid.lun, sid.channel);
                 }
+        }
+        return 0;
 }
 
 
@@ -356,11 +357,7 @@ int get_sr(char * sr)
 int did[2], bus;
 int fd, rc;
 unsigned int busno, chno, id, lun;
-char temp[10],comm[25];
-int maj, min;
 int retry_count = RETRY_OPEN;
-char *ma, *mi;
-FILE *fp;
 
         did[0] = 0; did[1] = 0;
 
@@ -675,12 +672,9 @@ struct getcfg_resp {
 
 #else  /* code for Linux */
 
-	int fd, rc;
+	    int rc;
         char msg[100], devname[50];
-        struct stat st;
-        struct sg_scsi_id sid;
         int i,r=0;
-        int did[2], bus;
 
     if (argc <= 1) {
         fprintf(stderr,"Usage %s: query DVD-RAM drive media\n", argv[0]);
@@ -690,7 +684,7 @@ struct getcfg_resp {
         fprintf(stderr,"\t  (10)  DVD_ROM   - inserted media is a DVD-ROM and not writeable\n");
         fprintf(stderr,"\t  (12)  DVD-RAM   - inserted medai is a DVD-RAM and is writable\n");
         fprintf(stderr,"\t  (-99) WRONG_DEV - device unknown.\n");
-	fprintf(stderr,"\t  (123) NOMEDIA   - no media present in the drive\n");
+	    fprintf(stderr,"\t  (123) NOMEDIA   - no media present in the drive\n");
         fprintf(stderr,"\t%s -m /dev/cd?\n", argv[0]);
         fprintf(stderr,"\t  Detect media in DVDROM drive\n");
         fprintf(stderr,"\t  (1)MEDIA_CD, (1)MEDIA_DVD, (1)MEDIA_NONE\n");

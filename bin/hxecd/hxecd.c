@@ -93,8 +93,8 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
   rptr = rptr_malloc;
 #else                     /* Linux */
   /* Page align the buffers for linux raw IO */
-  wptr = HTX_PAGE_ALIGN(wptr_malloc);
-  rptr = HTX_PAGE_ALIGN(rptr_malloc);
+  wptr = (char *)HTX_PAGE_ALIGN(wptr_malloc);
+  rptr = (char *)HTX_PAGE_ALIGN(rptr_malloc);
 #endif
 
   memset(&r, 0, sizeof(struct ruleinfo));
@@ -108,9 +108,10 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
   if(wptr == NULL || rptr == NULL) {
     sprintf(msg, "Unable to allocate memory of %d bytes\n", BUF_SIZE+PAGE_SIZE);
 	hxfmsg(&s, 0, SYSERR, msg);
-  }     /****************************************/
-        /*- SIGTERM handler initializations    -*/
-        /****************************************/
+  }
+  /****************************************/
+  /*- SIGTERM handler initializations    -*/
+  /****************************************/
   sigemptyset(&(sigvector.sa_mask));
   sigvector.sa_flags = 0 ;
   sigvector.sa_handler = (void (*)(int)) SIGTERM_hdl;
@@ -144,7 +145,7 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
   strcat(pipe_name, ".pipe");
   if ( (fptr = fopen(rules_file_name, "r")) == NULL ) {
      strcpy(msg, "error opening rules file - ");
-        strcat(msg, strerror(errno));
+     strcat(msg, strerror(errno));
      strcat(msg, "\n");
      hxfmsg(&s, errno, SYSERR, msg);
      exit(1);
@@ -179,7 +180,7 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
 
   if ( r.fildes == -1 ) {
      strcpy(msg, "Initial open error - ");
-        strcat(msg, strerror(errno));
+     strcat(msg, strerror(errno));
      strcat(msg, "\n");
      hxfmsg(&s, errno, SYSERR, msg);
      exit(1);
@@ -193,7 +194,7 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
   p_dev_stat = (struct stat *) malloc(sizeof (struct stat));
   if ( 0 != (rc = fstat(r.fildes, p_dev_stat))) {
      strcpy(msg, "fstat() error - ");
-         strcat(msg, strerror(errno));
+     strcat(msg, strerror(errno));
      strcat(msg, "\n");
      hxfmsg(&s, errno, SYSERR, msg);
      exit(1);
@@ -226,12 +227,12 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
             *************************************************/
 #ifndef __HTX_LINUX__
    r.master_audio_type = get_audio_type(&r, &s);
-#else 
+#else
    r.master_audio_type = 0;
 #endif
    if ( r.master_audio_type == -1 ) {
       strcpy(msg, "Get Audio Type error - ");
-         strcat(msg, strerror(errno));
+      strcat(msg, strerror(errno));
       strcat(msg,"\n");
       hxfmsg(&s,errno,SYSERR,msg);
       exit(1);
@@ -298,7 +299,7 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
              exit(1);
          }
 
-           strcat(msg, strerror(errno));
+        strcat(msg, strerror(errno));
         strcat(msg,"\n");
         hxfmsg(&s, errno, HARD, msg);
      } else {
@@ -436,7 +437,7 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
         fclose(fptr);
         if ( (fptr = fopen(pipe_name, "r")) == NULL ) {
            strcpy(msg, "error opening pipe file - ");
-              strcat(msg, strerror(errno));
+           strcat(msg, strerror(errno));
            strcat(msg, "\n");
            hxfmsg(&s, errno, SYSERR, msg);
            return(1);
@@ -449,7 +450,7 @@ int main (int argc, char **argv)                    /* Begin MAIN line code   */
         signal_flag = 'N';
         if ( (fptr = fopen(rules_file_name, "r")) == NULL ) {
            strcpy(msg, "error opening rules file - ");
-              strcat(msg, strerror(errno));
+           strcat(msg, strerror(errno));
            strcat(msg, "\n");
            hxfmsg(&s, errno, SYSERR, msg);
            return(1);

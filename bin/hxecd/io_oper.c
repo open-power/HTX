@@ -50,13 +50,13 @@
 #include "hxecd.h"
 #define MAX_SENSE 64
 
+extern char device_subclass[];  /* subclass of device */
+extern dev_t device_st_rdev;    /* device id (see stat.h) */
+
 #ifndef __HTX_LINUX__
 static char sense_buf [MAX_SENSE];
 static char msg_str [256];
 #endif
-
-extern char device_subclass[];  /* subclass of device */
-extern dev_t device_st_rdev;    /* device id (see stat.h) */
 
 /*************************************************************************/
 /* close_reopen - close device and reopen in the passed mode.            */
@@ -206,7 +206,7 @@ int get_audio_type(struct ruleinfo *pr, struct htx_data *ps)
                     /*********************************************************/
               if ( (xrc == 0) && (retry_op == 0) ) {
                  strcpy(msg_str, " audio type inquiry command error - ");
-                    strcat(msg_str, strerror(errno));
+                 strcat(msg_str, strerror(errno));
                  strcat(msg_str, "\n  Request Sense Data:");
                  sens_len = 8 + sense_buf[7];
                  for ( i = 0; i < sens_len; i++ ) {
@@ -265,11 +265,9 @@ int get_audio_type(struct ruleinfo *pr, struct htx_data *ps)
 /**************************************************************************/
 /* set file pointer                                                       */
 /**************************************************************************/
-
 void set_addr(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 {
-  /*off_t addr, rcode, lseek();*/
-    offset_t addr, rcode;
+  offset_t addr, rcode;
 
 #ifdef __HTX_LINUX__     /* Linux */
   /* No seek required for M2F1 M2F2 and DA */
@@ -284,7 +282,6 @@ void set_addr(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
   *         blkno[0], pr->bytpsec, addr,addr);
   * prt_msg(ps, pr, loop, blkno, errno, INFO, msg);
   ***********************************************************************/
-/*  rcode = lseek(pr->fildes, addr, 0);*/
 #ifdef __HTX_LINUX__
   rcode = lseek64(pr->fildes, addr, 0);
 #else
@@ -439,7 +436,7 @@ void read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
   int  rc, r_ptr, save_dlen;
   int  mm, ss, bb, x, i;
   char CDpath[120], INFOpath[120], msg[200], xsg[100];
-  char sMM[5], sSS[5], sBB[5], msb[40], tbuf[3000];
+  char sMM[5], sSS[5], sBB[5], msb[40], tbuf[3000], log_dir[32];
   static char open_type[4] = "wb";     /* for fopen() */
   FILE *fp;
 
@@ -463,9 +460,11 @@ void read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
      prt_msg(ps, pr, loop, blkno, errno, HARD, "read error - ");
   else {
                     /*--- write out new pattern id read compare data file ---*/
-     if ( (int)strlen((char *) strcpy(CDpath,
-                                      (char *)getenv("HTXPATTERNS"))) == 0 )
-     strcpy(CDpath, "../pattern/");                       /* default ONLY */
+     if ((char *)getenv("HTXPATTERNS") != NULL) {
+           strcpy(CDpath, (char *)getenv("HTXPATTERNS"));
+     } else {
+         strcpy(CDpath, "../pattern/");                       /* default ONLY */
+     }
      strcat (CDpath, "CD\0");
      strcat (CDpath, pr->pattern_id);
 		/* set access type to pattern file so that it truncates the */
@@ -489,9 +488,11 @@ void read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
      strcat(msg, xsg);
      sprintf(xsg, "  Starting block: %s  (", pr->starting_block);
      strcat(msg, xsg);
-                                      /**************************************/
-                                      /*- calculate mm:ss:bb from block #  -*/
-                                      /**************************************/
+                       /**************************************/
+                       /*- calculate mm:ss:bb from block #  -*/
+                       /**************************************/
+     strcpy(log_dir, ps->htx_exer_log_dir);
+ 
      mm = 0;
      ss = 0;
      bb = 0;
@@ -513,7 +514,8 @@ void read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
      strcat(msg, xsg);
      sprintf(xsg, "Number of blocks: %d\n", pr->num_blks);
      strcat(msg, xsg);
-     strcpy(INFOpath, "/tmp/CD");
+     strcpy(INFOpath, log_dir);
+     strcat(INFOpath, "CD");
      strcat(INFOpath, pr->pattern_id);
      strcat(INFOpath, ".info");
      if ( (fp = fopen(INFOpath, "w")) == NULL ) {
@@ -532,9 +534,9 @@ void read_write_pattern(struct htx_data *ps, struct ruleinfo *pr, int loop,
 /**************************************************************************/
 /* audio                                                                  */
 /**************************************************************************/
-#ifndef __HTX_LINUX__
 void audio_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 {
+#ifndef __HTX_LINUX__
   int    rc, xrc, i, sens_len;
   char   tmp_str[3], buf[1024];
   FILE   *fp;
@@ -670,8 +672,8 @@ void audio_cdrom(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
   if ( close_reopen(ps, pr, SC_SINGLE, "audio_cdrom") != 0 )
      prt_msg(ps, pr, loop, blkno, errno, HARD, "reopen failure - ");
   }
-}
 #endif
+}
 
 /**************************************************************************/
 /* audio multimedia - play audio using multimedia mode of device driver   */
@@ -912,7 +914,7 @@ int audio_mm(struct htx_data *ps, struct ruleinfo *pr, int loop, int *blkno)
 /* init_iocmd -- sets up a scsi pass through command                      */
 /**************************************************************************/
 #ifndef __HTX_LINUX__
-init_iocmd(struct sc_iocmd *iocmd_buf)
+void init_iocmd(struct sc_iocmd *iocmd_buf)
 {
    memset(iocmd_buf, 0, sizeof(struct sc_iocmd));
    iocmd_buf->buffer = NULL;
@@ -927,7 +929,7 @@ init_iocmd(struct sc_iocmd *iocmd_buf)
 /**************************************************************************/
 /* init_viocmd -- sets up a scsi pass through command                      */
 /**************************************************************************/
-init_viocmd(struct scsi_iocmd *viocmd_buf)
+void init_viocmd(struct scsi_iocmd *viocmd_buf)
 {
    memset(viocmd_buf, 0, sizeof(struct scsi_iocmd));
 #ifndef __HTX43X__
@@ -1244,7 +1246,7 @@ int ms_get(struct ruleinfo *pr, struct htx_data *ps, unsigned int *p_last_lba,
 #endif
   if ( rc != 0 ) {
      sprintf(msg, "%s : Mode Select error : %s.\n", pr->rule_id, mode_descr);
-        strcat(msg, strerror(errno));
+     strcat(msg, strerror(errno));
      strcat(msg,"\n");
      hxfmsg(ps, errno, HARD, msg);
      rc = -1;
@@ -1259,7 +1261,7 @@ int ms_get(struct ruleinfo *pr, struct htx_data *ps, unsigned int *p_last_lba,
      if ( rc != 0 ) {
         sprintf(msg, "Mode Get error : %s.\n", mode_descr);
         strcat(tmp_msg, msg);
-           strcat(tmp_msg, strerror(errno));
+        strcat(tmp_msg, strerror(errno));
         strcat(tmp_msg,"\n");
         hxfmsg(ps, errno, HARD, tmp_msg);
         rc = -1;
@@ -1299,7 +1301,7 @@ int ms_get(struct ruleinfo *pr, struct htx_data *ps, unsigned int *p_last_lba,
         if ( *p_blk_size == 0 ) {
            sprintf(msg, "Mode Get error : %s.\n", mode_descr);
            strcat(tmp_msg, msg);
-              strcat(tmp_msg, strerror(errno));
+           strcat(tmp_msg, strerror(errno));
            strcat(tmp_msg,"\n");
            hxfmsg(ps, errno, HARD, tmp_msg);
            rc = -1;
@@ -1381,14 +1383,12 @@ void show_stuff(struct htx_data *ps, struct ruleinfo *pr, int loop,
          prt_msg(ps, pr, loop, blkno, errno, HARD, "reopen failure - ");
    }
 }
-#endif
 
 /**************************************************************************/
 /* do_req_sense -- do a request sense operation and return sense data     */
 /**************************************************************************/
 int do_req_sense(int fildes, char *sense_buf, int sense_buf_len)
 {
-#ifndef __HTX_LINUX__
   int    rc;
   struct sc_iocmd iocmd_buf;
   struct ide_atapi_passthru atapi_pt;
@@ -1430,10 +1430,8 @@ int do_req_sense(int fildes, char *sense_buf, int sense_buf_len)
 	  rc = ioctl(fildes, IDEPASSTHRU, &atapi_pt);
   }
   return(rc);
-#else
-  return 0;
-#endif
 }
+#endif
 
 /**********************************************************************/
 /* get_disc_pn - get disk part number by reading the disc table of    */
@@ -1446,9 +1444,9 @@ int do_req_sense(int fildes, char *sense_buf, int sense_buf_len)
 int get_disc_pn(struct htx_data *ps, struct ruleinfo *pr)
 {
 #ifndef __HTX_LINUX__
-               /***********************************************************/
-               /*- known cdrom test disc'c toc data                      -*/
-               /***********************************************************/
+/***********************************************************/
+/*- known cdrom test disc'c toc data                      -*/
+/***********************************************************/
                                 /*--- toc data for blocksize of 2048   ---*/
 const char toc2048_53F3088[200] =
   "00420107001401000000000000100200000012C00014030000001C6B\
@@ -1471,9 +1469,7 @@ const char toc2048_81F8902[200] =
 000409E30014AA0000041BC2";
 
 const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
-#endif
 
-#ifndef __HTX_LINUX__
    int    rc, i, xrc, x, xno;
    int    retry_op, toc_length, sens_len;
    char   ch2[4], parm_str[20], tmp_str[120], toc_dat[220], rbuf[220];
@@ -1547,9 +1543,8 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
 				sense_buf[7] = 0;  /* reset sense buffer's additional sense byte */
 				xrc = do_req_sense(pr->fildes, sense_buf, sizeof(sense_buf));
 				if ( (xrc == 0) && (retry_op == 0) ) {
-				   sprintf(tmp_str, " Unable to determine toc_length, errno = %d\n", errno );
-                   strcpy(msg_str, tmp_str);
-					  strcat(msg_str, strerror(errno));
+				   sprintf(msg_str, " Unable to determine toc_length, errno = %d\n", errno );
+				   strcat(msg_str, strerror(errno));
 				   strcat(msg_str, "\n  Request Sense Data:");
 				   sens_len = (8 + sense_buf[7]);
 				   for ( i = 0; i < sens_len; i++ ) {
@@ -1675,7 +1670,7 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
 
 	/* D406339 - It was observed that if we pass a buffer of larger size than reqd to read toc command, it fails. The fix was to pass
 	the correct number of bytes in the size. In order to determine the toc length, which in turn depends on the media inserted, we need
-	to first find the toc length, and then issue the read toc command with the correct length.
+	audio_cdrom to first find the toc length, and then issue the read toc command with the correct length.
 
 	The buffer size was never a issue before, but something seems to have changed at the driver level, for which we need this change.
 	Also this issue was observed only on the IDE devices.
@@ -1717,7 +1712,7 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
             xrc = do_req_sense(pr->fildes, sense_buf, sizeof(sense_buf));
             if ( (xrc == 0) && (retry_op == 0) ) {
                strcpy(msg_str, " read table of contents error - ");
-                  strcat(msg_str, strerror(errno));
+               strcat(msg_str, strerror(errno));
                strcat(msg_str, "\n  Request Sense Data:");
                sens_len = (8 + sense_buf[7]);
                for ( i = 0; i < sens_len; i++ ) {
@@ -1767,7 +1762,7 @@ const char toc_dvd_03K998x[50] = "0012010100140100000000000014AA00003FA0E0";
             xrc = do_req_sense(pr->fildes, sense_buf, sizeof(sense_buf));
             if ( (xrc == 0) && (retry_op == 0) ) {
                strcpy(msg_str, " read table of contents error - ");
-                  strcat(msg_str, strerror(errno));
+               strcat(msg_str, strerror(errno));
                strcat(msg_str, "\n  Request Sense Data:");
                sens_len = (8 + sense_buf[7]);
                for ( i = 0; i < sens_len; i++ ) {
@@ -2036,7 +2031,12 @@ int do_cmd(struct htx_data *ps, struct ruleinfo *pr)
 {
    int    a, b, c, d, rc = 0, filedes;
    char   tmsg[600], cmd_line[300], msg[650];
-   char   filenam[30] = "/tmp/errout.";
+   char   filenam[64], log_dir[32];
+
+   strcpy(log_dir, ps->htx_exer_log_dir);
+
+   strcpy(filenam, log_dir);
+   strcat(filenam, "errout.");
 
    close(pr->fildes);
    b = 0;

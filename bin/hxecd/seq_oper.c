@@ -101,7 +101,7 @@ void set_blkno( int *blkno, char *direction, int increment, int num_blks)
 /**************************************************************************/
 /* check for file wrap around on sequential operations                    */
 /**************************************************************************/
-int wrap( struct ruleinfo *pr, int *blkno)
+int wrap(struct ruleinfo *pr, int *blkno)
 {
   int rc;
 

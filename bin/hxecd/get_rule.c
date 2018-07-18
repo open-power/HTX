@@ -40,7 +40,7 @@
  ******************************************************************************/
 #include "hxecd.h"
 
-extern      FILE *fptr;
+extern FILE *fptr;
 extern int  cnt, crash_on_mis, rule_stanza[99];
 extern char signal_flag, pipe_name[15], rules_file_name[100];
 
@@ -366,10 +366,10 @@ int get_rule(struct htx_data *ps, struct ruleinfo *pr)
 /*****************************************************************************/
 void set_defaults(struct ruleinfo *pr)
 {
-                    /************************************************/
-                    /* DON'T do a memset to clear this structure as */
-                    /* parts of it are used across different rules. */
-                    /************************************************/
+     /************************************************/
+     /* DON'T do a memset to clear this structure as */
+     /* parts of it are used across different rules. */
+     /************************************************/
    pr->op_in_progress = 0;      /* init to undefined op in progress */
    pr->min_blkno = 0;
    pr->max_blkno = pr->tot_blks;
