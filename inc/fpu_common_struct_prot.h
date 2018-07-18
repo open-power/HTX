@@ -36,9 +36,18 @@
 #define mprintf(format, ...)
 #endif
 
+#ifdef SIMDBG
+#define SIM_DEBUG(x, format, ...) fprintf(x, format, ##__VA_ARGS__)
+#define SIM_FFLUSH(x) fflush(x)
+#else
+#define SIM_DEBUG(x, format, ...)
+#define SIM_FFLUSH(x)
+#endif
+
 #define INLINE static
 #define ASSERT(arg)
 
+extern FILE *simlog;
 extern FILE *hlog;
 
 /* TypeDef declarations */
@@ -143,6 +152,7 @@ typedef long long           sint64;
 #define F_XVRDPI FPS_FX | FPS_VXSNAN
 #define F_XVRDPIC FPS_FX | FPS_XX | FPS_VXSNAN
 #define F_XSRDPIC FPS_FPRF | FPS_FR | FPS_FI | FPS_FX | FPS_XX | FPS_VXSNAN
+#define F_XSDIVQP FPS_FPRF | FPS_FR | FPS_FI | FPS_FX | FPS_VXSNAN | FPS_VXIDI | FPS_VXZDZ | FPS_OX | FPS_UX | FPS_ZX | FPS_XX
 
 
 union DoubleWord
@@ -1019,7 +1029,9 @@ int simulate_vrsqrtefp(uint32 * machine_code , struct testcase *test_case);
 
 
 /* P9 : RFC02462 */
+int simulate_lxvl(uint32 * machine_code , struct testcase *test_case);
 int simulate_lxvll(uint32 * machine_code , struct testcase *test_case);
+int simulate_stxvl(uint32 * machine_code , struct testcase *test_case);
 int simulate_stxvll(uint32 * machine_code , struct testcase *test_case);
 
 /* VMX crypto instructions */
@@ -1080,11 +1092,17 @@ int simulate_bcdutrunc(uint32 * machine_code , struct testcase *test_case);
  * ---------------------------------------------
  */
 int simulate_vcmpneb(uint32 * machine_code , struct testcase *test_case);
+int simulate_vcmpneb_dot(uint32 * machine_code , struct testcase *test_case);
 int simulate_vcmpnezb(uint32 * machine_code , struct testcase *test_case);
+int simulate_vcmpnezb_dot(uint32 * machine_code , struct testcase *test_case);
 int simulate_vcmpneh(uint32 * machine_code , struct testcase *test_case);
+int simulate_vcmpneh_dot(uint32 * machine_code , struct testcase *test_case);
 int simulate_vcmpnezh(uint32 * machine_code , struct testcase *test_case);
+int simulate_vcmpnezh_dot(uint32 * machine_code , struct testcase *test_case);
 int simulate_vcmpnew(uint32 * machine_code , struct testcase *test_case);
+int simulate_vcmpnew_dot(uint32 * machine_code , struct testcase *test_case);
 int simulate_vcmpnezw(uint32 * machine_code , struct testcase *test_case);
+int simulate_vcmpnezw_dot(uint32 * machine_code , struct testcase *test_case);
 int simulate_vclzlsbb(uint32 * machine_code , struct testcase *test_case);
 int simulate_vctzlsbb(uint32 * machine_code , struct testcase *test_case);
 int simulate_vextublx(uint32 * machine_code , struct testcase *test_case);
@@ -1382,6 +1400,7 @@ int simulate_vinsertd(uint32 * machine_code , struct testcase *test_case);
 int simulate_vinserth(uint32 * machine_code , struct testcase *test_case);
 int simulate_vinsertw(uint32 * machine_code , struct testcase *test_case);
 int simulate_vpermr(uint32 * machine_code , struct testcase *test_case);
+int simulate_vmsumudm(uint32 * machine_code , struct testcase *test_case);
 
 /* RFC02471.r13: 128-bit SIMD Miscellaneous Operations */
 int simulate_lxvb16x(uint32 * machine_code , struct testcase *test_case);

@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/*static char sccsid[] = "%Z%%M%	%I%  %W% %G% %U%";*/
 
 #include <errno.h>
 #include <string.h>
@@ -97,6 +96,10 @@ struct dev_info {
 FILE *hlog = NULL;
 char dumpfile[128];
 
+#ifdef SIMDBG
+	/* Run simulation trace in single thread mode only, otherwise need to declare it per thread */
+    FILE *simlog = NULL;
+#endif
 /*
  * core_num is a number encoded in device name. For e.g. if device name is /dev/fpu5, core_num = 5.
  * Thread specific log files will be created in the format of vsx_log.<core_num>.<thread_num>.
@@ -263,6 +266,7 @@ main(int argc, char *argv[])
 	sigaddset(&myset, SIGALRM);
 	sigaddset(&myset, SIGTERM);
 	sigaddset(&myset, SIGINT);
+
 	char *temp_string = getenv("HTX_DR_TEST");
 	int htx_dr_test = 0;
 	if (temp_string != NULL){
@@ -354,10 +358,17 @@ main(int argc, char *argv[])
 	rc = strlen(hd.htx_exer_log_dir);
 	if ( rc == 0 ) {
 		sprintf(msg, "mkdir -p /tmp/htx/%s/%s", hd.HE_name, &(hd.sdev_id[5]));
-		system(msg);
-		sprintf(hd.htx_exer_log_dir, "/tmp/htx/hxefpu64/%s", &(hd.sdev_id[5]));
-		sprintf(msg, "htx_exer_log_dir not initialized. Setting it to %s", hd.htx_exer_log_dir);
-		hxfmsg(&hd, 0, HTX_HE_INFO, msg);
+		rc = system(msg);
+		if (rc) {
+			sprintf(msg, "RC: %d: failed to create dir: /tmp/htx/%s/%s", rc, hd.HE_name, &(hd.sdev_id[5]));
+			hxfmsg(&hd, 0, HTX_HE_HARD_ERROR, msg);
+			exit(rc);
+		}
+		else {
+			sprintf(hd.htx_exer_log_dir, "/tmp/htx/hxefpu64/%s", &(hd.sdev_id[5]));
+			sprintf(msg, "htx_exer_log_dir not initialized. Setting it to %s", hd.htx_exer_log_dir);
+			hxfmsg(&hd, 0, HTX_HE_INFO, msg);
+		}
 	}
 
    	sprintf(msg, "Exerciser started.\n%s %s %s %s\n", argv[0], argv[1], argv[2], argv[3]);
@@ -1493,6 +1504,16 @@ client_func(void *cinfo)
 #endif
 
 	DPRINT(cptr->clog, "Entering Client#%d function.\n", client_no);
+	#ifdef SIMDBG
+	if (client_no == 0) {
+    char sim_fname[128];
+    sprintf(sim_fname, "%s/sim_dbg%d", hd.htx_exer_log_dir, client_no);
+    simlog = fopen(sim_fname, "w");
+    if (simlog == NULL) {
+        printf("fopen failed for %s: %s\n", sim_fname, strerror(errno));
+    }
+	}
+    #endif
 
 	rc = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 	if ( rc ) {
@@ -1726,8 +1747,18 @@ client_func(void *cinfo)
 		(copy_epilog_fptr)(client_no);
 		impart_context_in_memory(client_no);
 
-		/*update_ea_off_array(client_no); for SCTU*/
-		reinit_ls_base(client_no);    /* feature:946581 making common with fpu */
+		update_ea_off_array(client_no);
+		rc  = reinit_ls_base(client_no);    /* feature:946581 making common with fpu */
+		if (rc) {
+			pthread_mutex_lock(&exit_flag_lock);
+        	exit_flag = 1;
+    		pthread_mutex_unlock(&exit_flag_lock);
+			#ifndef SCTU
+            if (!rule.testcase_sync) {
+                pthread_exit(&rc);
+            }
+        	#endif
+        }
 
 #ifdef SCTU
 
@@ -1753,6 +1784,14 @@ client_func(void *cinfo)
 		pthread_mutex_lock(&pass1_exec_lock);
 
 #endif
+		/* check for exit_flag: SW417137 */
+		if (exit_flag) {
+			if (!rule.testcase_sync) {
+				pthread_exit((void *)NULL);
+			}
+		}
+		sdata = &global_sdata[PASS1_BUF];
+		populate_buf(PASS1_BUF, client_no);
 
 		if(rule.test_method == CORRECTNESS_CHECK) {
 			/*
@@ -1761,10 +1800,7 @@ client_func(void *cinfo)
 			DPRINT(cptr->clog, "fpu%d: In SIM\n", core_num);
 			FFLUSH(cptr->clog);
 
-			sdata = &global_sdata[PASS1_BUF];
-			populate_buf(PASS1_BUF, client_no);
 			simulate_testcase(client_no);
-			adjust_vsrs_memory_image(client_no, PASS1_BUF);
 		}
 		else {
 			/*
@@ -1773,11 +1809,9 @@ client_func(void *cinfo)
 			DPRINT(cptr->clog, "fpu%d: In HW\n", core_num);
 			FFLUSH(cptr->clog);
 
-			sdata = &global_sdata[PASS1_BUF];
-			populate_buf(PASS1_BUF, client_no);
 			execute_testcase(client_no, PASS1_BUF);
-			adjust_vsrs_memory_image(client_no, PASS1_BUF);
 		}
+		adjust_vsrs_memory_image(client_no, PASS1_BUF);
 
 #ifdef SCTU
 		pthread_mutex_unlock(&pass1_exec_lock);
@@ -1899,6 +1933,12 @@ client_func(void *cinfo)
 
 		cptr->miscompare_in_numoper = rc;
 #else  /* SCTU part ends */
+		/* check for exit_flag, SW417137 */
+		if (exit_flag) {
+			if (!rule.testcase_sync) {
+				pthread_exit((void *)NULL);
+			}
+		}
 		/* Multiple pass2 for FPU and CPU only */
 		if (rule.log_seed == 1) {
 			/* CHAR time based testcase execution */
@@ -2039,32 +2079,46 @@ client_func(void *cinfo)
 			}
 #endif
 
+			char miscomp_name[128];
+			memset(miscomp_name, 0, 50);
+
 			if(shifted_pvr_os <= 0x3e) {
 				dump_testcase_p6(client_no, num_oper, rc, miscomparing_num);
+				switch (rc) {
+				case 1: sprintf(miscomp_name,"VSR");
+						break;
+				case 2: sprintf(miscomp_name,"GPR");
+						break;
+				case 3: sprintf(miscomp_name,"FPSCR");
+						break;
+				case 4: sprintf(miscomp_name,"VSCR");
+						break;
+				case 5: sprintf(miscomp_name,"CR");
+						break;
+				case 6: sprintf(miscomp_name,"Load/Store region");
+						break;
+				}
 			}
 			else {
 				dump_testcase_p7(client_no, num_oper, rc);
-			}
-
-			char miscomp_name[50];
-			memset(miscomp_name, 0, 50);
-			if (rc & CMP_TYPE_VSR) {
-				sprintf(miscomp_name,"VSR ");
-			}
-			if (rc & CMP_TYPE_GPR) {
-				sprintf(miscomp_name, "%sGPR ", miscomp_name);
-			}
-			if (rc & CMP_TYPE_FPSCR) {
-				sprintf(miscomp_name, "%sFPSCR ", miscomp_name);
-			}
-			if (rc & CMP_TYPE_VSCR) {
-				sprintf(miscomp_name, "%sVSCR ", miscomp_name);
-			}
-			if (rc & CMP_TYPE_CR) {
-				sprintf(miscomp_name, "%sCR ", miscomp_name);
-			}
-			if (rc & CMP_TYPE_LS) {
-				sprintf(miscomp_name, "%sLoad Store ", miscomp_name);
+				if (rc & CMP_TYPE_VSR) {
+					sprintf(miscomp_name,"VSR ");
+				}
+				if (rc & CMP_TYPE_GPR) {
+					sprintf(miscomp_name, "%sGPR ", miscomp_name);
+				}
+				if (rc & CMP_TYPE_FPSCR) {
+					sprintf(miscomp_name, "%sFPSCR ", miscomp_name);
+				}
+				if (rc & CMP_TYPE_VSCR) {
+					sprintf(miscomp_name, "%sVSCR ", miscomp_name);
+				}
+				if (rc & CMP_TYPE_CR) {
+					sprintf(miscomp_name, "%sCR ", miscomp_name);
+				}
+				if (rc & CMP_TYPE_LS) {
+					sprintf(miscomp_name, "%sLoad Store ", miscomp_name);
+				}
 			}
 
 
@@ -2325,6 +2379,11 @@ client_func(void *cinfo)
 	#else
 	read_tb(tick_end);
 	#endif
+	#ifdef SIMDBG
+	if (client_no == 0) {
+    fclose(simlog);
+	}
+    #endif
 }
 
 void dump_testcase_p7(int cno, int num_oper, int type)
@@ -2334,7 +2393,7 @@ void dump_testcase_p7(int cno, int num_oper, int type)
 	uint32 seed, miscom_index = 0, type_list, ins_cat;
 	char  *basei, *base1, *base2;
 	struct vsr_node *list_h, *list_t, *tmp_vsrs_list;
-	int i, j, num;
+	int i, j, num, mark;
 	int thread_start_index, thread_end_index;
 	char dump_file[128], temp_val1[35], temp_val2[35], host_name[50];
 	FILE *dump;
@@ -2640,7 +2699,7 @@ void dump_testcase_p7(int cno, int num_oper, int type)
 			fprintf(dump, "\n Type: %d -->", ins_cat);
 			tmp_vsrs_list = list_h;
 			while( tmp_vsrs_list != list_t ) {
-				fprintf(dump, " %d",tmp_vsrs_list->vsr_no);
+				fprintf(dump, " %d", tmp_vsrs_list->vsr_no);
 				tmp_vsrs_list = tmp_vsrs_list->next;
 			}
 			if ((tmp_vsrs_list != NULL) && (tmp_vsrs_list->vsr_no != 0)) {
@@ -2793,8 +2852,13 @@ void dump_testcase_p7(int cno, int num_oper, int type)
            		fprintf(dump, "Miscompare Type    : VSR Miscompare.\n");
            		fprintf(dump, "Mismatching VSR no : %d\n", num);
 
+				/* clear all marked indices first */
+				for (mark = 0; mark < cptr->num_ins_built; mark++) {
+					cptr->dc_instr[mark].marked = 0;
+				}
 				miscmp_head->instr_tree.head = create_instr_tree(dump, cno, num, VSR_DTYPE, -1, &miscmp_head);
 
+				#if 0
 				if ((num > 31) && (miscmp_head->instr_tree.head == NULL)) {
 					/* VMX special case where registers are mapped VR + 31 */
            			int i, found_index = -1;
@@ -2813,6 +2877,7 @@ void dump_testcase_p7(int cno, int num_oper, int type)
 						miscmp_head->instr_tree.head  = create_instr_tree(dump, cno, num - 32, VSR_DTYPE, found_index, &miscmp_head);
 					}
 				}
+				#endif
 				fprintf(dump, "================================================\n");
 				delete_reg_use_list(miscmp_head->instr_tree.head);
 				break;
@@ -2822,6 +2887,9 @@ void dump_testcase_p7(int cno, int num_oper, int type)
 				fprintf(dump, "================================================\n");
 				fprintf(dump, "Miscompare Type    : GPR Miscompare.\n");
 				fprintf(dump, "Mismatching GPR no : %d\n", num);
+				for (mark = 0; mark < cptr->num_ins_built; mark++) {
+					cptr->dc_instr[mark].marked = 0;
+				}
 				miscmp_head->instr_tree.head = create_instr_tree(dump, cno, num, GPR_DTYPE, -1, &miscmp_head);
 				fprintf(dump, "================================================\n");
 				delete_reg_use_list(miscmp_head->instr_tree.head);
@@ -2832,6 +2900,9 @@ void dump_testcase_p7(int cno, int num_oper, int type)
 				fprintf(dump, "================================================\n");
 				fprintf(dump, "Miscompare Type    : Load/Store Area Miscompare.\n");
 				fprintf(dump, "Mismatching Offset : 0x%llx bytes\n", offset);
+				for (mark = 0; mark < cptr->num_ins_built; mark++) {
+					cptr->dc_instr[mark].marked = 0;
+				}
 				miscmp_head->instr_tree.head = prepare_ls_call_list(dump, cno, offset, &miscmp_head);
 				fprintf(dump, "================================================\n");
 				delete_reg_use_list(miscmp_head->instr_tree.head);
@@ -3753,7 +3824,7 @@ calculate_seg_size()
 int
 simulate_testcase(int cno)
 {
-	uint16 prolog_size, num_ins_built, ins, sim_end_off;
+	uint16 prolog_size, /*num_ins_built,*/ ins, sim_end_off;
 	struct client_data *cptr = global_sdata[PASS1_BUF].cdata_ptr[cno];
 	void (*sim_ptr1)(uint32 *, struct testcase *);
 	uint64 old_fpscr, /*mod_fpscr,*/ f_mask;
@@ -3762,9 +3833,9 @@ simulate_testcase(int cno)
 	/*uint8 val;*/
 
 	prolog_size = cptr->sim_jmp_off;
-	num_ins_built = cptr->num_ins_built;
+	/*num_ins_built = cptr->num_ins_built;*/
 	sim_end_off = cptr->sim_end_off;
-	DPRINT(cptr->clog, "\nProlog size = %d, Num-ins = %d Sim end off = %d\n", prolog_size, num_ins_built, sim_end_off);
+	DPRINT(cptr->clog, "\nProlog size = %d, Num-ins = %d Sim end off = %d\n", prolog_size, cptr->num_ins_built, sim_end_off);
 	for(ins = prolog_size; ins < sim_end_off; ins++) {
 		sim_ptr1 = (sim_fptr)(cptr->tc_ptr[PASS1_BUF]->sim_ptr[ins]);
 		if(sim_ptr1 == NULL) continue;
@@ -3792,9 +3863,8 @@ simulate_testcase(int cno)
 	return (0);
 }
 
-
-void
-adjust_fpscr(int cno, uint64 old_fpscr, uint64 fpscr_mask)
+/* Inputs: fpscr before sim test, fpscr passed by instr table */
+void adjust_fpscr(int cno, uint64 old_fpscr, uint64 fpscr_mask)
 {
 	uint64 *fpscr = &(global_sdata[PASS1_BUF].cdata_ptr[cno]->tc_ptr[PASS1_BUF]->tcc.sprs.fpscr);
 	uint64 fpscr_sticky, modified_fpscr;
@@ -3972,20 +4042,9 @@ initialize_client(int cno)
 	s->cdata_ptr[cno]->cpu_id_mask = (0x1ULL << cno);
 
 
+	distribute_vsrs(cno);
 
-#if 0
-		for(i = 0; i < VSR_OP_TYPES; i++) {
-			s->cdata_ptr[j]->vsr_reg_wt[i] = vsr_reg_wt[i];
-		}
-		for(i = 0; i < (BFP_OP_TYPES + 1); i++) {
-			s->cdata_ptr[j]->bfp_reg_wt[i] = bfp_reg_wt[i];
-		}
-#else
-	if (distribute_vsrs_based_on_ins_bias(cno)) {
-		return (-1);
-	}
-#endif
-	return(0);
+    return(0);
 }
 
 int
@@ -4264,6 +4323,7 @@ allocate_vsr_mem(int client_no)
 	struct server_data *sdata = &global_sdata[INITIAL_BUF];
 	struct client_data *cptr = sdata->cdata_ptr[client_no];
 
+	/* allocate 64 nodes for all OP_TYPES  for VSX category */
 	for(i = 0; i < VSR_OP_TYPES; i++) {
 		cptr->vsrs[i].head[VSX] = (struct vsr_node *)malloc(sizeof(struct vsr_node));
 		tmp = cptr->vsrs[i].head[VSX];
@@ -4290,6 +4350,8 @@ allocate_vsr_mem(int client_no)
 		}
 		tmp->next = NULL;
 	}
+
+	/* Allocate 64 nodes for all OP_TYPES for BFP category */
 	for(i = 1; i <= BFP_OP_TYPES; i++) {
 		cptr->vsrs[i].head[BFP] = (struct vsr_node *)malloc(sizeof(struct vsr_node));
 		tmp = cptr->vsrs[i].head[BFP];
@@ -4316,6 +4378,9 @@ allocate_vsr_mem(int client_no)
 		}
 		tmp->next = NULL;
 	}
+
+	/* Allocate 64 nodes for DFP OP_TYPES for DFP category */
+	/* CR_T ang GR are ignored */
 	for(i = DFP_SHORT; i <= DFP_QUAD; i++) {
 		cptr->vsrs[i].head[DFP] = (struct vsr_node *)malloc(sizeof(struct vsr_node));
 		tmp = cptr->vsrs[i].head[DFP];
@@ -4343,6 +4408,8 @@ allocate_vsr_mem(int client_no)
 		tmp->next = NULL;
 	}
 
+	/* Allocate 64 nodes for VMX OP_TYPES for VMX category */
+	/* Only for VECTOR_SP, QGPR and GR is needed */
 	for(i = VECTOR_SP; i <= QGPR; i++) {
 		if (i == VECTOR_DP)
 			continue;
@@ -4592,7 +4659,7 @@ impart_context_in_memory(int cno)
 		tcc->gprs[i] = get_random_no_64(cno);
     }
 	tcc->sprs.cr = 0;
-	tcc->sprs.fpscr = rule.fpscr[cno];
+	tcc->sprs.fpscr = rule.fpscr[cno]; /* set fpscr rounding mode bit, passed by the rule FPSCR */
 	tcc->sprs.vscr[0] = tcc->sprs.vscr[1] = 0x0;
 	tcc->sprs.comp_fpscr = TRUE;
 	return(0);
@@ -4604,33 +4671,30 @@ impart_context_in_memory(int cno)
 int
 initialize_vsrs(int client_no)
 {
-	struct vsr_node *tmp1 = NULL, *tmp2 = NULL, *tmp3 = NULL;
-	struct vsr_node *prev1 = NULL, *prev2 = NULL, *prev3 = NULL, *prev_ary[VSR_OP_TYPES];
-	struct vsr_node *tmp = NULL,*prev_cpu = NULL;
+	uint32 i = 0, j = 0, k = 0, l = 0;
+	struct vsr_node *node = NULL, *prev = NULL, *node_vsx = NULL, *prev_vsx = NULL, *prev_ary[VSR_OP_TYPES];
+
 	struct server_data *sdata = &global_sdata[INITIAL_BUF];
 	struct client_data *cptr = sdata->cdata_ptr[client_no];
-	uint32 i, j, k, l = 0;
-	uint32 vsx_reg_used[NUM_VSRS], gpr_reg_used[NUM_GPRS - START_GPR_USED];
+
+	uint32 vsx_reg_used[NUM_VSRS]; 
 
 	bzero(vsx_reg_used, sizeof(vsx_reg_used));
-	bzero(gpr_reg_used, sizeof(gpr_reg_used));
 
 	for(i = 1; i < NUM_VSRS; i++) {
 		cptr->vsx_reg[i-1] = i;
 	}
-	shuffle(client_no, cptr->vsx_reg, (NUM_VSRS - 1));
+	shuffle(client_no, cptr->vsx_reg, (NUM_VSRS -  1));
 
 	for(i = 0; i < VSR_OP_TYPES; i++) {
-		prev_ary[i] = cptr->vsrs[i].head[VSX];
-	}
+        prev_ary[i] = cptr->vsrs[i].head[VSX];
+    }
+
 	for(i = 0; i < (NUM_VSRS); i++) {
 		vsx_reg_used[i] = 0;
 	}
 
-	/*
-	 * i runs up to VSR_OP_TYPES because for type CR_T, these two variables are
-	 * initialized in initialize_gprs_n_sprs functions.
-	 */
+	/* Initialize VSRs list for every stanza */
 	for(i = 0; i < (VSR_OP_TYPES); i++) {
 		cptr->vsrs[i].num_vsrs = 0;
 		cptr->vsrs[i].dirty_mask = 0;
@@ -4649,29 +4713,36 @@ initialize_vsrs(int client_no)
 		}
 		cptr->vsrs[i].head[VSX]->vsr_no = 0;
 	}
-	/* Only GPRs starting START_USED_GPR till MAX_REG is used i.e. only GPR 11 till GPR 31 will
+	/********************
+     * poulate GPR list *
+	 ********************
+	 * Only GPRs starting START_USED_GPR till MAX_REG is used i.e. only GPR 11 till GPR 31
 	 * will be part of linked list
 	 */
 	for(i = 0; i < RANGE_GPRS ; i++) {
 		cptr->gpr_reg[i] = i + START_GPR_USED;
 	}
-	shuffle(client_no, cptr->gpr_reg,RANGE_GPRS);
+	shuffle(client_no, cptr->gpr_reg, RANGE_GPRS);
 
 	cptr->vsrs[GR].tail[BFP] = cptr->vsrs[GR].head[BFP];
 	cptr->vsrs[GR].head[BFP]->vsr_no = 0;
-	cptr->vsrs[GR].num_vsrs = 32;
+	cptr->vsrs[GR].num_vsrs = 0; /*32;*/
 	cptr->vsrs[GR].dirty_mask = 0;
-	tmp = cptr->vsrs[GR].head[BFP];
+	node = cptr->vsrs[GR].head[BFP];
 	/* now create the list */
 	for(l = 0 ; l < RANGE_GPRS; l++) {
-		tmp->vsr_no = cptr->gpr_reg[l];
-		gpr_reg_used[l]=1;
-		prev_cpu = tmp;
-		tmp = tmp->next;
+		node->vsr_no = cptr->gpr_reg[l];
+		prev = node;
+		node = node->next;
 	}
-	cptr->vsrs[GR].tail[BFP] = prev_cpu;
-	cptr->vsrs[GR].tail[BFP]->next=cptr->vsrs[GR].head[BFP];
+	cptr->vsrs[GR].tail[BFP] = prev;
+	cptr->vsrs[GR].tail[BFP]->next = cptr->vsrs[GR].head[BFP];
+	cptr->vsrs[GR].num_vsrs = RANGE_GPRS;
+    cptr->vsrs[GR].dirty_mask = 0;
 
+	/***************/
+	/* DFP_QUAD    */
+	/***************/
 	/*
 	 * This loop is placed 1st because for quad instructions, 2 registers are required.
 	 * Hence most stringent of all allocation.
@@ -4680,63 +4751,66 @@ initialize_vsrs(int client_no)
 	k = 0;
 	/* this block is for DFP_QUAD only. */
 	{
-		DPRINT(cptr->clog, "DFP_QUAD_REG_WT[%d] = %d\n", DFP_QUAD, cptr->vsr_reg_wt[DFP_QUAD]);
-		tmp3 = cptr->vsrs[DFP_QUAD].head[DFP];
-		prev3 = tmp3;
+		DPRINT(cptr->clog, "DFP_QUAD_REG_WT[%d] = %d\n", DFP_QUAD, cptr->dfp_dtype.num_vsr[DFP_QUAD]);
+		node = cptr->vsrs[DFP_QUAD].head[DFP];
+		prev = node;
 		j = 0;
-		while(j < (cptr->vsr_reg_wt[DFP_QUAD]/2)) {
-			if(cptr->vsx_reg[k] < 31 && (cptr->vsx_reg[k] % 2 == 0) && (vsx_reg_used[k] == 0)) {
+		while(j < (cptr->dfp_dtype.num_vsr[DFP_QUAD]/2)) {
+			if((cptr->vsx_reg[k] < 31) && (cptr->vsx_reg[k] % 2 == 0) && (vsx_reg_used[k] == 0)) {
 				int l;
 				for(l = 0; l < (NUM_VSRS - 1); l++) {
 					if((cptr->vsx_reg[l] == (cptr->vsx_reg[k] + 1)) && (vsx_reg_used[l] == 0)) {
 						vsx_reg_used[l] = vsx_reg_used[k] = 1;
-						tmp3->vsr_no = cptr->vsx_reg[k];
-						DPRINT(cptr->clog,  "%s: DFP_QUAD: vsr no: %d\n", __FUNCTION__, tmp3->vsr_no);
+						node->vsr_no = cptr->vsx_reg[k];
+						DPRINT(cptr->clog,  "%s: DFP_QUAD: vsr no: %d\n", __FUNCTION__, node->vsr_no);
 						j++;
 						k++;
-						prev3 = tmp3;
-						tmp3 = tmp3->next;
+						prev = node;
+						node = node->next;
 						break;
 					}
 				}
-				if(l == (NUM_VSRS - 1)) {
+				if (l == (NUM_VSRS - 1)) {
 					sprintf(msg,"Could not find reg pair for DFP_QUAD");
 					hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-					return(1);
+					return(-11);
 				}
 			}
 			else {
 				k++;
-				if ( k > (NUM_VSRS - 2)) {
+				if (k > (NUM_VSRS - 2)) {
 					sprintf(msg,"Using more than 31 registers for DFP_QUAD");
 					hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
 					return(1);
 				}
 			}
+
 		}
-		cptr->vsrs[DFP_QUAD].num_vsrs = cptr->vsr_reg_wt[DFP_QUAD];
-		DPRINT(cptr->clog, "%s: VSR: Initializing %d vsrs for DFP_QUAD type\n",__FUNCTION__, cptr->vsr_reg_wt[DFP_QUAD]);
+		cptr->vsrs[DFP_QUAD].num_vsrs = cptr->dfp_dtype.num_vsr[DFP_QUAD];
+		DPRINT(cptr->clog, "%s: VSR: Initializing %d vsrs for DFP_QUAD type\n",__FUNCTION__, cptr->dfp_dtype.num_vsr[DFP_QUAD]);
 		FFLUSH(cptr->clog);
-		if (cptr->vsr_reg_wt[DFP_QUAD] != 0) {
-			cptr->vsrs[DFP_QUAD].tail[DFP] = prev3;
+		if (cptr->dfp_dtype.num_vsr[DFP_QUAD] != 0) {
+			cptr->vsrs[DFP_QUAD].tail[DFP] = prev;
 		}
 	}
 
-
+	/***************/
+	/* REST OF DFP */
+	/***************/
 	k=0;
 	for(i = DFP_SHORT; i <= DFP_LONG; i++) {
-		tmp1 = cptr->vsrs[i].head[DFP];
-		prev1 = tmp1;
+		node = cptr->vsrs[i].head[DFP];
+		prev = node;
 
-		DPRINT(cptr->clog,"DFP_REG_WT[%d] = %d\n", i, cptr->vsr_reg_wt[i]);
+		DPRINT(cptr->clog,"DFP_REG_WT[%d] = %d\n", i, cptr->dfp_dtype.num_vsr[i]);
 		FFLUSH(cptr->clog);
-		for (j = 0; j < (cptr->vsr_reg_wt[i]); j++) {
+		for (j = 0; j < (cptr->dfp_dtype.num_vsr[i]); j++) {
 			while (cptr->vsx_reg[k] > 31 || (vsx_reg_used[k] == 1)) {
 				k++;
-				if ( k > (NUM_VSRS - 2)) {
+				if (k > (NUM_VSRS - 2)) {
 					sprintf(msg,"Using more than 31 registers for DFP");
 					hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-					return(1);
+					return(-1);
 				}
 			}
 
@@ -4747,41 +4821,45 @@ initialize_vsrs(int client_no)
 			     */
 			    sprintf(msg,"Using more than 31 registers for DFP");
 			    hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-			    return(1);
+                return(-1);
 			}
 			else {
-				tmp1->vsr_no = cptr->vsx_reg[k];
-				DPRINT(cptr->clog,  "op type: %d vsr no: %d\n",i, tmp1->vsr_no);
+                node->vsr_no = cptr->vsx_reg[k];
+                DPRINT(cptr->clog,  "op type: %d vsr no: %d\n", i, node->vsr_no);
 				FFLUSH(cptr->clog);
 				vsx_reg_used[k] = 1;
 				k++;
-				prev1 = tmp1;
-				tmp1 = tmp1->next;
+                prev = node;
+                node = node->next;
 			}
+
 		}
-		sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->vsr_reg_wt[i];
-		DPRINT(cptr->clog, "%s: VSR: Initializing %d vsrs for %d data type\n",__FUNCTION__, cptr->vsr_reg_wt[i], i);
+		sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->dfp_dtype.num_vsr[i];
+		DPRINT(cptr->clog, "%s: VSR: Initializing %d vsrs for %d data type\n",__FUNCTION__, cptr->dfp_dtype.num_vsr[i], i);
 		FFLUSH(cptr->clog);
-		if (cptr->vsr_reg_wt[i] != 0) {
-			sdata->cdata_ptr[client_no]->vsrs[i].tail[DFP] = prev1;
+		if (cptr->dfp_dtype.num_vsr[i] != 0) {
+			sdata->cdata_ptr[client_no]->vsrs[i].tail[DFP] = prev;
 		}
     }
 
+	/**********/
+	/* BFP QP */
+	/**********/
 	k = 0;
 	/* this block is for BFP_QP only. */
 	{
-		tmp1 = cptr->vsrs[BFP_QP].head[BFP];
-		prev1 = tmp1;
+        node = cptr->vsrs[BFP_QP].head[BFP];
+        prev = node;
 
-		DPRINT(cptr->clog,"BFP_REG_WT = %d\n", cptr->bfp_reg_wt[BFP_QP]);
+        DPRINT(cptr->clog,"BFP_REG_WT = %d\n", cptr->bfp_dtype.num_vsr[BFP_QP]);
 		FFLUSH(cptr->clog);
-		for (j = 0; j < (cptr->bfp_reg_wt[BFP_QP]); j++) {
+        for (j = 0; j < (cptr->bfp_dtype.num_vsr[BFP_QP]); j++) {
 			while (cptr->vsx_reg[k] > 31 || (vsx_reg_used[k] == 1)) {
 				k++;
 				if ( k > (NUM_VSRS - 2)) {
 					sprintf(msg,"Using more than 31 registers for BFP_QP");
 					hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-					return(1);
+                    return (-1);
 				}
 			}
 
@@ -4792,46 +4870,42 @@ initialize_vsrs(int client_no)
 			     */
 			    sprintf(msg,"Using more than 31 registers for BFP_QP");
 			    hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-			    return(1);
+                return (-1);
 			}
 			else {
-				tmp1->vsr_no = cptr->vsx_reg[k];
-				DPRINT(cptr->clog,  "op type: BFP_QP vsr no: %d\n",tmp1->vsr_no);
+                node->vsr_no = cptr->vsx_reg[k];
+                DPRINT(cptr->clog,  "op type: BFP_QP vsr no: %d\n", node->vsr_no);
 				FFLUSH(cptr->clog);
 				vsx_reg_used[k] = 1;
 				k++;
-				prev1 = tmp1;
-				tmp1 = tmp1->next;
+                prev = node;
+                node = node->next;
 			}
 		}
-		sdata->cdata_ptr[client_no]->vsrs[BFP_QP].num_vsrs = cptr->bfp_reg_wt[BFP_QP];
-		DPRINT(cptr->clog, "%s: Initializing %d vsrs for BFP_QP data type \n",__FUNCTION__, cptr->bfp_reg_wt[BFP_QP]);
+        sdata->cdata_ptr[client_no]->vsrs[BFP_QP].num_vsrs = cptr->bfp_dtype.num_vsr[BFP_QP];
+        DPRINT(cptr->clog, "%s: Initializing %d vsrs for BFP_QP data type \n",__FUNCTION__, cptr->bfp_dtype.num_vsr[BFP_QP]);
 		FFLUSH(cptr->clog);
-		if (cptr->bfp_reg_wt[BFP_QP] != 0) {
-			sdata->cdata_ptr[client_no]->vsrs[BFP_QP].tail[BFP] = prev1;
+        if (cptr->bfp_dtype.num_vsr[BFP_QP] != 0) {
+            sdata->cdata_ptr[client_no]->vsrs[BFP_QP].tail[BFP] = prev;
 		}
     }
-
-
-	/*
-	 * This loop will populate SP n DP registers for both VSX n BFP. Half of that VSX SP n DP list will
-	 * be filled here, whereas whole BFP SP n DP list will be populated. The remaining VSX list will be
-	 * filled in the next for loop.
-	 */
+	
+	/*********************************************/
+	/* Rest OF BFP: VSR would be shared with VSX */
+	/*********************************************/
 	k = 0;
-	for(i = SCALAR_SP; i <= SCALAR_DP; i++) {
-		tmp1 = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
-		tmp2 = sdata->cdata_ptr[client_no]->vsrs[i].head[BFP];
-
-		DPRINT(cptr->clog,"BFP_REG_WT[%d] = %d\n", i, cptr->bfp_reg_wt[i]);
+	for (i = BFP_SP; i <= BFP_DP; i++) {
+		node = sdata->cdata_ptr[client_no]->vsrs[i].head[BFP];
+		node_vsx = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
+		DPRINT(cptr->clog,"BFP_REG_WT[%d] = %d\n", i, cptr->bfp_dtype.num_vsr[i]);
 		FFLUSH(cptr->clog);
-		for (j = 0; j < (cptr->bfp_reg_wt[i]); j++) {
+		for (j = 0; j < (cptr->bfp_dtype.num_vsr[i]); j++) {
 			while (cptr->vsx_reg[k] > 31 || (vsx_reg_used[k] == 1)) {
 				k++;
 				if ( k > (NUM_VSRS - 2)) {
-					sprintf(msg,"Using more than 31 registers for SCALAR: type: %d, bfp_reg_wt[%d]: %d, reg_num: %d\n", i, i, cptr->bfp_reg_wt[i], k);
+                    sprintf(msg,"Using more than 31 registers for SCALAR: type: %d, bfp_reg_wt[%d]: %d, reg_num: %d\n", i, i, cptr->bfp_dtype.num_vsr[i], k);
 					hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-					return(1);
+                    return (-1);
 				}
 			}
 
@@ -4842,163 +4916,160 @@ initialize_vsrs(int client_no)
 			     */
 			    sprintf(msg,"Using more than 31 registers for BFP");
 			    hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-			    return(1);
+                return (-1);
 			}
 			else {
-				tmp1->vsr_no = cptr->vsx_reg[k];
-				tmp2->vsr_no = cptr->vsx_reg[k];
-				DPRINT(cptr->clog,  "op type: %d vsr no: %d\n",i, tmp1->vsr_no);
+				node->vsr_no = cptr->vsx_reg[k];
+				node_vsx->vsr_no = cptr->vsx_reg[k];
+				DPRINT(cptr->clog,  "op type: %d vsr no: %d\n", i, node->vsr_no);
 				FFLUSH(cptr->clog);
 				vsx_reg_used[k] = 1;
 				k++;
-				if(i <= SCALAR_DP) {
-					prev1 = tmp1;
-					prev2 = tmp2;
-					tmp1 = tmp1->next;
-					tmp2 = tmp2->next;
-				}
+				prev = node;
+				prev_vsx = node_vsx;
+				node = node->next;
+				node_vsx = node_vsx->next;
 			}
 		}
-		sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->bfp_reg_wt[i];
-		DPRINT(cptr->clog, "%s: BFP: Initializing %d vsrs for %d data type \n",__FUNCTION__, cptr->bfp_reg_wt[i], i);
+		sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->bfp_dtype.num_vsr[i];
+		DPRINT(cptr->clog, "%s: BFP: Initializing %d vsrs for %d data type \n",__FUNCTION__, cptr->bfp_dtype.num_vsr[i], i);
 		FFLUSH(cptr->clog);
-		if (cptr->bfp_reg_wt[i] != 0) {
-			sdata->cdata_ptr[client_no]->vsrs[i].tail[BFP] = prev2;
-			/*
-			 * prev1 is pointing to the last valid node in the link list.
-			 */
-			prev_ary[i] = prev1;
+		if (cptr->bfp_dtype.num_vsr[i] != 0) {
+			sdata->cdata_ptr[client_no]->vsrs[i].tail[BFP] = prev;
+			prev_ary[i] = prev_vsx;
 		}
     }
 
+	/*******/
+	/* VMX */
+	/*******/
 	k=0;
 	for(i = VECTOR_SP; i <= QGPR; i++) {
-		if (i == VECTOR_DP)
-			continue;
-
-		tmp1 = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
-		tmp2 = sdata->cdata_ptr[client_no]->vsrs[i].head[VMX];
-
-		DPRINT(cptr->clog,"VMX_REG_WT[%d] = %d\n", i, cptr->vmx_reg_wt[i]);
-		FFLUSH(cptr->clog);
-		for (j = 0; j < (cptr->vmx_reg_wt[i]); j++) {
-			while (cptr->vsx_reg[k] < 32 || (vsx_reg_used[k] == 1)) {
-				k++;
-				if ( k > (NUM_VSRS - 2)) {
-					sprintf(msg,"Using more than 31 registers for VMX");
-					hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-					return(1);
-				}
-			}
-
-			if(vsx_reg_used[k] == 1 ) {
-	 			/*
-				 * Error Condition. If we are hitting this case means wrong weight has been assigned and
-				 * we end up using more than 32 registers for BFP instruction. This error needs flagging
-				 */
-				sprintf(msg,"Using more than 31 registers for VMX");
-				hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
-				return(1);
-			}
-			else {
-				tmp1->vsr_no = cptr->vsx_reg[k];
-				tmp2->vsr_no = cptr->vsx_reg[k];
-				DPRINT(cptr->clog,  "op type: %d vsr no: %d\n",i, tmp1->vsr_no);
+		switch (i) {
+			case VECTOR_SP:
+			case QGPR:	
+				node = sdata->cdata_ptr[client_no]->vsrs[i].head[VMX];
+				node_vsx = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
+				DPRINT(cptr->clog,"VMX_REG_WT[%d] = %d\n", i, cptr->vmx_dtype.num_vsr[i]);
 				FFLUSH(cptr->clog);
-				vsx_reg_used[k] = 1;
-				k++;
-				prev1 = tmp1;
-				prev2 = tmp2;
-				tmp1 = tmp1->next;
-				tmp2 = tmp2->next;
-			}
-		}
-		sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->vmx_reg_wt[i];
-		DPRINT(cptr->clog, "%s: VMX: Initializing %d vsrs for %d data type \n",__FUNCTION__, cptr->vmx_reg_wt[i], i);
-		FFLUSH(cptr->clog);
-		if (cptr->vmx_reg_wt[i] != 0) {
-			sdata->cdata_ptr[client_no]->vsrs[i].tail[VMX] = prev2;
-			/*
-			 * prev1 is pointing to the last valid node in the link list.
-			 */
-			prev_ary[i] = prev1;
+				for (j = 0; j < (cptr->vmx_dtype.num_vsr[i]); j++) {
+					while ((cptr->vsx_reg[k] < 32) || (vsx_reg_used[k] == 1)) {
+						k++;
+						if (k > (NUM_VSRS - 2)) {
+							sprintf(msg,"Using more than 31 registers for VMX");
+							hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+							return (-1);
+						}
+					}
+					if (vsx_reg_used[k] == 1) {
+                		/*
+                 	 	 * Error Condition. If we are hitting this case means wrong weight has been assigned and
+                 	 	 * we end up using more than 32 registers for BFP instruction. This error needs flagging
+                 	 	 */
+                		sprintf(msg,"Using more than 31 registers for VMX");
+                		hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg);
+                		return(-1);
+            		}
+            		else {
+						node->vsr_no = cptr->vsx_reg[k];
+						node_vsx->vsr_no = cptr->vsx_reg[k];
+						DPRINT(cptr->clog,  "op type: %d vsr no: %d\n", i, node->vsr_no);
+						FFLUSH(cptr->clog);
+						vsx_reg_used[k] = 1;
+						k++;
+						prev = node;
+						prev_vsx = node_vsx;
+						node = node->next;
+						node_vsx = node_vsx->next;
+					}
+				}
+				sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->vmx_dtype.num_vsr[i];
+				DPRINT(cptr->clog, "%s: VMX: Initializing %d vsrs for %d data type \n",__FUNCTION__, cptr->vmx_dtype.num_vsr[i], i);
+				FFLUSH(cptr->clog);
+				if (cptr->vmx_dtype.num_vsr[i] != 0) {
+					sdata->cdata_ptr[client_no]->vsrs[i].tail[VMX] = prev;
+					prev_ary[i] = prev_vsx;
+				}
 		}
 	}
 
-	/* For remaining list of VSX datatypes */
+	/*******/
+	/* VSX */
+	/*******/
 	k=0;
-	for(i = SCALAR_SP; i <= VECTOR_HP; i++) {
+	for (i = SCALAR_SP; i <= VECTOR_HP; i++) {
 		switch(i) {
-			case SCALAR_SP:
-			case SCALAR_DP:
-	    		/* This assignment is for SCALAR_SP n SCALAR_DP
-				 * We have to take care of these two datatypes
-				 * because they at shared between BFP n VSX.
-				 */
-				if(cptr->bfp_reg_wt[i] != 0) {
-					prev1 = prev_ary[i];
-					tmp1 = prev_ary[i]->next;
-				}
-				else {
-					prev1 = tmp1 = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
-				}
-				break;
+            case SCALAR_SP:
+            case SCALAR_DP:
+                /* This assignment is for SCALAR_SP n SCALAR_DP
+                 * We have to take care of these two datatypes
+                 * because they at shared between BFP n VSX.
+                 */
+                if((cptr->bfp_dtype.num_vsr[i] != 0) && (prev_ary[i] != NULL)) {
+                    prev = prev_ary[i];
+                    node = prev_ary[i]->next;
+                }
+                else {
+                    prev = node = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
+                }
+                break;
+            case VECTOR_SP:
+            case QGPR:
+                /* This assignment is for VECTOR_SP and QGPR
+                 * We have to take care of these two datatypes
+                 * because they at shared between VSX and VMX.
+                 */
+                if((cptr->vmx_dtype.num_vsr[i] != 0) && (prev_ary[i] != NULL)) {
+                    prev = prev_ary[i];
+                    node = prev_ary[i]->next;
+                }
+                else {
+                    prev = node = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
+                }
+                break;
 
-			case VECTOR_SP:
-			case QGPR:
-	    		/* This assignment is for VECTOR_SP and QGPR
-				 * We have to take care of these two datatypes
-				 * because they at shared between VSX and VMX.
-				 */
-				if(cptr->vmx_reg_wt[i] != 0) {
-					prev1 = prev_ary[i];
-					tmp1 = prev_ary[i]->next;
-				}
-				else {
-					prev1 = tmp1 = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
-				}
-				break;
+            default:
+                /* This is for rest of datatypes */
+                prev = node = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
+        }
 
-			default:
-				/* This is for rest of datatypes */
-				prev1 = tmp1 = sdata->cdata_ptr[client_no]->vsrs[i].head[VSX];
-		}
-
-		DPRINT(cptr->clog,"VSX_REG_WT[%d] = %d\n", i, cptr->vsr_reg_wt[i]);
+		DPRINT(cptr->clog,"VSX_REG_WT[%d] = %d\n", i, cptr->vsx_dtype.num_vsr[i]);
 		FFLUSH(cptr->clog);
-		for(j = 0; j < cptr->vsr_reg_wt[i]; j++) {
-			while (vsx_reg_used[k] == 1) {
+		for(j = 0; j < cptr->vsx_dtype.num_vsr[i]; j++) {
+			while ((vsx_reg_used[k] == 1)) {
 				k++;
-				if ( k > 62 ) {
+				if (k > (NUM_VSRS - 2)) {
 					/*
 					 * Error Condition. If we are hitting this case means wrong weight has been assigned and
 					 * we end up using more than 32 registers for BFP instruction. This error needs flagging
 					 */
 					sprintf(msg, "VSX: Using more than 62 VSRs, type = %d, reg_wt = %d, reg_num = %d\n", i, j, k);
 			    	hxfmsg(&hd, -1, HTX_HE_HARD_ERROR, msg); 
-			    	return(1);
+			    	return(-1);
 				}
 			}
-			tmp1->vsr_no = cptr->vsx_reg[k];
-
-			DPRINT(cptr->clog,  "op type: %d vsr no: %d\n",i, tmp1->vsr_no);
+			/*if ((cptr->vsx_reg[k] < 32) && (vsx_reg_used[k + 32] == 1)) {
+				k++;
+				continue;
+			}*/
+			node->vsr_no = cptr->vsx_reg[k];
+			DPRINT(cptr->clog, "op type: %d vsr no: %d\n", i, node->vsr_no);
 			FFLUSH(cptr->clog);
 			vsx_reg_used[k] = 1;
 			k++;
-			prev1 = tmp1;
-			tmp1 = tmp1->next;
+			prev = node;
+			node = node->next;
 		}
 		if(i == SCALAR_SP || i == SCALAR_DP || i == VECTOR_SP || i == QGPR) {
-			sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs += cptr->vsr_reg_wt[i];
-			DPRINT(cptr->clog, "%s: VSX: Initializing %d vsrs for %d data type \n",__FUNCTION__, sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs, i);
-			FFLUSH(cptr->clog);
+			sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs += cptr->vsx_dtype.num_vsr[i];
+		} else {
+			sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->vsx_dtype.num_vsr[i];
 		}
-		else {
-			sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = cptr->vsr_reg_wt[i];
-			DPRINT(cptr->clog, "%s: VSX: Initializing %d vsrs for %d data type \n",__FUNCTION__, sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs, i);
-		}
-		sdata->cdata_ptr[client_no]->vsrs[i].tail[VSX] = prev1;
+		DPRINT(cptr->clog, "%s: VSX: Initializing %d vsrs for %d data type \n",__FUNCTION__, sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs, i);
+		FFLUSH(cptr->clog);
+		sdata->cdata_ptr[client_no]->vsrs[i].tail[VSX] = prev;
 	}
+
 	return(0);
 }
 
@@ -5230,6 +5301,10 @@ build_testcase(uint32 client_no)
 				class_vsx_store_gen(client_no, random_no, ins, index);
 				break;
 
+			case CLASS_VSX_STORE_SIMD:
+				class_vsx_stxvll_gen(client_no, random_no, ins, index);
+				break;
+
 			case CLASS_VSX_TEST_INS:
 				class_vsx_test_ins_gen(client_no, random_no, ins, index);
 				break;
@@ -5347,7 +5422,9 @@ build_testcase(uint32 client_no)
 			case CLASS_VMX_STORE:
 				class_vmx_store_gen(client_no, random_no, ins, index);
 				break;
-
+			case CLASS_VMX_BCD:
+				class_vmx_bcd_gen(client_no, random_no, ins, index);
+				break;
 			case CLASS_VMX_NORMAL:
 			case CLASS_VMX_NORMAL_3INPUTS:
 				class_vmx_normal_gen(client_no, random_no, ins, index);
@@ -5483,14 +5560,16 @@ build_testcase(uint32 client_no)
 			case CLASS_SHL:
 				class_cpu_shl_gen(client_no, random_no, ins, index);
 				break;
-#ifndef SCTU
 			case CLASS_CPU_LOAD_ATOMIC:
+#ifndef SCTU
 				class_cpu_load_atomic_gen(client_no, random_no, ins, index);
+#endif
 				break;
 			case CLASS_CPU_STORE_ATOMIC:
+#ifndef SCTU
 				class_cpu_store_atomic_gen(client_no, random_no, ins, index);
-				break;
 #endif
+				break;
 			case CLASS_CPU_LOAD_RELATIVE:
 				class_cpu_load_relative_gen(client_no, random_no, ins, index);
 				break;
@@ -8313,6 +8392,142 @@ set_ins_bias_array(int cno)
 	}
 }
 
+int distribute_vsrs(int cno)
+{
+	int low_32_vsrs = 31; /* VSR# 0 not counted */
+	int i, remaining_vsrs = 0;
+	int num_vsr_vsx = 0, num_vsr_bfp = 0, num_vsr_dfp = 0, num_vsr_vmx = 0;
+	uint64 cat_mask = 0;
+	int enabled_category[4] = {0, 0, 0, 0};
+	int enabled_optype[VSR_OP_TYPES];
+
+	struct server_data *sdata = &global_sdata[INITIAL_BUF];
+	struct client_data *cptr = sdata->cdata_ptr[cno];
+
+	struct enabled_instruction *instr = cptr->enabled_ins_table;
+	int num_instr = cptr->num_enabled_ins;
+
+	/* For each instruction category go through the enabled instructions table
+	 * and assign weight on their data types used
+	 */
+	memset(&cptr->vsx_dtype, 0, sizeof(dtype_info_t));
+	memset(&cptr->bfp_dtype, 0, sizeof(dtype_info_t));
+	memset(&cptr->dfp_dtype, 0, sizeof(dtype_info_t));
+	memset(&cptr->vmx_dtype, 0, sizeof(dtype_info_t));
+
+	/* Marking all enabled op data types and 
+	 * all enabled instruction categories 
+  	 */
+	for (i = 0; i < num_instr; i++) {
+		cat_mask = instr[i].instr_table.ins_cat_mask & INS_CAT;
+		cat_mask = cat_mask >> 56;
+		enabled_category[cat_mask - 1] = 1; /* Mask values ranges from 1 (VSX) to 4 (VMX)*/
+		enabled_optype[instr[i].instr_table.tgt_dtype] = 1;
+		enabled_optype[instr[i].instr_table.op1_dtype] = 1;
+		enabled_optype[instr[i].instr_table.op2_dtype] = 1;
+		enabled_optype[instr[i].instr_table.op3_dtype] = 1;
+	}
+	enabled_optype[DUMMY] = 0;
+	enabled_optype[CR_T]  = 0;
+	enabled_optype[GR]    = 0;
+	enabled_optype[GRU]   = 0;
+
+	
+	/* if any of BFP, DFP enabled they should use lower 32 vsrs
+	 * distribute 31 vsrs count wise equally among enabled instruction categores
+	 * VSX and VMX should always use higer than 32 VSRs
+	 * Do not count VSr# 0 in assignment
+	 */
+	if (enabled_category[BFP] || enabled_category[DFP]) {
+		while (low_32_vsrs > 0) {
+			if (enabled_category[DFP]) {
+				num_vsr_dfp += 1;
+				low_32_vsrs--;
+			}
+			if (enabled_category[BFP] && (low_32_vsrs > 0)) {
+				num_vsr_bfp += 1; 
+				low_32_vsrs--;
+			}
+		}
+	}
+
+	remaining_vsrs = (NUM_VSRS - 1) - (num_vsr_bfp + num_vsr_dfp);
+
+	if (enabled_category[VMX] && enabled_category[VSX]) {
+		num_vsr_vmx = remaining_vsrs / 3;
+		num_vsr_vsx = (remaining_vsrs - num_vsr_vmx);
+	}
+	else if (enabled_category[VSX] && !enabled_category[VMX]) {
+			num_vsr_vsx = remaining_vsrs;
+	}
+	else if (!enabled_category[VSX] && enabled_category[VMX]) {
+			num_vsr_vmx = 32; /* only upper 32 VSRs to be used by VMX */
+	}
+
+
+	/* calculate no of vsrs, per dtype and category */
+
+	/* VSX */
+	/*printf("---------VSX: %d---------------\n", num_vsr_vsx);*/
+	while (num_vsr_vsx > 0) {
+		for (i = SCALAR_SP; i <= VECTOR_HP; i++) {
+			if ((enabled_optype[i] != 0) && (num_vsr_vsx > 0)) {
+				cptr->vsx_dtype.num_vsr[i] += 1;
+				num_vsr_vsx--;
+			}
+			/*printf("vsx_dtype.num_vsr[%d] = %d, num_vsr_vsx: %d\n", i, cptr->vsx_dtype.num_vsr[i], num_vsr_vsx);*/
+		}
+	}
+
+	/* BFP */
+	/*printf("---------BFP: %d---------------\n", num_vsr_bfp);*/
+	while (num_vsr_bfp > 0) {
+		for (i = BFP_SP; i <= BFP_QP; i++) {
+			switch (i) {
+				case BFP_SP:
+				case BFP_DP:
+				case BFP_QP:
+				if ((enabled_optype[i] != 0) && (num_vsr_bfp > 0)) {
+					cptr->bfp_dtype.num_vsr[i] += 1;
+					num_vsr_bfp--;
+				}
+				/*printf("bfp_dtype.num_vsr[%d] = %d, num_vsr_bfp: %d\n", i, cptr->bfp_dtype.num_vsr[i], num_vsr_bfp);*/
+			}
+		}
+	}
+
+	/* DFP */
+	/*printf("---------DFP: %d---------------\n", num_vsr_dfp);*/
+	while (num_vsr_dfp > 0) {
+		for (i = DFP_SHORT; i <= DFP_QUAD; i++) {
+			if ((enabled_optype[i] != 0) && (num_vsr_dfp > 0)) {
+				cptr->dfp_dtype.num_vsr[i] += 1;
+				num_vsr_dfp--;
+			}
+			/*printf("dfp_dtype.num_vsr[%d] = %d, num_vsr_dfp: %d\n", i, cptr->dfp_dtype.num_vsr[i], num_vsr_dfp);*/
+		}
+	}
+
+	/* VMX */
+	/*printf("---------VMX: %d---------------\n", num_vsr_vmx);*/
+	while (num_vsr_vmx > 0) {
+		for (i = VECTOR_SP; i <= QGPR; i++) {
+			switch (i) {
+				case VECTOR_SP:
+				case QGPR:
+					if ((enabled_optype[i] != 0) && (num_vsr_vmx > 0)) {
+						cptr->vmx_dtype.num_vsr[i] += 1;
+						num_vsr_vmx--;
+					}
+					/*printf("vmx_dtype.num_vsr[%d] = %d, num_vsr_vmx: %d\n", i, cptr->vmx_dtype.num_vsr[i], num_vsr_vmx);*/
+			}
+		}
+	}
+
+	return (0);
+}
+
+#if 0
 int distribute_vsrs_based_on_ins_bias(int cno)
 {
 	struct server_data *sdata = &global_sdata[INITIAL_BUF];
@@ -8324,7 +8539,7 @@ int distribute_vsrs_based_on_ins_bias(int cno)
 	int extra_regs, extra_per_op;
 	uint32 i, j, alloted_vsrs = 0, reg_31, reg_63;
 	uint64 vsx_ins_masks_array[VSR_OP_TYPES], bfp_ins_masks_array[BFP_OP_TYPES], vmx_ins_masks_array[VMX_OP_TYPES];
-	uint64 cpu_ins_masks_array;  									/* only cpu instructions  which act on GPRs*/
+	/*uint64 cpu_ins_masks_array;  									* only cpu instructions  which act on GPRs*/
 
 	bfp_ins_masks_array[BFP_SP] =  BFP_SP_ALL;
 	bfp_ins_masks_array[BFP_DP] =  BFP_DP_ALL;
@@ -8343,7 +8558,7 @@ int distribute_vsrs_based_on_ins_bias(int cno)
 	vmx_ins_masks_array[VECTOR_SP] = VMX_FP_ALL;
 	vmx_ins_masks_array[QGPR]      = VMX_INT_ALL | VMX_MISC_ONLY | VMX_DFP_ARITHMETIC | P9_VMX_DFP_ARITHMETIC;
 
-	cpu_ins_masks_array		= CPU_ALL;
+	/*cpu_ins_masks_array		= CPU_ALL;*/
 
 	DPRINT(cptr->clog, "\n**********Entry: %s: for Client: %d**********\n", __FUNCTION__, cno);
 
@@ -8355,8 +8570,8 @@ int distribute_vsrs_based_on_ins_bias(int cno)
 	}
 
 	bzero(cptr->vsr_reg_wt, sizeof(cptr->vsr_reg_wt));
-	bzero(cptr->bfp_reg_wt, sizeof(cptr->vsr_reg_wt));
-	bzero(cptr->vmx_reg_wt, sizeof(cptr->vsr_reg_wt));
+	bzero(cptr->bfp_reg_wt, sizeof(cptr->bfp_reg_wt));
+	bzero(cptr->vmx_reg_wt, sizeof(cptr->vmx_reg_wt));
 
 	for ( j=0; j<INS_TYPES; j++ ) {
 		total_cat_wt[j]=0;
@@ -8587,6 +8802,7 @@ int distribute_vsrs_based_on_ins_bias(int cno)
 	DPRINT(cptr->clog, "\n**********Exit: %s: for Client: %d**********\n", __FUNCTION__, cno);
 	return(0);
 }
+#endif
 
 int
 create_ins_cat_wise_tables(int cno)
@@ -9127,6 +9343,7 @@ void * sighandler_thread(void *arg)
 }
 
 
+#ifdef SCTU
 int copy_common_data(int pass, int cno)
 {
 	char *from_ptr, *to_ptr /*,i*/;
@@ -9139,15 +9356,12 @@ int copy_common_data(int pass, int cno)
 	/*
 	 * Copy common data
 	 */
-#ifdef SCTU
 	from_ptr = (char *)i_buf->common_data_ptr->ls_ptr;
 	to_ptr = (char *)pass_buf->common_data_ptr->ls_ptr;
 	memcpy(to_ptr, from_ptr, 2*MAX_INS_STREAM_DEPTH*16);
-#endif
 	return (0);
 }
 
-#ifdef SCTU
 /* last sctu client should dump testcase for all clients */
 /* this is done to avoid adding extra synchronization for all threads to be stopped/synced */
 /* so that some clients don't move to next num oper when others are dumping their testcase */
@@ -9481,17 +9695,17 @@ int node_testcase(void)
 	}
 
 
-	for ( node = 0; node < MAX_NODES && node < Sys_stat.nodes && stop_cond == 0; node++ ) {
-		for ( thread = 0; thread < MAX_CPUS_PER_CORE && thread < Sys_stat.cpus && stop_cond == 0; thread++ ) {
-			for ( core = 0; core < MAX_CORES_PER_CHIP && core < Sys_stat.cores && stop_cond == 0; core++ ) {
-				for ( chip = 0; chip < MAX_CHIPS_PER_NODE && chip < Sys_stat.chips && stop_cond == 0; chip++ ) {
+	for (node = 0; (node < MAX_NODES) && (node < Sys_stat.nodes) && (stop_cond == 0); node++) {
+		for (thread = 0; (thread < MAX_CPUS_PER_CORE) && (thread < Sys_stat.cpus) && (stop_cond == 0); thread++) {
+			for (core = 0; (core < MAX_CORES_PER_CHIP) && (core < Sys_stat.cores) && (stop_cond == 0); core++) {
+				for (chip = 0; (chip < MAX_CHIPS_PER_NODE) && (chip < Sys_stat.chips) && (stop_cond == 0); chip++ ) {
 					if ( cpu_index >= Sys_stat.cpus ) {
 						stop_cond = 1;
 					}
 						/* printf("node=%d, chip=%d, core=%d, th=%d, sctu_server_num=%d, server_cpu_index=%d, cpu_index=%d, cpu=%d\n", 
 						node, chip, core, thread, sctu_server_num, server_cpu_index, cpu_index,
 						global_ptr->syscfg.node[node].chip[chip].core[core].lprocs[thread]); */
-					if ( global_ptr->syscfg.node[node].chip[chip].core[core].lprocs[thread] != -1 ) {
+					if (global_ptr->syscfg.node[node].chip[chip].core[core].lprocs[thread] != -1 ) {
 						sctu_server[sctu_server_num][server_cpu_index] = global_ptr->syscfg.node[node].chip[chip].core[core].lprocs[thread];
 						sctu_server_size[sctu_server_num] = server_cpu_index;
 						server_cpu_index++;
@@ -9584,7 +9798,10 @@ int init_sctu_cpu_array(void)
  */
 void set_sctu_gang_size(void)
 {
-	if ( shifted_pvr_hw >= 0x4e ) { /* P9 n above */
+	int local_pvr = get_cpu_version();
+	local_pvr >>= 16;
+	local_pvr &= 0xffff;
+	if ( local_pvr >= 0x4e ) { /* P9 n above */
 		sctu_gang_size = SCTU_GANG_P9;
 	}
 	else {

@@ -1,7 +1,7 @@
 include ../../../htx.mk
 
 TARGET= \
-	default.p6 \
+        default.p6 \
         default.p7 \
         default.p8 \
         default.p9 \
@@ -24,8 +24,15 @@ TARGET= \
         rules.vsx.vmx \
         rules.multi \
         rules.hpc_comp_node \
-	fpu_cpu_combo.p8 \
-	fpu_cpu_combo.p9 \
+        fpu_cpu_combo.p8 \
+        fpu_cpu_combo.p9 \
+        dfu_p9 \
+        flush_p9 \
+        fp_stress_p9 \
+        mix_cover_p9 \
+        pm_p9 \
+        thermal_p9 \
+        vsu_p9 \
         hxefpu64.readme
 
 .PHONY: all clean

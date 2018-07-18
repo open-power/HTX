@@ -3,10 +3,10 @@
 * 50% load/store of VMX+VSX+BFP+DFP and 50% rest all. Only norm data.
 
 rule_id				sao1
-num_oper			200
+num_oper			1000
 seed				[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
 stream_depth			2000
-test_method			2
+test_method			1
 unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
 fpscr				[0,0,0,0,0,0,0,0]
 prot_sao			1
@@ -17,10 +17,10 @@ ins_bias_mask			[(0x010000180000f003,10)(0x020000000000003f,10)(0x03000000180000
 * 50% load/store of VMX+VSX+BFP+DFP and 50% rest all. Only de-norm data.
 
 rule_id				sao2
-num_oper			200
+num_oper			1000
 seed				[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
 stream_depth			2000
-test_method			2
+test_method			1
 unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
 fpscr				[0,0,0,0,0,0,0,0]
 prot_sao			1
@@ -31,10 +31,10 @@ ins_bias_mask			[(0x010000180000f003,10)(0x020000000000003f,10)(0x03000000180000
 * 50% load/store of VMX+VSX+BFP+DFP and 50% rest all. Only norm and de-norm data.
 
 rule_id				sao3
-num_oper			200
+num_oper			1000
 seed				[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
 stream_depth			2000
-test_method			2
+test_method			1
 unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
 fpscr				[0,0,0,0,0,0,0,0]
 prot_sao			1

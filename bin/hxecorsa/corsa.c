@@ -23,7 +23,6 @@
 #include <strings.h>
 #include <sys/shm.h>
 #include <sys/types.h>
-#include "hxihtx64.h"
 
 #ifdef __HTX_LINUX__
 #include "genwqe_card.h"
@@ -1877,35 +1876,34 @@ th_context * corsa_get_buffer(int no_buf, int buf_size, int alignment)
 	}
 
 
-	/* Same exerciser is used for both PCIe Gzip corsa(A5)  and CAPI Gzip corsa(A7).
-	 * CAPI corsa only supports compression/decompression and hence FD is not required as
-	 * there are no IOCTLs to eb performed. 
-	 * So, if the device name has cxl (CAPI corsa) then dont open() the device. 
+	/* Open Corsa device (as I/O) and save fd, to be used in ioctl() for execution.
+	 * Also handle EEH.
 	 */
-
-	if ( strncmp(&(stats.sdev_id[5]), "genwqe", 6) == 0 ) { /* PCIe Corsa */
-
-		/* Open Corsa device (as I/O) and save fd, to be used in ioctl() for execution.
-		 * Also handle EEH.
+	temp_retries = eeh_retries;
+	while ( temp_retries > 0 ) {
+	#ifndef __HTX_LINUX__
+		node->corsa_fd = open(stats.sdev_id, O_RDONLY, S_IRUSR /*ignored by corsa*/);
+	#else
+		/* Same exerciser is used for both PCIe Gzip corsa(A5)  and CAPI Gzip corsa(A7).
+		 * CAPI corsa only supports compression/decompression and hence FD is not required as
+		 * there are no IOCTLs to eb performed. 
+		 * So, if the device name has cxl (CAPI corsa) then dont open() the device. 
 		 */
-		temp_retries = eeh_retries;
-		while ( temp_retries > 0 ) {
-		#ifndef __HTX_LINUX__
-			node->corsa_fd = open(stats.sdev_id, O_RDONLY, S_IRUSR /*ignored by corsa*/);
-		#else
-			node->corsa_fd = open(stats.sdev_id, O_RDWR);
-		#endif
-			if ( node->corsa_fd != -1 )
-				break;
 
-			temp_retries--;
-			sleep(EEH_SLEEP);
+		if ( strncmp(&(stats.sdev_id[5]), "genwqe", 6) == 0 ) { /* PCIe Corsa */
+			node->corsa_fd = open(stats.sdev_id, O_RDWR);
 		}
-		if ( node->corsa_fd == -1 ) {
-			sprintf(info_msg,"%s[%d]:open() failed for %s with %d(%s).\nCan not run on hardware. Testing can be done using standard zlib in software.",
-			__FUNCTION__, __LINE__, stats.sdev_id, errno, strerror(errno));
-			hxfmsg(&stats, 1, HTX_HE_SOFT_ERROR, info_msg);
-		}
+	#endif
+		if ( node->corsa_fd != -1 )
+			break;
+
+		temp_retries--;
+		sleep(EEH_SLEEP);
+	}
+	if ( node->corsa_fd == -1 ) {
+		sprintf(info_msg,"%s[%d]:open() failed for %s with %d(%s).\nCan not run on hardware. Testing can be done using standard zlib in software.",
+		__FUNCTION__, __LINE__, stats.sdev_id, errno, strerror(errno));
+		hxfmsg(&stats, 1, HTX_HE_SOFT_ERROR, info_msg);
 	}
 
 

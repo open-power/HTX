@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/*static char sccsid[] = "%Z%%M%	%I%  %W% %G% %U%";*/
 
 #include "framework.h"
 
@@ -126,7 +125,7 @@ struct instruction_masks vsx_instructions_array[] = {
 /* xvnmsubmsp */{0xF00006C8, F_XVMADDSUB,VECTOR_SP, 16, VECTOR_SP, 11, VECTOR_SP, 21, VECTOR_SP, 21, 0x3,  "xvnmsubmsp", (sim_fptr)&simulate_xvnmsubmsp, VSX_VECTOR_SP_FP_MUL_ADD_ONLY, FORM_XX3_XT_XA_XB},
 
 /* VSX  Scalar Floating-Point Comparison Instructions */
-/* xscmpodp */	{0xF0000158, F_XSCMP,SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, CR_T, 23, 0x4,  "xscmpodp", (sim_fptr)&simulate_xscmpodp, VSX_SCALAR_DP_FP_COMP_ONLY, FORM_XX3_BF_XA_XB},
+/* xscmpodp */	{0xF0000158, F_XSCMP,SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, CR_T, 23, 0x4,  "xscmpodp", (sim_fptr)&simulate_xscmpodp, VSX_SCALAR_DP_FP_COMP_ONLY | HW_ONLY, FORM_XX3_BF_XA_XB},
 /* Following is an old way of randomizing CR field in instruction coding. New way is to use CR_T.*/
 #if 0
 
@@ -139,7 +138,7 @@ struct instruction_masks vsx_instructions_array[] = {
 			{0xF3800158, 0,SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, DUMMY, DUMMY, 0x0,  "xscmpodp",  NULL, VSX_SCALAR_DP_FP_COMP_ONLY, FORM_XX3_BF_XA_XB},
 #endif
 
-/* xscmpudp */	{0xF0000118, F_XSCMP,SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, CR_T, 23, 0x4,  "xscmpudp",  (sim_fptr)&simulate_xscmpudp, VSX_SCALAR_DP_FP_COMP_ONLY, FORM_XX3_BF_XA_XB},
+/* xscmpudp */	{0xF0000118, F_XSCMP,SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, CR_T, 23, 0x4,  "xscmpudp",  (sim_fptr)&simulate_xscmpudp, VSX_SCALAR_DP_FP_COMP_ONLY | HW_ONLY, FORM_XX3_BF_XA_XB},
 /* Following is an old way of randomizing CR field in instruction coding. New way is to use CR_T.*/
 #if 0
 			{0xF0800118, 0,SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, DUMMY, DUMMY, 0x0,  "xscmpudp",  NULL, VSX_SCALAR_DP_FP_COMP_ONLY, FORM_XX3_BF_XA_XB},
@@ -325,13 +324,13 @@ struct instruction_masks vsx_p8_instructions_array[] = {
 struct instruction_masks vsx_p9_instructions_array[] = {
 /* RFC02462 - Decimal integer support operation */
 /* lxvll	*/	{0x7C00025A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvll",	(sim_fptr)&simulate_lxvll, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* stxvll	*/	{0x7C00035A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvll",	(sim_fptr)&simulate_stxvll,VSX_VECTOR_LENGTH_STORE_ONLY,FORM_XX1_XT_RA_RB},
+/* stxvll	*/	{0x7C00035A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0xb, "stxvll",	(sim_fptr)&simulate_stxvll, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
 
 /* VSX half precision - RFC02468 */
-/* xscvhpdp	*/	{0xF010056C, 0, DUMMY, DUMMY, SCALAR_HP, 11, DUMMY, DUMMY, SCALAR_HP, 21, 0x0, "xscvhpdp", (sim_fptr)&simulate_xscvhpdp, VSX_SCALAR_CONV_HP_DP_ONLY, FORM_XX2_XT_XB},
-/* xscvdphp */	{0xF011056C, 0, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_HP, 21, 0x0, "xscvdphp", (sim_fptr)&simulate_xscvdphp, VSX_SCALAR_CONV_HP_DP_ONLY, FORM_XX2_XT_XB},
-/* xvcvhpsp	*/	{0xF018076C, 0, DUMMY, DUMMY, VECTOR_HP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0, "xvcvhpsp", (sim_fptr)&simulate_xvcvhpsp, VSX_VECTOR_CONV_HP_SP_ONLY, FORM_XX2_XT_XB},
-/* xvcvsphp */	{0xF019076C, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_HP, 21, 0x0, "xvcvsphp", (sim_fptr)&simulate_xvcvsphp, VSX_VECTOR_CONV_HP_SP_ONLY, FORM_XX2_XT_XB},
+/* xscvhpdp	*/	{0xF010056C, 0, DUMMY, DUMMY, SCALAR_HP, 11, DUMMY, DUMMY, SCALAR_HP, 21, 0x0, "xscvhpdp", (sim_fptr)&simulate_xscvhpdp, VSX_SCALAR_CONV_HP_DP_ONLY | HW_ONLY, FORM_XX2_XT_XB},
+/* xscvdphp */	{0xF011056C, 0, DUMMY, DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, SCALAR_HP, 21, 0x0, "xscvdphp", (sim_fptr)&simulate_xscvdphp, VSX_SCALAR_CONV_HP_DP_ONLY | HW_ONLY, FORM_XX2_XT_XB},
+/* xvcvhpsp	*/	{0xF018076C, (FPS_FX | FPS_VXSNAN), DUMMY, DUMMY, VECTOR_HP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0, "xvcvhpsp", (sim_fptr)&simulate_xvcvhpsp, VSX_VECTOR_CONV_HP_SP_ONLY | HW_ONLY, FORM_XX2_XT_XB},
+/* xvcvsphp */	{0xF019076C, 0, DUMMY, DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_HP, 21, 0x0, "xvcvsphp", (sim_fptr)&simulate_xvcvsphp, VSX_VECTOR_CONV_HP_SP_ONLY | HW_ONLY, FORM_XX2_XT_XB},
 
 /* 2496   - VSX Permute instructions */
 /* xxperm */  {0xF00000D0, 0, QGPR, 16, QGPR, 11, DUMMY, DUMMY, QGPR, 21, 0x0,  "xxperm",  (sim_fptr)&simulate_xxperm, P9_VSX_MISC_ONLY, FORM_XX3_XT_XA_XB},
@@ -339,8 +338,8 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 
 /* RFC02467.r10: String Operations (VSU Option) */ 
 /************************************************/
-/* lxvl	*/	{0x7C00021A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvl",	(sim_fptr)&simulate_lxvll, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* stxvl*/	{0x7C00031A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvl",	(sim_fptr)&simulate_stxvll, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
+/* lxvl	*/	{0x7C00021A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvl",	(sim_fptr)&simulate_lxvl, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
+/* stxvl*/	{0x7C00031A, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvl",	(sim_fptr)&simulate_stxvl, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
 /* RFC02470 128-bit SIMD FXU Operations */
 /************************************************/
 /* lxsibzx */{0x7C00061A, 0, GR, 16, GR, 11, DUMMY, DUMMY, SCALAR_DP, 21, 0x1, "lxsibzx",(sim_fptr)&simulate_lxsibzx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
@@ -354,7 +353,7 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 /* lxvx 	*/{0x7C000218, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvx",(sim_fptr)&simulate_lxvx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
 /* lxvx {0x7C000258, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvx",(sim_fptr)&simulate_lxvx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},*/
 /* lxvwsx */{0x7C0002D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x1, "lxvwsx",(sim_fptr)&simulate_lxvwsx, VSX_VECTOR_LENGTH_LOAD_ONLY, FORM_XX1_XT_RA_RB},
-/* mfvsrld*/{0x7C000266, 0, VECTOR_DP, 21, DUMMY, DUMMY, DUMMY, DUMMY, GR, 16, 0x7, "mfvsrld",(sim_fptr)&simulate_mfvsrld, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA},
+/* mfvsrld*/{0x7C000266, 0, VECTOR_DP, 21, DUMMY, DUMMY, DUMMY, DUMMY, GR, 16, 0x7, "mfvsrld",(sim_fptr)&simulate_mfvsrld, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_RA_XS},
 /* mtvsrdd */{0x7C000366, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x7, "mtvsrdd",(sim_fptr)&simulate_mtvsrdd, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA_RB},
 /* mtvsrws*/{0x7C000326, 0, GR, 16, DUMMY, DUMMY, DUMMY, DUMMY, VECTOR_DP, 21, 0x7, "mtvsrws",(sim_fptr)&simulate_mtvsrws, P9_VSX_SCALAR_DP_MOVE_ONLY, FORM_XX1_XT_RA},
 /* stxvb16x*/{0x7C0007D8, 0, GR, 16, GR, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x2, "stxvb16x",(sim_fptr)&simulate_stxvb16x, VSX_VECTOR_LENGTH_STORE_ONLY, FORM_XX1_XT_RA_RB},
@@ -369,10 +368,10 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 /* xxspltib*/{0xF00002D0, 0, IMM_DATA_8BIT, 11, DUMMY, DUMMY, DUMMY, DUMMY, VECTOR_DP, 21, 0x8, "xxspltib",(sim_fptr)&simulate_xxspltib, P9_VSX_MISC_ONLY, FORM_XX1_IMM8},
 /* RFC 2464 - Binary Floating-Point Support Operations */
 /***********using VSX instructions for BFP **************************/
-/* xscmpexpdp */ {0xF00001D8, 0, SCALAR_DP,     16,    SCALAR_DP, 11, DUMMY, DUMMY, CR_T,      23, 0x4,  "xscmpexpdp", (sim_fptr)&simulate_xscmpexpdp, VSX_SCALAR_DP_FP_COMP_ONLY, FORM_XX3_BF_XA_XB},
+/* xscmpexpdp */ {0xF00001D8, 0, SCALAR_DP, 16, SCALAR_DP, 11, DUMMY, DUMMY, CR_T,      23, 0x4, "xscmpexpdp", (sim_fptr)&simulate_xscmpexpdp, VSX_SCALAR_DP_FP_COMP_ONLY | HW_ONLY, FORM_XX3_BF_XA_XB},
 /* xsiexpdp */   {0xF000072C, 0, GR,            16,    GR,        11, DUMMY, DUMMY, SCALAR_DP, 21, 0x7,  "xsiexpdp",   (sim_fptr)&simulate_xsiexpdp,   P9_VSX_SCALAR_DP_MOVE_ONLY,           FORM_XX1_XT_RA_RB},
-/* xststdcdp */  {0xF00005A8, 0, IMM_DATA_7BIT, 16,    SCALAR_DP, 11, DUMMY, DUMMY, CR_T,      23, 0x4,  "xststdcdp",  (sim_fptr)&simulate_xststdcdp,  P9_VSX_MISC_ONLY,           X_FORM_BF_DCMX_vrb_eop_rc},
-/* xststdcsp */  {0xF00004A8, 0, IMM_DATA_7BIT, 16,    SCALAR_SP, 11, DUMMY, DUMMY, CR_T,      23, 0x4,  "xststdcsp",  (sim_fptr)&simulate_xststdcsp,  P9_VSX_MISC_ONLY,           X_FORM_BF_DCMX_vrb_eop_rc},
+/* xststdcdp */  {0xF00005A8, FPS_FPCC, IMM_DATA_7BIT, 16, SCALAR_DP, 11, DUMMY, DUMMY, CR_T,      23, 0x4,  "xststdcdp",  (sim_fptr)&simulate_xststdcdp,  P9_VSX_MISC_ONLY,  X_FORM_BF_DCMX_vrb_eop_rc},
+/* xststdcsp */  {0xF00004A8, FPS_FPCC, IMM_DATA_7BIT, 16, SCALAR_SP, 11, DUMMY, DUMMY, CR_T,  23, 0x4,  "xststdcsp",  (sim_fptr)&simulate_xststdcsp,  P9_VSX_MISC_ONLY,  X_FORM_BF_DCMX_vrb_eop_rc},
 /* xsxexpdp */   {0xF000056C, 0, DUMMY,         DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, GR,        21, 0x7,  "xsxexpdp",   (sim_fptr)&simulate_xsxexpdp,   P9_VSX_SCALAR_DP_MOVE_ONLY,           FORM_XX2_XT_UIM4_XB},
 /* xsxsigdp */   {0xF001056C, 0, DUMMY,         DUMMY, SCALAR_DP, 11, DUMMY, DUMMY, GR,        21, 0x7,  "xsxsigdp",   (sim_fptr)&simulate_xsxsigdp,   P9_VSX_SCALAR_DP_MOVE_ONLY,           FORM_XX2_XT_UIM4_XB},
 /* xviexpdp */   {0xF00007C0, 0, VECTOR_DP,     16,    VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xviexpdp",   (sim_fptr)&simulate_xviexpdp,   P9_VSX_SCALAR_DP_MOVE_ONLY,           FORM_XX3_XT_XA_XB},
@@ -384,12 +383,12 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 /* xvxsigdp */   {0xF001076C, 0, DUMMY,         DUMMY, VECTOR_DP, 11, DUMMY, DUMMY, VECTOR_DP, 21, 0x0,  "xvxsigdp",   (sim_fptr)&simulate_xvxsigdp,   P9_VSX_MISC_ONLY,           FORM_XX2_XT_XB},
 /* xvxsigsp */   {0xF009076C, 0, DUMMY,         DUMMY, VECTOR_SP, 11, DUMMY, DUMMY, VECTOR_SP, 21, 0x0,  "xvxsigsp",   (sim_fptr)&simulate_xvxsigsp,   P9_VSX_MISC_ONLY,           FORM_XX2_XT_XB},
 /* RFC02493.r3: D-form VSX Floating-Point Storage Access Instructions */
-/* lxsd  */  {0xE4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0x9, "lxsd",  (sim_fptr)&simulate_lxsd,    VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
-/* stxsd */  {0xF4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0xa, "stxsd", (sim_fptr)&simulate_stxsd,   VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
-/* lxssp */  {0xE4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0x9, "lxssp",  (sim_fptr)&simulate_lxssp,  VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
-/* stxssp*/  {0xF4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0xa, "stxssp", (sim_fptr)&simulate_stxssp, VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
+/* lxsd  */  {0xE4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0x9, "lxsd",  (sim_fptr)&simulate_lxsd,    VSX_VECTOR_LENGTH_LOAD_ONLY | HIGH32, D_FORM_RT_RA_D},
+/* stxsd */  {0xF4000002, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_DP, 21, 0xa, "stxsd", (sim_fptr)&simulate_stxsd,   VSX_VECTOR_LENGTH_STORE_ONLY | HIGH32, D_FORM_RT_RA_D},
+/* lxssp */  {0xE4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0x9, "lxssp",  (sim_fptr)&simulate_lxssp,  VSX_VECTOR_LENGTH_LOAD_ONLY | HIGH32, D_FORM_RT_RA_D},
+/* stxssp*/  {0xF4000003, 0, GR, 16, IMM_DATA_14BIT, 2, DUMMY, DUMMY, SCALAR_SP, 21, 0xa, "stxssp", (sim_fptr)&simulate_stxssp, VSX_VECTOR_LENGTH_STORE_ONLY | HIGH32, D_FORM_RT_RA_D},
 /* lxv   */  {0xF4000001, 0, GR, 16, IMM_DATA_12BIT, 4, DUMMY, DUMMY, VECTOR_DP, 21, 0x9, "lxv",    (sim_fptr)&simulate_lxv,    VSX_VECTOR_LENGTH_LOAD_ONLY, D_FORM_RT_RA_D},
-/* stxv  */  {0xF4000005, 0, GR, 16, IMM_DATA_12BIT, 4, DUMMY, DUMMY, VECTOR_DP, 21, 0xa, "stxv",   (sim_fptr)&simulate_stxv,   VSX_VECTOR_LENGTH_STORE_ONLY,D_FORM_RT_RA_D},
+/* stxv  */  {0xF4000005, 0, GR, 16, IMM_DATA_12BIT, 4, DUMMY, DUMMY, VECTOR_DP, 21, 0xa, "stxv",   (sim_fptr)&simulate_stxv,   VSX_VECTOR_LENGTH_STORE_ONLY, D_FORM_RT_RA_D},
 
 /* last ins indicator */ {0xDEADBEEF, 0, DUMMY, 0, DUMMY, 0, DUMMY, DUMMY, DUMMY, 0, 0x0, "last_instruction", 0, 0, 0}
 
@@ -398,8 +397,7 @@ struct instruction_masks vsx_p9_instructions_array[] = {
 
 uint32 vsr_reg_wt[VSR_OP_TYPES] = {0, 11, 11, 11, 10, 10, 0};
 extern store_macro_fptr st_fptrs[VSR_OP_TYPES];
-sim_fptr st_sim_fptrs[VSR_OP_TYPES] = {NULL, (sim_fptr)&simulate_stxsdx, (sim_fptr)&simulate_stxsdx,
-					 (sim_fptr)&simulate_stxvd2x ,(sim_fptr) &simulate_stxvd2x, (sim_fptr)&simulate_stxvd2x, NULL};
+sim_fptr st_sim_fptrs[VSR_OP_TYPES] = {NULL, (sim_fptr)&simulate_stxsdx, (sim_fptr)&simulate_stxsdx, (sim_fptr)&simulate_stxvd2x ,(sim_fptr) &simulate_stxvd2x, (sim_fptr)&simulate_stxvd2x, (sim_fptr)&simulate_stxvd2x, (sim_fptr)&simulate_stxvd2x, NULL};
 int sim_fptrs_index[VSR_OP_TYPES]= {0, stxsdx, stxsdx, stxvd2x, stxvd2x, stxvd2x, stxvd2x, stxvd2x, 0};
 
 void class_vsx_mul_add_sub_gen(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index)
@@ -1016,7 +1014,7 @@ void class_vsx_load_gen2(uint32 client_no, uint32 random_no, struct instruction_
 {
     uint32 gpr_num, vsr4;
     uint32 op1 = 0, op2 = 0, tgt = 0;
-    uint32 mcode, store_off, load_off, addi_mcode;
+    uint32 mcode = 0, store_off = 0, load_off = 0, addi_mcode = 0;
     uint32 prolog_size, *tc_memory, num_ins_built;
     struct vsr_list *vsrs;
     struct server_data *sdata = &global_sdata[INITIAL_BUF];
@@ -1096,8 +1094,8 @@ void class_vsx_load_gen2(uint32 client_no, uint32 random_no, struct instruction_
 void class_vsx_store_gen2(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index)
 {
     uint32 vsr4;
-    uint32 op1, op2, tgt;
-    uint32 mcode, store_off;
+    uint32 op1 = 0, op2 = 0, tgt = 0;
+    uint32 mcode, store_off = 0;
     uint32 num_ins_built, prolog_size, *tc_memory;
     struct vsr_list *vsrs;
     struct server_data *sdata = &global_sdata[INITIAL_BUF];
@@ -1154,4 +1152,68 @@ void class_vsx_store_gen2(uint32 client_no, uint32 random_no, struct instruction
 
     /* Restore the number of instruction built */
     cptr->num_ins_built = num_ins_built;
+}
+
+
+void class_vsx_stxvll_gen(uint32 client_no, uint32 random_no, struct instruction_masks *temp, int index)
+{
+	uint32 vsr4;
+	uint32 op1, op2, src;
+	uint32 mcode, store_off, dep_mcode;
+	uint32 num_ins_built, prolog_size, *tc_memory;
+	struct vsr_list *vsrs;
+	struct server_data *sdata = &global_sdata[INITIAL_BUF];
+	struct client_data *cptr = sdata->cdata_ptr[client_no];
+
+	prolog_size = cptr->prolog_size;
+	num_ins_built = cptr->num_ins_built;
+	tc_memory = &(cptr->tc_ptr[INITIAL_BUF]->tc_ins[prolog_size + num_ins_built]);
+
+	/* Generate tgt VSX reg and figure out its data type */
+	vsrs = &(cptr->vsrs[temp->tgt_dtype]);
+	vsr4 = vsrs->head[VSX]->vsr_no;
+	/* For store ins, vsr is not getting dirty hence moving to end */
+	MOVE_VSR_TO_END(client_no, temp->tgt_dtype, VSX);
+	/* Reset dirty bit corresponding to target VSR */
+	vsrs->dirty_mask &= (~(0x1ULL << vsr4));
+
+	/* reserve memory for store */
+	store_off = init_mem_for_vsx_store(client_no, temp->tgt_dtype);
+	dep_mcode = GEN_ADDI_MCODE(STORE_RA, STORE_RA, store_off);
+	*tc_memory = dep_mcode;
+	cptr->instr_index[prolog_size + num_ins_built] = addi | 0x20000000;
+	cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)&simulate_addi;
+	tc_memory++;
+	num_ins_built++;
+
+	dep_mcode = GEN_ADDI_MCODE(STORE_RB, 0, (random_no & 0xF));
+	*tc_memory = dep_mcode;
+	cptr->instr_index[prolog_size + num_ins_built] = addi | 0x20000000;
+	cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)&simulate_addi;
+	tc_memory++;
+	num_ins_built++;
+
+	op1 = (STORE_RA) << (temp->op1_pos); /* RA = RA + store_off */
+	op2 = (STORE_RB) << (temp->op2_pos);
+	src = ((vsr4 & 0x1f) << (temp->tgt_pos)) | ((vsr4 & 0x20) >> 5);
+
+	mcode = (temp->op_eop_mask | op1 | op2 | src);
+	*tc_memory = mcode;
+	cptr->instr_index[prolog_size + num_ins_built] = index | 0x10000000;
+	cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)temp->sim_func;
+	tc_memory++;
+	num_ins_built++;
+
+	/* save offset */
+	sdata->cdata_ptr[client_no]->tc_ptr[INITIAL_BUF]->ea_off[num_ins_built + prolog_size] = store_off;
+
+	/* Restore R5 */
+	*tc_memory = OR(BASE_GPR, LOAD_RA);
+	cptr->instr_index[prolog_size + num_ins_built] = or | 0x20000000;
+	cptr->tc_ptr[INITIAL_BUF]->sim_ptr[prolog_size + num_ins_built] = (sim_fptr)&simulate_or;
+	tc_memory++;
+	num_ins_built++;
+
+	/* Restore the number of instruction built */
+	cptr->num_ins_built = num_ins_built;
 }

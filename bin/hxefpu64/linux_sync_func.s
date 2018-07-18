@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-# %Z%%M%	%I%  %W% %G% %U%
 .machine "any"
 .file  	 "sync_func.s"		
 .globl  htx_sync

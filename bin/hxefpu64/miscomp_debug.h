@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* %Z%%M%   %I%  %W% %G% %U% */
 
 #ifndef _MISCMP_DEBUG_H
 #define _MISCMP_DEBUG_H

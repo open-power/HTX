@@ -17,7 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/*static char sccid[] = "%Z%%M% %I%  %W% %G% %U%";*/
 #include "framework.h"
 
 /*
@@ -163,8 +162,8 @@ struct instruction_masks bfp_instructions_array[] = {
 
 
 	/* Floating-point Status and Control Register(FPSCR) instructions */
-	/* mffs		*/	{0xFC00048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffs", &simulate_mffs, BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
-	/* mffs.	*/	{0xFC00048F, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffs.", &simulate_mffs, BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffs		*/	{0xFC00048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffs", &simulate_mffs, BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffs.	*/	{0xFC00048F, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffs.", &simulate_mffs, BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
 
 	/* mtfsfi(W0)*/	{0xFC00010C, 0xffffffff, DUMMY, DUMMY, IMM_DATA_4BIT, 12, DUMMY, DUMMY, CR_T, 23, 0x16, "mtfsfi", &simulate_mtfsfi, BFP_FPSCR_ONLY, X_FORM_BF_W_U_eop_rc},
 	/* mtfsfi.	*/	{0xFC00010D, 0xffffffff, DUMMY, DUMMY, IMM_DATA_4BIT, 12, DUMMY, DUMMY, CR_T, 23, 0x16, "mtfsfi.", &simulate_mtfsfi, BFP_FPSCR_ONLY, X_FORM_BF_W_U_eop_rc},
@@ -229,68 +228,69 @@ struct instruction_masks bfp_p8_instructions_array[] = {
 
 
 struct instruction_masks bfp_p9_instructions_array[] = {
+/* xscpsgndp 	{0xFC0000C8, 0, BFP_DP, 16, BFP_DP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscpsgndp",(sim_fptr)&simulate_xscpsgndp,P9_BFP_MOVE_ONLY, FORM_XX3_XT_XA_XB},*/
 /* RFC02465 - Quad precision BFP operations */
-/* xscpsgnqp */	{0xFC0000C8, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscpsgnqp",(sim_fptr)&simulate_xscpsgnqp,P9_BFP_MOVE_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xscpsgnqp */	{0xFC0000C8, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscpsgnqp",(sim_fptr)&simulate_xscpsgnqp,P9_BFP_MOVE_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
 
-/* xsaddqp	*/	{0xFC000008, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsaddqp", (sim_fptr)&simulate_xsaddqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsaddqpo	*/	{0xFC000009, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsaddqpo",(sim_fptr)&simulate_xsaddqpo,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xssubqp	*/	{0xFC000408, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssubqp", (sim_fptr)&simulate_xssubqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xssubqpo	*/	{0xFC000409, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssubqpo",(sim_fptr)&simulate_xssubqpo,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsmulqp	*/	{0xFC000048, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmulqp", (sim_fptr)&simulate_xsmulqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsmulqpo	*/	{0xFC000049, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmulqpo",(sim_fptr)&simulate_xsmulqpo,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsdivqp	*/	{0xFC000448, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsdivqp", (sim_fptr)&simulate_xsdivqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsdivqpo	*/	{0xFC000449, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsdivqpo",(sim_fptr)&simulate_xsdivqpo,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsnegqp	*/	{0xFC100648, 0, DUMMY,DUMMY,BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnegqp", (sim_fptr)&simulate_xsnegqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsabsqp	*/	{0xFC000648, 0, DUMMY,DUMMY,BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsabsqp", (sim_fptr)&simulate_xsabsqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsnabsqp	*/	{0xFC080648, 0, DUMMY,DUMMY,BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnabsqp",(sim_fptr)&simulate_xsnabsqp,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
+/* xsaddqp	*/	{0xFC000008, F_XSASDP, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsaddqp", (sim_fptr)&simulate_xsaddqp, P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsaddqpo	*/	{0xFC000009, F_XSASDP, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsaddqpo",(sim_fptr)&simulate_xsaddqpo,P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xssubqp	*/	{0xFC000408, F_XSASDP, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssubqp", (sim_fptr)&simulate_xssubqp, P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xssubqpo	*/	{0xFC000409, F_XSASDP, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssubqpo",(sim_fptr)&simulate_xssubqpo,P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsmulqp	*/	{0xFC000048, F_XSMULDP,BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmulqp", (sim_fptr)&simulate_xsmulqp, P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsmulqpo	*/	{0xFC000049, F_XSMULDP,BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmulqpo",(sim_fptr)&simulate_xsmulqpo,P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsdivqp	*/	{0xFC000448, F_XSDIVDP,BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsdivqp", (sim_fptr)&simulate_xsdivqp, P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsdivqpo	*/	{0xFC000449, F_XSDIVDP,BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsdivqpo",(sim_fptr)&simulate_xsdivqpo,P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsnegqp	*/	{0xFC100648, 0, DUMMY,DUMMY,BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnegqp", (sim_fptr)&simulate_xsnegqp, P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsabsqp	*/	{0xFC000648, 0, DUMMY,DUMMY,BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsabsqp", (sim_fptr)&simulate_xsabsqp, P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsnabsqp	*/	{0xFC080648, 0, DUMMY,DUMMY,BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnabsqp",(sim_fptr)&simulate_xsnabsqp,P9_BFP_ELEM_ARITH_QP | HIGH32, X_FORM_RT_RA_RB_eop_rc},
 
-/* xscmpexpqp*/ {0xFC000148, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, CR_T, 23, 0x14,"xscmpexpqp",(sim_fptr)&simulate_xscmpexpqp,P9_BFP_COMPARE_ONLY,X_FORM_BF_RA_RB_eop_rc},
-/* xscmpoqp	*/	{0xFC000108, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, CR_T, 23, 0x14, "xscmpoqp", (sim_fptr)&simulate_xscmpoqp,  P9_BFP_COMPARE_ONLY,X_FORM_BF_RA_RB_eop_rc},
-/* xscmpuqp	*/	{0xFC000508, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, CR_T, 23, 0x14, "xscmpuqp", (sim_fptr)&simulate_xscmpuqp,  P9_BFP_COMPARE_ONLY,X_FORM_BF_RA_RB_eop_rc},
+/* xscmpexpqp*/ {0xFC000148, FPS_FPCC, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, CR_T, 23, 0x14,"xscmpexpqp",(sim_fptr)&simulate_xscmpexpqp, P9_BFP_COMPARE_ONLY | HIGH32, X_FORM_BF_RA_RB_eop_rc},
+/* xscmpoqp	*/	{0xFC000108, F_XSCMP, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, CR_T, 23, 0x14, "xscmpoqp", (sim_fptr)&simulate_xscmpoqp, P9_BFP_COMPARE_ONLY | HIGH32, X_FORM_BF_RA_RB_eop_rc},
+/* xscmpuqp	*/	{0xFC000508, F_XSCMP, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, CR_T, 23, 0x14, "xscmpuqp", (sim_fptr)&simulate_xscmpuqp, P9_BFP_COMPARE_ONLY | HIGH32, X_FORM_BF_RA_RB_eop_rc},
 
-/* xscvdpqp	*/	{0xFC160688, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscvdpqp", (sim_fptr)&simulate_xscvdpqp, P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvqpdp	*/	{0xFC140688, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpdp", (sim_fptr)&simulate_xscvqpdp, P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvqpdpo*/	{0xFC140689, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpdpo",(sim_fptr)&simulate_xscvqpdpo,P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvqpsdz*/	{0xFC190688, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpsdz",(sim_fptr)&simulate_xscvqpsdz,P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvqpswz*/	{0xFC090688, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpswz",(sim_fptr)&simulate_xscvqpswz,P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvqpudz*/	{0xFC110688, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpudz",(sim_fptr)&simulate_xscvqpudz,P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvqpuwz*/	{0xFC010688, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpuwz",(sim_fptr)&simulate_xscvqpuwz,P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvsdqp	*/	{0xFC0A0688, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscvsdqp", (sim_fptr)&simulate_xscvsdqp, P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xscvudqp	*/	{0xFC020688, 0, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscvudqp", (sim_fptr)&simulate_xscvudqp, P9_BFP_CONV_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xscvdpqp	*/	{0xFC160688, F_XSASDP, DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscvdpqp", (sim_fptr)&simulate_xscvdpqp, P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xscvqpdp	*/	{0xFC140688, F_XSASDP, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpdp", (sim_fptr)&simulate_xscvqpdp, P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xscvqpdpo*/	{0xFC140689, F_XSASDP, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpdpo",(sim_fptr)&simulate_xscvqpdpo,P9_BFP_CONV_ONLY | HIGH32 | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xscvqpsdz*/	{0xFC190688, F_XSCV, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpsdz",(sim_fptr)&simulate_xscvqpsdz,P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xscvqpswz*/	{0xFC090688, F_XSCV, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpswz",(sim_fptr)&simulate_xscvqpswz,P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xscvqpudz*/	{0xFC110688, F_XSCV, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpudz",(sim_fptr)&simulate_xscvqpudz,P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xscvqpuwz*/	{0xFC010688, F_XSCV, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xscvqpuwz",(sim_fptr)&simulate_xscvqpuwz,P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xscvsdqp	*/	{0xFC0A0688, (FPS_FPRF | FPS_FR | FPS_FI), DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscvsdqp", (sim_fptr)&simulate_xscvsdqp, P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xscvudqp	*/	{0xFC020688, (FPS_FPRF | FPS_FR | FPS_FI), DUMMY, DUMMY, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xscvudqp", (sim_fptr)&simulate_xscvudqp, P9_BFP_CONV_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
 
-/* xsxexpqp	*/	{0xFC020648, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xsxexpqp",(sim_fptr)&simulate_xsxexpqp, P9_BFP_MOVE_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xsxsigqp	*/	{0xFC120648, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsxsigqp",(sim_fptr)&simulate_xsxsigqp, P9_BFP_MOVE_ONLY, X_FORM_RT_RA_RB_eop_rc},
-/* xsiexpqp	*/	{0xFC0006C8, 0, BFP_QP, 16, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14,   "xsiexpqp",(sim_fptr)&simulate_xsiexpqp, P9_BFP_MOVE_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsxexpqp	*/	{0xFC020648, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_DP, 21, 0x14, "xsxexpqp",(sim_fptr)&simulate_xsxexpqp, P9_BFP_MOVE_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsxsigqp	*/	{0xFC120648, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsxsigqp",(sim_fptr)&simulate_xsxsigqp, P9_BFP_MOVE_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xsiexpqp	*/	{0xFC0006C8, 0, BFP_QP, 16, BFP_DP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14,   "xsiexpqp",(sim_fptr)&simulate_xsiexpqp, P9_BFP_MOVE_ONLY | HIGH32, X_FORM_RT_RA_RB_eop_rc},
 
-/* xsmaddqp	*/	{0xFC000308, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmaddqp", (sim_fptr)&simulate_xsmaddqp, P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsmaddqpo*/	{0xFC000309, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmaddqpo",(sim_fptr)&simulate_xsmaddqpo,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsmsubqp	*/	{0xFC000348, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmsubqp", (sim_fptr)&simulate_xsmsubqp, P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsmsubqpo*/	{0xFC000349, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmsubqpo",(sim_fptr)&simulate_xsmsubqpo,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsnmaddqp*/	{0xFC000388, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnmaddqp",(sim_fptr)&simulate_xsnmaddqp,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsnmaddqpo*/	{0xFC000389, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14,"xsnmaddqpo",(sim_fptr)&simulate_xsnmaddqpo,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsnmsubqp*/	{0xFC0003C8, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnmsubqp",(sim_fptr)&simulate_xsnmsubqp,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xsnmsubqpo*/	{0xFC0003C9, 0, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14,"xsnmsubqpo",(sim_fptr)&simulate_xsnmsubqpo,P9_BFP_ADD_MUL_QP, X_FORM_RT_RA_RB_eop_rc},
+/* xsmaddqp	*/	{0xFC000308, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmaddqp", (sim_fptr)&simulate_xsmaddqp, P9_BFP_ADD_MUL_QP| HIGH32 | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsmaddqpo*/	{0xFC000309, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmaddqpo",(sim_fptr)&simulate_xsmaddqpo,P9_BFP_ADD_MUL_QP| HIGH32 | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsmsubqp	*/	{0xFC000348, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmsubqp", (sim_fptr)&simulate_xsmsubqp, P9_BFP_ADD_MUL_QP | HIGH32| HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsmsubqpo*/	{0xFC000349, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsmsubqpo",(sim_fptr)&simulate_xsmsubqpo,P9_BFP_ADD_MUL_QP | HIGH32| HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsnmaddqp*/	{0xFC000388, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnmaddqp",(sim_fptr)&simulate_xsnmaddqp,P9_BFP_ADD_MUL_QP | HIGH32| HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsnmaddqpo*/	{0xFC000389, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14,"xsnmaddqpo",(sim_fptr)&simulate_xsnmaddqpo,P9_BFP_ADD_MUL_QP | HIGH32| HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsnmsubqp*/	{0xFC0003C8, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xsnmsubqp",(sim_fptr)&simulate_xsnmsubqp,P9_BFP_ADD_MUL_QP | HIGH32| HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+/* xsnmsubqpo*/	{0xFC0003C9, F_XSMADDSUB, BFP_QP, 16, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14,"xsnmsubqpo",(sim_fptr)&simulate_xsnmsubqpo,P9_BFP_ADD_MUL_QP | HIGH32| HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
 
-/* xsrqpi	*/	{0xFC00000A, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpi",  (sim_fptr)&simulate_xsrqpi, P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
-/* xsrqpix	*/	{0xFC00000B, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpix", (sim_fptr)&simulate_xsrqpix,P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
-/* xsrqpxp	*/	{0xFC00004A, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpxp", (sim_fptr)&simulate_xsrqpxp,P9_BFP_ROUND_2_INT, Z_FORM_RT_R_RB_RMC_eop_rc},
+/* xsrqpi	*/	{0xFC00000A, F_XSASDP, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpi",  (sim_fptr)&simulate_xsrqpi, P9_BFP_ROUND_2_INT | HIGH32| HW_ONLY, Z_FORM_RT_R_RB_RMC_eop_rc},
+/* xsrqpix	*/	{0xFC00000B, F_XSASDP, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpix", (sim_fptr)&simulate_xsrqpix,P9_BFP_ROUND_2_INT | HIGH32| HW_ONLY, Z_FORM_RT_R_RB_RMC_eop_rc},
+/* xsrqpxp	*/	{0xFC00004A, F_XSASDP, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x1A, "xsrqpxp", (sim_fptr)&simulate_xsrqpxp,P9_BFP_ROUND_2_INT | HIGH32| HW_ONLY, Z_FORM_RT_R_RB_RMC_eop_rc},
 
-/* xssqrtqp	*/	{0xFC1B0648, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssqrtqp", (sim_fptr)&simulate_xssqrtqp, P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
-/* xssqrtqpo*/	{0xFC1B0649, 0, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssqrtqpo",(sim_fptr)&simulate_xssqrtqpo,P9_BFP_ELEM_ARITH_QP, X_FORM_RT_RA_RB_eop_rc},
+/* xssqrtqp	*/	{0xFC1B0648, F_XSSQRTDP, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssqrtqp", (sim_fptr)&simulate_xssqrtqp, P9_BFP_ELEM_ARITH_QP| HIGH32, X_FORM_RT_RA_RB_eop_rc},
+/* xssqrtqpo*/	{0xFC1B0649, F_XSSQRTDP, DUMMY, DUMMY, BFP_QP, 11, DUMMY, DUMMY, BFP_QP, 21, 0x14, "xssqrtqpo",(sim_fptr)&simulate_xssqrtqpo,P9_BFP_ELEM_ARITH_QP | HIGH32| HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
 
-/* xststdcqp*/	{0xFC000588, 0,IMM_DATA_7BIT, 16, BFP_QP,11, DUMMY,DUMMY, CR_T, 23, 0x1B,"xststdcqp",(sim_fptr)&simulate_xststdcqp,P9_BFP_TEST_ONLY,X_FORM_BF_DCMX_vrb_eop_rc},
+/* xststdcqp*/	{0xFC000588, FPS_FPCC, IMM_DATA_7BIT, 16, BFP_QP,11, DUMMY,DUMMY, CR_T, 23, 0x1B,"xststdcqp",(sim_fptr)&simulate_xststdcqp, P9_BFP_TEST_ONLY | HIGH32, X_FORM_BF_DCMX_vrb_eop_rc},
 
 /* last ins indicator */ {0xDEADBEEF, 0,DUMMY    ,  0, DUMMY    ,  0, DUMMY, DUMMY, DUMMY    ,  0, 0x0, "last_instruction"}
 
 };
 
 struct instruction_masks bfp_p9_dd2_instructions_array[] = {
-	/* mffsce */ 	{0xFC01048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffsce", &simulate_mffsce, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
-	/* mffscdrn */ 	{0xFC14048E, 0, BFP_DP, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscdrn", &simulate_mffscdrn, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
-	/* mffscdrni */ {0xFC15048E, 0, IMM_DATA_3BIT, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscdrni", &simulate_mffscdrni, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
-	/* mffscrn */ 	{0xFC16048E, 0, BFP_DP, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscrn", &simulate_mffscrn, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
-	/* mffscrni */ 	{0xFC17048E, 0, IMM_DATA_2BIT, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscrni", &simulate_mffscrni, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
-	/* mffsl */ 	{0xFC18048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffsl", &simulate_mffsl, P9_BFP_FPSCR_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffsce */ 	{0xFC01048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffsce", &simulate_mffsce, P9_BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscdrn */ 	{0xFC14048E, 0, BFP_DP, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscdrn", &simulate_mffscdrn, P9_BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscdrni */ {0xFC15048E, 0, IMM_DATA_3BIT, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscdrni", &simulate_mffscdrni, P9_BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscrn */ 	{0xFC16048E, 0, BFP_DP, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscrn", &simulate_mffscrn, P9_BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffscrni */ 	{0xFC17048E, 0, IMM_DATA_2BIT, 11, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffscrni", &simulate_mffscrni, P9_BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
+	/* mffsl */ 	{0xFC18048E, 0, DUMMY, DUMMY, DUMMY, DUMMY,DUMMY, DUMMY, BFP_DP, 21, 0x14, "mffsl", &simulate_mffsl, P9_BFP_FPSCR_ONLY | HW_ONLY, X_FORM_RT_RA_RB_eop_rc},
 	/* last ins indicator */ {0xDEADBEEF, 0, DUMMY,  0, DUMMY, 0, DUMMY, DUMMY, DUMMY,  0, 0x0, "last_instruction", 0, 0, 0}
 };
 
