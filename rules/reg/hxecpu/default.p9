@@ -1,27 +1,3 @@
-* @(#)64        1.7  src/htx/usr/lpp/htx/rules/reg/hxecpu/rules.default, exer_cpu, htxubuntu 4/23/14 04:52:25
-* IBM_PROLOG_BEGIN_TAG 
-* This is an automatically generated prolog. 
-*  
-* htxubuntu src/htx/usr/lpp/htx/rules/reg/hxecpu/default.p9 1.1 
-*  
-* Licensed Materials - Property of IBM 
-*  
-* COPYRIGHT International Business Machines Corp. 2014,2016 
-* All Rights Reserved 
-*  
-* US Government Users Restricted Rights - Use, duplication or 
-* disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
-*  
-* IBM_PROLOG_END_TAG 
-* Rule file for hxefpu64 exerciser running on P6
-* For details of rule keywords, please refer README.hxefpu64
-* in /usr/lpp/htx/rules/reg/hxefpu64 dir on test machine.
-*
-* NOTE: Rule keyword & associated value should be all in one
-*	line _only_. Currently '\n' (newline) is used as
-*	delimiter to differentiate between keywords.
-* Types of CPU instructions: load,storage,branch,cache,external,SPR,rotate,logic,arth,conditional,store
-*
 * All P9 Only CPU Instructions
 rule_id						test1
 num_oper					5000 
