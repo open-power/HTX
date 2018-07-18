@@ -1,0 +1,80 @@
+* hxestorage rulefile for stressing more on adapter cache testing
+*---------------------------------------------------------------------------*
+*- STANZA 1: Sequentially write a small portion of the disk (0 - 10% of the-*
+*-           disk on 1st iteration of the rulefile).                       -*
+*-           This stanza will create 4 threads which will run in the       -*
+*-           background while other stanza in the rule are running.        -*
+*-           Each thread will be covering a different section of the disk. -*
+*- Th 1 : Does Sequential IO from LBA 0 to 0.1 * MaxBlk/4, proceed from    -*
+*-        LBA # 0 --> LBA # 0.1 * Maxblks/4.                               -*
+*- Th 2 : Does Sequential IO from LBA 0.1 * maxblks/4 to 0.1 * maxBlks/2,  -*
+*-        LBA # 0.1 * Maxblks/2 --> LBA # 0.1 * Maxblks/4.                 -*
+*- Th 3 : Does Sequential IO from LBA 0.1 * maxblks/2 to 0.1 * 3/4maxblks, -*
+*-        proceed from LBA # 0.1 * Maxblks/2 --> LBA # 0.1 * 3/4maxblks.   -*
+*- Th 4 : Does Sequential IO from 0.1 * maxblks to 0.1 * 3/4maxblks,       -*
+*-        proceed from LBA # 0.1 * Maxblks --> LBA # 0.1 * 3/4Maxblks.     -*
+*---------------------------------------------------------------------------*
+rule_id = rule_1
+pattern_id = #003
+oper = bwrc
+num_oper = 0
+num_threads = 4
+direction = UP DOWN
+starting_block = BOT TOP
+transfer_size = 256K
+num_mallocs = 1
+max_blkno = 0.1
+seek_breakup_prcnt = 0
+section = yes
+skip = -99999999
+
+*---------------------------------------------------------------------------*
+*- STANZA 2: Sleep for 1 minutes.                                          -*
+*-           This lets the background thread (STANZA 1) initialize an area -*
+*-           of the disk before the other rule stanzas start.              -*
+*---------------------------------------------------------------------------*
+rule_id = rule_2
+oper = S
+sleep = 60000000
+skip = -99999999
+
+*---------------------------------------------------------------------------*
+*- STANZA 3: Creates 1.2QD number of threads doing RWRC on random LBAs in  -*
+*- lower 10% range of the disk. IOs will be of random size between         -*
+*- 1BLK - 128K.                                                            -*
+*---------------------------------------------------------------------------*
+rule_id = rule_3
+pattern_id = #003
+num_threads = 1.2QD
+oper = rwrc
+num_oper = 40000
+transfer_size = [1BLK-128k,-1]
+max_blkno = 0.1
+seek_breakup_prcnt = 100
+
+*---------------------------------------------------------------------------*
+*- STANZA 4: Creates 1QD number of threads doing W/RWRC/WRC opers with     -*
+*- random LBAs accesses in the lower 10% range of the disk.                -*
+*- (small IO transfer size).                                               -*
+*---------------------------------------------------------------------------*
+rule_id = rule_4
+pattern_id = #003
+num_threads = 1QD
+oper = wrc w rwrc
+num_oper = 40000
+transfer_size = [1BLK-128k,-1]
+max_blkno = 0.1
+seek_breakup_prcnt = 100
+
+*---------------------------------------------------------------------------*
+*- STANZA 5: Creates 1QD number of threads doing RWRC/WRC opers with       -*
+*- 80/20 random/sequential LBA accesses.                                   -*
+*---------------------------------------------------------------------------*
+rule_id = rule_5
+pattern_id = #003
+num_threads = 1QD
+oper = rwrc wrc
+num_oper = 20000
+transfer_size = 4K 8K 16K 32K 64K
+max_blkno = 0.1
+seek_breakup_prcnt = 80

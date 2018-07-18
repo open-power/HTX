@@ -25,6 +25,11 @@ TARGET = default.ssd \
         rules.hpc_comp_node \
         rules.hpc_io_node \
         hd.cache \
+        rules.cache_stress \
+        rules.discard \
+        rules.sync_cache \
+        storage.coral.pass1 \
+        storage.coral.pass1 \
         hxestorage.readme
 
 .PHONY: all clean

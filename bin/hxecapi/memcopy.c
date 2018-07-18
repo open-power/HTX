@@ -56,7 +56,7 @@ int hxfcbuf_capi(struct htx_data * htx_d, uint32_t * cnt, char * wbuf, char * rb
 
 /*
  *Checks memory allocation status[Failure Code, Success Code].
- */ 
+ */
 static int alloc_test (struct htx_data * htx_d, const char *str, __u64 addr, int ret)
 {
 	int32_t rc = -1;
@@ -112,7 +112,7 @@ void check_errors (struct htx_data * htx_d, struct wed *wed0)
             sprintf (msg, "AFU received CONTEXT response\n");
         if (wed0->error & 0x0001ull)
             sprintf (msg, "AFU detected unsupported job code\n");
-		
+
 		hxfmsg(htx_d, 0, HTX_HE_INFO, msg);
     }
 }
@@ -205,7 +205,7 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
 	    rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata0);
     	rc = cxl_mmio_read64 (afu_h, MMIO_TRACE_ADDR, &tdata1);
 	    response_lines_outstanding = response_lines_outstanding - 1;
-	    trace_time = (tdata0 >> 24) & 0xffffffffffull;
+		trace_time = (tdata0 >> 24) & 0xffffffffffull;
 
     	sprintf (msg,"0x%010llx:", (long long) trace_time);
 		hxfmsg(htx_d, -1, HTX_HE_SOFT_ERROR, msg);
@@ -237,7 +237,7 @@ void dump_trace (struct htx_data * htx_d, struct cxl_afu_h *afu_h,int command_li
               (int) ((tdata1 >> 13) & 0x1ull)
       	    );
 			hxfmsg(htx_d, -1, HTX_HE_SOFT_ERROR, msg);
-	    }	
+	    }
     	if (tdata1 & 0x0000000000000800ull) {
 		    sprintf (msg,"0x%010llx:", (long long) trace_time);
 	    	hxfmsg(htx_d, -1, HTX_HE_SOFT_ERROR, msg);
@@ -272,10 +272,10 @@ int main (int argc, char *argv[])
     int com_trace_reads = 3;
     int resp_trace_reads = 3;
     int ctl_trace_reads = 2;
-	
+
 	uint32_t stanza = 0, num_stanzas = 0;
 	uint32_t miscompare_count = 0;
-    
+ 
 	/*
 	 * HTX Data Structure and rules file variable
 	 */
@@ -366,13 +366,13 @@ int main (int argc, char *argv[])
 				__u8 *to = NULL;
 
 				/*
-				Set number of entries to read from trace array.Trace array only 256 entries deep, 
-				so never need to read more than that or will produce redundant data.Don't read 
-				trace array lines that won't be set. Harmless on hardware as invalid lines will 
-				read as F's.Reading unitialized RAM entries may cause parity errors on mmio bus 
-				in simulation.Anticapte number of entires to read. Formula is base of 3 for 
-				command and response trace arrays for wed reads/writes.Add 2*buffer_cl, because 
-				there will be 2 commands/responses for each cacheline: cmd/rsp for read and 
+				Set number of entries to read from trace array.Trace array only 256 entries deep,
+				so never need to read more than that or will produce redundant data.Don't read
+				trace array lines that won't be set. Harmless on hardware as invalid lines will
+				read as F's.Reading unitialized RAM entries may cause parity errors on mmio bus
+				in simulation.Anticapte number of entires to read. Formula is base of 3 for
+				command and response trace arrays for wed reads/writes.Add 2*buffer_cl, because
+				there will be 2 commands/responses for each cacheline: cmd/rsp for read and
 				cmd/rsp for write.
 				*/
 
@@ -425,7 +425,7 @@ int main (int argc, char *argv[])
 
 				if(DEBUG)
 					printf("Allocated To memory @ 0x%016llx\n", (long long) to);
-			
+
 				/* Polute from buffer with random data*/
 				__u64 seed = time (NULL);
 
@@ -476,7 +476,7 @@ int main (int argc, char *argv[])
 				printf ("Starting copy of %lld bytes from 0x%016llx to 0x%016llx\n",
 				   (long long) wed0->size, (long long) wed0->from, (long long)
 				   wed0->to);
-			
+
 				/* Send start to AFU */
 				ret = cxl_afu_attach (afu_h, (__u64) wed0);
 
@@ -498,7 +498,7 @@ int main (int argc, char *argv[])
                     return -1;
                 }
 
-				/* Pre mmio section. Do mmio reads and writes. Set bit 0 to 1 when writing trace options 
+				/* Pre mmio section. Do mmio reads and writes. Set bit 0 to 1 when writing trace options
 				register to kick off copy routine*/
 				stat_ctl_reg_wrdata = 0x8000000000000000;
 				ret = cxl_mmio_read64 (afu_h, MMIO_STAT_CTL_REG_ADDR, &stat_ctl_reg_rddata);
@@ -543,7 +543,7 @@ int main (int argc, char *argv[])
 			        sprintf(msg, "cxl_mmio_write64 for device failed errno = %d %s. \n",errno,strerror(errno));
 			        hxfmsg(&htx_d, 0, HTX_HE_INFO, msg);
 			    }
-	
+
 				/* Wait for AFU to start or timeout*/
 				struct timespec start, now;
 				double time_passed;
@@ -629,7 +629,7 @@ int main (int argc, char *argv[])
 				if(DEBUG) {
 					printf("Post mmio state bit is %08lx\n", stat_ctl_reg_rddata);
 				}
-  
+
 				while (stat_ctl_reg_rddata != 1) {
 				    struct timespec ts;
 				    ts.tv_sec = 0;
@@ -682,7 +682,7 @@ int main (int argc, char *argv[])
 					if(rc) {
 						htx_d.bad_writes += 1;
 					} else {
-						printf("**************************: oper = %d, r_buf=%#llx, w_buf=%#llx, bufsize=%#lx \n",  oper, (unsigned long long)wed0->from, 
+						printf("**************************: oper = %d, r_buf=%#llx, w_buf=%#llx, bufsize=%#lx \n",  oper, (unsigned long long)wed0->from,
                                                        (unsigned long long)wed0->to, wed0->size);
 
 	                    htx_d.good_writes += 1;
@@ -690,7 +690,7 @@ int main (int argc, char *argv[])
 					}
         	        hxfupdate(UPDATE, &htx_d);
 				}
-				
+
 				if (DEBUG) {
 					check_errors (&htx_d, wed0);
 				}
@@ -704,7 +704,7 @@ int main (int argc, char *argv[])
 				}
 
 				cxl_afu_free (afu_h);
-				
+
 				if((__u8 *)from) {
 					free((__u8 *)from);
 					from = NULL;
@@ -713,7 +713,7 @@ int main (int argc, char *argv[])
 					free((__u8 *)to);
 					to = NULL;
 				}
-	
+
 			}/*End of for loop*/
 
 
@@ -813,7 +813,7 @@ int hxfcbuf_capi(struct htx_data * htx_d, uint32_t * cnt, char * wbuf, char * rb
         } else {
 			sprintf(work_str, "The maximum number of saved miscompare \
 									buffers (%d) have already\nbeen saved.  The read and write buffers for this \
-									miscompare will\nnot be saved to disk.\n", MAX_MISCOMPARES);            
+									miscompare will\nnot be saved to disk.\n", MAX_MISCOMPARES);
 			strcat(msg_ptr, work_str);
 		}
 		hxfmsg(htx_d, i, HTX_HE_MISCOMPARE, msg_ptr);
