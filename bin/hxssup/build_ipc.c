@@ -393,12 +393,10 @@ int	process_mdt_to_shm(char *stanza, int stanza_length,
 	shm_point.HE_addr->bad_writes = 0;
 
 	/* set Number of Bytes Read */
-	shm_point.HE_addr->bytes_read1 = 0;
-	shm_point.HE_addr->bytes_read2 = 0;
+	shm_point.HE_addr->bytes_read = 0;
 
 	/* set Number of Bytes Written */
-	shm_point.HE_addr->bytes_writ1 = 0;
-	shm_point.HE_addr->bytes_writ2 = 0;
+	shm_point.HE_addr->bytes_writ = 0;
 
 	/* set Number of Other Good Operations */
 	shm_point.HE_addr->good_others = 0;
