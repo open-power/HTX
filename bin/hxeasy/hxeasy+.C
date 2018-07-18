@@ -16,6 +16,14 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
+//   FUNCTIONS: CkPath
+//		GetPath
+//		PrtSyntax
+//		SIGTERM_hdl
+//		get_rule
+//		main
+//		pat_to_buf
+//		sync_ports
 
 #ifdef __HTX_LINUX__
 #include <headers.h>

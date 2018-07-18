@@ -17,6 +17,13 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+//   FUNCTIONS: Cmsg
+//		GetMsgAddr
+//		GetTempStatsPtr
+//		SendMsg
+//		Update
+
+
 #ifndef __HTX_LINUX__
 #include "headers.h"
 #else

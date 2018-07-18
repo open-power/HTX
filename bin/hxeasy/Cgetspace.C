@@ -17,6 +17,12 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+//   FUNCTIONS: CGetSpace
+//		GetPbuf
+//		GetRbuf
+//		GetWbuf
+//
+
 #include"headers.h"
 
 CGetSpace::CGetSpace(int size)

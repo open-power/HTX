@@ -17,6 +17,9 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+//   FUNCTIONS: CmsgBase
+//		GetStatsPtr
+
 #include"headers.h"
 
 CmsgBase::CmsgBase()

@@ -17,6 +17,12 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+//   FUNCTIONS: SanityCkBaud
+//		SetHwDefaults
+//		SetStanzaDefaults1448
+//		get_rule
+//		get_line
+
 #include"headers.h"
 
 /*

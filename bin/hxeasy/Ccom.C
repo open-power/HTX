@@ -16,6 +16,27 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
+
+//   FUNCTIONS: ClearComm
+//		ClosePort
+//		ConnectPorts
+//		GetDcbPtr
+//		GetProp
+//		GetState
+//      Quick_Sync
+//		Ltcsetattr
+//		OpenPort
+//		SetHW
+//		SetPortDefaults
+//		SetTimeOuts
+//		atoi
+//		for
+//		if
+//		odm_get_obj
+//		ready_ports
+//		set_vmin
+
+
 /*****************************************************************************/
 /*                                                                           */
 /* This file has class routines for the Ccom class. It handles all access to */

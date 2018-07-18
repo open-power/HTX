@@ -1,0 +1,149 @@
+/* 
+ * Copyright 2003,2016 IBM International Business Machines Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/* IBM_PROLOG_END_TAG */
+* %Z%%M%        %I%  %W% %G% %U%
+
+* All types of CPU Instructions except thread priority instructions
+rule_id						test1
+num_oper					5000 
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100):(0x0500000000003fff,100)]
+
+* Only LOADS and STORES and Thread Priority Instructions
+rule_id						test2
+num_oper					5000 
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x0500000000003841,100):(0x0500000000003841,100):(0x0500000000003841,100):(0x0500000000003841,100):(0x0500000000003841,100):(0x0500000000003841,100):(0x0500000000003841,100):(0x0500000000003841,100)]
+
+* Only ARITHMETIC and ROTATE instructions
+rule_id						test3
+num_oper					5000 
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x0500000000000014,100):(0x0500000000000014,100):(0x0500000000000014,100):(0x0500000000000014,100):(0x0500000000000014,100):(0x0500000000000014,100):(0x0500000000000014,100):(0x0500000000000014,100)]
+
+* Only Logical and Conditional Logic Instructions
+rule_id						test4
+num_oper					5000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x050000000000000A,100):(0x050000000000000A,100):(0x050000000000000A,100):(0x050000000000000A,100):(0x050000000000000A,100):(0x050000000000000A,100):(0x050000000000000A,100):(0x050000000000000A,100)]
+
+
+* Only  cache,storage and external instructions
+rule_id						test5
+num_oper					5000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				1000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x0500000000000380,100):(0x0500000000000380,100):(0x0500000000000380,100):(0x0500000000000380,100):(0x0500000000000380,100):(0x0500000000000380,100):(0x0500000000000380,100):(0x0500000000000380,100)]
+
+* Only  Branch Instructions
+rule_id						test6
+num_oper					5000	
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x0500000000000400,100):(0x0500000000000400,100):(0x0500000000000400,100):(0x0500000000000400,100):(0x0500000000000400,100):(0x0500000000000400,100):(0x0500000000000400,100):(0x0500000000000400,100)]
+
+* VMX only. With de-norm data only.
+rule_id						test7
+num_oper					5000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+data_bias_mask				[0xa0, 0xa0, 0xa0, 0xa0, 0xa0, 0xa0, 0xa0, 0xa0]
+ins_bias_mask				[(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100)]
+
+* VMX only. With norm and de-norm data.
+rule_id						test8
+num_oper					5000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+data_bias_mask				[0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55]
+ins_bias_mask				[(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100):(0x0400000003ffffff,100)]
+
+* VSX only. With norm and de-norm data.
+rule_id						test9
+num_oper					5000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+data_bias_mask				[0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55]
+ins_bias_mask				[(0x0100001fffffffff,100):(0x0100001fffffffff,100):(0x0100001fffffffff,100):(0x0100001fffffffff,100):(0x0100001fffffffff,100):(0x0100001fffffffff,100):(0x0100001fffffffff,100):(0x0100001fffffffff,100)]
+
+* 50% VSX and 50% VMX. With norm and de-norm data.
+rule_id						test10
+num_oper					5000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+data_bias_mask				[0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55]
+ins_bias_mask				[(0x0100001fffffffff,50)(0x0400000003ffffff,50):(0x0100001fffffffff,50)(0x0400000003ffffff,50):(0x0100001fffffffff,50)(0x0400000003ffffff,50):(0x0100001fffffffff,50)(0x0400000003ffffff,50):(0x0100001fffffffff,50)(0x0400000003ffffff,50):(0x0100001fffffffff,50)(0x0400000003ffffff,50):(0x0100001fffffffff,50)(0x0400000003ffffff,50):(0x0100001fffffffff,50)(0x0400000003ffffff,50)]
+
+* 50% VSX+VMX and 50% rest of all instructions. With norm and de-norm data.
+rule_id						test11
+num_oper					5000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+fpscr						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+data_bias_mask				[0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55]
+ins_bias_mask				[(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50):(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50):(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50):(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50):(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50):(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50):(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50):(0x0100001fffffffff,25)(0x0400000003ffffff,25)(0x0500000000003fff,50)]
+
+* 50% Atomic Load & Stores and 50% all other CPU instructions
+rule_id						test12
+num_oper					30000
+num_threads					0
+seed						[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+stream_depth				2000
+test_method					1
+unaligned_loads_stores_%	[0,0,0,0,0,0,0,0]
+INS_BIAS_MASK               [(0x0500000000003000,50)(0x0500000000000fff,50):(0x0500000000003000,50)(0x0500000000000fff,50):(0x0500000000003000,50)(0x0500000000000fff,50):(0x0500000000003000,50)(0x0500000000000fff,50):(0x0500000000003000,50)(0x0500000000000fff,50):(0x0500000000003000,50)(0x0500000000000fff,50):(0x0500000000003000,50)(0x0500000000000fff,50):(0x0500000000003000,50)(0x0500000000000fff,50)]
