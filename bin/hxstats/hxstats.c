@@ -384,31 +384,14 @@ int	main(int argc, char *argv[])
 								file_buffer,
 								   workstr);
 
-								sprintf(
-								    workstr,
-									"  # bytes read                        = ");
-								htx_strcat(
-								file_buffer,
-								   workstr);
+                                                                sprintf(
+                                                                    workstr,
+                                                                        "  # bytes read                        =              %5llu\n",
+                                                                        HE_ptr->bytes_read);
 
-								if (HE_ptr->bytes_read1) {
-									sprintf(
-										workstr,
-										"%9llu%09llu\n",
-										HE_ptr->bytes_read1,
-										HE_ptr->bytes_read2);
-									htx_strcat(
-										   file_buffer,
-										   workstr);
-								} else {
-									sprintf(
-										workstr,
-										"         %9lu\n",
-										(unsigned long) HE_ptr->bytes_read2);
-									htx_strcat(
-										   file_buffer,
-										   workstr);
-								}	/* endif */
+                                                                htx_strcat(
+                                                                file_buffer,
+                                                                   workstr);
 
 								sprintf(
 								    workstr,
@@ -426,30 +409,15 @@ int	main(int argc, char *argv[])
 								htx_strcat(
 								file_buffer,
 								   workstr);
-								sprintf(
-								    workstr,
-									"  # bytes written                     = ");
-								htx_strcat(
-								file_buffer,
-								   workstr);
-								if (HE_ptr->bytes_writ1) {
-									sprintf(
-										workstr,
-										"%9llu%09llu\n",
-										HE_ptr->bytes_writ1,
-										HE_ptr->bytes_writ2);
-									htx_strcat(
-										   file_buffer,
-										   workstr);
-								} else {
-									sprintf(
-										workstr,
-										"         %9llu\n",
-										HE_ptr->bytes_writ2);
-									htx_strcat(
-										   file_buffer,
-										   workstr);
-								}	/* endif */
+
+                                                                sprintf(
+                                                                    workstr,
+                                                                        "  # bytes written                     =              %5llu\n",
+                                                                        HE_ptr->bytes_writ);
+
+                                                                htx_strcat(
+                                                                file_buffer,
+                                                                   workstr);
 
 								sprintf(
 								    workstr,

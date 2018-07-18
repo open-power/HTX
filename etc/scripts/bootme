@@ -295,7 +295,7 @@ check_space ()
 # If the second command line arguement is bypass, only execute crontab functions
   [ "$2" = "bypass" ] && { CRONSET_ONLY="yes"; touch ${HTX_HOME_DIR}/bootme.bypass; }
 
-# pulls REBOOT statement from ${HTXRGERULES}/bootme/default
+# pulls REBOOT statement from ${HTXREGRULES}/bootme/default
   rules=${HTXREGRULES}/bootme/default
   REBOOT=$(grep "^REBOOT:" $rules | head -n1)
   REBOOT=${REBOOT##*: }

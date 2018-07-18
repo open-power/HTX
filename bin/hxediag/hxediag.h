@@ -55,6 +55,7 @@
 #define TRAVIS_3EN				3
 #define	SHINER					4
 #define GLACIERPARK_1PORT	 	5
+#define LASSEN				6
 
 #define MAX_RETRY	0x10
 
@@ -108,6 +109,7 @@ struct self_test {
 	status  interrupt_test; 				/* Interrupt test with NOP 	   */ 
 	status  speed_test; 
 	status loopback_test;				
+	status health_test;				
 
 }; 
 

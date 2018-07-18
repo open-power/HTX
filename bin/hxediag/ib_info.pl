@@ -44,6 +44,7 @@ if(-e $opensm_pid) { #OpenSM Already running
 } elsif (-e $opensm_service_path) { # Try starting OpenSM Service 
 	print("OpenSMD Daemon present, will start in daemon mode \n") if(!$quiet);
     $rc = `service opensmd start`;
+    sleep(60);
     if( -e $opensm_pid) {
     	print("opensm daemon successfully started \n") if(!$quiet);
         $opensmd = 1;

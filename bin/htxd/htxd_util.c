@@ -481,7 +481,7 @@ int htxd_execute_shell_profile(void)
 	sprintf(trace_string, "/bin/bash %s/etc/scripts/htx_setup.sh > %s/%s 2>&1", global_htx_home_dir, global_htxd_log_dir, HTXD_CREATE_MDT_LOG);
 	return_status = system(trace_string);
 #else
-	sprintf(trace_string, "%s/.profile > %s/%s 2>&1", global_htx_home_dir, global_htxd_log_dir, HTXD_CREATE_MDT_LOG);
+	sprintf(trace_string, "%s/etc/scripts/htx_setup > %s/%s 2>&1", global_htx_home_dir, global_htxd_log_dir, HTXD_CREATE_MDT_LOG);
 	return_status = system(trace_string);
 #endif
 

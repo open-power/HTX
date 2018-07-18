@@ -346,7 +346,7 @@ void register_signal_handlers(void)
 		    break;
 		case SIGTERM:            /* software termination signal */
 		    sigvector.sa_handler = (void (*)(int)) sig_end;
-		    break;
+		    break; 
 		case SIGURG:             /* urgent condition on I/O channel */
 		    sigvector.sa_handler = SIG_DFL;
 		    break;

@@ -44,7 +44,7 @@
   HOST_NAME=`hostname`
   SERIAL_NO=`cat /proc/device-tree/system-id 2>/dev/null || echo "Not Found"`
   TYPE_MODEL_NO=`cat /proc/device-tree/model 2>/dev/null || echo "Not Found"`
-  SYS_FW_LEVEL=`cat /proc/device-tree/openprom/model | cut -d ',' -f2 2>/dev/null || echo "Not Found"`
+  SYS_FW_LEVEL=`cat /proc/device-tree/openprom/model 2>/dev/null | cut -d ',' -f2 2>/dev/null || echo "Not Found"`
 
 # Clear screen
   [ "$1" = "clear" ] && tput clear

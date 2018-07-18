@@ -236,6 +236,8 @@ int htxd_load_exerciser(struct htxshm_HE *p_HE)
 	char rule_path[64];
 	int emc_mode;
 	char trace_str[256];
+	char *hxenvlink2_argv[5];
+	char *hxenvlink2_env[] = { "CUDA_IGNORE_GET_CLOCK_FAILURE=1", "CUDA_ENABLE_UVM_ATS=1", NULL };
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_load_exerciser");
@@ -293,12 +295,30 @@ int htxd_load_exerciser(struct htxshm_HE *p_HE)
 		/* system("export EXTSHM=OFF"); */
 		unsetenv("EXTSHM");
 
-		if ( (execl(exerciser_path, exerciser_name, device_name, run_mode, rule_path, (char *) 0) ) == -1) {
-			sprintf(trace_str, "execl() failed  exerciser_path <%s> exerciser_name <%s> errno = <%d>\n", exerciser_path, exerciser_name, errno);
-			htxd_send_message (trace_str, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
-			HTXD_TRACE(LOG_ON, trace_str);
-			exit(-1);
+		if (strcmp(p_HE->HE_name, "hxenvlink2") == 0) {
+			sprintf(trace_str, "hxenvlink2 is getting loaded");
+			HTXD_TRACE(LOG_OFF, trace_str);
+			hxenvlink2_argv[0] = p_HE->HE_name;
+			hxenvlink2_argv[1] = device_name;
+			hxenvlink2_argv[2] = run_mode;
+			hxenvlink2_argv[3] = rule_path;
+			hxenvlink2_argv[4] = NULL;
+			if ( (execve(exerciser_path, hxenvlink2_argv, hxenvlink2_env))  == -1) {
+				sprintf(trace_str, "execve() failed  exerciser_path <%s> exerciser_name <%s> errno = <%d>\n", exerciser_path, exerciser_name, errno);
+				htxd_send_message (trace_str, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
+				HTXD_TRACE(LOG_ON, trace_str);
+				exit(-1);
+			}
+		} else {
+			if ( (execl(exerciser_path, exerciser_name, device_name, run_mode, rule_path, (char *) 0) ) == -1) {
+				sprintf(trace_str, "execl() failed  exerciser_path <%s> exerciser_name <%s> errno = <%d>\n", exerciser_path, exerciser_name, errno);
+				htxd_send_message (trace_str, 0, HTX_SYS_SOFT_ERROR, HTX_SYS_MSG);
+				HTXD_TRACE(LOG_ON, trace_str);
+				exit(-1);
+			}
 		}
+
+
 
 	case -1:
 		sprintf(trace_str, "exerciser <%s> fork failed with error <%d>", p_HE->sdev_id, errno);

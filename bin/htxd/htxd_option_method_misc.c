@@ -3045,16 +3045,17 @@ int htxd_option_method_get_daemon_state(char **command_result, htxd_command *p_c
 	int daemon_state;
 	int test_running_state;
 	char trace_string[256];
+	int result_length = 1024 * 10;
 
 
-	*command_result = malloc(64);
+	*command_result = malloc(result_length);
 	if(*command_result == NULL) {
 		sprintf(trace_string, "command_result: malloc failed with errno = <%d>", errno);
 		HTXD_TRACE(LOG_ON, trace_string);
 		return -1;
 	}
 
-	memset(*command_result, 0, (64) );
+	memset(*command_result, 0, (result_length) );
 
 	daemon_state = htxd_get_daemon_state();
 	test_running_state = htxd_get_test_running_state();

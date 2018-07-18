@@ -28,7 +28,7 @@
  
 
   if [[ -n $(grep "hxecom" $1 2>/dev/null) ]]
-     then if [[ -e ${HTXRUNSETUP}chatmpvc.runsetup ]]
+     then if [[ -e ${HTXRUNSETUP}hxecom.runsetup ]]
              then echo "Preparing hxecom environment"
                   ${HTXRUNSETUP}hxecom.runsetup
           fi

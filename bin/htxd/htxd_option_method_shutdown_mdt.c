@@ -94,6 +94,7 @@ int htxd_unload_exercisers(htxd_ecg_info *p_ecg_info_list)
 	int					pid_to_unload;
 	int					number_of_exercisers_to_stop;
 	int					i;
+	int                 is_equaliser_stopped_any = 0;
 	int					exer_still_running;
 	char				trace_str[256];
 	htxd_ecg_manager *		p_ecg_manager;
@@ -110,6 +111,22 @@ int htxd_unload_exercisers(htxd_ecg_info *p_ecg_info_list)
 	/* release all semphore locks */
 	htxd_release_all_semaphore(p_ecg_info_list->ecg_sem_id);
 
+    /* to stop exerciser halted by equaliser */
+    for(i = 0; i < number_of_exercisers_to_stop; i++) {
+        pid_to_unload = (shm_union_pointer.HE_addr + i)->PID;
+        if(pid_to_unload != 0) {
+            if( ( (shm_union_pointer.HE_addr + i)->equaliser_halt) == 1) {
+                kill(pid_to_unload, SIGCONT);
+                is_equaliser_stopped_any = 1;
+            }
+        }
+    }
+
+    /* to provide time to deliver SIGCONT */
+    if(is_equaliser_stopped_any == 1) {
+        sleep(2);
+    }
+
 	for(i = 0; i < number_of_exercisers_to_stop; i++) {
 		pid_to_unload = (shm_union_pointer.HE_addr + i)->PID;
 		if(pid_to_unload != 0) {
@@ -125,6 +142,10 @@ int htxd_unload_exercisers(htxd_ecg_info *p_ecg_info_list)
 		exer_still_running = htxd_count_exer_still_running(p_ecg_info_list);
 		if(exer_still_running == 0) {
 			HTXD_TRACE(LOG_OFF, "all exercisers are stopped");
+			break;
+		} else if (exer_still_running < 0) {
+			sprintf(trace_str, "Warning: htxd_count_exer_still_running returned with <%d>, this not an expected value, continue as no exerciser is currently running", exer_still_running);
+			HTXD_TRACE(LOG_ON, trace_str);
 			break;
 		} else {
 			sprintf(trace_str, "still running exerciser count <%d>\n", exer_still_running);
