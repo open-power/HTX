@@ -75,12 +75,15 @@ rule_id = dma_4
 mode = concurrent
 pattern_id = HEXZEROS(4096)
 messages = no
-max_mem = yes
+max_mem = no
 compare = yes
 num_oper = 1
 oper = dma
 width = 8
-mem_percent = 5
+seg_size_64k = 2097152
+num_seg_64k = 1
+seg_size_4k = 2097152
+num_seg_4k = 1
 
 *Enhanced RIM operation 
 rule_id = WRFR_5
@@ -92,3 +95,4 @@ compare = yes
 num_oper = 1
 oper = rim
 width = 8
+mem_percent = 7

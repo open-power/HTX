@@ -1,4 +1,4 @@
-**This rule attempts to saturate fabricbus connecting chips within every  node, Remote chip memory is exercised by every cpu.
+**This rule attempts to saturate fabricbus connecting nodes, Remote node memory is exercised by [0-1] threads of every core.
 **Only one segment will be exercised by each cpu and it is filled with 9 different patterns.
 **Please read the documnetation hxefabricbus.readme_P9 for explaination of rule parameters.
 **************************************************************************************************
@@ -6,9 +6,8 @@
 global_startup_delay = 0
 global_disable_cpu_bind  = NO
 global_disable_filters = no
-global_fabric_links_drive = cores
 *********************************
-rule_id = intra_node_fab_test
+rule_id = inter_node_fab_test
 oper = stride
 pattern_id = HEXFF(8) HEXZEROS(8) 0x5555555555555555 0xAAAAAAAAAAAAAAAA 0xCCCCCCCCCCCCCCCC 0x3333333333333333 0x0F0F0F0F0F0F0F0F 0x3C3C3C3C3C3C3C3C 0x5A5A5A5A5A5A5A5A
 switch_pat_per_seg = all
@@ -17,6 +16,6 @@ num_writes = 1
 num_read_only = 1
 num_read_comp = 1
 width = 8
-affinity = intra_node
+affinity = inter_node
 disable_cpu_bind = NO
-cpu_filter = N*P*C*T*
+cpu_filter = N*P*C*T[0-1]

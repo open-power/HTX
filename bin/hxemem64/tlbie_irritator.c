@@ -357,7 +357,7 @@ void tlb_gen_sequential_cores(void* th){
                         trap(0xBEEFDEAD,pattern[c],parse_read_shm_ptr,t->bind_proc,iter,t,g_data.stanza_ptr);
                         #endif
                     }
-                    char msg_text[200];
+                    char msg_text[500];
                     sprintf(msg_text,"MISCOMPARE(hxetlbie) in rule %s,Rules file=%s\n"
                             "Expected pattern=%llx,Actual value=%llx at Effective address = %llx\n"
                             "Segment address=%llx,num oper=%d,Thread number = %d, CPU number bound with = %d\n",\

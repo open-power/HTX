@@ -1,4 +1,3 @@
-* IBM_PROLOG_BEGIN_TAG 
 *******Global Rules**********
 global_alloc_mem_percent = 70
 global_startup_delay = 0

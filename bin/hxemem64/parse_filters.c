@@ -64,7 +64,7 @@ int parse_mem_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
         strcpy(tmp_filter_str,filter_ptr[filt_idx]);
         if((strchr(tmp_filter_str,'N') == NULL)||(strchr(tmp_filter_str,'P')== NULL)){
             displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:Improper value is provided in rule %s, rule file:%s "
-            "for mem_filer:%s,filter num:%d,cpu filter must conatin both 'N' & 'P'\n",
+            "for mem_filer:%s,filter num:%d,mem filter must conatin both 'N' & 'P'\n",
             __LINE__,__FUNCTION__,r.rule_id,g_data.rules_file_name,filter_ptr[filt_idx],filt_idx);
             return FAILURE;
         }
@@ -332,7 +332,7 @@ int parse_mem_filter(char filter_ptr[][MAX_POSSIBLE_ENTRIES]){
                     
 
                         	chip_ptr[chip_n].mem_details.pdata[page_index].page_wise_usage_mpercent = num_value; 
-                            int temp_mem_percent = g_data.gstanza.global_alloc_mem_percent;
+                            double temp_mem_percent = g_data.gstanza.global_alloc_mem_percent;
                             if(page_index < PAGE_INDEX_2M){
                                 if(g_data.gstanza.global_alloc_mem_size > 0 && g_data.gstanza.global_alloc_mem_size < sysptr->node[n].chip[chip_n].mem_details.pdata[page_index].free){
                                     temp_mem_percent = (g_data.gstanza.global_alloc_mem_size * 100.0) / (sysptr->node[n].chip[chip_n].mem_details.pdata[page_index].free);

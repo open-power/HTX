@@ -31,7 +31,6 @@ TARGET= \
              rules.MBA \
       		 mem.eq.50 \
 	    	 mem.eq.90 \
-             mem.coral_pass1 \
              default \
              default.char \
 			 rules.char_1 \

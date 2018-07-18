@@ -70,7 +70,7 @@ int set_fabricb_exer_page_preferances(){
 }
 
 int memory_segments_calculation(){
-    int rc = SUCCESS,oper = -1,absolute_chip=0,n,c,cpu,k,div_factor = 1;
+    int rc = SUCCESS,oper = -1,absolute_chip=0,n,c,cpu,core,k,div_factor = 1;
     int start_chip_in_node[MAX_NODES] = {0};
     int prev_node_chips = 0,count=0,host_cpu;
     int remote_node =0,remote_chip = 0,count_no_fab_nodes=0;
@@ -124,21 +124,76 @@ int memory_segments_calculation(){
 	/*Identify and mark remote memory chunk for every cpu based inter_node and intra_node test case*/
     switch(oper) {
         case INTRA_NODE:
-            for(n=0;n<sysptr->nodes;n++){ 
-				if(sysptr->node[n].num_chips <= 1){
-					displaym(HTX_HE_INFO,DBG_MUST_PRINT,"No Fabricbus detected in node:%d(num chips=%d),Node must have atleast 2 chips in it,"
-                      "  continuing to next node\n",n,sysptr->node[n].num_chips);
-					count_no_fab_nodes++;
-					continue;
-				}
-                for(c=0;c<sysptr->node[n].num_chips;c++){
-					/*k indicates remote chip within a node*/
-                    /* For every cpu in a chip identify a memory chunk on remote chip of same node, fill fab_g.dest_chip structure.
-                        And eventually count number of segments per chip*/
-                    for(cpu=0,k=absolute_chip+1;cpu<mem_details_per_chip[absolute_chip].num_cpus;cpu++,k++){
-							host_cpu = mem_details_per_chip[absolute_chip].cpulist[cpu];
+			if(g_data.gstanza.global_fab_links_drive_type == CORES_FAB){
+				displaym(HTX_HE_INFO,DBG_MUST_PRINT,"core boundaries will be used to drive  links within nodes\n");
+				for(n=0;n<sysptr->nodes;n++){
+					if(sysptr->node[n].num_chips <= 1){
+						displaym(HTX_HE_INFO,DBG_MUST_PRINT,"No Fabricbus detected in node:%d(num chips=%d),Node must have atleast 2 chips in it,"
+							"  continuing to next node\n",n,sysptr->node[n].num_chips);
+						count_no_fab_nodes++;
+						continue;
+					}	
+					for(c=0;c<sysptr->node[n].num_chips;c++){
+						/*k indicates remote chip within a node*/
+						/* For every cpu in a chip identify a memory chunk on remote chip of same node, fill fab_g.dest_chip structure.
+							And eventually count number of segments per chip*/
+						for(core=0,k=absolute_chip+1;core<mem_details_per_chip[absolute_chip].num_cores;core++,k++){
                             if(k == absolute_chip)k++;
                             if(k >= start_chip_in_node[n] + sysptr->node[n].num_chips ){
+                                k = start_chip_in_node[n];
+                                if(k == absolute_chip)k++;
+                            }
+                            count = 0;
+                            /* skip memory less chips,loop untill chip with memory behind it is identified*/
+                            while(mem_details_per_chip[k].memory_details.total_mem_avail <= 0){
+                                count++;
+                                k = (k+1)%(sysptr->node[n].num_chips + start_chip_in_node[n]);
+                                if(k == absolute_chip){
+                                    count++;
+                                }
+                                if(count == sysptr->node[n].num_chips) {
+                                    displaym(HTX_HE_INFO,DBG_MUST_PRINT,"for cpu:%d,No memory found behind node:%d, num_chips=%d\n",host_cpu,n,count);
+                                    break;
+                                }
+                            }
+							if((mem_details_per_chip[k].memory_details.total_mem_avail > 0) && (k != absolute_chip)){
+								for(cpu=0;cpu<mem_details_per_chip[absolute_chip].core_array[core].num_procs;cpu++){
+										host_cpu = mem_details_per_chip[absolute_chip].core_array[core].lprocs[cpu];
+										fab_g.dest_chip[host_cpu].seg_num  = fab_g.segs_per_chip[k]++;
+										fab_g.dest_chip[host_cpu].chip_num = k;
+										fprintf(fp,"%d (node:%d)\t%d\t\t%d (node:%d)\n-------------------------------------------\n",absolute_chip,n,host_cpu,k,n);
+								}
+							}	
+						}
+						/*capture total L3 size for every chip*/
+						fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
+						absolute_chip++;
+					}
+				}
+				if(count_no_fab_nodes == sysptr->nodes){
+					print_partition_config(HTX_HE_SOFT_ERROR);
+					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:No fabricbus detected within any node of total nodes:%d, "
+						"There must be atleast 2 chips enabled for a node, exiting..\n",
+						__LINE__,__FUNCTION__,sysptr->nodes);
+					return FAILURE;
+				}
+
+			}else if(g_data.gstanza.global_fab_links_drive_type == THREADS_FAB){
+				for(n=0;n<sysptr->nodes;n++){ 
+					if(sysptr->node[n].num_chips <= 1){
+						displaym(HTX_HE_INFO,DBG_MUST_PRINT,"No Fabricbus detected in node:%d(num chips=%d),Node must have atleast 2 chips in it,"
+						  "  continuing to next node\n",n,sysptr->node[n].num_chips);
+						count_no_fab_nodes++;
+						continue;
+					}
+					for(c=0;c<sysptr->node[n].num_chips;c++){
+						/*k indicates remote chip within a node*/
+						/* For every cpu in a chip identify a memory chunk on remote chip of same node, fill fab_g.dest_chip structure.
+							And eventually count number of segments per chip*/
+						for(cpu=0,k=absolute_chip+1;cpu<mem_details_per_chip[absolute_chip].num_cpus;cpu++,k++){
+								host_cpu = mem_details_per_chip[absolute_chip].cpulist[cpu];
+								if(k == absolute_chip)k++;
+								if(k >= start_chip_in_node[n] + sysptr->node[n].num_chips ){
                                 k = start_chip_in_node[n];
                                 if(k == absolute_chip)k++;
                             }
@@ -160,19 +215,25 @@ int memory_segments_calculation(){
                             	fab_g.dest_chip[host_cpu].chip_num = k;
 								fprintf(fp,"%d (node:%d)\t%d\t\t%d (node:%d)\n-------------------------------------------\n",absolute_chip,n,host_cpu,k,n);
                             }
-                    }
-                    /*capture total L3 size for every chip*/
-                    fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
-                    absolute_chip++;
-                }
-            }
-			if(count_no_fab_nodes == sysptr->nodes){
-                print_partition_config(HTX_HE_SOFT_ERROR);
-				displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:No fabricbus detected within any node of total nodes:%d, "
-                    "There must be atleast 2 chips enabled for a node, exiting..\n",
-					__LINE__,__FUNCTION__,sysptr->nodes);
-				return FAILURE;
+						}
+						/*capture total L3 size for every chip*/
+						fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
+						absolute_chip++;
+					}
+            	}
+				if(count_no_fab_nodes == sysptr->nodes){
+					print_partition_config(HTX_HE_SOFT_ERROR);
+					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:No fabricbus detected within any node of total nodes:%d, "
+						"There must be atleast 2 chips enabled for a node, exiting..\n",
+						__LINE__,__FUNCTION__,sysptr->nodes);
+					return FAILURE;
+				}
 			}
+            else {
+                    displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:wrong value of g_data.global_fab_links_drive_type = %d, please check rule file\n",
+                        g_data.gstanza.global_fab_links_drive_type);
+                    return (FAILURE);
+            }
             break;
 
         case INTER_NODE:
@@ -183,53 +244,102 @@ int memory_segments_calculation(){
 					__LINE__,__FUNCTION__,sysptr->nodes);
 				return FAILURE;
 			}
-            for(n=0;n<sysptr->nodes;n++){
-				/*printf("###node = %d\n",n);*/
-                for(c=0,remote_chip=0;c<sysptr->node[n].num_chips;c++,remote_chip++){
-                    remote_node = (n+1)%sysptr->nodes;
-					/*printf("\t**chip = %d\n",c);*/
-
-					/*k indicates remote chip in remote  node*/
-                    /* For every cpu in a chip identify a memory chunk on remote same offset chip of remote node, fill fab_g.dest_chip structure.
-                        And eventually count number of segments per chip*/
-                    for(cpu=0,k=(start_chip_in_node[remote_node] + (remote_chip%sysptr->node[remote_node].num_chips));cpu<mem_details_per_chip[absolute_chip].num_cpus;cpu++){
-                        count = 0;
-						host_cpu = mem_details_per_chip[absolute_chip].cpulist[cpu];
-                        while(mem_details_per_chip[k].memory_details.total_mem_avail <= 0){
-                            count++;
-                            k = (k+1)%(sysptr->node[remote_node].num_chips + start_chip_in_node[remote_node]);
-                            if(count == sysptr->node[remote_node].num_chips){ 
-								displaym(HTX_HE_INFO,DBG_MUST_PRINT,"for cpu:%d, No memory found behind remote node:%d, num_chips=%d\n",host_cpu,n,count);
-								remote_node++;
-								break;
+			if(g_data.gstanza.global_fab_links_drive_type == CORES_FAB){
+				displaym(HTX_HE_INFO,DBG_MUST_PRINT,"core boundaries will be used to drive  links between nodes\n");
+				for(n=0;n<sysptr->nodes;n++){
+					for(c=0,remote_chip=0;c<sysptr->node[n].num_chips;c++,remote_chip++){
+						remote_node = (n+1)%sysptr->nodes;
+						for(core=0,k=(start_chip_in_node[remote_node] + (remote_chip%sysptr->node[remote_node].num_chips));core<mem_details_per_chip[absolute_chip].num_cores;core++){
+							count = 0;
+							while(mem_details_per_chip[k].memory_details.total_mem_avail <= 0){
+								count++;
+								k = (k+1)%(sysptr->node[remote_node].num_chips + start_chip_in_node[remote_node]);
+								if(count == sysptr->node[remote_node].num_chips){
+									displaym(HTX_HE_INFO,DBG_MUST_PRINT,"for cpu:%d, No memory found behind remote node:%d, num_chips=%d\n",host_cpu,n,count);
+									remote_node++;
+									break;
+								}
 							}
+							if(remote_node == n){
+								remote_node = (remote_node + 1)%sysptr->nodes;
+								k = (sysptr->node[n].num_chips + start_chip_in_node[n] + (remote_chip % sysptr->node[remote_node].num_chips));
+							}
+							if ( remote_node >= sysptr->nodes){
+								remote_node = 0;
+								k = start_chip_in_node[remote_node] + (remote_chip%sysptr->node[remote_node].num_chips);
+								if(remote_node == n){
+									k = (sysptr->node[n].num_chips + start_chip_in_node[n] + (remote_chip % sysptr->node[remote_node].num_chips));
+									remote_node = (remote_node + 1)%sysptr->nodes;
+								}
+							}
+
+							k = (k%sysptr->num_chip_mem_pools);/*can be removed*/
+							for(cpu=0;cpu<mem_details_per_chip[absolute_chip].core_array[core].num_procs;cpu++){
+								host_cpu = mem_details_per_chip[absolute_chip].core_array[core].lprocs[cpu];
+								fab_g.dest_chip[host_cpu].seg_num  = fab_g.segs_per_chip[k]++;
+								fab_g.dest_chip[host_cpu].chip_num = k;
+								fprintf(fp,"%d(node:%d)\t%d\t\t%d (node:%d)\n-----------------------------------------------\n",absolute_chip,n,host_cpu,k,remote_node);
+							}
+							k = (k + sysptr->node[remote_node++].num_chips);
                         }
-                        if(remote_node == n){
-                            remote_node = (remote_node + 1)%sysptr->nodes;
-                            k = (sysptr->node[n].num_chips + start_chip_in_node[n] + (remote_chip % sysptr->node[remote_node].num_chips)); 
-                        }
-                        if ( remote_node >= sysptr->nodes){
-                            remote_node = 0;
-                            k = start_chip_in_node[remote_node] + (remote_chip%sysptr->node[remote_node].num_chips);
-                            if(remote_node == n){
-                                k = (sysptr->node[n].num_chips + start_chip_in_node[n] + (remote_chip % sysptr->node[remote_node].num_chips)); 
-                                remote_node = (remote_node + 1)%sysptr->nodes;
-                            }
-                        }
-                        k = (k%sysptr->num_chip_mem_pools);/*can be removed*/
-                        if(mem_details_per_chip[k].memory_details.total_mem_avail > 0){
-							fab_g.dest_chip[host_cpu].seg_num  = fab_g.segs_per_chip[k]++;
-							fab_g.dest_chip[host_cpu].chip_num = k;
-							fprintf(fp,"%d(node:%d)\t%d\t\t%d (node:%d)\n-----------------------------------------------\n",absolute_chip,n,host_cpu,k,remote_node);
-                        }
-                        k = (k + sysptr->node[remote_node++].num_chips);
-                    }   
-                    /*capture total L3 size for every chip*/
-                    fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
-                    absolute_chip++;
-                }
-            }
-    
+						/*capture total L3 size for every chip*/
+                    	fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
+                    	absolute_chip++;
+                	}
+				}
+			}else if(g_data.gstanza.global_fab_links_drive_type == THREADS_FAB){
+            	for(n=0;n<sysptr->nodes;n++){
+				/*printf("###node = %d\n",n);*/
+                	for(c=0,remote_chip=0;c<sysptr->node[n].num_chips;c++,remote_chip++){
+                    	remote_node = (n+1)%sysptr->nodes;
+						/*printf("\t**chip = %d\n",c);*/
+
+						/*k indicates remote chip in remote  node*/
+                    	/* For every cpu in a chip identify a memory chunk on remote same offset chip of remote node, fill fab_g.dest_chip structure.
+                        And eventually count number of segments per chip*/
+                    	for(cpu=0,k=(start_chip_in_node[remote_node] + (remote_chip%sysptr->node[remote_node].num_chips));cpu<mem_details_per_chip[absolute_chip].num_cpus;cpu++){
+                        	count = 0;
+							host_cpu = mem_details_per_chip[absolute_chip].cpulist[cpu];
+                        	while(mem_details_per_chip[k].memory_details.total_mem_avail <= 0){
+                            	count++;
+                            	k = (k+1)%(sysptr->node[remote_node].num_chips + start_chip_in_node[remote_node]);
+                            	if(count == sysptr->node[remote_node].num_chips){ 
+									displaym(HTX_HE_INFO,DBG_MUST_PRINT,"for cpu:%d, No memory found behind remote node:%d, num_chips=%d\n",host_cpu,n,count);
+									remote_node++;
+									break;
+								}
+                        	}
+                        	if(remote_node == n){
+                            	remote_node = (remote_node + 1)%sysptr->nodes;
+                            	k = (sysptr->node[n].num_chips + start_chip_in_node[n] + (remote_chip % sysptr->node[remote_node].num_chips)); 
+                        	}
+                        	if ( remote_node >= sysptr->nodes){
+                            	remote_node = 0;
+                            	k = start_chip_in_node[remote_node] + (remote_chip%sysptr->node[remote_node].num_chips);
+                            	if(remote_node == n){
+                                	k = (sysptr->node[n].num_chips + start_chip_in_node[n] + (remote_chip % sysptr->node[remote_node].num_chips)); 
+                                	remote_node = (remote_node + 1)%sysptr->nodes;
+                            	}
+                        	}
+                        	k = (k%sysptr->num_chip_mem_pools);/*can be removed*/
+                        	if(mem_details_per_chip[k].memory_details.total_mem_avail > 0){
+								fab_g.dest_chip[host_cpu].seg_num  = fab_g.segs_per_chip[k]++;
+								fab_g.dest_chip[host_cpu].chip_num = k;
+								fprintf(fp,"%d(node:%d)\t%d\t\t%d (node:%d)\n-----------------------------------------------\n",absolute_chip,n,host_cpu,k,remote_node);
+                        	}
+                        	k = (k + sysptr->node[remote_node++].num_chips);
+                    	}   
+                    	/*capture total L3 size for every chip*/
+                    	fab_g.fab_chip_L3_sz[absolute_chip] = ((sysptr->node[n].chip[c].num_cores/div_factor) * g_data.sys_details.cache_info[L3].cache_size);
+                    	absolute_chip++;
+                	}
+            	}
+    		}
+			else {
+					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:wrong value of g_data.global_fab_links_drive_type = %d, please check rule file\n",
+						g_data.gstanza.global_fab_links_drive_type);
+					return (FAILURE);
+			}
 			/*for(int i=0;i<sysptr->num_chip_mem_pools;i++){
 				printf("\t L3 chip size = %ld, aboslute chip:%d, segs=%d\n",fab_g.fab_chip_L3_sz[i],i,fab_g.segs_per_chip[i]);
 			}*/
@@ -237,7 +347,7 @@ int memory_segments_calculation(){
 
         	default: displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:Unknown operation in fabricbus exer,  %d\n",
             __LINE__,__FUNCTION__,oper);        
-    }
+	}
 	fclose(fp);
     return rc;
 		

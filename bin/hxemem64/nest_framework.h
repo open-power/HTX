@@ -165,10 +165,17 @@
 #define MAX_FILTERS             20
 #define MAX_POSSIBLE_ENTRIES    200
 
+#define THREADS_FAB		0
+#define CORES_FAB		1
 #define STATS_VAR_INC(var, val) \
-    pthread_mutex_lock(&g_data.tmutex);\
-    g_data.nest_stats.var += val; \
-    pthread_mutex_unlock(&g_data.tmutex);
+    if(exer_err_halt_status(&g_data.htx_d)){ \
+        STATS_HTX_UPDATE(UPDATE) \
+    }else { \
+        pthread_mutex_lock(&g_data.tmutex); \
+        g_data.nest_stats.var += val; \
+        pthread_mutex_unlock(&g_data.tmutex);\
+    } \
+
 
 #define STATS_VAR_INIT(var, val) \
     pthread_mutex_lock(&g_data.tmutex); \
@@ -192,24 +199,29 @@
 	#define debug(...)
 #endif
 enum test_type { MEM=0,FABRICB,TLB,CACHE };
-enum mem_oper_type { OPER_MEM=0, OPER_DMA, OPER_RIM, OPER_TLB, OPER_MPSS, OPER_STRIDE, OPER_L4_ROLL, OPER_MBA, OPER_CORSA };
+enum mem_oper_type { OPER_MEM=0,OPER_STRIDE, OPER_RIM, OPER_DMA, OPER_RAND_MEM, LATENCY_TEST, OPER_MPSS, OPER_L4_ROLL, OPER_MBA, OPER_CORSA };
 enum caches	{ L1=0,L2,L3,L4 };
 enum cache_opers {NONE=0,OPER_CACHE,OPER_PREFETCH};
 enum cache_tests {CACHE_BOUNCE_ONLY=0,CACHE_BOUNCE_WITH_PREF,CACHE_ROLL_ONLY,CACHE_ROLL_WITH_PREF,PREFETCH_ONLY};
 enum affinity { LOCAL=1,REMOTE_CHIP,FLOATING,INTRA_NODE,INTER_NODE,ABOSOLUTE };
-
-#define WRC                     3
-#define MAX_PATTERN_TYPES       4
-#define MAX_TEST_TYPES          4
-#define MAX_OPER_TYPES          4
-#define MAX_MEM_ACCESS_TYPES    3 
-enum pattern_size_type { PATTERN_SIZE_NORMAL=0, PATTERN_SIZE_BIG, PATTERN_ADDRESS, PATTERN_RANDOM };
-enum basic_oper {WRITE=0,READ,COMPARE,RIM};
+enum pattern_size_type { PATTERN_SIZE_NORMAL=0, PATTERN_SIZE_BIG, PATTERN_ADDRESS, PATTERN_RANDOM,RANDOM_MEM_ACCESS };
+enum data_oper {WRITE=0,READ,COMPARE,RIM};
 enum width_oper {DWORD=0,WORD,BYTE};
 
-typedef int (*op_fptr)(int,void*,void*,int,void*,void*,void*,void*);
+#define WRC                     3
+#define MAX_PATTERN_TYPES       5
+#define MAX_TEST_TYPES          4 /*MEM,FABRICB,TLB,CACHE*/
+#define MAX_MEM_OPER_TYPES	    10
+#define MAX_DATA_OPER_TYPES     4 /*write,read,comp,rim*/
+#define MAX_MEM_ACCESS_TYPES    3 /*width (8,4,1)*/
+
+#define LATENCY_TEST_OPERS      1000000
+#define LATENCY_TEST_SEGMENTS   3
+
 typedef int (*exer_mem_alloc_fptr)(void);
 typedef int (*exer_stanza_oper_fptr)(void);
+typedef int (*mem_data_op_fptr)(unsigned long,void*,void*,int,void*,void*,void*,void*);
+typedef int (*mem_op_fptr)(int);
 
 struct page_wise_seg_info {
 	unsigned long seg_num;
@@ -310,7 +322,7 @@ struct sys_info {
 	struct mem_info memory_details; /*RV1: dont need to keep all mem deatils at system level*/
 	int num_chip_mem_pools;
 	struct chip_mem_pool_info chip_mem_pool_data[MAX_CHIPS];
-	int shmmax;
+	unsigned long shmmax;
 	int shmall;
 	int shmmni;
 };
@@ -330,7 +342,7 @@ struct filter_info{
 };
 
 struct global_rule{
-    int global_alloc_mem_percent;
+    double global_alloc_mem_percent;
 	unsigned int global_mem_4k_use_percent;
 	unsigned int global_mem_64k_use_percent;
     int          global_alloc_huge_page;
@@ -341,9 +353,10 @@ struct global_rule{
     int			 global_startup_delay;    /* Seconds to sleep before starting the test */
 	int 		 global_disable_filters;
 	int 		 global_num_threads; /* used only in case of disable_filters = yes*/
+	int 		 global_fab_links_drive_type; /* flag to mark whether cores or threads to distribute accross X/A links  in fab exer algorithm*/
 };
 struct rule_info {
-    char                    rule_id[16];                /* Rule Id                                        */
+    char                    rule_id[32];                /* Rule Id                                        */
 	int                     stanza_num; 
     char                    pattern_id[9];              /* /htx/pattern_lib/xxxxxxxx                      */
     int                     num_oper;                   /* number of operations to be performed           */
@@ -457,6 +470,14 @@ struct mem_exer_thread_info{
     int bit_mask[MAX_L4_MASKS];					 /*L4*/
     unsigned int start_offset; 					 /*offset address for every thread in L4*/
     struct page_wise_seg_info *seg_details;
+    double write_latency;
+    double read_latency;
+    unsigned long th_seed;
+    unsigned long rand_expected_value;           /*expected value track in random pattern,usefull in miscompare print*/
+	struct drand48_data buffer;
+    /*rand_debug*/
+    unsigned long rc_pass_count;
+    unsigned long rc_offset;
 };
 	
 /****************************************************
@@ -586,6 +607,7 @@ struct cache_exer_info {
     struct  contiguous_mem_info *cont_mem;
     int     num_cont_mem_chunks;
     struct cache_exer_thread_info *cache_th_data;
+	unsigned int cache_instance;   /* used to over write static cache insance with srad no.,incase of imbalced config*/
 };
 
 struct nest_stats_info {
@@ -645,8 +667,10 @@ int fill_exer_huge_page_requirement(void);
 void print_partition_config(int);
 int displaym(int,int , const char *,...);
 int read_rules(void);
-int mem_exer_opearation(void);
-
+int nest_framework_fun(void);
+int fill_per_chip_segment_details(void);
+int fill_system_segment_details(void);
+int run_mem_stanza_operation(void);
 void SIGCPUFAIL_handler(int,int, struct sigcontext *);
 void reg_sig_handlers(void);
 int read_cmd_line(int argc,char *argv[]);
@@ -656,6 +680,7 @@ int get_system_details(void);
 int apply_process_settings(void);
 int modify_shared_mem_limits_linux(unsigned long);
 int dump_miscompared_buffers(int,unsigned long,int,int,unsigned long *,int,int,int,struct segment_detail*);
+int log_mem_seg_details(void);
 int parse_cpu_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
 int parse_mem_filter(char[MAX_FILTERS][MAX_POSSIBLE_ENTRIES]);
 int allocate_mem_for_threads(void);
@@ -663,73 +688,88 @@ void release_thread_resources(int);
 int remove_shared_memory(void);
 int apply_filters(void);
 void print_memory_allocation_seg_details(int);
+int fun_NULL(void);
 #ifdef __HTX_LINUX__
 extern void SIGUSR2_hdl(int, int, struct sigcontext *);
 #endif
 
 /*Normal pattern size operation functions*/
-int mem_operation_write_dword(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_write_word(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_write_byte(int,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_write_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_write_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_write_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-int mem_operation_read_dword(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_read_word(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_read_byte(int,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_read_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_read_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_read_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-int mem_operation_comp_dword(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_comp_word(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_comp_byte(int,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_comp_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_comp_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_comp_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-int mem_operation_rim_dword(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_rim_word(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_rim_byte(int,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_rim_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_rim_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_rim_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
 /*Big size pattern file operation functions*/
-int pat_operation_write_dword(int,void *,void *,int,void *,void *,void *,void*);
-int pat_operation_write_word(int,void *,void *,int,void *,void *,void *,void*);
-int pat_operation_write_byte(int,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_write_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_write_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_write_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-int pat_operation_comp_dword(int,void *,void *,int,void *,void *,void *,void*);
-int pat_operation_comp_word(int,void *,void *,int,void *,void *,void *,void*);
-int pat_operation_comp_byte(int,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_comp_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_comp_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_comp_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-int pat_operation_rim_dword(int,void *,void *,int,void *,void *,void *,void*);
-int pat_operation_rim_word(int,void *,void *,int,void *,void *,void *,void*);
-int pat_operation_rim_byte(int,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_rim_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_rim_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int pat_operation_rim_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
 /*Address pattern operation functions*/
-int mem_operation_write_addr(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_comp_addr(int,void *,void *,int,void *,void *,void *,void*);
-int mem_operation_write_addr_comp(int,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_write_addr(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_comp_addr(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int mem_operation_write_addr_comp(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
 /*Random type pattern operation functions*/
-int rand_operation_write_dword(int,void *,void *,int,void *,void *,void *,void*);
-int rand_operation_write_word(int,void *,void *,int,void *,void *,void *,void*);
-int rand_operation_write_byte(int,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_write_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_write_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_write_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-int rand_operation_comp_dword(int,void *,void *,int,void *,void *,void *,void*);
-int rand_operation_comp_word(int,void *,void *,int,void *,void *,void *,void*);
-int rand_operation_comp_byte(int,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_comp_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_comp_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_comp_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-int rand_operation_rim_dword(int,void *,void *,int,void *,void *,void *,void*);
-int rand_operation_rim_word(int,void *,void *,int,void *,void *,void *,void*);
-int rand_operation_rim_byte(int,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_rim_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_rim_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_operation_rim_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
 
-unsigned long get_random_no_64(unsigned long*);
-unsigned int  get_random_no_32(unsigned long*);
-unsigned char get_random_no_8(unsigned long*);
+/*Random memory access/latency test operation functions*/
+int rand_mem_access_wr_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_mem_access_rd_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_mem_access_cmp_dword(unsigned long,void *,void *,int,void *,void *,void *,void*);
+
+int rand_mem_access_wr_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_mem_access_rd_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_mem_access_cmp_word(unsigned long,void *,void *,int,void *,void *,void *,void*);
+
+int rand_mem_access_wr_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_mem_access_rd_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
+int rand_mem_access_cmp_byte(unsigned long,void *,void *,int,void *,void *,void *,void*);
+
+/*unsigned long get_random_no_64(unsigned int*);*/
+unsigned long get_random_no_64(struct drand48_data*);
+unsigned int  get_random_no_32(struct drand48_data*);
+unsigned char get_random_no_8(struct drand48_data*);
 
 /*nstride operation related functions*/
 int do_stride_operation(int);
-int write_dword(void*, int,int,int, unsigned long*);
-int read_dword(void*,int,int);
-int read_comp_dword(void*,int,int, int, unsigned long*,int,struct segment_detail*);
-int write_word(void*,int,int,int,unsigned long*);
-int read_word(void*,int,int);
-int read_comp_word(void*,int,int,int,unsigned long*,int,struct segment_detail*);
-int write_byte(void*,int,int,int,unsigned long*);
-int read_byte(void*,int,int);
-int read_comp_byte(void*,int,int,int,unsigned long*,int,struct segment_detail*);
+int write_dword(void*,unsigned long ,int,int,struct mem_exer_thread_info*);
+int read_dword(void*,unsigned long,int);
+int read_comp_dword(void*,unsigned long,int, int,int,struct segment_detail*);
+int write_word(void*,unsigned long,int,int,struct mem_exer_thread_info*);
+int read_word(void*,unsigned long,int);
+int read_comp_word(void*,unsigned long,int,int,int,struct segment_detail*);
+int write_byte(void*,unsigned long,int,int,struct mem_exer_thread_info*);
+int read_byte(void*,unsigned long,int);
+int read_comp_byte(void*,unsigned long,int,int,int,struct segment_detail*);
 
 /*fabricbus specific modules*/
 int set_fabricb_exer_page_preferances(void);
@@ -740,6 +780,7 @@ int fill_fabb_thread_structure(struct chip_mem_pool_info*,int);
 int run_tlb_operaion(void);
 /*cache exer specific modules*/
 int fill_cache_exer_mem_req(void);
+int setup_memory_to_use(void);
 int cache_exer_operations(void);
 void* prefetch_thread_function(void*);
 void* cache_thread_function(void*);

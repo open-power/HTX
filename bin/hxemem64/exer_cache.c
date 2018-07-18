@@ -1,3 +1,18 @@
+/* IBM_PROLOG_BEGIN_TAG */
+/*
+ * Copyright 2003,2016 IBM International Business Machines Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.
+*/
 #include "nest_framework.h"
 #define PAGEMAP_ENTRY 8
 #define GET_BIT(X,Y) (X & ((uint64_t)1<<Y)) >> Y
@@ -16,7 +31,6 @@ void update_hxecache_stats(void);
 int sort_huge_pages(void);
 int fill_contiguous_chunks_details(void);
 int identify_contiguous_mem_chunks(void);
-int setup_memory_to_use(void);
 int worstcase_mem_to_allocate_p9(void);
 int worstcase_mem_to_allocate_p8(void);
 int fill_cache_exer_thread_context(void);
@@ -42,19 +56,34 @@ int print_thread_data(void);
 int modify_filters_for_undertest_cache_instance(void);
 
 int fill_cache_exer_mem_req(){
-    int rc = SUCCESS,chip=g_data.dev_id;
+    int rc = SUCCESS,chip=g_data.dev_id,chip_map_count,i;
     struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[0];
     struct page_wise_seg_info *seg_details;
     unsigned long seg_size=0;
     int seg=0,num_segs=0;/*One seg of hugepage size and one segment with base pagesize */
     printf("coming in fill_cache_exer_mem_req()\n");
 
+    /*Below logic is to map logical instance number to logical chip number of Nest FW structure having cpus in it, i.e
+    to avoid mapping to chip having only memory in it(srad to PIR map)*/
+	cache_g.cache_instance = g_data.dev_id;
+    chip_map_count = -1;
+    for(i=0;i<g_data.sys_details.num_chip_mem_pools;i++){
+        if(mem_details_per_chip[i].num_cores > 0){
+            chip_map_count++;
+            if ( chip == chip_map_count){
+                chip = i;
+				cache_g.cache_instance = chip;
+                break;
+            }
+        } 
+    }
+
     /* If selected chip does not have memory, over write the structure and still go ahead n fill segment details for that chip*/
     if(mem_details_per_chip[chip].memory_details.total_mem_avail ==  0){
         displaym(HTX_HE_INFO,DBG_MUST_PRINT,"There is no mem behind chip:%d, cache instance may not get local memory!\n",chip);
 
         mem_details_per_chip[chip].has_cpu_and_mem = 1;
-        for(int i=0; i<MAX_PAGE_SIZES; i++) {
+        for(i=0; i<MAX_PAGE_SIZES; i++) {
             mem_details_per_chip[chip].memory_details.pdata[i].supported = g_data.sys_details.memory_details.pdata[i].supported;
         }
     } 
@@ -288,7 +317,7 @@ int setup_memory_to_use(){
     int cache_pi    = cache_g.cache_pages.huge_page_index;
     int prefetch_pi = cache_g.cache_pages.prefetch_page_index;
     unsigned char       *p, *addr;
-    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
     struct cache_mem_info* mem = &cache_g.cache_pages;
 
     unsigned long   shm_size    = chip_under_test->memory_details.pdata[cache_pi].page_wise_seg_data[0].shm_size;
@@ -327,7 +356,7 @@ int setup_memory_to_use(){
 }
 int worstcase_mem_to_allocate_p9() {
     int rc = SUCCESS;
-    struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
     int fused_core_factor=1;
 
     if(DD1_FUSED_CORE == get_p9_core_type()){
@@ -352,7 +381,7 @@ int worstcase_mem_to_allocate_p9() {
 
 int worstcase_mem_to_allocate_p8(){
     int rc = SUCCESS;
-    struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
 
     cache_g.max_possible_cache_threads      = mem_details_per_chip->num_cores;
     cache_g.max_possible_prefetch_threads   = mem_details_per_chip->num_cpus;
@@ -365,7 +394,7 @@ int worstcase_mem_to_allocate_p8(){
 
 int fill_cache_exer_thread_context(){
     int rc = SUCCESS,excluded_cores=0,pref_cpu = 0;
-    struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    struct chip_mem_pool_info* mem_details_per_chip  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
 
     int fused_core_cache_thread = 0;
     if((DD1_FUSED_CORE == get_p9_core_type())&& ((g_data.sys_details.true_pvr == POWER9_NIMBUS) || (g_data.sys_details.true_pvr == POWER9_CUMULUS))){
@@ -387,7 +416,15 @@ int fill_cache_exer_thread_context(){
     for(int c=0; c<mem_details_per_chip->num_cores; c++){    
         if(mem_details_per_chip->inuse_core_array[c].num_procs > 0){
             if(g_data.stanza_ptr->cache_test_case != PREFETCH_ONLY){
-                g_data.stanza_ptr->num_cache_threads_to_create = (g_data.stanza_ptr->num_cache_threads_to_create + 1 + fused_core_cache_thread);
+				if((fused_core_cache_thread == 1) && (mem_details_per_chip->inuse_core_array[c].num_procs >= 2)){
+                	g_data.stanza_ptr->num_cache_threads_to_create = (g_data.stanza_ptr->num_cache_threads_to_create + 1 + fused_core_cache_thread);
+				}else {
+					if(mem_details_per_chip->inuse_core_array[c].num_procs == 1){
+						displaym(HTX_HE_INFO,DBG_DEBUG_PRINT,"[%d]%s:There is only 1 cpu found in core :%d ,cache "
+							"rollover may not possible for  this core.\n",__LINE__,__FUNCTION__,c);
+					}
+					g_data.stanza_ptr->num_cache_threads_to_create = (g_data.stanza_ptr->num_cache_threads_to_create + 1);
+				}
             }
         }else{
             excluded_cores++;
@@ -400,7 +437,7 @@ int fill_cache_exer_thread_context(){
         }
     }
     if(excluded_cores){
-        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"[%d]%s:Looks like %d number of cores are excluded in cpu_filter "
+        displaym(HTX_HE_INFO,DBG_MUST_PRINT,"[%d]%s:Looks like %d number of cores are excluded in cpu_filter, "
             "cache operation will not perfomrmed for these cores\n",__LINE__,__FUNCTION__,excluded_cores);
     } 
 
@@ -427,7 +464,7 @@ int fill_cache_exer_thread_context(){
         rc = fill_prefetch_threads_context();
     }
     if((g_data.stanza_ptr->num_prefetch_threads_to_create <= 0) && (g_data.stanza_ptr->num_cache_threads_to_create <= 0)){
-        displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s: num of threads resulted into zero,cache threads=%d, prefect threads=%d",
+        displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s: num of threads resulted into zero,cache threads=%d, prefect threads=%d,"
             " total_threads = %d\n",__LINE__,__FUNCTION__,g_data.stanza_ptr->num_cache_threads_to_create,
             g_data.stanza_ptr->num_prefetch_threads_to_create,g_data.stanza_ptr->num_threads);
         return FAILURE;
@@ -436,7 +473,7 @@ int fill_cache_exer_thread_context(){
 }
 int fill_prefetch_threads_context(){
     int thread_num=0,rc=SUCCESS,cpu=0,core=0;
-    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
     struct thread_data* th = &g_data.thread_ptr[0];
     struct cache_exer_thread_info *local_ptr = NULL;
     int cache_threads_per_core = 1;
@@ -517,7 +554,7 @@ int derive_prefetch_algorithm_to_use(){
 
     int prefetch_algorithms[MAX_PREFETCH_ALGOS] = { PREFETCH_IRRITATOR , PREFETCH_NSTRIDE ,
                                                     PREFETCH_PARTIAL, PREFETCH_TRANSIENT , PREFETCH_NA };
-    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
 
     int     pf_algo_to_use;
 
@@ -613,8 +650,8 @@ int find_cont_mem_cache_thread(int t){
     return (FAILURE);
 }
 int fill_cache_threads_context(){
-    int thread_num=0,rc=SUCCESS,cpu=0,core=0;
-    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    int thread_num=0,rc=SUCCESS,cpu=0,core=0,single_thread=0;
+    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
     struct thread_data* th = &g_data.thread_ptr[0];
     struct cache_exer_thread_info *local_ptr = NULL;
     int fused_core_flag = 0,p9_mult_factor = 2,mem_per_thread;
@@ -634,61 +671,75 @@ int fill_cache_threads_context(){
         if((fused_core_flag == 1) && (core == chip_under_test->inuse_num_cores)){
             core = 0;      
             cpu = (chip_under_test->inuse_core_array[core].num_procs/2);
-            thread_num = chip_under_test->inuse_core_array[0].num_procs/2;
+			if(chip_under_test->inuse_core_array[0].num_procs == 1 ){/* Take care of thread_num if only cpu is enabled in the core*/
+				single_thread = 1;
+			}else{
+				thread_num = chip_under_test->inuse_core_array[0].num_procs/2;
+			}
         	local_ptr = &cache_g.cache_th_data[thread_num];
             walk_2_into_cores = 1;
             core_end_index = -1;
         }
-        core_end_index += (chip_under_test->inuse_core_array[core].num_procs);
-        th[thread_num].testcase_thread_details  = (void *)local_ptr; 
-        th[thread_num].thread_num               = thread_num;
-        th[thread_num].bind_proc                = chip_under_test->inuse_core_array[core].lprocs[cpu];
-        if(cpus_track[core][cpu] == UNSET){
-            cpus_track[core][cpu] = SET;
-        }
-        local_ptr->oper_type                    = OPER_CACHE;
-        local_ptr->start_class                  = 0;
-        local_ptr->found_cont_pages             = 0;
+		if(single_thread != 1) {
+				th[thread_num].testcase_thread_details  = (void *)local_ptr; 
+				th[thread_num].thread_num               = thread_num;
+				th[thread_num].bind_proc                = chip_under_test->inuse_core_array[core].lprocs[cpu];
+				if(cpus_track[core][cpu] == UNSET){
+					cpus_track[core][cpu] = SET;
+				}
+				local_ptr->oper_type                    = OPER_CACHE;
+				local_ptr->start_class                  = 0;
+				local_ptr->found_cont_pages             = 0;
 
-        char* pat_ptr   = (char *)&local_ptr->pattern;
-        for (int k=0; k<sizeof(local_ptr->pattern); k++) {
-            *pat_ptr++ = (thread_num+1);
-        }
-        for(int p=0;p<MAX_HUGE_PAGES_PER_CACHE_THREAD;p++){
-             local_ptr->contig_mem[p] = NULL;
-        }
-        switch (g_data.stanza_ptr->cache_test_case){
-            case CACHE_BOUNCE_ONLY:
-            case CACHE_BOUNCE_WITH_PREF:
-                mem_per_thread = (g_data.sys_details.cache_info[L2].cache_line_size/g_data.stanza_ptr->num_cache_threads_to_create);
-                local_ptr->walk_class_jump = 1;
-                local_ptr->offset_within_cache_line = (mem_per_thread * j);
-                local_ptr->num_mem_sets = 1;
+				char* pat_ptr   = (char *)&local_ptr->pattern;
+				for (int k=0; k<sizeof(local_ptr->pattern); k++) {
+					*pat_ptr++ = (thread_num+1);
+				}
+				for(int p=0;p<MAX_HUGE_PAGES_PER_CACHE_THREAD;p++){
+					 local_ptr->contig_mem[p] = NULL;
+				}
+				switch (g_data.stanza_ptr->cache_test_case){
+					case CACHE_BOUNCE_ONLY:
+					case CACHE_BOUNCE_WITH_PREF:
+						mem_per_thread = (g_data.sys_details.cache_info[L2].cache_line_size/g_data.stanza_ptr->num_cache_threads_to_create);
+						local_ptr->walk_class_jump = 1;
+						local_ptr->offset_within_cache_line = (mem_per_thread * j);
+						local_ptr->num_mem_sets = 1;
 
-                break;
-            case CACHE_ROLL_ONLY:
-            case CACHE_ROLL_WITH_PREF:
-                local_ptr->walk_class_jump  =  1;
-                local_ptr->end_class        =  (p9_mult_factor * g_data.sys_details.cache_info[g_data.stanza_ptr->tgt_cache].cache_associativity) - 1;    
-                local_ptr->num_mem_sets     =  (cache_g.contiguous_mem_required/cache_g.cache_pages.huge_page_size);
-                if(cache_g.contiguous_mem_required % cache_g.cache_pages.huge_page_size){
-                    local_ptr->num_mem_sets++;
-                }
-                local_ptr->offset_within_cache_line = 0;
-                break;
-        }
-        rc = find_cont_mem_cache_thread(thread_num);
-        if(rc != SUCCESS){
-            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s: fill_thread_mem_details() failed with rc = %d\n",__LINE__,__FUNCTION__,rc);
-            return(FAILURE);
-        }
+						break;
+					case CACHE_ROLL_ONLY:
+					case CACHE_ROLL_WITH_PREF:
+						local_ptr->walk_class_jump  =  1;
+						local_ptr->end_class        =  (p9_mult_factor * g_data.sys_details.cache_info[g_data.stanza_ptr->tgt_cache].cache_associativity) - 1;    
+						local_ptr->num_mem_sets     =  (cache_g.contiguous_mem_required/cache_g.cache_pages.huge_page_size);
+						if(cache_g.contiguous_mem_required % cache_g.cache_pages.huge_page_size){
+							local_ptr->num_mem_sets++;
+						}
+						local_ptr->offset_within_cache_line = 0;
+						break;
+				}
+				rc = find_cont_mem_cache_thread(thread_num);
+				if(rc != SUCCESS){
+					displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s: fill_thread_mem_details() failed with rc = %d\n",__LINE__,__FUNCTION__,rc);
+					return(FAILURE);
+				}
+			}
         /*printf("cache threads: %d  cpu = %d\n",thread_num,th[thread_num].bind_proc);*/
         if(walk_2_into_cores){/*wlaking 2nd time into cores for identifying 2nd cache thread index  for p9 fused core config*/
-            thread_num = (core_end_index + (chip_under_test->inuse_core_array[core].num_procs/2));
+			single_thread = 0;
+        	core_end_index += (chip_under_test->inuse_core_array[core].num_procs);
+        	core++;
+			if(chip_under_test->inuse_core_array[core].num_procs == 2){/* if cpus = 2, generate thread_num differntly to avoid overwriting first cache thread*/
+				thread_num = (core_end_index + chip_under_test->inuse_core_array[core].num_procs);
+			}else if(chip_under_test->inuse_core_array[core].num_procs > 2){
+            	thread_num = (core_end_index + (chip_under_test->inuse_core_array[core].num_procs/2));
+			}else{/*There is only one cpu in the core*/
+				single_thread = 1;
+			}
         }else{
             thread_num += (chip_under_test->inuse_core_array[core].num_procs); 
+        	core++;
         }
-        core++;
     }    
 
     return rc;
@@ -727,7 +778,7 @@ int dump_miscompare_data(int tn,void *addr) {
     fprintf(dump_fp,"####################          Hxecache Miscompare Dump File            ######################\n");
     fprintf(dump_fp,"#############################################################################################\n");
 
-    fprintf(dump_fp,"Exerciser instance             = %d\n",g_data.dev_id);
+    fprintf(dump_fp,"Exerciser instance             = %d\n",cache_g.cache_instance);
     fprintf(dump_fp,"Thread number                  = 0x%x\n",tn);
     fprintf(dump_fp,"Bind to CPU                    = %d\n",th->bind_proc);
     fprintf(dump_fp,"Pattern                        =0x%llx\n",local_ptr->pattern);
@@ -1047,8 +1098,8 @@ void* cache_thread_function(void *tn){
     pthread_exit((void *)1);
 }
 int create_cache_threads(){
-    int thread_num=0,rc=SUCCESS,core=0;
-    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[g_data.dev_id];
+    int thread_num=0,rc=SUCCESS,core=0,single_thread=0;
+    struct chip_mem_pool_info* chip_under_test  = &g_data.sys_details.chip_mem_pool_data[cache_g.cache_instance];
     struct thread_data* th = &g_data.thread_ptr[0];
     int fused_core_flag = 0;
     int core_end_index = -1,walk_2_into_cores=0;/*to handle imbalanced core cpu_filter config for fused core mode*/
@@ -1061,60 +1112,88 @@ int create_cache_threads(){
     for(int t=0;t<g_data.stanza_ptr->num_cache_threads_to_create;t++){
         if((fused_core_flag == 1) && (core == chip_under_test->inuse_num_cores)){
             core = 0;
-            thread_num = chip_under_test->inuse_core_array[0].num_procs/2;
+            if(chip_under_test->inuse_core_array[0].num_procs == 1 ){/* Take care of thread_num if only cpu is enabled in the core*/
+                single_thread = 1;
+            }else{
+            	thread_num = chip_under_test->inuse_core_array[0].num_procs/2;
+			}
             walk_2_into_cores = 1;
             core_end_index = -1;
         }
-        core_end_index += (chip_under_test->inuse_core_array[core].num_procs);
-        rc = pthread_create((pthread_t *)&th[thread_num].tid,NULL,cache_thread_function,&th[thread_num]);
-        if(rc != 0){
-            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:pthread_create failed with rc = %d (errno %d):(%s) for thread_num = %d\n",
-                __LINE__,__FUNCTION__,rc,errno,strerror(errno),thread_num);
-            return(FAILURE);
-        }
-        /*else{
-            printf("th %d (%d)created..\n",th[thread_num].thread_num,thread_num);
-        }*/
+		if(single_thread != 1){
+			rc = pthread_create((pthread_t *)&th[thread_num].tid,NULL,cache_thread_function,&th[thread_num]);
+			if(rc != 0){
+				displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:pthread_create failed with rc = %d (errno %d):(%s) for thread_num = %d\n",
+					__LINE__,__FUNCTION__,rc,errno,strerror(errno),thread_num);
+				return(FAILURE);
+			}
+			/*else{
+				printf("th %d (%d)created..\n",th[thread_num].thread_num,thread_num);
+			}*/
+		}
         if(walk_2_into_cores){/*wlaking 2nd time into cores for identifying 2nd cache thread index  for p9 fused core config*/
-            thread_num = (core_end_index + (chip_under_test->inuse_core_array[core].num_procs/2));
+			single_thread = 0;
+        	core_end_index += (chip_under_test->inuse_core_array[core].num_procs);
+        	core++;
+			if(chip_under_test->inuse_core_array[core].num_procs == 2){/* if cpus <= 2, generate thread_num differntly to avoid overwriting first cache thread*/
+				thread_num = (core_end_index + chip_under_test->inuse_core_array[core].num_procs);
+			}else if(chip_under_test->inuse_core_array[core].num_procs > 2){
+            	thread_num = (core_end_index + (chip_under_test->inuse_core_array[core].num_procs/2));
+            }else{/*There is only one cpu in the core*/
+                single_thread = 1;
+            }			
         }else{
             thread_num += (chip_under_test->inuse_core_array[core].num_procs); 
+			core++;
         }
-        core++;
     }
 
     thread_num=0;
     core = 0;
+	single_thread = 0;
     walk_2_into_cores = 0;
     core_end_index = -1;
     for(int t=0;t<g_data.stanza_ptr->num_cache_threads_to_create;t++){
         if((fused_core_flag == 1) && (core == chip_under_test->inuse_num_cores)){
             core = 0;
-            thread_num = chip_under_test->inuse_core_array[0].num_procs/2;
+            if(chip_under_test->inuse_core_array[0].num_procs == 1 ){/* Take care of thread_num if only cpu is enabled in the core*/
+                single_thread = 1;
+            }else{
+                thread_num = chip_under_test->inuse_core_array[0].num_procs/2;
+            }
             walk_2_into_cores = 1;
             core_end_index = -1;
         }
-        core_end_index += (chip_under_test->inuse_core_array[core].num_procs);
-        rc = pthread_join(th[thread_num].tid,&tresult);
-        if(rc != 0){
-            displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:pthread_join with rc = %d (errno %d):(%s) for thread_num = %d \n",
-                __LINE__,__FUNCTION__,rc,errno,strerror(errno),thread_num);
-            return(FAILURE);
-        }
-        /*else{
-            printf("##pref th %d (%d)Joined..\n",th[thread_num].thread_num,thread_num);
-        }*/
-        th[thread_num].thread_num   = -1;
-        th[thread_num].tid          = -1;
-        th[thread_num].kernel_tid   = -1;
-        th[thread_num].bind_proc    = -1;
-
+        if(single_thread != 1){
+			rc = pthread_join(th[thread_num].tid,&tresult);
+			if(rc != 0){
+				displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:pthread_join with rc = %d (errno %d):(%s) for thread_num = %d \n",
+					__LINE__,__FUNCTION__,rc,errno,strerror(errno),thread_num);
+				return(FAILURE);
+			}
+			/*else{
+				printf("## th %d (%d)Joined..\n",th[thread_num].thread_num,thread_num);
+			}*/
+			th[thread_num].thread_num   = -1;
+			th[thread_num].tid          = -1;
+			th[thread_num].kernel_tid   = -1;
+			th[thread_num].bind_proc    = -1;
+		}
         if(walk_2_into_cores){/*wlaking 2nd time into cores for identifying 2nd cache thread index  for p9 fused core config*/
-            thread_num = (core_end_index + (chip_under_test->inuse_core_array[core].num_procs/2));
+			single_thread = 0;
+        	core_end_index += (chip_under_test->inuse_core_array[core].num_procs);
+        	core++;
+			if(chip_under_test->inuse_core_array[core].num_procs == 2){/* if cpus <= 2, generate thread_num differntly to avoid overwriting first cache thread*/
+				thread_num = (core_end_index + chip_under_test->inuse_core_array[core].num_procs);
+			}else if (chip_under_test->inuse_core_array[core].num_procs > 2){
+                thread_num = (core_end_index + (chip_under_test->inuse_core_array[core].num_procs/2));
+            }else{/*There is only one cpu in the core*/
+				single_thread = 1;
+			}
         }else{
             thread_num += (chip_under_test->inuse_core_array[core].num_procs); 
+        	core++;
         }
-        core++;
     }
 
     return rc;
@@ -1271,7 +1350,7 @@ int print_thread_data(){
     fprintf(log_fp,"####################          Hxecache Log File            ######################\n");
     fprintf(log_fp,"#############################################################################################\n");
 
-    fprintf(log_fp,"Exerciser instance          = %d\n",g_data.dev_id);
+    fprintf(log_fp,"Exerciser instance          = %d\n",cache_g.cache_instance);
     fprintf(log_fp,"PVR                         = %x\n",g_data.sys_details.true_pvr);
     fprintf(log_fp,"L3 size                     = %llx MB \n\n",(g_data.sys_details.cache_info[L3].cache_size/MB));
     fprintf(log_fp,"Current Rule id             = %s\n",g_data.stanza_ptr->rule_id);

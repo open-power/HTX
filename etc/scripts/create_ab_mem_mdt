@@ -1,14 +1,41 @@
 #!/bin/bash
+# IBM_PROLOG_BEGIN_TAG
+#
+# Copyright 2003,2016 IBM International Business Machines Corp.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# IBM_PROLOG_END_TAG
 
-proc_ver=`cat ${HTX_LOG_DIR}/htx_syscfg | grep Version | awk -F: '{print $2}'`
-proc_ver_dec=`printf %d $proc_ver`
+true_pvr=` grep "TRUE PVR ver" ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}'`
+true_pvr=`printf %d $true_pvr`
+
+num_nodes=`grep "Number of nodes" ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}'`
+num_nodes_dec=`printf %d $num_nodes`
+
+if [[ $num_nodes_dec -le 1 ]]
+then
+    echo "create_ab_mem_mdt:number of nodes found to be <= 1,num_nodes_dec = $num_nodes_dec, mdt.mem_inter_node will not be created." >> $HTXNoise
+    exit
+fi
 
 mdt="mdt.mem_inter_node"
 rule="default.inter_node"
 device="fabn"
 echo "Creating mdt.mem_inter_node"
 
-if [[ $proc_ver_dec -ge 78 ]]
+if [[ $true_pvr -ge 78 ]]
 then
     create_my_mdt mem:default.mfg 							> ${HTXMDT}/${mdt}
 else
