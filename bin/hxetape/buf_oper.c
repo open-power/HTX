@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)10	1.22.3.2  src/htx/usr/lpp/htx/bin/hxetape/buf_oper.c, exer_tape, htxubuntu 2/26/13 03:36:05 */
-
 /******************************************************************************
  * COMPONENT_NAME: exer_tape
  *

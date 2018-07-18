@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)11	1.44  src/htx/usr/lpp/htx/bin/hxetape/hxetape.c, exer_tape, htxubuntu 5/8/07 07:12:55 */
-
 /*****************************************************************************
  *   COMPONENT_NAME: exer_tape
  *
@@ -191,8 +189,10 @@ main (int argc, char *argv[])
       exit(1);
    }
    bzero(kdblevel, 4);
-   htx_strcpy(kdblevel, getenv("HTXKDBLEVEL"));
-   crash_on_mis = atoi(kdblevel);
+   if (getenv("HTXKDBLEVEL") != NULL) {
+      htx_strcpy(kdblevel, getenv("HTXKDBLEVEL"));
+      crash_on_mis = atoi(kdblevel);
+   }
 
    i = strlen(htx_info.sdev_id);
    done = 0;
@@ -400,12 +400,12 @@ get_tape_config( rule_info.fildes, &htx_info );
 				sprintf(msg,"Buster pattern malloc'ed wptr = %llx, rptr = %llx\n", (unsigned long long)wptr, (unsigned long long)rptr);
 				hxfmsg(&htx_info, 0, INFO, msg);
 
-				bufrem = (int)((unsigned long long) wptr  % bus_width);
+				bufrem = (int) ((unsigned long long) wptr % bus_width);
 				if( bufrem != 0 ) {
 					wptr = wptr + ( bus_width - bufrem );
 				}
 
-				bufrem = (int)((unsigned long long) rptr  % bus_width);
+				bufrem = (int) ((unsigned long long) rptr % bus_width);
 				if( bufrem != 0 ) {
 					rptr = rptr + ( bus_width - bufrem );
 				}

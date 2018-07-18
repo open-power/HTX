@@ -17,8 +17,6 @@
  */
 /* IBM_PROLOG_END_TAG */
 
-/* @(#)12	1.46.2.5  src/htx/usr/lpp/htx/bin/hxetape/io_oper.c, exer_tape, htxubuntu 2/26/13 03:36:02 */
-
 /******************************************************************************
  * COMPONENT_NAME: exer_tape
  *
@@ -1598,10 +1596,12 @@ VBS_Write(struct htx_data *pHTX, struct ruleinfo *pRule,
 
   if ( (pRule->pattern_id[0] != '#') && (pRule->pattern_id[0] != '\0') ) {
 	 sWork[0] = '\0';
-	 htx_strcpy(sWork, getenv("HTXPATTERNS"));
-	 if ( htx_strlen(sWork) == 0 )
-        htx_strcpy(sWork, "../pattern/");                   /* For default ONLY */
-     htx_strcat (sWork, pRule->pattern_id);
+	 if (getenv("HTXPATTERNS") != NULL) {
+             htx_strcpy(sWork, getenv("HTXPATTERNS"));
+         } else {
+              htx_strcpy(sWork, "../pattern/");                   /* For default ONLY */
+         }
+         htx_strcat (sWork, pRule->pattern_id);
   }
            /* Initialize the write buffer if a pattern file was specified. */
   if ( pRule->pattern_id[0] != '#' ) {
@@ -1783,7 +1783,7 @@ VBS_Read(struct htx_data *pHTX, struct ruleinfo *pRule,
     sprintf(sWork,"Buster pattern malloc'ed Rbuf = %llx\n", (unsigned long long)Rbuf);
     hxfmsg(pHTX, 0, INFO, sWork);
 
-	bufrem = (int)((unsigned long long) Rbuf  % bus_width);
+	bufrem = (int)((unsigned long long) Rbuf % bus_width);
 	if( bufrem != 0 ) {
 		Rbuf = Rbuf + ( bus_width - bufrem );
 	}
@@ -1953,7 +1953,7 @@ VBS_Readc(struct htx_data *pHTX, struct ruleinfo *pRule,
     sprintf(sWork,"Buster pattern malloc'ed Rbuf = %llx, Wbuf = %llx\n", (unsigned long long)Rbuf, (unsigned long long)Wbuf);
     hxfmsg(pHTX, 0, INFO, sWork);
 
-	bufrem = (int)((unsigned long long) Wbuf  % bus_width);
+	bufrem = (int)((unsigned long long) Wbuf % bus_width);
 	if( bufrem != 0 ) {
 		Wbuf = Wbuf + ( bus_width - bufrem );
 	}
@@ -1986,8 +1986,11 @@ VBS_Readc(struct htx_data *pHTX, struct ruleinfo *pRule,
   if ( (pRule->pattern_id[0] != '#') && (pRule->pattern_id[0] != '\0') ) {
        /* get HTXPATTERNS environment variable */
 	sWork[0] = '\0';
-    if ( htx_strlen(htx_strcpy(sWork, getenv("HTXPATTERNS"))) == 0 )
-      strcpy(sWork, "../pattern/");                     /* For default ONLY */
+    if ( getenv("HTXPATTERNS") != NULL) {
+        htx_strcpy(sWork, getenv("HTXPATTERNS"));
+    } else {
+        strcpy(sWork, "../pattern/");                     /* For default ONLY */
+    }
     strcat (sWork, pRule->pattern_id);
   }
 
@@ -2186,7 +2189,7 @@ medium_load(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( rc == -1 ) {
      phtx_info->bad_others = phtx_info->bad_others + 1;
      strcpy(tmp_str, "Adante Move Medium Load Error - ");
-     strcat(tmp_str, strerror((errno));
+     strcat(tmp_str, strerror(errno));
      strcat(tmp_str, "\n");
      prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
      tape_error_code = errno;
@@ -2741,7 +2744,7 @@ twrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         } else {
            phtx_info->bad_others = phtx_info->bad_others + 1;
            strcpy(tmp_str, "TimberWolf Read Element Status Error - ");
-           strcat(tmp_str, strerror((errno));
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -2759,7 +2762,7 @@ twrd_stat(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         strcpy(tmp_str, "Close error on ");
         strcat(tmp_str, phtx_info->sdev_id);
         strcat(tmp_str, " at end of read element status rule.\n");
-        strcat(tmp_str, strerror((errno));
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         hxfmsg(phtx_info, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2792,7 +2795,7 @@ twmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
      if ( rc == -1 ) {
         phtx_info->bad_others = phtx_info->bad_others + 1;
         strcpy(tmp_str, "TimberWolf UnLoad Error - ");
-        strcat(tmp_str, strerror((errno));
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2802,7 +2805,7 @@ twmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
   if ( tape_error_code == 0 ) {
      if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
         strcpy(tmp_str, "TimberWolf Move Tape Open Error - ");
-        strcat(tmp_str, strerror((errno));
+        strcat(tmp_str, strerror(errno));
         strcat(tmp_str, "\n");
         prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
         tape_error_code = errno;
@@ -2817,7 +2820,7 @@ twmv_tape(struct htx_data *phtx_info, struct ruleinfo *prule_info,
         } else {
            phtx_info->bad_others = phtx_info->bad_others + 1;
            strcpy(tmp_str, "TimberWolf Move Medium Error - ");
-           strcat(tmp_str, strerror((errno));
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
            tape_error_code = errno;
@@ -2869,7 +2872,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            tape_error_code = errno;
         } else if ( (errno == EBADF) && (Open_Mode == O_RDONLY) ) {
            strcpy(tmp_str, "TimberWolf Write Error - Write-Protected Media - ");
-           strcat(tmp_str, strerror((errno));
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                         tmp_str);
@@ -2895,7 +2898,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            continue_loop = 1;
            phtx_info->bad_writes = phtx_info->bad_writes + 1;
            strcpy(tmp_str, "TimberWolf Write EOF Error after WEOT - ");
-           strcat(tmp_str, strerror((errno));
+           strcat(tmp_str, strerror(errno));
            strcat(tmp_str, "\n");
            prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                    tmp_str);
@@ -2907,7 +2910,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
               continue_loop = 1;
               phtx_info->bad_writes = phtx_info->bad_writes + 1;
               strcpy(tmp_str, "TimberWolf Tape UnLoad Error - ");
-              strcat(tmp_str, strerror((errno));
+              strcat(tmp_str, strerror(errno));
               strcat(tmp_str, "\n");
               prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                       tmp_str);
@@ -2915,7 +2918,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
            } else {
               if ( (sffd = open(prule_info->chs_file,O_RDWR | O_NDELAY)) < 0 ) {
                  strcpy(tmp_str, "TimberWolf Tape Open Error - ");
-                 strcat(tmp_str, strerror((errno));
+                 strcat(tmp_str, strerror(errno));
                  strcat(tmp_str, "\n");
                  prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                          tmp_str);
@@ -2946,7 +2949,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                     continue_loop = 1;
                     phtx_info->bad_others = phtx_info->bad_others + 1;
                     strcpy(tmp_str, "TimberWolf Request Sense Error - ");
-                    strcat(tmp_str, strerror((errno));
+                    strcat(tmp_str, strerror(errno));
                     strcat(tmp_str, "\n");
                     prt_msg(phtx_info, prule_info, loop, pblk_num, errno,
                             HARD, tmp_str);
@@ -2956,7 +2959,7 @@ int tape_unload(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                     strcpy(tmp_str, "Close error on ");
                     strcat(tmp_str, phtx_info->sdev_id);
                     strcat(tmp_str, " at end of tape unload rule.\n");
-                    strcat(tmp_str, strerror((errno));
+                    strcat(tmp_str, strerror(errno));
                     strcat(tmp_str, "\n");
                     hxfmsg(phtx_info, errno, HARD, tmp_str);
                     tape_error_code = errno;
@@ -3000,14 +3003,14 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
        continue_loop = 1;
        phtx_info->bad_writes = phtx_info->bad_writes + 1;
        strcpy(tmp_str, "TimberWolf Write EOT Error - ");
-       strcat(tmp_str, strerror((errno));
+       strcat(tmp_str, strerror(errno));
        strcat(tmp_str, "\n");
        prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
        tape_error_code = errno;
     } else if ( (errno == EBADF) && (Open_Mode == O_RDONLY) ) {
        continue_loop = 1;
        strcpy(tmp_str, "TimberWolf Write Error - Write Protected Media - ");
-       strcat(tmp_str, strerror((errno));
+       strcat(tmp_str, strerror(errno));
        strcat(tmp_str, "\n");
        prt_msg_asis(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                     tmp_str);
@@ -3020,7 +3023,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
           continue_loop = 1;
           phtx_info->bad_writes = phtx_info->bad_writes + 1;
           strcpy(tmp_str, "TimberWolf Write EOF Error after WEOT - ");
-          strcat(tmp_str, strerror((errno));
+          strcat(tmp_str, strerror(errno));
           strcat(tmp_str, "\n");
           prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD, tmp_str);
           tape_error_code = errno;
@@ -3031,7 +3034,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
              continue_loop = 1;
              phtx_info->bad_writes = phtx_info->bad_writes + 1;
              strcpy(tmp_str, "TimberWolf Tape UnLoad Error - ");
-             strcat(tmp_str, strerror((errno));
+             strcat(tmp_str, strerror(errno));
              strcat(tmp_str, "\n");
              prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                      tmp_str);
@@ -3040,7 +3043,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
              sleep(prule_info->u_sleep);
              if ( (sffd = open(prule_info->chs_file, O_RDWR | O_NDELAY)) < 0 ) {
                 strcpy(tmp_str, "TimberWolf Open Error - ");
-                strcat(tmp_str, strerror((errno));
+                strcat(tmp_str, strerror(errno));
                 strcat(tmp_str, "\n");
                 prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
                         tmp_str);
@@ -3083,7 +3086,7 @@ unload_write(struct htx_data *phtx_info, struct ruleinfo *prule_info,
                    strcpy(tmp_str, "Close error on ");
                    strcat(tmp_str, phtx_info->sdev_id);
                    strcat(tmp_str, " at end of move medium rule.\n");
-                   strcat(tmp_str, strerror((errno));
+                   strcat(tmp_str, strerror(errno));
                    strcat(tmp_str, "\n");
                    hxfmsg(phtx_info, errno, HARD, tmp_str);
                    tape_error_code = errno;
@@ -3392,7 +3395,7 @@ himove(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 				prule_info->fildes = open(phtx_info->sdev_id, Open_Mode);
 				if ( prule_info->fildes == -1 ) {
 					strcpy(tmp_str, "Hidalgo Open Error - ");
-					strcat(tmp_str, strerror((errno));
+					strcat(tmp_str, strerror(errno));
 					strcat(tmp_str, "\n");
 					prt_msg(phtx_info, prule_info, loop, pblk_num, errno, HARD,
 																		tmp_str);
@@ -3786,9 +3789,13 @@ do_cmd(struct htx_data *phtx_info, struct ruleinfo *prule_info,
 {
    int    a, b, c, d, rc = 0, filedes;
    char   dev_type[40], tmsg[600], cmd_line[300], msg[650];
-   char   filenam[30] = "/tmp/cmdout.";
+   char   filenam[64], log_dir[32];
 /*   struct ruleinfo *pr;*/
 
+   strcpy(log_dir, phtx_info->htx_exer_log_dir);
+
+   strcpy(filenam, log_dir);
+   strcat(filenam, "cmdout.");
    dev_type[0]= '\0';
    rc = close(prule_info->fildes);
    if ( /*rc == -1*/ 0 ) {
@@ -3952,6 +3959,7 @@ cmp_buf(struct htx_data *ps, char *wbuf, char *rbuf, size_t len, char *misc_data
   char path[128];            /* dump files path                              */
   char s[3];                 /* string segment used when building error msg  */
   char work_str[512];        /* work string                                  */
+  char log_dir[64];
 
   int mis_flag, rc = 0;              /* miscompare flag: boolean                     */
 
@@ -4006,7 +4014,8 @@ cmp_buf(struct htx_data *ps, char *wbuf, char *rbuf, size_t len, char *misc_data
 	   * Copy write and read buffers to dump file.
 	   */
 	  ps->miscompare_count++;
-	  (void) strcpy(path, DUMP_PATH);
+	  strcpy(log_dir, ps->htx_exer_log_dir);
+          (void) strcpy(path, log_dir);
 	  (void) strcat(path, "htx");
 	  (void) strcat(path, &(ps->sdev_id[5]));
 	  (void) strcat(path, ".wbuf");
@@ -4015,7 +4024,7 @@ cmp_buf(struct htx_data *ps, char *wbuf, char *rbuf, size_t len, char *misc_data
 
 	  (void) savebuf_tofile(wbuf, len, path, ps);
 
-	  (void) strcpy(path, DUMP_PATH);
+	  (void) strcpy(path, log_dir);
 	  (void) strcat(path, "htx");
 	  (void) strcat(path, &(ps->sdev_id[5]));
 	  (void) strcat(path, ".rbuf");
