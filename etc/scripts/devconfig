@@ -21,6 +21,10 @@
 echo "Entering devconfig..." >> ${HTXNoise}
 proc_ver=`grep Version ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}'`
 proc_ver_dec=`printf %d $proc_ver`
+
+true_pvr=` grep "TRUE PVR ver" ${HTX_LOG_DIR}/htx_syscfg | awk -F: '{print $2}'`
+true_pvr=`printf %d $true_pvr`
+
 shared_proc_mode=`grep shared_processor_mode ${HTX_LOG_DIR}/htx_syscfg | awk '{print $3}'`
 
 echo "Creating mdt files. Please wait a moment."
@@ -59,14 +63,20 @@ then
     create_my_mdt afu[0-9].[0-9]d:default > ${HTXMDT}/mdt.memcopy
 fi	
 
-
-
+#create fabricbus mdts in early stage as "create_my_mdt" script uses these mdts for later use
+# mdt.mem should have been created before create_ab_mem_mdt
+if [[ $proc_ver_dec -ge 62 ]] && [[ "$shared_proc_mode" = "no" ]];
+then
+    create_ab_mem_mdt 2>> ${HTXNoise}
+    create_mdt_ab 2>> ${HTXNoise}
+    create_mdt_xyz 2>> ${HTXNoise}
+fi
 # Set cache rulefile based on architecture. 
-if [ $proc_ver_dec -le 74 ];
+if [ $true_pvr -le 74 ];
 then
 	cache_sw_prefetch_rf="default.sw_prefetch"
 	cache_rf="default.p7"
-elif [ $proc_ver_dec -ge 75 ] && [ $proc_ver_dec -le 77 ]
+elif [ $true_pvr -ge 75 ] && [ $true_pvr -le 77 ]
 then
 	cache_sw_prefetch_rf="default.sw_prefetch.p8"
 	cache_rf="default.p8"
@@ -106,6 +116,8 @@ if [ -f ${HTX_LOG_DIR}/mpath_parts ]; then
     hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
     hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
     hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
+    hxestorage_cache_stress=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.cache_stress ",$0)}'`
+    hxestorage_sync_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart ${HTX_LOG_DIR}/mpath_parts 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.sync_cache ",$0)}'`
 else
     hxestorage_default=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart  2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
     hxestorage_buster=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s: ",$0)}'`
@@ -128,9 +140,11 @@ else
     hxestorage_camss_cloud=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_cloud ",$0)}'`
     hxestorage_camss_video_streaming=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_video_streaming ",$0)}'`
     hxestorage_camss_med_imaging=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.camss_med_imaging ",$0)}'`
+    hxestorage_cache_stress=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.cache_stress ",$0)}'`
+    hxestorage_sync_cache=`cat ${HTX_LOG_DIR}/rawpart ${HTX_LOG_DIR}/dvdwpart 2>> $HTXNoise | awk  '{sub(/ *$/, "", $0)} /./ { printf("%s:rules.sync_cache ",$0)}'`
 fi
 
-#Remove all storage mdts first and then create them fresh
+#Remove all storage mdts first and then create them fresh. This is to avoid stale storage mdts when system config changed and there are no more disks.
 rm ${HTXMDT}/mdt.hd 2>/dev/null
 rm ${HTXMDT}/mdt.hdbuster 2>/dev/null
 rm ${HTXMDT}/mdt.easytier 2>/dev/null
@@ -147,7 +161,9 @@ rm ${HTXMDT}/mdt.storage_4K_rand_read 2>/dev/null
 rm ${HTXMDT}/mdt.camss_cloud 2>/dev/null
 rm ${HTXMDT}/mdt.camss_video_streaming 2>/dev/null
 rm ${HTXMDT}/mdt.camss_med_imaging 2>/dev/null
-	
+rm ${HTXMDT}/mdt.storage_cache_stress 2>/dev/null
+rm ${HTXMDT}/mdt.storage_sync_cache 2>/dev/null
+
 if [ "$hxestorage_default" != "" ];
 then
 	echo "[devconfig]Creating storage exerciser specific mdts..." >> $HTXNoise
@@ -167,8 +183,10 @@ then
 	create_my_mdt $hxestorage_256K_seq_read > ${HTXMDT}/mdt.storage_256K_seq_read
 	create_my_mdt $hxestorage_4K_rand_write > ${HTXMDT}/mdt.storage_4K_rand_write
 	create_my_mdt $hxestorage_4K_rand_read > ${HTXMDT}/mdt.storage_4K_rand_read
+	create_my_mdt $hxestorage_cache_stress > ${HTXMDT}/mdt.storage_cache_stress
+	create_my_mdt $hxestorage_sync_cache > ${HTXMDT}/mdt.storage_sync_cache
 fi
-	
+
 create_my_mdt fpu:$fpu_combo_rf >  ${HTXMDT}/mdt.bu_combo_char
 #P9 and above shifts
 if [ $proc_ver_dec -ge 78 ]; then
@@ -177,27 +195,47 @@ if [ $proc_ver_dec -ge 78 ]; then
 	create_my_mdt mem:default.mfg.nodelay > ${HTXMDT}/mdt.mem
 	create_my_mdt mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_tlbie
 	create_my_mdt sctu: cache:$cache_rf tlbie:tlbie > ${HTXMDT}/mdt.nest
-	create_my_mdt cache:$cache_rf mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_nest
-	create_my_mdt fpu:$fpu_combo_rf mem:rules.char_1 > ${HTXMDT}/mdt.bu_char
-	create_my_mdt $hxestorage_default mem:default.mfg ven:default > ${HTXMDT}/mdt.mem.io
-	create_my_mdt $hxestorage_default ven:default cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+	create_my_mdt cache:$cache_rf mem:rules.char_2 tlbie:tlbie > ${HTXMDT}/mdt.mem_nest
+	create_my_mdt fpu:$fpu_combo_rf mem:rules.char_2 > ${HTXMDT}/mdt.bu_char
+	create_my_mdt $hxestorage_default mem:default.mfg > ${HTXMDT}/mdt.mem.io
+	create_my_mdt $hxestorage_default cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
 	create_my_mdt cache:rules.noprefetch.p9 > ${HTXMDT}/mdt.cache.noprefetch
+	cp ${HTXMDT}/mdt.io ${HTXMDT}/mdt.inter_io
 
-# Core shifts
-
-
-else
-	create_my_mdt mem:memmfg.nodelay > ${HTXMDT}/mdt.mem
-	create_my_mdt mem:memmfg.nodelay tlbie: > ${HTXMDT}/mdt.mem_tlbie
-	create_my_mdt sctu: cache:$cache_rf mem:memmfg tlbie:tlbie > ${HTXMDT}/mdt.nest
-	create_my_mdt cache:$cache_rf mem:memmfg > ${HTXMDT}/mdt.mem_nest
-	create_my_mdt fpu:$fpu_combo_rf mem:memmfg nvidia:default.char > ${HTXMDT}/mdt.bu_char
-	create_my_mdt $hxestorage_default mem:memmfg ven:default > ${HTXMDT}/mdt.mem.io
-	create_my_mdt $hxestorage_default ven:default mem:memmfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
-	create_my_mdt cache:rules.noprefetch > ${HTXMDT}/mdt.cache.noprefetch
-	create_my_mdt cache:rules.l2_and_l3_bounce > ${HTXMDT}/mdt.cache.l2_and_l3_bounce
+	#core shifts
+	create_my_mdt fpu:mix_cover_p9 > ${HTXMDT}/mdt.fpu_cover
+	create_my_mdt fpu:fp_stress_p9 > ${HTXMDT}/mdt.fpu_stress
+	create_my_mdt fpu:thermal_p9 > ${HTXMDT}/mdt.fpu_thermal
+	create_my_mdt fpu:flush_p9 > ${HTXMDT}/mdt.fpu_flush
+	create_my_mdt fpu:dfu_p9 > ${HTXMDT}/mdt.fpu_dfu
+	create_my_mdt fpu:vsu_p9 > ${HTXMDT}/mdt.fpu_vsu
+	create_my_mdt fpu:pm_p9 > ${HTXMDT}/mdt.fpu_pm
 	cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk default cpu fpu sctu >> ${HTXMDT}/mdt.bu_combo_char
+else
+	if [ $true_pvr -ge 78 ]; then
+		create_my_mdt mem:default.mfg.nodelay > ${HTXMDT}/mdt.mem
+		create_my_mdt mem:default.mfg tlbie:tlbie > ${HTXMDT}/mdt.mem_tlbie
+		create_my_mdt sctu: cache:$cache_rf tlbie:tlbie > ${HTXMDT}/mdt.nest
+		create_my_mdt cache:$cache_rf mem:rules.char_2 tlbie:tlbie > ${HTXMDT}/mdt.mem_nest
+		create_my_mdt fpu:$fpu_combo_rf mem:rules.char_2 > ${HTXMDT}/mdt.bu_char
+		create_my_mdt $hxestorage_default mem:default.mfg > ${HTXMDT}/mdt.mem.io
+		create_my_mdt $hxestorage_default cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+		create_my_mdt cache:rules.noprefetch.p9 > ${HTXMDT}/mdt.cache.noprefetch
+		cp ${HTXMDT}/mdt.io ${HTXMDT}/mdt.inter_io
+	else		
+		create_my_mdt mem:memmfg.nodelay > ${HTXMDT}/mdt.mem
+		create_my_mdt mem:memmfg.nodelay tlbie: > ${HTXMDT}/mdt.mem_tlbie
+		create_my_mdt sctu: cache:$cache_rf mem:memmfg tlbie:tlbie > ${HTXMDT}/mdt.nest
+		create_my_mdt cache:$cache_rf mem:memmfg > ${HTXMDT}/mdt.mem_nest
+		create_my_mdt fpu:$fpu_combo_rf mem:memmfg > ${HTXMDT}/mdt.bu_char
+		create_my_mdt $hxestorage_default mem:memmfg > ${HTXMDT}/mdt.mem.io
+		create_my_mdt $hxestorage_default mem:memmfg cache:$cache_rf sctu: tlbie:tlbie > ${HTXMDT}/mdt.nest.io
+		create_my_mdt cache:rules.noprefetch > ${HTXMDT}/mdt.cache.noprefetch
+		create_my_mdt cache:rules.l2_and_l3_bounce > ${HTXMDT}/mdt.cache.l2_and_l3_bounce
+		cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk default cpu fpu sctu >> ${HTXMDT}/mdt.bu_combo_char
+	fi
 fi
+
 create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu_combo_char
 
 # P8 specific core, nest and IO workload/shifts
@@ -215,7 +253,7 @@ if [ $proc_ver_dec -ge 75 ]; then
 	create_my_mdt fpu:rules.sao cpu:rules.sao sctu:rules.64.SAO > ${HTXMDT}/mdt.sao
 
 	#nest shifts
-	if [ $proc_ver_dec -lt 78 ]; then
+	if [ $true_pvr -lt 78 ]; then
 		create_my_mdt cache:rules.l2_bounce.p8 > ${HTXMDT}/mdt.cache.l2_bounce
 		create_my_mdt cache:default.eco.p8 > ${HTXMDT}/mdt.cache.dynamic_eco
 	else
@@ -248,27 +286,18 @@ then
     create_my_mdt fpu:xs_dfp > ${HTXMDT}/mdt.fpu.xs_dfp
 fi
 
-#Shifts for P6 & above
-# mdt.mem should have been created before create_ab_mem_mdt
-if [ $proc_ver_dec -ge 62 ];
-then
-    create_ab_mem_mdt 2>> ${HTXNoise}
-    create_mdt_ab 2>> ${HTXNoise}
-    create_mdt_xyz 2>> ${HTXNoise}
-fi
 #Shifts for P6 & earlier
 if [ $proc_ver_dec -le 62 ];
 then
     create_my_mdt mem:memmfg.p6 > ${HTXMDT}/mdt.mem
 fi
 
-create_my_mdt $hxestorage_cache ven:default cache:$cache_rf sctu: > ${HTXMDT}/mdt.cache.io
+create_my_mdt $hxestorage_cache cache:$cache_rf sctu: > ${HTXMDT}/mdt.cache.io
 create_my_mdt mem:rules.comm_db_pk $hxestorage_comm_db_pk cpu:rules.comm_db_pk  > ${HTXMDT}/mdt.comm_db_pk
 create_my_mdt $hxestorage_app_server mem:rules.app_server > ${HTXMDT}/mdt.app_server #mdt for application or middleware server
 create_my_mdt $hxestorage_web_server mem:rules.web_server > ${HTXMDT}/mdt.web_server #mdt for edge or webserver
 create_my_mdt mem:rules.hpc_comp_node fpu:rules.hpc_comp_node $hxestorage_hpc_comp_node > ${HTXMDT}/mdt.hpc_comp_node # mdt for HPC compute node
 create_my_mdt $hxestorage_business_int_db_pk cpu:rules.business_int_db_pk > ${HTXMDT}/mdt.business_int_db_pk
-create_my_mdt ven:default > ${HTXMDT}/mdt.ventura
 
 #Nest shifts
 create_my_mdt mem:mem_16m_hwpf > ${HTXMDT}/mdt.mem.hw_prefetch
@@ -284,13 +313,16 @@ create_my_mdt tlbie: > ${HTXMDT}/mdt.tlbie
 # sctu devices created are half compared to sctu devices in mdt.bu
 echo "Creating mdt.mem_nest ..."
 create_my_sctu_stanzas.awk MEM_NEST >> ${HTXMDT}/mdt.mem_nest
+
 # Create mdt.bu.characterization having only 1 sctu server per gang.
 # Number of sctu servers per gang is reduced to get optimum fmax results.
 cat ${HTXMDT}mdt.bu | create_mdt_without_devices.awk default cpu fpu sctu mem >> ${HTXMDT}/mdt.bu_char
 create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu_char
+
 cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk sctu > ${HTXMDT}mdt.bu.characterization
 create_my_sctu_stanzas.awk CHARACTERIZATION >> ${HTXMDT}mdt.bu.characterization
 echo >> ${HTXMDT}mdt.bu.characterization
+
 if [[ "$shared_proc_mode" = "no" ]];
 then
     num_nodes=`awk -F : '/Number of nodes/ {print $2}' ${HTX_LOG_DIR}/htx_syscfg`
@@ -317,7 +349,6 @@ fi
 create_my_mdt fpu: cpu: > ${HTXMDT}/mdt.core
 # assuming core.GB (which is derived out of mdt.core_wo_cpu) does not run on P7 system. (hardcoding rulefile to fpu_cpu_combo.p8)
 create_my_mdt fpu:$fpu_combo_rf > ${HTXMDT}/mdt.core_wo_cpu
-
 
 # Core shifts
 create_my_mdt fpu: > ${HTXMDT}/mdt.fpu
@@ -364,15 +395,7 @@ then
 			cat ${HTX_LOG_DIR}/mdt.nets >> ${HTXMDT}/mdt.nest.io
 		fi
 	fi
-else 
-	#Run buildnet to get loopback test network information
-	if [ ! -f ${HTX_LOG_DIR}/saveprof ];
-	then
-		/usr/bin/htx_build_net;
-	fi
-fi	
-
-# Feature#938362. Adding cpu-fpu combo rule for characterization.
+fi
 
 if [[ -f ${HTX_HOME_DIR}/.internal ]];
 then
@@ -385,21 +408,41 @@ then
 fi
 
 #Append inter_node fabric link test stanza in mdt.bu_char
-if [ $proc_ver_dec -ge 78 ]; then
-	echo                                                                                            | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo "fabn:"                                                                                  | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo -e "\tHE_name = \"hxefabricbus\"                     "                                             | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo -e "\tadapt_desc = \"Node to Node\"                  "                                     | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo -e "\tdevice_desc = \"Memory BW\"                    "                                             | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo -e "\treg_rules = \"hxefabricbus/default.char\"        "                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo -e "\temc_rules = \"hxefabricbus/default.char\"        "                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo -e "\tcont_on_err = \"NO\"                         "                                       | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
-	echo                                                                                            | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io > /dev/null
+
+if [ $true_pvr -ge 78 ]; then
+    if [[ $num_nodes -gt 1 ]]
+    then
+		echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo "fabn:"                                                                                  | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo -e "\tHE_name = \"hxefabricbus\"                     "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo -e "\tadapt_desc = \"Node to Node\"                  "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo -e "\tdevice_desc = \"Memory BW\"                    "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo -e "\treg_rules = \"hxefabricbus/default.char\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo -e "\temc_rules = \"hxefabricbus/default.char\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo -e "\tcont_on_err = \"NO\"                         "                                     | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+		echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+    fi
 	 
-    cp ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.bu_char_tmp
-	cat ${HTXMDT}/mdt.bu_char_tmp $* | \
-	sed 's/rules\.char_1/rules\.char_2/' > ${HTXMDT}/mdt.bu_char
-	rm ${HTXMDT}/mdt.bu_char_tmp
+    if [[ -f ${HTXMDT}mdt.inter_chip ]]
+    then
+        echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo "fabc:"                                                                                  | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo -e "\tHE_name = \"hxefabricbus\"                     "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo -e "\tadapt_desc = \"Chip to Chip\"                  "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo -e "\tdevice_desc = \"Memory BW\"                    "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo -e "\treg_rules = \"hxefabricbus/default.inter_chip\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo -e "\temc_rules = \"hxefabricbus/default.inter_chip\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo -e "\tcont_on_err = \"NO\"                         "                                     | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
+        echo                            
+	fi
+
+    if [[ -f ${HTXMDT}/mdt.bw_bi ]];
+    then
+        cat ${HTXMDT}/mdt.bw_bi | create_mdt_without_devices.awk default >> ${HTXMDT}/mdt.inter_io
+    fi
+    
+    cp ${HTXMDT}/mdt.mem_nest ${HTXMDT}/mdt.mem_nest_inter_io
+    cat ${HTXMDT}/mdt.inter_io | create_mdt_without_devices.awk default >> ${HTXMDT}/mdt.mem_nest_inter_io
 fi
 
 # Removing temp mdts created earlier for core.GB

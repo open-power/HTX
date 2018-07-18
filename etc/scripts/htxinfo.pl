@@ -41,9 +41,12 @@ $htx_ver=@arr_htx_ver[$#arr_htx_ver];
 
 if( $linux_dist =~ /Fedora Core release 4.9/ )                   { $linux_dist = "FC5";    }
 if( $linux_dist =~ /Fedora Core release 6/ )                     { $linux_dist = "FC6";    }
+if( $linux_dist =~ /SUSE LINUX Enterprise Server 9/ )            { $linux_dist = "SLES9";  }
+if( $linux_dist =~ /SUSE Linux Enterprise Server 10/ )           { $linux_dist = "SLES10"; }
 if( $linux_dist =~ /SUSE Linux Enterprise Server 11/ )           { $linux_dist = "SLES11"; }
+if( $linux_dist =~ /Red Hat Enterprise Linux AS release 4/ )     { $linux_dist = "RHEL4";  }
+if( $linux_dist =~ /Red Hat Enterprise Linux Server release 5/ ) { $linux_dist = "RHEL5";  }
 if( $linux_dist =~ /Red Hat Enterprise Linux Server release 6/)  { $linux_dist = "RHEL6";  }
-if( $linux_dist =~ /Red Hat Enterprise Linux Server/)		{ $linux_dist = "RHEL";  }
 
 chomp ($kern_ver);
 chomp ($htx_ver);
