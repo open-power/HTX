@@ -69,7 +69,12 @@
 #define W                   1
 #define C                   2
 #define V                   2
+#ifdef __CAPI_FLASH__
+/* Unmap is same as discard in legacy mode */
+#define U                   3
+#else
 #define D                   3
+#endif
 
 #define R_CACHE             0
 #define W_CACHE             1
@@ -84,6 +89,8 @@
 
 #define MIN_SLEEP_TIME              15
 #define MAX_SLEEP_TIME              90
+
+#define STATS_UPDATE_INTERVAL       10
 
 /*
  * MAX_THREADS defines threads spawned by this exer, BITS_USED is
@@ -232,6 +239,29 @@
 #define LUN_TYPE_VAR_LEN				9
 #define	CHUNK_SIZE_VAR_LEN				11
 
+#ifndef __HTX_LINUX__
+extern pthread_mutex_t log_mutex;
+#endif
+
+#define STATS_VAR_INC(var, val, data) \
+    if (exer_err_halt_status(data) == 1) { \
+        HTX_STATS_UPDATE(UPDATE, data); \
+    } else { \
+        pthread_mutex_lock(&stats_mutex);\
+        global_htx_d.var += val; \
+        pthread_mutex_unlock(&stats_mutex); \
+    }
+
+#ifndef __HTX_LINUX__
+#define HTX_STATS_UPDATE(stage, data) \
+    pthread_mutex_lock(&log_mutex); \
+    hxfupdate(stage, data); \
+    pthread_mutex_unlock(&log_mutex);
+#else
+#define HTX_STATS_UPDATE(stage, data) \
+    hxfupdate(stage, data);
+#endif
+
 /*****************************************************************************
 ** Following pragma allows us to create some inline code that will checkstop
 ** the machine without having to go into a kernel extension.  This trap is
@@ -260,11 +290,12 @@ typedef int (*close_fptr)(struct htx_data *, struct thread_context *);
 typedef int (*oper_fptr)(struct htx_data *, struct thread_context *, int);
 
 extern int read_rules_file_count;
-extern pthread_mutex_t cache_mutex, log_mutex;
+extern pthread_mutex_t cache_mutex, stats_mutex;
 extern int eeh_retries, turn_attention_on;
 extern time_t time_mark;
 extern volatile char exit_flag, signal_flag, int_signal_flag;
 extern int total_BWRC_threads;
+extern struct htx_data global_htx_d;
 
 pthread_attr_t thread_attrs_detached;    /* threads created detached */
 
@@ -471,6 +502,12 @@ struct BWRC_range lba_fencepost[MAX_BWRC_THREADS];
 /* This wstructure will be update by main thread   */
 /* which creates cache threads.                    */
 /***************************************************/
+struct cache_thread {
+    int th_num;
+    int parent_th_num;
+    struct htx_data cache_htx_ds;
+};
+
 struct cache_thread_info {
     volatile unsigned long long dlen;
     volatile char *buf;
@@ -481,6 +518,7 @@ struct cache_thread_info {
     volatile int num_cache_threads_waiting;
     pthread_mutex_t cache_mutex;
     pthread_cond_t do_oper_cond;
+    struct cache_thread cache_th[MAX_NUM_CACHE_THREADS];
 };
 struct cache_thread_info c_th_info[MAX_NUM_CACHE_THREADS];
 
@@ -523,6 +561,7 @@ int sync_state_table(struct htx_data *, char *);
 
 int check_write_cache(struct htx_data *);
 int sync_cache_thread(struct htx_data *);
+void stats_update_thread(void);
 
 void analyze_miscompare(struct thread_context *, int, char *);
 void sig_function(int, int, struct sigcontext *);
