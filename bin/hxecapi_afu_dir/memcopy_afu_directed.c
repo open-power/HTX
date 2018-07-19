@@ -1,11 +1,8 @@
 
-
-#include <memcopy_afu_directed.h>
-
-#define _BSD_SOURCE
+#define _BSD_SOURCE 
 #define __STDC_FORMAT_MACROS
 #define _ISOC11_SOURCE
-#define _GNU_SOURCE
+#define _GNU_SOURCE 
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -23,6 +20,7 @@
 #include <fcntl.h>
 #include <libcxl.h>
 #include "memcpy_afu.h"
+#include "memcopy_afu_directed.h"
 
 
 struct thread_context th_ctx[MAX_THREADS];
@@ -382,14 +380,14 @@ int test_afu_memcpy(struct thread_context * tctx, struct htx_data * htx_d)
 	bufsize	= tctx->bufsize; 
 	
 	/* Allocate memory areas for afu to copy to/from */
-    src = aligned_alloc(CACHELINESIZE/2, bufsize);
+    src = (char *) aligned_alloc(CACHELINESIZE/2, bufsize);
 	if(src == NULL) {
 		sprintf(msg, "[th:%d]:[oper:%d]:[aligned_alloc for src failed]\n", tctx->thread_id, oper);
 		hxfmsg(htx_d, 1, HTX_HE_HARD_ERROR, msg);
         return 1;
 	}
 	
-    dst = aligned_alloc(CACHELINESIZE/2, (size_t)bufsize);
+    dst = (char *) aligned_alloc(CACHELINESIZE/2, (size_t)bufsize);
 	if(dst == NULL) {
         sprintf(msg, "[th:%d]:[oper:%d]:[aligned_alloc for dst failed]\n", tctx->thread_id, oper);
 		hxfmsg(htx_d, 1, HTX_HE_HARD_ERROR, msg);
