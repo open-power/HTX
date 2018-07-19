@@ -4352,7 +4352,7 @@ allocate_vsr_mem(int client_no)
 	}
 
 	/* Allocate 64 nodes for all OP_TYPES for BFP category */
-	for(i = 1; i <= BFP_OP_TYPES; i++) {
+	for(i = 1; i < BFP_OP_TYPES; i++) {
 		cptr->vsrs[i].head[BFP] = (struct vsr_node *)malloc(sizeof(struct vsr_node));
 		tmp = cptr->vsrs[i].head[BFP];
 		cptr->vsrs[i].tail[BFP] = tmp;
@@ -4519,7 +4519,7 @@ free_vsr_mem(int client_no)
 		sdata->cdata_ptr[client_no]->vsrs[i].tail[VSX] = NULL;
 		sdata->cdata_ptr[client_no]->vsrs[i].num_vsrs = 0;
 	}
-	for(i = 1; i <= BFP_OP_TYPES; i++) {
+	for(i = 1; i < BFP_OP_TYPES; i++) {
 		tmp = sdata->cdata_ptr[client_no]->vsrs[i].head[BFP];
 		for(j = 0; j < NUM_FPRS; j++) {
 			prev = tmp;
@@ -4566,7 +4566,7 @@ free_bfp_mem(int client_no)
 	struct vsr_node *tmp=NULL, *prev=NULL;
 	struct server_data *sdata = &global_sdata[INITIAL_BUF];
 
-	for(i = 1; i <= BFP_OP_TYPES; i++) {
+	for(i = 1; i < BFP_OP_TYPES; i++) {
 		tmp = sdata->cdata_ptr[client_no]->vsrs[i].head[BFP];
 		for(j = 0; j < NUM_FPRS; j++) {
 			prev = tmp;

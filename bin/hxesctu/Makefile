@@ -19,7 +19,7 @@ OBJECTS = framework${OBJ_SUFF} \
 
 SRCS = $(patsubst %.o, %.c, $(OBJECTS))
 
-CFLAGS +=  -O1 -g -D__HTX_LINUX__ -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -DSCTU
+CFLAGS +=  -O1 -g -D__HTX_LINUX__ -D__64_LINUX__ -D_GNU_SOURCE -DKERNEL_2_6 -DSCTU -fno-stack-protector
 
 LIBS =-lpthread -lc -lhtx64 -lsimstub
 
