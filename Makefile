@@ -54,7 +54,6 @@ deb:
 	@echo "Making HTX Debian package..."
 	cp -r $(PACKAGINGDIR)/ubuntu/* $(SHIPDIR)/
 	echo -n "Compiled on: " > ${SHIPTOPDIR}/etc/version ; date '+%d/%m/%Y %H:%M:%S'  >> ${SHIPTOPDIR}/etc/version
-	#date '+%d/%m/%Y %H:%M:%S'  >> ${SHIPTOPDIR}/etc/version
 	dpkg-deb -b $(SHIPDIR)  $(TOPDIR)/htxubuntu.deb
 
 tar:    
