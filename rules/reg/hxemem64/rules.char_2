@@ -5,7 +5,9 @@
 ****************************************************************************************
 *******Global Rules**********
 global_startup_delay = 60
-global_alloc_mem_percent = 90
+global_alloc_mem_size = 1073741824
+global_alloc_segment_size = 10485760
+global_alloc_huge_page = no
 global_disable_cpu_bind  = NO
 global_disable_filters = no
 *********************************
