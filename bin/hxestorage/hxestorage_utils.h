@@ -23,6 +23,7 @@
 /* declaration associated with hxestorage_utils.c                      	*/
 /********************************************************************/
 
+#include <sys/stat.h>
 #include "hxestorage.h"
 
 /** Pre-prcoessor declarations for HEADER **/
