@@ -1965,6 +1965,10 @@ void hang_monitor (struct htx_data *htx_ds)
                         #endif
                         }
                         user_msg (htx_ds, -1, 0, err_level, msg1);
+			if (dump_ptr != NULL) {
+				free (dump_ptr);
+				dump_ptr = NULL;
+			}
                 }
 		 /* Release the segment table mutex. */
                 if ((err_level = pthread_mutex_unlock(&(seg_info.seg_table + i)->segment_mutex))) {
