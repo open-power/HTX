@@ -12,7 +12,11 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
  * implied.
-*/
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/* IBM_PROLOG_END_TAG */
+
 /*
  * Debug messages levels (for displaying)
  * 0 (MUST DISPLAY MESSAGES), 1 (VERY IMPORTANT DISPLAY MESSAGES) ,
@@ -203,7 +207,7 @@ enum mem_oper_type { OPER_MEM=0,OPER_STRIDE, OPER_RIM, OPER_DMA, OPER_RAND_MEM, 
 enum caches	{ L1=0,L2,L3,L4 };
 enum cache_opers {NONE=0,OPER_CACHE,OPER_PREFETCH};
 enum cache_tests {CACHE_BOUNCE_ONLY=0,CACHE_BOUNCE_WITH_PREF,CACHE_ROLL_ONLY,CACHE_ROLL_WITH_PREF,PREFETCH_ONLY};
-enum affinity { LOCAL=1,REMOTE_CHIP,FLOATING,INTRA_NODE,INTER_NODE,ABOSOLUTE };
+enum affinity { LOCAL=1,REMOTE_CHIP,FLOATING,INTRA_NODE,INTER_NODE,ABOSOLUTE,ALL_FABRIC};
 enum pattern_size_type { PATTERN_SIZE_NORMAL=0, PATTERN_SIZE_BIG, PATTERN_ADDRESS, PATTERN_RANDOM,RANDOM_MEM_ACCESS };
 enum data_oper {WRITE=0,READ,COMPARE,RIM};
 enum width_oper {DWORD=0,WORD,BYTE};
@@ -569,6 +573,7 @@ struct dest_chip_details{
 struct fabb_exer_info {/* RFB1: keep a pointer of this strucure in global str*/
     unsigned long seg_size;
     long          fab_chip_L3_sz[MAX_CHIPS];
+	int 		  fab_cores[MAX_CHIPS][MAX_CORES_PER_CHIP];
     unsigned long segs_per_chip[MAX_CHIPS];
     struct dest_chip_details dest_chip[MAX_CPUS];
 

@@ -1,4 +1,3 @@
-/* IBM_PROLOG_BEGIN_TAG */
 /*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
@@ -288,7 +287,8 @@ void get_test_type()
 	else if ((strncmp ((char*)(DEVICE_NAME+5),"cach",4)) == 0){
 		g_data.test_type = CACHE;
 	}
-	else if (	((strncmp ((char*)(DEVICE_NAME+5),"fabn",4)) == 0) || (strncmp ((char*)(DEVICE_NAME+5),"fabc",4)== 0)	){
+	else if (	((strncmp ((char*)(DEVICE_NAME+5),"fabn",4)) == 0) || (strncmp ((char*)(DEVICE_NAME+5),"fabc",4)== 0)	|| 
+		(strncmp ((char*)(DEVICE_NAME+5),"fabxo",5)== 0) ){
 		g_data.test_type = FABRICB;
 	}
 	else if ((strncmp ((char*)(DEVICE_NAME+5),"tlb",3)) == 0){
@@ -296,7 +296,7 @@ void get_test_type()
 	}	
 	else {
 		displaym(HTX_HE_HARD_ERROR,DBG_MUST_PRINT,"[%d]%s:unknown device name %s, supported htx nest devices are:"
-            "mem,cache<chip_num>,fabn,fabc,tlb\n",__LINE__,__FUNCTION__,DEVICE_NAME);
+            "mem,cache<chip_num>,fabn,fabc,fabxo,tlb\n",__LINE__,__FUNCTION__,DEVICE_NAME);
 		exit(1);
 	}
 		

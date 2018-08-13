@@ -3,6 +3,7 @@ TARGET = \
             hxefabricbus.readme \
             default.ab \
             default.xyz \
+            rules.all_links \
             default.inter_chip \
             default.inter_node
 

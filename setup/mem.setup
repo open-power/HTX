@@ -30,7 +30,7 @@ echo "mem.setup:OS proc_ver=$proc_ver, true pvr=$true_proc_ver" >> $HTXNoise
 
 ln -sf ${HTXBIN}/hxemem64_new ${HTXBIN}/hxetlbie
 ln -sf ${HTXBIN}/hxemem64_old ${HTXBIN}/hxecentaur
-ln -sf ${HTXBIN}/hxemem64_new ${HTXBIN}/hxefabricbus_new
+ln -sf ${HTXBIN}/hxemem64_new ${HTXBIN}/hxefabricbus
 if [ $true_proc_ver -lt 78 ];
 then
     #P8 or less
@@ -77,11 +77,9 @@ then
 	echo "mem.setup:Old mem and cache exer binaries will be used" >> $HTXNoise
 	ln -sf ${HTXBIN}/hxemem64_old ${HTXBIN}/hxemem64
     ln -sf ${HTXBIN}/hxecache_old ${HTXBIN}/hxecache
-	ln -sf ${HTXBIN}/hxefabricbus_old ${HTXBIN}/hxefabricbus
 else
 	ln -sf ${HTXBIN}/hxemem64_new ${HTXBIN}/hxemem64
     ln -sf ${HTXBIN}/hxecache_new ${HTXBIN}/hxecache
-	ln -sf ${HTXBIN}/hxefabricbus_new ${HTXBIN}/hxefabricbus
 fi
 Hugepagesize=`cat /proc/meminfo |grep Hugepagesize |awk '{print $2}'`
 if [[ $Hugepagesize -lt 2048 ]]

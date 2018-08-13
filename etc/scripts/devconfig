@@ -410,32 +410,29 @@ fi
 #Append inter_node fabric link test stanza in mdt.bu_char
 
 if [ $true_pvr -ge 78 ]; then
-    if [[ $num_nodes -gt 1 ]]
-    then
-		echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo "fabn:"                                                                                  | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo -e "\tHE_name = \"hxefabricbus\"                     "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo -e "\tadapt_desc = \"Node to Node\"                  "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo -e "\tdevice_desc = \"Memory BW\"                    "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo -e "\treg_rules = \"hxefabricbus/default.char\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo -e "\temc_rules = \"hxefabricbus/default.char\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo -e "\tcont_on_err = \"NO\"                         "                                     | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-		echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-    fi
-	 
-    if [[ -f ${HTXMDT}mdt.inter_chip ]]
-    then
-        echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo "fabc:"                                                                                  | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo -e "\tHE_name = \"hxefabricbus\"                     "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo -e "\tadapt_desc = \"Chip to Chip\"                  "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo -e "\tdevice_desc = \"Memory BW\"                    "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo -e "\treg_rules = \"hxefabricbus/default.inter_chip\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo -e "\temc_rules = \"hxefabricbus/default.inter_chip\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo -e "\tcont_on_err = \"NO\"                         "                                     | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io > /dev/null
-        echo                            
+	cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk > ${HTXMDT}mdt.fabric
+	if [ -f ${HTXMDT}mdt.inter_chip ] && [ -f ${HTXMDT}mdt.inter_node ];
+	then
+		fab_dev="fabxo:"
+		fab_rf="rules.all_links"
+	elif [ -f ${HTXMDT}mdt.inter_node ] && [ ! -f ${HTXMDT}mdt.inter_chip ];
+	then
+		fab_dev="fabn:"
+		fab_rf="default.inter_node"
+	elif [ ! -f ${HTXMDT}mdt.inter_node ] && [  -f ${HTXMDT}mdt.inter_chip ];
+	then
+		fab_dev="fabc:"
+		fab_rf="default.inter_chip"
 	fi
-
+	echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io  ${HTXMDT}/mdt.fabric > /dev/null
+		echo "$fab_dev"                                                                                  | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io ${HTXMDT}/mdt.fabric > /dev/null
+		echo -e "\tHE_name = \"hxefabricbus\"                     "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io ${HTXMDT}/mdt.fabric > /dev/null
+		echo -e "\tdevice_desc = \"Memory BW\"                    "                                   | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io ${HTXMDT}/mdt.fabric > /dev/null
+		echo -e "\treg_rules = \"hxefabricbus/$fab_rf\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io ${HTXMDT}/mdt.fabric > /dev/null
+		echo -e "\temc_rules = \"hxefabricbus/$fab_rf\"        "                                 | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io ${HTXMDT}/mdt.fabric > /dev/null
+		echo -e "\tcont_on_err = \"NO\"                         "                                     | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io ${HTXMDT}/mdt.fabric > /dev/null
+		echo                                                                                          | tee -a ${HTXMDT}/mdt.bu_char ${HTXMDT}/mdt.nest.io ${HTXMDT}/mdt.inter_io ${HTXMDT}/mdt.fabric > /dev/null
+	 
     if [[ -f ${HTXMDT}/mdt.bw_bi ]];
     then
         cat ${HTXMDT}/mdt.bw_bi | create_mdt_without_devices.awk default >> ${HTXMDT}/mdt.inter_io
