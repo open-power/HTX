@@ -1829,12 +1829,14 @@ void hang_monitor (struct htx_data *htx_ds)
 {
 		#define MSG1_LIMIT      2048
 
-        int i, j, err_level, hung_switch;
-        int threshold_exceeded=0;
+        int i, j, rc, err_level, hung_switch;
+        int threshold_exceeded=0, size, count = 0;
         pid_t pid;
         time_t current_time, oldest_time, temp_time;
-        char msg[256], msg1[MSG1_LIMIT + 25];
-        char err_str[ERR_STR_SZ];
+        char msg[256], msg1[MSG1_LIMIT + 25], file_name[256];
+        char err_str[ERR_STR_SZ], cmd[256], *dump_ptr = NULL;
+        FILE *dump_fp;
+        struct stat buffer;
 
         pid = getpid(); /* Get our process ID */
         while (1) {
@@ -1915,6 +1917,46 @@ void hang_monitor (struct htx_data *htx_ds)
                                         }
                                 }
                         }
+                        /* Dump the procstack in a file then in a buffer and pass the buffer address to KDB */
+                        sprintf (file_name, "%s/procstack_dump_%d", htx_ds->htx_exer_log_dir, count);
+                    #ifdef __HTX_LINUX__
+                        sprintf (cmd, "gstack %d > %s", pid, file_name);
+                    #else
+                        sprintf (cmd, "procstack %d > %s", pid, file_name);
+                    #endif
+                        rc = system (cmd);
+                        if (!WIFEXITED(rc)) {
+                            sprintf(msg, "command to execute procstack dump failed. rc: %d.\n", rc);
+                            user_msg (htx_ds, -1,  0, HARD, msg);
+                        } else {
+                            if (count < 20) {
+                                count++;
+                            }
+                            rc = stat (file_name, &buffer);
+                            if ( rc == -1) {
+                                err_level = errno;
+                                sprintf (msg, "Could not get dumpfile size. errno: %d\n", errno);
+                                user_msg (htx_ds, err_level, 0, HARD, msg);
+                            } else {
+                                size = buffer.st_size;
+                                dump_ptr = malloc (size + 128);
+                                if (dump_ptr == NULL) {
+                                    err_level = errno;
+                                    sprintf (msg, "Could not allocate memory for procstack dump. errno: %d\n", errno);
+                                    user_msg (htx_ds, err_level, 0, HARD, msg);
+                                } else {
+                                    dump_fp = fopen(file_name, "r");
+                                    if (dump_fp == NULL) {
+                                        err_level = errno;
+                                        sprintf (msg, "Could not open dumpfile. errno: %d\n", errno);
+                                        user_msg (htx_ds, err_level, 0, HARD, msg);
+                                    } else {
+                                        rc = fread (dump_ptr, size, 1, dump_fp);
+                                        fclose(dump_fp);
+                                    }
+                                }
+                            }
+                        }
                         if (dev_info.crash_on_hang) {
                         #ifdef __HTX_LINUX__
                                 do_trap_htx64(0xBEEFDEAD, (unsigned long)(seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, (unsigned long)msg1, (unsigned long)htx_ds, 0, 0);
@@ -1923,6 +1965,10 @@ void hang_monitor (struct htx_data *htx_ds)
                         #endif
                         }
                         user_msg (htx_ds, -1, 0, err_level, msg1);
+			if (dump_ptr != NULL) {
+				free (dump_ptr);
+				dump_ptr = NULL;
+			}
                 }
 		 /* Release the segment table mutex. */
                 if ((err_level = pthread_mutex_unlock(&(seg_info.seg_table + i)->segment_mutex))) {
