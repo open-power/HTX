@@ -67,9 +67,13 @@ unsigned long long set_first_blk (struct htx_data *htx_ds, struct thread_context
 		}
 	}
 
-	/* Adjust first blk if direction is DOWN and num_blks is greater than max_blkno */
-	if ((tctx->direction == DOWN) && (first_blk + tctx->num_blks - 1 > tctx->max_blkno)) {
-		first_blk = first_blk - (first_blk + tctx->num_blks - tctx->max_blkno - 1);
+	/* Adjust first blk if direction is DOWN  */
+	if (tctx->direction == DOWN) {
+		if (tctx->starting_block == MID) {
+			first_blk = first_blk - tctx->num_blks + 1;
+		} else if (first_blk + tctx->num_blks - 1 > tctx->max_blkno) { /* num_blks is greater than max_blkno */
+ 		    first_blk = first_blk - (first_blk + tctx->num_blks - tctx->max_blkno - 1);
+	    }
 	}
 
 	if (tctx->direction == OUT && first_blk != (tctx->min_blkno + ((tctx->max_blkno - tctx->min_blkno + 1) / 2))) {
@@ -531,6 +535,13 @@ void do_fencepost_check (struct htx_data *htx_ds, struct thread_context *tctx)
 	if ((tctx->blkno[0] >= lba_fencepost[tctx->BWRC_zone_index].min_lba) && ((tctx->blkno[0] + tctx->num_blks - 1) <= lba_fencepost[tctx->BWRC_zone_index].max_lba)) { /* means num_blks lie within fencepost of 1 BWRC zone */
 		return; /* We are good to do operation. do nothing and return */
 	} else {
+		/* defect SW441918 - In case of variable length, transfer size may go beyond LBA fencepost.
+		 * If so, change the transfer size and then call init_blkno
+		 */
+		 if (tctx->transfer_sz.increment == -1) {
+			 tctx->dlen = tctx->transfer_sz.min_len;
+			 tctx->num_blks = tctx->dlen / dev_info.blksize;
+		 }
 		init_blkno(htx_ds, tctx);
 	}
 }
