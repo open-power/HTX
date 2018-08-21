@@ -1199,6 +1199,10 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
          * know whether SEQ/RANDOM oper were going on.
          */
         tctx->cur_seek_type = RANDOM;
+        if (tctx->transfer_sz.increment == -1 && tctx->dlen != tctx->transfer_sz.min_len) {
+            tctx->dlen = tctx->transfer_sz.min_len;
+            tctx->num_blks = tctx->dlen / dev_info.blksize;
+        }
         oper_loop = 0;
         cur_num_oper = tctx->num_oper[RANDOM];
 
