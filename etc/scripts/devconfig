@@ -63,6 +63,12 @@ then
     create_my_mdt afu[0-9].[0-9]d:default > ${HTXMDT}/mdt.memcopy
 fi	
 
+ocapi_memcpy_dev=`ls /dev/ocxl | grep MEMCPY3 | wc -l`
+if [[ $ocapi_memcpy_dev -ne  0 ]];
+then
+        create_my_mdt omcpy:default > ${HTXMDT}/mdt.ocapi_memcopy
+fi
+
 #create fabricbus mdts in early stage as "create_my_mdt" script uses these mdts for later use
 # mdt.mem should have been created before create_ab_mem_mdt
 if [[ $proc_ver_dec -ge 62 ]] && [[ "$shared_proc_mode" = "no" ]];
