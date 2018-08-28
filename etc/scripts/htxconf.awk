@@ -644,6 +644,19 @@ BEGIN {
 	}
 	close(cmd);
 
+	# opencapi memcpy exerciser stranza creation
+	ocapi_memcpy_present = snarf("ls /dev/ocxl | grep MEMCPY3 | wc -l");
+	if (ocapi_memcpy_present) {
+    	for (dev_num=1;dev_num<(ocapi_memcpy_present+1);dev_num++) {
+        	tmp=sprintf("ls -l /dev/ocxl 2> /dev/null | grep MEMCPY3 | awk 'NR==%d {print $NF}'",dev_num);
+        	dev=snarf(tmp);
+        	dev_name=sprintf("omcpy%d",(dev_num-1));
+        	tmp = sprintf("ln -sf /dev/ocxl/%s /dev/%s", dev, dev_name);
+        	snarf(tmp);
+        	mkstanza("hxeocapi", "AFU memcpy", "OpenCAPI", dev_name, "hxeocapi", "default", "");
+    	}
+	}
+
    	ibm_internal = snarf("ls -l ${HTX_HOME_DIR}/.internal 2> /dev/null | wc -l");
 }
 
