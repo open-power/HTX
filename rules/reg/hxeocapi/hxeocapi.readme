@@ -1,0 +1,96 @@
+README For hxeocapi exerciser
+============================
+
+Goal:
+-----
+Exerciser goal is to stress and validate OpenCAPI infrastructure provided on
+Power9 using memcopy AFU adhering to OPPA architecture.
+
+Features:
+---------
+1) Supports MEMCOPY test case in AFU directed Mode.
+
+Brief description of hxeocapi exerciser :
+---------------------------------------
+Hxeocapi exerciser use libocxl APIs to perform memcopy operation on Memcopy AFU. It is 
+a multi threaded application that stress memcopy AFU running in afu directed mode.
+
+Hardware supported & HW test scope:
+-----------------------------------
+This exerciser runs on openCAPI enabled hardware and software.
+So supported hardware should be Power9. 
+
+Supported OS:
+-------------
+AIX   : n
+Linux : y
+BML   : n
+
+Prerequisites:
+--------------
+1) Hardware should support OPPA Architecture, so this exerciser 
+   should run on Power9 chip or above.
+
+2) libocxl library needs to be installed prior to running exerciser.
+   It can be downloaded from github at below location:
+   https://github.com/OpenCAPI/libocxl
+
+List of mdt files:
+-----------------
+If devcies are present in /dev/ocxl directory. omcpy<n> device stanza entry will be 
+created in mdt.bu and mdt.ocapi_memcopy.
+
+List of rules:
+--------------
+default
+
+Rule File Parameters:
+--------------------
+
+HTX OpenCAPI exerciser sample rules file looks like :
+
+rule_id = rule_1
+bufsize = 128
+compare = true
+num_oper = 10000
+num_threads = 8
+completion_method = polling
+timeout = 20
+
+This rule will create 8 threads and each issuing MEMCOPY command to AFU for buffer size 128 bytes.
+
+
+1) RULE_ID :
+        This parameter is used to assign unique name to each of the rule stanza
+        in the rule file. The value should be of type character string.
+
+2) BUFSIZE:
+        Size of buffer in bytes.
+        Default - 128
+
+3) COMPARE:
+        This parameter indicates whether to compare source and destination buffer.
+        Possible Values - TRUE or FALSE
+        Default - TRUE.
+
+4) NUM_OPER:
+        This parameter indicates number of times memcopy test has to be performed.
+        Possible Values - Input should be positive real number.
+        Default - 100
+
+5) NUM_THREADS:
+        This parameter indicates number of threads to create to do test operations.
+        Possible Values - Input must be between 1 and 32.
+        Default - 32
+
+6) COMPLETION_METHOD:
+        This parameter indicates which method to use for checking the completion of memcopy operation.
+        Possible Values - POLLING or INTERRUPT
+        Default - POLLING
+
+7) TIMEOUT:
+        This parameter indicates the timeout value waiting for any AFU event.
+        Input is in unit of seconds.
+        Default -  10
+
+
