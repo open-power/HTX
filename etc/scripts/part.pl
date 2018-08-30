@@ -905,7 +905,7 @@ sub get_parts_to_exclude
 		        $parts_to_exclude[$cnt++]=$alternate_dev;
 		    }
 		    #Now check if mpath or any of its partitions has boot disk
-		    $res=`parted "$abs_path" print 2>/dev/null | awk  '/PPC/ || /Linux/ || /linux/ || /boot/ || /prep/' || /swap/' | grep -v \"device-mapper\"`;
+		    $res=`parted "$abs_path" print 2>/dev/null | awk  '/PPC/ || /Linux/ || /linux/ || /boot/ || /prep/ || /swap/' | grep -v \"device-mapper\"`;
 #		    $res=`fdisk -l "$abs_path"  2>/dev/null | awk  '/PPC/ || /Linux/ '` ; 
 		    chomp($res); 
 		    if($res) { 

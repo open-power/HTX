@@ -1,0 +1,26 @@
+* Rule file for OpenCAPI memcpy AFU
+
+*************************************************
+*   STANZA 1 - COPY TEST - Issue copy command   *
+*   of size 128 bytes for 10000 num_oper.       *
+*************************************************
+rule_id = rule_1
+testcase = COPY
+bufsize = 128
+compare = true
+num_oper = 10000
+num_threads = 8
+completion_method = polling
+
+*************************************************
+*   STANZA 2 - COPY TEST - Issue copy command   *
+*   of size 2048 bytes for 10000 num_oper.      *
+*************************************************
+rule_id = rule_2
+testcase = COPY
+bufsize = 2048
+compare = true
+num_oper = 10000
+num_threads = 4
+completion_method = polling
+
