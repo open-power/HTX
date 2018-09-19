@@ -140,14 +140,19 @@ extern int volatile collisions;
  * thread before performing any IO.
  */
 struct segment_table_data {
-        unsigned long long flba;        /* start LBA no. */
-        unsigned long long llba;        /* End LBA no. */
-        unsigned long long seg_flba;    /* start LBA no of individual segment. */
-        unsigned long long seg_llba;    /* End LBA no of individual segment. */
-        pthread_t tid;                  /* thread id */
-        time_t thread_time;             /* Time when IO started */
-        int hang_count;                 /* hang count */
-        int in_use;                     /* flag to indicate if segment index is in use */
+        unsigned long long th_context_addr; /* address of thread context updating the entry */
+        unsigned long long flba;            /* start LBA no. */
+        unsigned long long llba;            /* End LBA no. */
+        unsigned long long seg_flba;        /* start LBA no of individual segment. */
+        unsigned long long seg_llba;        /* End LBA no of individual segment. */
+        pthread_t tid;                      /* thread id */
+        time_t last_update_time;            /* Time when IO started */
+        time_t io_update_time[8];           /* Time stamp for individual IO operation */
+        pthread_mutex_t time_mutex;         /* Mutex lock for updating timestamp */
+        short time_index;                   /* index into io_update_time */
+        short hang_count;                   /* hang count */
+        int io_in_progress: 1;              /* Flag to check if IO is in progress */
+        int in_use: 1;                      /* flag to indicate if segment table entry is in use */
 };
 
 /* segment_table structure holds the uppper and lower lba range of individual segments */

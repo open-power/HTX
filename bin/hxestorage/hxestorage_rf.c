@@ -386,6 +386,9 @@ void check_n_update_rule_params(struct htx_data *htx_ds, struct ruleinfo *curren
     } else if (current_stanza_ptr->num_threads == DEFAULT_NUM_THREADS) {
         current_stanza_ptr->num_threads = 1;
     }
+    if(max_thread_cnt < current_stanza_ptr->num_threads){
+        max_thread_cnt = current_stanza_ptr->num_threads;
+    }
 }
 
 /*****************************************************************/
