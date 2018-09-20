@@ -56,7 +56,6 @@ struct dev_info {
 struct dev_exer_map map_array[] = {{"mem", "hxemem64", "64bit", "memory"},
                                {"fpu", "hxefpu64", "core", "floating_point"},
                                {"cpu", "hxecpu", "processor", "processor"},
-                               {"sctu", "hxesctu", "cache", "coherence_test"},
                                {"cache", "hxecache", "", "Processor_cache"},
                                {"tdp", "hxeewm", "", "energy workload"},
                                {"rdp", "hxeewm", "", "energy workload"},
@@ -69,11 +68,17 @@ struct dev_exer_map map_array[] = {{"mem", "hxemem64", "64bit", "memory"},
                                {"mrd", "hxeewm", "", "energy workload"},
                                {"triad", "hxeewm", "", "energy workload"},
                                {"ddot", "hxeewm", "", "energy workload"},
-                               {"pv", "hxeewm", "", "energy workload"}
+                               {"pv", "hxeewm", "", "energy workload"},
+                               {"nvidia", "hxenvidia", "NVIDIA_GPU", "Graphics_Device"},
+                               {"disk_", "hxestorage", "storage", " Storage Device"},
+                               {"net_", "hxecom", "network", "Network Device"},
+                               {"fabc", "hxefabricbus", "", "chip to chip"},
+                               {"fabn", "hxefabricbus", "", "node to node"},
+                               {"sctu", "hxesctu", "cache coherency", "coherence_test"}
                               };
 int line_num = 0;
-int pvr, num_devs = 0;
-char scripts_dir[128];
+int pvr, num_devs = 0, net_configured = 0;
+char scripts_dir[128], mdt_dir[128], mdt_file_name[256];
 static int num_mem_instances = 0;
 
 void create_default_stanza(FILE *fp, char *eq_file);
@@ -128,6 +133,12 @@ int main(int argc, char **argv)
     if (ptr != NULL) {
          strcpy(scripts_dir, ptr);
     }
+
+        ptr = getenv("HTXMDT");
+    if (ptr != NULL) {
+         strcpy(mdt_dir, ptr);
+    }
+
     create_default_stanza(mdt_fp, eq_file_name);
     while (1) {
         line_num++;
@@ -182,9 +193,16 @@ int main(int argc, char **argv)
                     create_dev_stanza(mdt_fp, resource_str, dev_input);
                 }
             }
-         }
-     }
-     return 0;
+        }
+    }
+    fclose(eq_fp);
+    fclose(mdt_fp);
+    if (net_configured == 1) {
+        sprintf(tmp_str, "%s/mdt_net %s", mdt_dir, basename(mdt_file_name));
+        system (tmp_str);
+        net_configured = 0;
+    }
+    return 0;
 }
 
 void create_device_entries(FILE *fp, char *dev_name_str, struct dev_exer_map cur_dev_map, struct dev_info cur_dev_input )
@@ -212,10 +230,11 @@ void create_device_entries(FILE *fp, char *dev_name_str, struct dev_exer_map cur
 
 int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
 {
-    int i, j, num_entries;
+    int i, j, num_entries, len;
     int node, chip, core, cpu;
-    char dev_name_str[16], rule_file_name[64];
-    char filter_str[2][128];
+    char dev_name_str[16], rule_file_name[64], tmp_str[64], cmd_str[256];
+    char filter_str[2][128], filename[64], *ptr;
+    FILE *fp1, *tmp_ptr;
     struct dev_exer_map cur_dev_map;
     struct dev_info cur_dev_input;
     struct resource_filter_info filter;
@@ -224,7 +243,10 @@ int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
     num_entries = sizeof(map_array) / sizeof(struct dev_exer_map);
     for (i = 0; i < num_devs; i++) {
         for (j = 0; j < num_entries; j++) {
-             if (strcasecmp (map_array[j].dev, dev_input[i].dev_name) == 0) {
+             if ((strcasecmp (map_array[j].dev, dev_input[i].dev_name) == 0) ||
+                 (strncasecmp (dev_input[i].dev_name, "nvidia", 6) == 0) ||
+                 ((strncasecmp (dev_input[i].dev_name, "disk_", 5) == 0 ) && (strncasecmp (map_array[j].dev, dev_input[i].dev_name, 5) == 0)) ||
+                 ((strncasecmp (dev_input[i].dev_name, "net_", 4) == 0) && (strncasecmp (map_array[j].dev, dev_input[i].dev_name, 4) == 0))) {
                 strcpy(cur_dev_map.exer, map_array[j].exer);
                 strcpy(cur_dev_map.adapt_desc, map_array[j].adapt_desc);
                 strcpy(cur_dev_map.dev_desc, map_array[j].dev_desc);
@@ -254,34 +276,112 @@ int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
             strcpy(cur_dev_input.rule_file_name, rule_file_name);
             create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
         } else {
-            parse_filter(filter_str, &filter, 1);
             strcpy(rule_file_name, cur_dev_map.exer);
             strcat(rule_file_name, "/");
             strcat(rule_file_name, dev_input[i].rule_file_name);
             memcpy(&cur_dev_input, &dev_input[i], sizeof(struct dev_info));
             strcpy(cur_dev_input.rule_file_name, rule_file_name);
-            for (node = 0; node < filter.num_nodes; node++) {
-                if (filter.node[node].node_num == -1) {
-                    continue;
-                }
-                for (chip = 0; chip < filter.node[node].num_chips; chip++) {
-                    if (filter.node[node].chip[chip].chip_num == -1) {
-                        continue;
-                    }
-                    for (core = 0; core < filter.node[node].chip[chip].num_cores; core++) {
-                        if (filter.node[node].chip[chip].core[core].core_num == -1) {
-                            continue;
-                        }
-                        for (cpu = 0; cpu < filter.node[node].chip[chip].core[core].num_procs; cpu++) {
-                            if (filter.node[node].chip[chip].core[core].lprocs[cpu] == -1 ) {
-                                continue;
+            if (filter_str[0][0] == '*') {
+                if (strncasecmp (dev_input[i].dev_name, "disk_", 5) == 0) {
+                    strcpy(tmp_str, &dev_input[i].dev_name[5]);
+                    if (tmp_str[0] == '*') {
+                    #ifdef __HTX_LINUX__
+                        strcpy(filename, "/tmp/rawpart");
+                        fp1 = fopen (filename, "r");
+                        if (fp1 != NULL) {
+                            while ((fscanf (fp1, "%s\n", tmp_str)) != EOF) {
+                                strcpy(dev_name_str, tmp_str);
+                                create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
                             }
-                            sprintf(dev_name_str, "%s%d", dev_input[i].dev_name, filter.node[node].chip[chip].core[core].lprocs[cpu]);
+                            fclose(fp1);
+                        }
+                        strcpy(filename, "/tmp/mpath_parts");
+                        fp1 = fopen (filename, "r");
+                        if (fp1 != NULL) {
+                            while ((fscanf (fp1, "%s\n", tmp_str)) != EOF) {
+                                strcpy(dev_name_str, tmp_str);
+                                create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
+                            }
+                            fclose(fp1);
+                        }
+                    #else
+                        sprintf(cmd_str, "cat %s/mdt.bu | grep rhdisk | grep :", mdt_dir);
+                        tmp_ptr = popen (cmd_str, "r");
+                        if (tmp_ptr == NULL) {
+                            printf("Error for popen for disk devices in create_eq_mdt. Exiting...");
+                            exit(1);
+                        }
+                        while (fgets(tmp_str, 32, tmp_ptr) != NULL) {
+                            ptr = strtok(tmp_str, ":");
+                            strcpy(dev_name_str, ptr);
                             create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
                         }
+                        pclose(tmp_ptr);
+                    #endif
+                    } else {
+                        sprintf(cmd_str, "cat %s/mdt.bu | grep %s | grep :", mdt_dir, tmp_str);
+                        tmp_ptr = popen (cmd_str, "r");
+                        if (tmp_ptr == NULL) {
+                            printf("Error for popen in create_eq_mdt. Exiting...");
+                            exit(1);
+                        }
+                        if (fgets(tmp_str, 32, tmp_ptr) != NULL) {
+                            ptr = strtok(tmp_str, ":");
+                            strcpy(dev_name_str, ptr);
+                            create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
+                        }
+                        pclose(tmp_ptr);
+                    }
+                } else if (strncasecmp (dev_input[i].dev_name, "net", 3) == 0) {
+                    system ("build_net help y y");
+                    net_configured = 1;
+                } else if (strncasecmp (dev_input[i].dev_name, "fab", 3)  == 0) {
+                    strcpy(dev_name_str, dev_input[i].dev_name);
+                    create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
+                } else {
+                    len = strlen (dev_input[i].dev_name);
+                    if (dev_input[i].dev_name[len - 1] == '*') {
+                        strncpy (tmp_str, dev_input[i].dev_name, len - 1); /* Will remove '*' from end */
+                    } else {
+                        strcpy (tmp_str, dev_input[i].dev_name);
+                    }
+                    sprintf(cmd_str, "cat %s/mdt.bu | grep %s | grep :", mdt_dir, tmp_str);
+                    tmp_ptr = popen (cmd_str, "r");
+                    if (tmp_ptr == NULL) {
+                        printf("Error for popen in create_eq_mdt. Exiting...");
+                        exit(1);
+                    }
+                    while (fgets(tmp_str, 32, tmp_ptr) != NULL) {
+                        ptr = strtok(tmp_str, ":");
+                        strcpy(dev_name_str, ptr);
+                        create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
                     }
                 }
-            }
+            } else {
+                parse_filter(filter_str, &filter, 1);
+                for (node = 0; node < filter.num_nodes; node++) {
+                    if (filter.node[node].node_num == -1) {
+                        continue;
+                    }
+                    for (chip = 0; chip < filter.node[node].num_chips; chip++) {
+                        if (filter.node[node].chip[chip].chip_num == -1) {
+                            continue;
+                        }
+                        for (core = 0; core < filter.node[node].chip[chip].num_cores; core++) {
+                            if (filter.node[node].chip[chip].core[core].core_num == -1) {
+                                continue;
+                            }
+                            for (cpu = 0; cpu < filter.node[node].chip[chip].core[core].num_procs; cpu++) {
+                                if (filter.node[node].chip[chip].core[core].lprocs[cpu] == -1 ) {
+                                    continue;
+                                }
+                                sprintf(dev_name_str, "%s%d", dev_input[i].dev_name, filter.node[node].chip[chip].core[core].lprocs[cpu]);
+                                create_device_entries(fp, dev_name_str, cur_dev_map, cur_dev_input);
+                            }
+                        }
+                    }
+                }
+		    }
         }
     }
     return 0;
@@ -290,10 +390,10 @@ int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
 void create_string_entry(FILE *fp, char *param_name, char *param_value, char *desc)
 {
     int start_index;
-    char comment[64];
+    char comment[128];
     char tmp[2] = "";
 
-    start_index = 40 - strlen(param_name) - strlen(param_value);
+    start_index = 60 - strlen(param_name) - strlen(param_value);
     sprintf(comment, "%*s", start_index, tmp);
     fprintf(fp, "\t%s = \"%s\" %s%s\n", param_name, param_value, comment, desc);
 }
@@ -301,9 +401,9 @@ void create_string_entry(FILE *fp, char *param_name, char *param_value, char *de
 void create_numeric_entry(FILE *fp, char *param_name, char *param_value, char *desc)
 {
     int start_index;
-    char comment[64], tmp[2] = "";
+    char comment[128], tmp[2] = "";
 
-    start_index = 42 - strlen(param_name) - strlen(param_value);
+    start_index = 62 - strlen(param_name) - strlen(param_value);
     sprintf(comment, "%*s", start_index, tmp);
     fprintf(fp, "\t%s = %s %s%s\n", param_name, param_value, comment, desc);
 }
@@ -320,11 +420,11 @@ int get_string_value(char *eq_file, char *string, char type, char *str_val)
         printf("Error for popen in create_eq_mdt. Exiting...");
         exit(1);
     }
-    if (fgets(str_val,24,tmp_fp) != NULL && type == NUMERIC) {
+    if (fgets(str_val,128,tmp_fp) != NULL && type == NUMERIC) {
         sscanf(str_val, "%d", &val);
     } else {
-        str_val[strlen(str_val) -1] = '\0';
-    }
+		str_val[strlen(str_val) -1] = '\0';
+	}
     pclose(tmp_fp);
     return val;
 }
@@ -370,8 +470,9 @@ void create_default_stanza(FILE *fp, char *eq_file)
     create_numeric_entry(fp, "equaliser_debug_flag", "0", "* Equaliser debug flag for supervisor");
     sprintf(str, "%d", time_quantum);
     create_numeric_entry(fp, "eq_time_quantum", str, "* Equaliser time quantum");
-    if ( offline_cpu == 1) {
-        create_numeric_entry(fp, "offline_cpu", "1", "* offlining the cpus is enabled");
+    if ( offline_cpu != 0) {
+        sprintf(str, "%d", offline_cpu);
+        create_numeric_entry(fp, "offline_cpu", str, "* offlining the cpus is enabled");
     }
     sprintf(str, "%d", startup_time_delay);
     create_numeric_entry(fp, "eq_startup_time_delay", str, "* Equaliser startup time delay");
@@ -420,4 +521,5 @@ int get_line(char line[], int lim, FILE *fp)
                 return rc;
         }
 }
+
 

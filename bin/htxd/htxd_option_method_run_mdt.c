@@ -537,7 +537,7 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 				#endif
 				#ifdef __HTX_LINUX__
 				/* start hotplug monitor */
-				if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
+				if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() == 0) {
 					htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
 					HTXD_TRACE(LOG_ON, "run started hotplug monitor");
 				}
@@ -551,7 +551,7 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 			#endif
 			#ifdef __HTX_LINUX__
 			/* start hotplug monitor */
-			if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
+			if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() == 0) {
 				htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
 				HTXD_TRACE(LOG_ON, "run started hotplug monitor");
 			}

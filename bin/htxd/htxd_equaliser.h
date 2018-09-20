@@ -37,6 +37,7 @@
 #define UTIL_RIGHT	    1
 #define UTIL_RANDOM  	2
 #define UTIL_PATTERN	3
+#define UTIL_SYS        4
 
 typedef char uint8;
 typedef unsigned short uint16;
@@ -86,6 +87,7 @@ struct config_parameters {
     uint16      pattern_length;      /* length of bit pattern */
     uint16      sequence_length;     /* Num of %age util defined */
     uint16      utilization_sequence[MAX_UTIL_SEQUENCE_LENGTH];
+    uint64      offline_cpu;         /* Bit pattern for offline cpu */
 };
 typedef struct config_parameters config_params;
 
@@ -97,7 +99,7 @@ typedef struct run_time_config_structure run_time_config;
 
 struct test_config_structure {
     uint32                      time_quantum;
-    uint32                      offline_cpu;           /* Flag to make cpu offline. only supported for Linux */
+    uint32                      offline_cpu_prcnt;     /* offline cpu percentage. only supported for Linux */
     uint32                      sys_util_flag;         /* Flag set if system level utilization is give */
     uint32                      startup_time_delay;    /* Time delay for equaliser to be effective */
     uint32                      log_duration;          /* Time duration foe which logs are collected. */

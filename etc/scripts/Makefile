@@ -43,6 +43,7 @@ TARGET = \
 	get_mem_pool_details.sh \
 	htx_exer_ipc_cleanup \
 	htx_setup.sh \
+	create_eq_mdts \
 	htx_env.sh
 
 
