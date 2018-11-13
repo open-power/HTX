@@ -31,6 +31,7 @@
 #define HXESTORAGE_DIFF_LBA_DATA        8
 #define HXESTORAGE_DIFF_STANZA_DATA     9
 #define HXESTORAGE_DIFF_PATTERN_DATA    10
+#define HXESTORAGE_WRITE_STAMP_MISMATCH       11
 
 #define UPDATE_DONE                     0
 #define PARTIAL_BLOCK_MISCOMPARE        1
@@ -78,6 +79,10 @@ void generate_miscompare_report (struct thread_context *tctx, int mis_offset, ch
     strcat(msg, temp);
     sprintf(temp, "Transfer size: 0x%llx\n", tctx->dlen);
     strcat(msg, temp);
+    if (enable_state_table) {
+        sprintf(temp, "State table feature is enabled.\n");
+        strcat(msg, temp);
+    }
     strcpy(tctx->mis_log_buf, msg);
 
     if (total_BWRC_threads != 0) {
@@ -94,13 +99,13 @@ void generate_miscompare_report (struct thread_context *tctx, int mis_offset, ch
     }
 
     strcpy(msg1, "\nMiscompare Summary:\n===================\n");
-    sprintf(temp, "LBA no. where miscomapre started:     0x%llx\n", tctx->mis_detail.mis_start_LBA);
+    sprintf(temp, "LBA no. where miscompare started:     0x%llx\n", tctx->mis_detail.mis_start_LBA);
     strcat(msg1, temp);
-    sprintf(temp, "LBA no. where miscomapre ended:       0x%llx\n", tctx->mis_detail.mis_end_LBA);
+    sprintf(temp, "LBA no. where miscompare ended:       0x%llx\n", tctx->mis_detail.mis_end_LBA);
     strcat(msg1, temp);
     sprintf(temp, "Miscompare start offset (in bytes):   0x%x\n", tctx->mis_detail.mis_start);
     strcat(msg1, temp);
-    sprintf(temp, "Miscomapre end offset (in bytes):     0x%x\n", tctx->mis_detail.mis_end);
+    sprintf(temp, "Miscompare end offset (in bytes):     0x%x\n", tctx->mis_detail.mis_end);
     strcat(msg1, temp);
     sprintf(temp, "Miscompare size (in bytes):           0x%x\n", tctx->mis_detail.mis_size);
     strcat(msg1, temp);
@@ -108,14 +113,14 @@ void generate_miscompare_report (struct thread_context *tctx, int mis_offset, ch
     strcat(msg, msg1);
     strcat(tctx->mis_log_buf, msg1);
 
-    strcat(msg, "\nExpected data (at miscomapre offset): ");
+    strcat(msg, "\nExpected data (at miscompare offset): ");
     for (i = 0; i < 16; i++) {
         sprintf(msg1, "%.2x", tctx->wbuf[mis_offset + i]);
         strcat(msg, msg1);
     }
     strcat(msg, "\n");
 
-    strcat(msg, "Actual data (at miscomapre offset):   ");
+    strcat(msg, "Actual data (at miscompare offset):   ");
     for (i = 0; i < 16; i++) {
         sprintf(msg1, "%.2x", tctx->rbuf[mis_offset + i]);
         strcat(msg, msg1 );
@@ -150,7 +155,8 @@ void generate_miscompare_report (struct thread_context *tctx, int mis_offset, ch
 
         case HXESTORAGE_STALE_DATA:
             sprintf(temp, "\nData in read buffer is stale data i.e. was written even before the current hxestorage run."
-                          "\n------------------------------------------------------------------------------------------\n");
+                          "\nCurrent hxestorage test start time: 0x%x."
+                          "\n------------------------------------------------------------------------------------------\n", (unsigned int)time_mark);
             break;
 
         case HXESTORAGE_OLD_DATA:
@@ -166,6 +172,11 @@ void generate_miscompare_report (struct thread_context *tctx, int mis_offset, ch
         case HXESTORAGE_DIFF_PATTERN_DATA:
             sprintf(temp, "\nExpected data was of pattern type %s, while actual data is of some different pattern type."
                           "\n------------------------------------------------------------------------------------------\n", tctx->pattern_id);
+            break;
+
+        case HXESTORAGE_WRITE_STAMP_MISMATCH:
+            sprintf(temp, "\nWrite stamping mismatch for LBA: 0x%llx.\n"
+                          "\n--------------------------------------------\n", tctx->mis_detail.mis_start_LBA);
             break;
 
         case HXESTORAGE_JUNK_DATA:
@@ -439,6 +450,28 @@ void check_diff_lba_data (struct thread_context *tctx, int blk_num, struct misco
     }
 }
 
+void check_write_stamp (struct thread_context *tctx, int blk_num, struct miscompare_details *cur_mis)
+{
+    char *rbuf, *wbuf;
+    unsigned short rbuf_write_status, wbuf_write_status;
+
+    rbuf = tctx->rbuf + blk_num * dev_info.blksize;
+    wbuf = tctx->wbuf + blk_num * dev_info.blksize;
+
+#ifndef __HTX_LE__
+    rbuf_write_status = rbuf[WRITE_STAMP_POS] << 8  | rbuf[WRITE_STAMP_POS + 1];
+    wbuf_write_status = wbuf[WRITE_STAMP_POS] << 8  | wbuf[WRITE_STAMP_POS + 1];
+#else
+    rbuf_write_status = rbuf[WRITE_STAMP_POS + 1] << 8  | rbuf[WRITE_STAMP_POS];
+    wbuf_write_status = wbuf[WRITE_STAMP_POS + 1] << 8  | wbuf[WRITE_STAMP_POS];
+#endif
+    if (wbuf_write_status != rbuf_write_status) {
+        cur_mis->mis_start = blk_num * dev_info.blksize + WRITE_STAMP_POS;
+        cur_mis->mis_end = (blk_num + 1) * dev_info.blksize - 1;
+        cur_mis->mis_type = HXESTORAGE_WRITE_STAMP_MISMATCH;
+    }
+}
+
 void check_stale_data (struct thread_context *tctx, int blk_num, struct miscompare_details *cur_mis)
 {
     char *rbuf, *wbuf, buf[10];
@@ -495,6 +528,10 @@ void validate_header_field (struct thread_context *tctx, int mis_blk, struct mis
     if (cur_mis->mis_type == HXESTORAGE_NO_MISCOMPARE) {
         /* Check if data is coming from different LBA */
         check_diff_lba_data(tctx, mis_blk, cur_mis);
+    }
+
+    if (cur_mis->mis_type == HXESTORAGE_NO_MISCOMPARE && enable_state_table == 1) {
+        check_write_stamp(tctx, mis_blk, cur_mis);
     }
 
     if (cur_mis->mis_type == HXESTORAGE_NO_MISCOMPARE) {
@@ -650,3 +687,4 @@ void analyze_miscompare(struct thread_context *tctx, int mis_offset, char *msg)
 
     generate_miscompare_report(tctx, save_mis_offset, msg);
 }
+

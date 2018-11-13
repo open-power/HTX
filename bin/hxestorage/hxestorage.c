@@ -2021,7 +2021,7 @@ void update_blkno(struct htx_data *htx_ds, struct ruleinfo *ruleptr, struct thre
     /* DPRINT("num_blks_per_thread: %lld\n", num_blks_per_thread); */
     remaining_blks = (ruleptr->max_blkno.value[0] - ruleptr->min_blkno.value[0] + 1) % ruleptr->num_threads;
     for (th_num = 0; th_num < ruleptr->num_threads; th_num++, current_tctx++) {
-        current_tctx->min_blkno = th_num * num_blks_per_thread;
+        current_tctx->min_blkno = ruleptr->min_blkno.value[0] + th_num * num_blks_per_thread;
         current_tctx->max_blkno = current_tctx->min_blkno + num_blks_per_thread - 1;
         if (th_num == (ruleptr->num_threads - 1) && remaining_blks != 0) {
             current_tctx->max_blkno += remaining_blks;
