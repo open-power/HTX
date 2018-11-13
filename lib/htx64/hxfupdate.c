@@ -17,6 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+
 /* "@(#)92	1.29.6.15  src/htx/usr/lpp/htx/lib/htx64/hxfupdate.c, htx_libhtx, htxubuntu 1/12/16 05:27:10"; */
 
 #define addw(msw, lsw, num) \
@@ -129,7 +130,18 @@ int rem_shm_id;
 #include <sys/socket.h>
 
 /*void set_misc_htx_data(struct htx_data *);*/
-struct htx_data             *misc_htx_data;
+struct htx_data *misc_htx_data;
+
+time_diff_func_struct time_diff_struct;
+static time_t exer_start_time_for_time_driven, exer_cur_time_for_time_driven;
+volatile float total_no_of_stanzas_present_lib;
+volatile float time_interval_for_stanza_switch_lib;
+volatile float time_interval_for_run_lib;
+volatile float no_of_stanzas_to_be_executed;
+volatile int stanzas_executed;
+pthread_attr_t timer_fn_th_attr;
+pthread_t timer_fn_th_tid;
+pthread_mutex_t mutex_for_time_driven_exec; /* mutex for time driven execution of HTX */
 
 int hxfadd(char *server_ip, struct htxshm_HE add_HE, char *ecg)
 {
@@ -1181,9 +1193,36 @@ Unable to find %s in HTX shared memory structure.\n",
 
         }
     }
+	if ((strcmp (data->run_type, "REG") == 0)) {
+		if (p_shm_hdr->time_of_exec != 0){
+            time_diff_struct.hd = data;
+			pthread_mutex_init(&mutex_for_time_driven_exec, NULL);
+            time_diff_struct.time_out_flag = 0; /*&time_out_flag;*/
+            time_diff_struct.time_interval_for_stanza_switch = 0; /*&time_interval_for_stanza_switch;*/
+			pthread_attr_init(&timer_fn_th_attr);
+			pthread_attr_setdetachstate(&timer_fn_th_attr, PTHREAD_CREATE_DETACHED);
+            int rc_timer = pthread_create(&timer_fn_th_tid, &timer_fn_th_attr, get_time_diff_function, (void *)&time_diff_struct);
+            if(rc_timer){
+                data->error_code = errno;
+                data->severity_code = HTX_SYS_HARD_ERROR;
+                (void) sprintf(data->msg_text,
+                "%s for %s: Error in hxfupdate start function.\nUnable to  create timer_fn_thread .\nerrno = %d",
+                data->HE_name,
+                data->sdev_id,
+                data->error_code);
 
+                if (sendp(data, HTX_SYS_MSG) != 0)       /* send message */
+                {
+                    perror(data->msg_text);
+                    (void) fflush(stderr);
+                } /* endif */
 
-  return (rc);
+            }
+	    	time(&exer_start_time_for_time_driven);
+        }
+    }
+
+    return (rc);
 
 } /* htx_start() */
 
@@ -1913,5 +1952,111 @@ int exer_err_halt_status(struct htx_data *data)
 	}
 	else
 		return 1;
+}
+
+int get_exec_time_value_from_shm_hdr(struct htx_data *data){
+    if (p_shm_hdr->time_of_exec != 0){
+	time(&exer_cur_time_for_time_driven);
+	double diff_t = difftime(exer_cur_time_for_time_driven, exer_start_time_for_time_driven);
+	if((p_shm_hdr->time_of_exec-diff_t)>0)
+	    return( p_shm_hdr->time_of_exec-diff_t);
+	else
+	    return 0;
+    }
+    else
+	    return 0;
+}
+
+int set_stop_flag_in_exer_shm(struct htx_data *data){
+    (p_shm_HE->sp3) = 1;
+}
+
+int set_time_driven_identification_flag_in_shm_HE(struct htx_data *data){
+    (p_shm_HE->sp2) = 1;
+}
+
+int get_initial_exec_time_value_from_shm_hdr(struct htx_data *data){
+    return(p_shm_hdr->time_of_exec);
+}
+
+void *get_time_diff_function(time_diff_func_struct *time_diff_func_struct_ptr){
+
+    char msg[1000];
+    int stanzas_executed;
+    sigset_t newMask, oldMask;
+    int ret = 0, skip_reset = 0, old_errno;
+    int i;
+
+    while(1){
+        if(time_diff_func_struct_ptr->time_interval_for_stanza_switch !=  0)
+            break;
+    }
+	
+	set_time_driven_identification_flag_in_shm_HE(time_diff_func_struct_ptr->hd);	
+
+    time_interval_for_run_lib = get_exec_time_value_from_shm_hdr(time_diff_func_struct_ptr->hd);
+
+    float total_no_of_stanzas_present_lib = (get_initial_exec_time_value_from_shm_hdr(time_diff_func_struct_ptr->hd))/ (time_diff_func_struct_ptr->time_interval_for_stanza_switch);
+    if(time_interval_for_run_lib > 3600) {
+        time_interval_for_stanza_switch_lib = (3600)/total_no_of_stanzas_present_lib;
+    }
+    else {
+        time_interval_for_stanza_switch_lib = (time_interval_for_run_lib)/total_no_of_stanzas_present_lib;
+    }
+    no_of_stanzas_to_be_executed = (time_interval_for_run_lib/ time_interval_for_stanza_switch_lib) ;
+
+    /* blocking signals */
+    sigemptyset(&oldMask);
+
+    sigfillset(&newMask);
+
+    old_errno = errno;
+
+    ret = pthread_sigmask(SIG_BLOCK, &newMask, &oldMask);
+        if(ret == -1) {
+        errno = old_errno;
+        skip_reset = 1;
+    }
+    /* end of blocking signals */
+
+    stanzas_executed = 0;
+    while(stanzas_executed < no_of_stanzas_to_be_executed){
+        for(i = 0; i< time_interval_for_stanza_switch_lib; i++){
+            if (*(time_diff_func_struct_ptr->exit_flag)) {
+                pthread_exit((void *)0);
+            }
+            sleep(1);
+        }
+		pthread_mutex_lock(&mutex_for_time_driven_exec);
+        (time_diff_func_struct_ptr->time_out_flag) = 1;
+		pthread_mutex_unlock(&mutex_for_time_driven_exec);
+
+        stanzas_executed++;
+    }
+
+    /* unblocking signals*/
+    if(skip_reset == 0) {
+            old_errno = errno;
+            ret = pthread_sigmask(SIG_SETMASK, &oldMask, NULL);
+
+            if(ret == -1) {
+                    errno = old_errno;
+            }
+    }
+    /* end of unblocking signals*/
+
+    sprintf(msg,"Exiting from %s after execution of %d stanzas in %d seconds \n ", time_diff_func_struct_ptr->hd->sdev_id, \
+    stanzas_executed,( (time_diff_func_struct_ptr->time_interval_for_stanza_switch)*stanzas_executed));
+    hxfmsg(((time_diff_func_struct_ptr->hd)), 0, HTX_HE_INFO, msg);
+
+    /* call hxfupdate before set_stop_flag_in_exer_shm so thata, if there's an error condition, it will be held by semaphore */
+    hxfupdate(UPDATE, (time_diff_func_struct_ptr->hd));
+
+    set_stop_flag_in_exer_shm((time_diff_func_struct_ptr->hd));
+
+	pthread_mutex_lock(&mutex_for_time_driven_exec);
+    *(time_diff_func_struct_ptr->exit_flag) = 1;
+	pthread_mutex_unlock(&mutex_for_time_driven_exec);
+    pthread_exit((void *)0);
 }
 

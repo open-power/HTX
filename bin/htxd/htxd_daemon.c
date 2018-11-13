@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
+
+
 /* @(#)38	1.8  src/htx/usr/lpp/htx/bin/htxd/htxd_daemon.c, htxd, htxfedora 9/15/15 20:28:01 */
 
 
@@ -287,6 +289,15 @@ int htxd_idle_daemon(void)
 		htxd_remove_hang_monitor();
 
 		sprintf(trace_string, "stopping hang monitor thread");
+		HTXD_TRACE(LOG_OFF, trace_string);
+	}
+	
+	if(htxd_is_time_driven_run_monitor_initialized() == TRUE) {
+		htxd_instance = htxd_get_instance();
+		htxd_stop_time_driven_run_monitor(&(htxd_instance->p_time_driven_run_monitor_thread));
+		htxd_remove_time_driven_run_monitor();
+
+		sprintf(trace_string, "stopping time_driven_run monitor thread");
 		HTXD_TRACE(LOG_OFF, trace_string);
 	}
 

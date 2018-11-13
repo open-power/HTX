@@ -17,6 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+/* static char sccsid[] = "@(#)82	1.18  src/htx/usr/lpp/htx/bin/hxediag/hxediag.c, exer_diag, htxubuntu, htxubuntu_497 10/5/18 01:09:24";  */
 #include "hxediag.h"
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -28,6 +29,13 @@ volatile unsigned int exit_flag = 0;
  * Main program for testing NICs in diagnostic mode using ethtool
  * infrastructure 
  *****************************************************************/
+
+time_diff_func_struct time_diff_struct;
+int total_no_of_stanzas_present = 0;
+volatile float time_interval_for_run = 0;
+volatile float time_interval_for_stanza_switch_tmp = 0;
+extern pthread_mutex_t mutex_for_time_driven_exec;
+
 int 
 main(int argc, char ** argv) {  
 
@@ -177,6 +185,10 @@ main(int argc, char ** argv) {
     sigvector.sa_handler = (void (*)(int)) SIGTERM_hdl;
     sigaction(SIGTERM, &sigvector, (struct sigaction *) NULL);
 
+    if ((rc = strcmp(htx_d.run_type, "REG")) == 0) {
+        time_interval_for_run = get_exec_time_value_from_shm_hdr(&htx_d);
+    }
+
     /****************************************************************
      * Parse rules file arguments ....
      * *************************************************************/
@@ -186,6 +198,15 @@ main(int argc, char ** argv) {
         hxfmsg(&htx_d, rc, HTX_HE_HARD_ERROR, htx_d.msg_text);
         return (rc);
     }
+
+    if (time_interval_for_run > 0){
+        /* provide total no. of stanzas present */
+		total_no_of_stanzas_present = num_stanzas;
+		time_interval_for_stanza_switch_tmp = (time_interval_for_run)/(total_no_of_stanzas_present);
+		time_diff_struct.time_interval_for_stanza_switch = time_interval_for_stanza_switch_tmp;
+		time_diff_struct.exit_flag = &exit_flag;
+	}
+
 
 	if(device_type == ETHERNET || device_type == ROCE) { 
 
@@ -539,7 +560,7 @@ main(int argc, char ** argv) {
         				free(strings);
         				return(rc);
     				}		
-	                rc = update_result(test, strings->len, supported_test, current_stanza->mask, &result, &htx_d);
+	                rc = update_result(test, strings->len, supported_test, &result, &htx_d);
     	            if(rc == -EOPNOTSUPP) {
         	            sprintf(htx_d.msg_text, "Unrecongnized test, exiting test... \n");
             	        hxfmsg(&htx_d, ENOSYS, HTX_HE_HARD_ERROR, htx_d.msg_text);
@@ -660,6 +681,17 @@ main(int argc, char ** argv) {
 				if(current_stanza->sleep && !exit_flag) { 
 					sleep(current_stanza->sleep); 
 				}
+                if ( time_interval_for_run > 0){
+                    i = 0;
+					pthread_mutex_lock(&mutex_for_time_driven_exec);
+                	if ( (time_diff_struct.time_out_flag) == 1) {
+						pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                    	break;
+					}
+					else
+						pthread_mutex_unlock(&mutex_for_time_driven_exec);
+				}
+
 			}  /* Off for(i = 0; i < current_stanza->num_oper; i++)  */ 
 		
 			if(device_type == ETHERNET || device_type == ROCE) { 
@@ -766,6 +798,12 @@ main(int argc, char ** argv) {
 			}
            	if(exit_flag)
                	break;
+		if (time_interval_for_run > 0){	
+			pthread_mutex_lock(&mutex_for_time_driven_exec);
+			(time_diff_struct.time_out_flag) = 0;
+			pthread_mutex_unlock(&mutex_for_time_driven_exec);
+		}
+		
 
 		} /* Off for(tc = 0; tc < num_stanzas; tc++)  */ 
 		/************************************************************************
@@ -937,7 +975,7 @@ char * strupr(char * str) {
 
 }	
 
-int update_result(struct ethtool_test *test, int num_tests,  char supported_test[][MSG_TEXT_SIZE], int error_mask, struct self_test * self_test, struct htx_data * htx_d) { 
+int update_result(struct ethtool_test *test, int num_tests,  char supported_test[][MSG_TEXT_SIZE], struct self_test * self_test, struct htx_data * htx_d) { 
 
 
 	int i = 0, rc = 0; 
@@ -952,9 +990,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 				 * NVRAM Test failing on Shiner-T adapter, Broadcom debugging 
 				 * Hence ignore failures for NVRAM Test 
 				 */ 
-				if(error_mask & NVRAM_MASK){
-					rc++;
-				}  
+				/* rc ++; */ 
 			} else { 
 				self_test->nvram_test.pass++; 
 			}
@@ -975,9 +1011,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "REGISTER")) { 
 			if(test->data[i]) { 
 				self_test->register_test.fail ++; 
-				if(error_mask & REGISTER_MASK){
-					rc++;
-				} 
+				rc++; 
 			} else { 
 				self_test->register_test.pass ++; 
 			}
@@ -985,9 +1019,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "MEMORY")) { 
 			if(test->data[i]) {
                 self_test->memory_test.fail ++; 
-				if(error_mask & MEMORY_MASK){
-					rc++;
-				} 
+				rc++; 
 			} else { 
 				self_test->memory_test.pass ++; 
 			} 
@@ -995,9 +1027,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "MAC")) { 
 			if(test->data[i]) {
 				self_test->mac_loopback.fail ++; 
-				if(error_mask & MAC_MASK){
-					rc++;
-				}
+				rc++;
 			} else { 
 				self_test->mac_loopback.pass++; 
 			} 
@@ -1005,9 +1035,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 		} else if(strstr(supported_test[i], "PHY")) { 
 			if(test->data[i]) {
 				self_test->phy_loopback.fail ++; 
-				if(error_mask & PHY_MASK){
-					rc++; 
-				}
+				rc++; 
 			} else { 
 				self_test->phy_loopback.pass ++; 
 			} 
@@ -1019,9 +1047,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  			 * ***************************************************/
 			if(test->data[i]) {
 				self_test->int_loopback.fail ++; 
-				if(error_mask & INT_LOOP_MASK){
-					rc++; 
-				}
+				rc++; 
 			} else { 
 				self_test->int_loopback.pass ++; 
 			}
@@ -1034,19 +1060,11 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  				 **************************************************************/
 				if(test->data[i]) {
 					self_test->ext_loopback.fail ++; 
-					if(error_mask & EXT_MASK){
-						rc++;
-					}  
 				} else { 
 					self_test->ext_loopback.pass ++; 
 				}
 			} else { 
-				if(test->data[i]) {
-					self_test->ext_loopback.fail ++;
-					if(error_mask & EXT_MASK){
-						rc++;
-                    }
-				}
+				self_test->ext_loopback.fail ++;
 			}
 			self_test->ext_loopback.total++; 
 		} else if(strstr(supported_test[i], "INTERRUPT")) { 
@@ -1057,9 +1075,7 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
 				 * due to device driver - BJKing needs to come back when this is fixed in driver
 				 * Uncomment below line if we want to flag hard error for Interrupt test. 
 				 ******************************************************************************/
-				if(error_mask & INTERRUPT_MASK){
-					rc++;  
-				}
+				/*  rc++;  */  
 			} else { 
 				self_test->interrupt_test.pass ++; 
 			}
@@ -1070,9 +1086,6 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  			 * ******************************************/
 			if(test->data[i]) {
                 self_test->speed_test.fail ++; 
-				if(error_mask & SPEED_MASK){
-					rc++;  
-				}
 			} else { 
 				self_test->speed_test.pass ++; 	
 			} 
@@ -1083,9 +1096,6 @@ int update_result(struct ethtool_test *test, int num_tests,  char supported_test
  			* ********************************************/
 			if(test->data[i]) {
 				self_test->loopback_test.fail ++; 
-				if(error_mask & LOOPBACK_MASK){
-					rc++;  
-				}
 			} else { 
 				self_test->loopback_test.pass ++; 
 			} 
@@ -1140,8 +1150,7 @@ set_defaults(struct rule_info h_r[]) {
 		h_r[i].num_oper = 8; 
 		h_r[i].test = 0; 
 		h_r[i].sleep = 5; 
-		h_r[i].threshold = 0;
-		h_r[i].mask = 0x7C; 
+		h_r[i].threshold = 0; 
 	}
 }
 
@@ -1266,16 +1275,6 @@ rf_read_rules(const char rf_name[], struct rule_info rf_info[], unsigned int * n
             } else {
                 if(DEBUG) printf("\n num_oper - %d ", current_ruleptr->num_oper);
             }
-		} else if ((strcmp(keywd, "mask")) == 0 ) {
-            sscanf(line, "%*s %x", &current_ruleptr->mask);
-            if(DEBUG) printf("\n mask - %x ", current_ruleptr->mask);
-            if (current_ruleptr->mask < 0x0000) {
-                sprintf(msg, "\n Invalid mask");
-                hxfmsg(htx_d, 0, HTX_HE_HARD_ERROR, msg);
-                return(-1);
-            } else {
-                if(DEBUG) printf("\n mask - %x ", current_ruleptr->mask);
-            }
 		} else if ((strcmp(keywd, "test")) == 0) { 
 			sscanf(line, "%*s %s", tmp); 			 
 			if((strcmp(tmp, "online")) == 0) { 
@@ -1283,7 +1282,7 @@ rf_read_rules(const char rf_name[], struct rule_info rf_info[], unsigned int * n
 			} else if((strcmp(tmp, "offline")) == 0) { 
 				current_ruleptr->test = ETH_TEST_FL_OFFLINE; 
 			} else if((strcmp(tmp, "external_lb")) == 0) { 
-				current_ruleptr->test = (ETH_TEST_FL_OFFLINE | ETH_TEST_FL_EXTERNAL_LB); 
+				current_ruleptr->test = ETH_TEST_FL_EXTERNAL_LB; 
 			} else if((strcmp(tmp, "ber")) == 0) { 
 				current_ruleptr->test = IB_BER_TEST; 
 			} else if((strcmp(tmp, "dma")) == 0) { 

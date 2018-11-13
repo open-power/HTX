@@ -26,6 +26,7 @@ htxd_OBJECTS = htxd.o \
 		htxd_exer${OBJ_SUFF} \
 		htxd_thread${OBJ_SUFF} \
 		htxd_hang_monitor${OBJ_SUFF} \
+		htxd_time_driven_run_monitor${OBJ_SUFF} \
 		htxd_dr${OBJ_SUFF} \
 		htxd_hotplug${OBJ_SUFF} \
 		htxd_equaliser${OBJ_SUFF} \
