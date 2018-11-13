@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)35	1.5  src/htx/usr/lpp/htx/bin/htxd/htxd.h, htxd, htxubuntu 11/24/15 23:59:18 */
+
+
+/* @(#)35	1.14  src/htx/usr/lpp/htx/bin/htxd/htxd.h, htxd, htxubuntu, htxubuntu_497 10/4/18 03:57:51 */
 
 
 
@@ -41,7 +43,7 @@
 #define		HTXD_TRACE_LOW			1
 #define		HTXD_TRACE_MEDIUM		2
 #define		HTXD_TRACE_HIGH			3
-
+#define 	TIME_DRIVEN_RUN_MONITOR_PERIOD	1
 
 typedef struct
 {
@@ -59,6 +61,7 @@ typedef struct
 	htxd_thread *		p_hang_monitor_thread;
 	htxd_thread *		p_hotplug_monitor_thread;
 	htxd_thread 		stop_watch_monitor_thread;
+	htxd_thread *		p_time_driven_run_monitor_thread;
 	char		program_name[80];
 	char		htx_path[80];
 	int			shutdown_flag;
@@ -99,6 +102,8 @@ typedef struct
 extern htxd *htxd_global_instance;
 
 extern int htxd_start_daemon(htxd*);
+
+extern int get_exec_time_value_from_shm_hdr();
 
 #ifdef __HTX_LINUX__
 	extern int smt, bind_th_num;

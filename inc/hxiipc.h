@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
+
+
 /* @(#)47  1.34.4.8  src/htx/usr/lpp/htx/inc/hxiipc.h, htx_libhtx, htxfedora 12/16/14 03:58:17 */
 /* Component = htx_libhtx_;x */
 
@@ -165,6 +167,7 @@ struct htxshm_hdr {
         unsigned int  num_entries;       /* # of entries currently in shm   */
         unsigned short pseudo_entries;    /* # of pseudo entries cur. in shm */
         unsigned short pseudo_entry_0;    /* index to first pseudo entry     */
+	unsigned int    time_of_exec;	/*the time_driven value fetched from htxd run command*/
 
 #ifdef HTX_REL_tu320
         struct         hft_devs {         /* hft devices...................  */

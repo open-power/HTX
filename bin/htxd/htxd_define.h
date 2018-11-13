@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)39	1.4  src/htx/usr/lpp/htx/bin/htxd/htxd_define.h, htxd, htxubuntu 9/15/15 20:28:07 */
+
+
+/* @(#)39	1.13  src/htx/usr/lpp/htx/bin/htxd/htxd_define.h, htxd, htxubuntu, htxubuntu_497 10/4/18 04:49:34 */
 
 
 
@@ -123,7 +125,7 @@
 #define HTXD_MDT_SHUTDOWN_MSG	190
 
 #define HTXD_HTX_PROCESS_FOUND 51
-
+#define HTXD_TIME_DRIVEN_EXIT 52
 
 /* daemon states */
 #define		HTXD_DAEMON_STATE_IDLE			1

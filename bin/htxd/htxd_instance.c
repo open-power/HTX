@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)48	1.9  src/htx/usr/lpp/htx/bin/htxd/htxd_instance.c, htxd, htxubuntu 11/24/15 23:59:21 */
+
+
+/* @(#)48	1.22  src/htx/usr/lpp/htx/bin/htxd/htxd_instance.c, htxd, htxubuntu, htxubuntu_497 10/4/18 04:37:25 */
 
 
 
@@ -410,6 +412,19 @@ int htxd_is_hang_monitor_initialized(void)
 	}
 }
 
+int htxd_is_time_driven_run_monitor_initialized(void)
+{
+	htxd *p_temp_instance;
+
+	p_temp_instance = htxd_get_instance();
+
+	if(p_temp_instance->p_time_driven_run_monitor_thread == 0) {
+		return FALSE;
+	} else {
+		return TRUE;
+	}
+}
+
 
 void htxd_remove_hang_monitor(void)
 {
@@ -420,7 +435,14 @@ void htxd_remove_hang_monitor(void)
 	p_temp_instance->p_hang_monitor_thread = 0;
 }
 
+void htxd_remove_time_driven_run_monitor(void)
+{
+	htxd *p_temp_instance;
 
+	p_temp_instance = htxd_get_instance();
+
+	p_temp_instance->p_time_driven_run_monitor_thread = 0;
+}
 
 int htxd_is_stop_watch_monitor_initialized(void)
 {
@@ -525,6 +547,7 @@ void init_htxd_instance(htxd *p_htxd_instance)
 	p_htxd_instance->dr_is_done			= 0;
 	p_htxd_instance->dr_child_pid			= 0;
 	p_htxd_instance->p_hang_monitor_thread		= NULL;
+	p_htxd_instance->p_time_driven_run_monitor_thread		= NULL;
 	p_htxd_instance->p_hotplug_monitor_thread	= NULL;
 	p_htxd_instance->equaliser_debug_flag		= 0;
 	p_htxd_instance->is_auto_started		= 0;

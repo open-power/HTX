@@ -17,6 +17,7 @@
  */
 /* IBM_PROLOG_END_TAG */
 
+
 /* @(#)44  1.9  src/htx/usr/lpp/htx/inc/htxlibdef.h, htx_libhtx, htx530 10/19/03 23:37:48 */
 /* Component = htx_libhtx_lx */
 
@@ -306,6 +307,23 @@ struct tm *htx_localtime_r (const time_t *timep, struct tm *result);
 int exer_err_halt_status(struct htx_data *data);
 
 int do_trap_htx64(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long,unsigned long,unsigned long);
+
+int get_exec_time_value_from_shm_hdr( struct htx_data *data);
+
+double get_start_and_current_time_diff(void);
+
+typedef struct {
+        volatile int no_of_stanzas_to_be_executed;
+        volatile int time_interval_for_stanza_switch;
+        volatile int time_out_flag;
+        volatile struct htx_data *hd;
+        volatile int *exit_flag;
+}time_diff_func_struct;
+
+void* get_time_diff_function(time_diff_func_struct *time_diff_func_struct);
+
+extern time_diff_func_struct time_diff_struct;
+
 #endif
 
 static const char IBM_copyright_string[]="\n\

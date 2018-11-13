@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
+
+
 /* @(#)57	1.8  src/htx/usr/lpp/htx/bin/htxd/htxd_option_method_run_mdt.c, htxd, htxfedora 8/23/15 23:34:35 */
 
 
@@ -383,6 +385,11 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 	char trace_str[512], cmd[128];
 	int return_code;
 	char temp_str[512];
+    union shm_pointers shm_addr_wk, shm_addr;
+    struct htxshm_hdr *p_htxshm_HDR;
+    char option_list_arg[MAX_ECG_NAME_LENGTH];
+	char *token;
+	int time_driven_value_fetched_from_command_line_args = -1;
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_run_mdt");
@@ -406,8 +413,13 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 	htxd_instance = htxd_get_instance();
 	strcpy(command_ecg_name, p_command->ecg_name);
 
-	sprintf(trace_str, "ECG name from command = <%s>", command_ecg_name);
-	HTXD_TRACE(LOG_OFF, trace_str);
+    strcpy(option_list_arg, p_command->option_list);
+	int time_driven_value_fetched_from_command_line_args_var = get_command_line_arguement_for_time_driven_run(&time_driven_value_fetched_from_command_line_args, &option_list_arg, &result);
+	if(time_driven_value_fetched_from_command_line_args_var != 0){
+		sprintf(*result,"The command line run args provided  as '%s' is invalid, try the format 'time <value in seconds>' ",option_list_arg);
+		HTXD_TRACE(LOG_ON, *result);
+		return  time_driven_value_fetched_from_command_line_args_var;
+	}
 
 	htxd_ecg_shutdown_flag = FALSE;
 
@@ -441,7 +453,6 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 		htxd_instance->p_ecg_manager = ecg_manager;
 	}
 
-
 	/* start hxsmsg process if it is not already started */
 	if(htxd_get_htx_msg_pid() == 0) {
 		sprintf(temp_str, "%s/%s", global_htx_home_dir, HTXD_AUTOSTART_FILE);
@@ -464,6 +475,8 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 			}
 			p_ecg_info_list = p_ecg_info_list->ecg_info_next;
 		}
+
+
 		sprintf(trace_str, "start activating  MDT <%s>", command_ecg_name);
 		htxd_send_message (trace_str, 0, HTX_SYS_INFO, HTX_SYS_MSG);
 		HTXD_TRACE(LOG_ON, trace_str);
@@ -496,6 +509,14 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 
 	htxd_set_daemon_state(HTXD_DAEMON_STATE_STARTING_MDT);
 	ecg_manager->current_loading_ecg_info->ecg_run_start_time = (int) time((time_t *) 0);
+
+/* time driven run */
+
+	shm_addr = ecg_manager->ecg_info_list->ecg_shm_addr;
+	p_htxshm_HDR = shm_addr.hdr_addr;
+
+	if (time_driven_value_fetched_from_command_line_args_var == 0)
+		p_htxshm_HDR->time_of_exec = time_driven_value_fetched_from_command_line_args;
 
 	/* initializing syscfg */
 	if(htxd_is_init_syscfg() != TRUE) {
@@ -537,7 +558,7 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 				#endif
 				#ifdef __HTX_LINUX__
 				/* start hotplug monitor */
-				if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
+				if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() == 0) {
 					htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
 					HTXD_TRACE(LOG_ON, "run started hotplug monitor");
 				}
@@ -551,7 +572,7 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 			#endif
 			#ifdef __HTX_LINUX__
 			/* start hotplug monitor */
-			if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() != 1) {
+			if( htxd_is_hotplug_monitor_initialized() != TRUE && htxd_get_equaliser_offline_cpu_flag() == 0) {
 				htxd_start_hotplug_monitor(&(htxd_instance->p_hotplug_monitor_thread));
 				HTXD_TRACE(LOG_ON, "run started hotplug monitor");
 			}
@@ -570,6 +591,12 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
 	if(htxd_is_hang_monitor_initialized() != TRUE) {
 		htxd_start_hang_monitor(&(htxd_instance->p_hang_monitor_thread));
 		HTXD_TRACE(LOG_ON, "run started hang monitor thread");
+	}
+	
+	/* start time_driven htx run monitor thread*/
+	if(((p_htxshm_HDR->time_of_exec)>0) && (htxd_is_time_driven_run_monitor_initialized() != TRUE)){
+		htxd_start_time_driven_run_monitor(&(htxd_instance->p_time_driven_run_monitor_thread));
+		HTXD_TRACE(LOG_ON, "run started time_driven htx run monitor thread");
 	}
 
 	/* start stop_watch monitor thread */
@@ -623,6 +650,10 @@ int htxd_option_method_select_mdt(char **result, htxd_command *p_command)
 	char trace_str[512], cmd[128];
 	char temp_str[512];
 	int return_code;
+    union shm_pointers shm_addr_wk, shm_addr;
+    struct htxshm_hdr *p_htxshm_HDR;
+    char option_list_arg[MAX_ECG_NAME_LENGTH];
+	char *token;
 
 
 	HTXD_FUNCTION_TRACE(FUN_ENTRY, "htxd_option_method_select_mdt");
@@ -644,6 +675,15 @@ int htxd_option_method_select_mdt(char **result, htxd_command *p_command)
 
 	ecg_manager = htxd_get_ecg_manager();
 	strcpy(command_ecg_name, p_command->ecg_name);
+	if  (strcmp(p_command->option_list, "")){
+	    strcpy(option_list_arg, p_command->option_list);
+
+        sprintf(trace_str, "ECG name from command vp_debug_msg3 = <%s>", command_ecg_name);
+        HTXD_TRACE(LOG_ON, trace_str);
+        sprintf(trace_str, "option list from command = <%s>", option_list_arg);
+        HTXD_TRACE(LOG_ON, trace_str);
+	}
+
 
 	if(htxd_instance->is_mdt_created == 0) {
 		htxd_execute_shell_profile();	
@@ -667,10 +707,6 @@ int htxd_option_method_select_mdt(char **result, htxd_command *p_command)
 		}
 		return 1;
 	}
-
-	sprintf(trace_str, "ECG name from command = <%s>", command_ecg_name);
-	HTXD_TRACE(LOG_OFF, trace_str);
-
 
 	if(command_ecg_name[0] == '\0') {
 		sprintf(command_ecg_name, "%s/mdt/%s", global_htx_home_dir, DEFAULT_ECG_NAME);
@@ -761,3 +797,39 @@ int htxd_option_method_select_mdt(char **result, htxd_command *p_command)
 	return 0;
 
 }
+/* time driven run */
+int get_command_line_arguement_for_time_driven_run(int *time_driven_value_fetched_from_command_line_args, char *option_list_arg, char **result){
+
+	char trace_str[256];
+	char *token;
+	if  (strcmp(option_list_arg, "")){
+        token = strtok(option_list_arg, " ");
+		if( token != NULL){
+			if((strcmp(token,"time"))==0){
+				token = strtok(NULL, " ");
+				if( token != NULL){
+					if  (strcmp(token, "")){
+						*time_driven_value_fetched_from_command_line_args = atoi(token);
+						sprintf(trace_str, "The command line run args provided is '%s' with time of execution as = %d",option_list_arg,*time_driven_value_fetched_from_command_line_args);
+						HTXD_TRACE(LOG_OFF, trace_str);
+						if ( (*time_driven_value_fetched_from_command_line_args == 0) || (*time_driven_value_fetched_from_command_line_args<0) ){
+							//sprintf(*result, "The time value given for htx time driven run as '%s' is invalid, try providing a value greater than zero", token);
+							return  HTXD_TIME_DRIVEN_EXIT;
+						}
+					}
+				}
+				else
+					return  HTXD_TIME_DRIVEN_EXIT;
+			}
+			else{
+				return  HTXD_TIME_DRIVEN_EXIT;
+			}
+
+		}
+	}	
+			
+	else 
+		 *time_driven_value_fetched_from_command_line_args = 0;
+	return 0;
+}
+

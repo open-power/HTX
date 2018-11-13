@@ -1,12 +1,12 @@
 /* IBM_PROLOG_BEGIN_TAG */
-/* 
+/*
  * Copyright 2003,2016 IBM International Business Machines Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * 		 http://www.apache.org/licenses/LICENSE-2.0
+ *               http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 /* IBM_PROLOG_END_TAG */
-/* @(#)56	1.6  src/htx/usr/lpp/htx/bin/htxd/htxd_option_method_misc.c, htxd, htxubuntu 9/15/15 20:28:32 */
+
+
+/* @(#)56	1.25  src/htx/usr/lpp/htx/bin/htxd/htxd_option_method_misc.c, htxd, htxubuntu, htxubuntu_497 10/4/18 04:06:01 */
 
 
 
@@ -48,7 +50,6 @@ extern int htxd_run_HE_script(char *, char *, int *);
 extern int htxd_get_ecg_list_length(htxd_ecg_manager *);
 extern int htxd_load_exerciser(struct htxshm_HE *);
 extern int htxd_get_common_command_result(int, htxd_ecg_info *, char *, char *);
-
 
 int htxd_expand_device_name_list(htxd_ecg_info *p_ecg_info_list, char *device_name_list)
 {
@@ -145,6 +146,8 @@ int htxd_get_device_run_status(struct htxshm_HE *p_HE, htxd_ecg_info *p_ecg_info
 	int device_sem_status;
 	int device_sem_id;
 
+//	struct htxshm_hdr *p_hdr;
+//	p_hdr = (p_ecg_info->ecg_shm_addr.hdr_addr);
 
 	if(status_result == NULL) {
 		return -1;
@@ -156,7 +159,9 @@ int htxd_get_device_run_status(struct htxshm_HE *p_HE, htxd_ecg_info *p_ecg_info
 	if( (p_ecg_info->ecg_shm_addr.hdr_addr->started == 0)&& (p_HE->is_child) ) {
 			strcpy(status_result, "  ");
 	} else if(p_HE->PID == 0) {
-		if(p_HE->DR_term == 1) {
+		if(p_HE->sp3 == 1) {
+			strcpy(status_result, "TE");/*timed exit*/
+		}else if(p_HE->DR_term == 1) {
 			strcpy(status_result, "DT");
 		} else if(p_HE->test_run_period_expired == 1) {
 			strcpy(status_result, "RT");
@@ -180,7 +185,7 @@ int htxd_get_device_run_status(struct htxshm_HE *p_HE, htxd_ecg_info *p_ecg_info
 		strcpy(status_result, "SD");
 	} else if( (p_HE->max_cycles != 0) && (p_HE->cycles >= p_HE->max_cycles) ) {
 		strcpy(status_result, "CP");
-	} else if( (epoch_time_now - p_HE->tm_last_upd) > ( (long)(p_HE->max_run_tm + p_HE->idle_time) ) ) {  ////?????
+	} else if( (epoch_time_now - p_HE->tm_last_upd) > ( (long)(p_HE->max_run_tm + p_HE->idle_time) ) ) { 
 		strcpy(status_result, "HG");
 	} else if( (p_HE->max_cycles != 0 ) && (p_HE->cycles >= p_HE->max_cycles) ) {
 		strcpy(status_result, "PR");
@@ -3587,5 +3592,7 @@ int htxd_option_method_get_dev_cycles(char **command_result, htxd_command *p_com
 
 	return 0;
 }
+
+
 
 
