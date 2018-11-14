@@ -55,6 +55,8 @@ cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk  sctu > ${HTXMDT}mdt.sctu
 cat ${HTXMDT}mdt.all | create_mdt_with_devices.awk fpu cache cpu rng tlbie > ${HTXMDT}mdt.cpu
 cat ${HTXMDT}mdt.all | create_mdt_without_devices.awk sctu mem tlbie fpu cache cpu rng > ${HTXMDT}mdt.io
 
+${HTXSCRIPTS}/create_eq_mdts 2>> ${HTXNoise}
+
 afu_dev=`ls /dev/cxl/ 2>/dev/null | awk '/afu[0-9].[0-9]d/ { print $1 }'`
   
 if [[ "$afu_dev" != "" ]];

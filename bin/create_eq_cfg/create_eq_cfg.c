@@ -28,7 +28,7 @@
 #define NUM_OF_SETS		5
 #define MAX_SMT			8
 
-#define FXU 	    0
+#define FXU 	0
 #define VSU	    1
 #define ANY	    2
 
@@ -48,13 +48,16 @@ struct thread_info {
     int thread_num[MAX_SMT];
 };
 
+int num_nodes, num_chips_in_node = 0;
+
 int open_file (char *);
-void make_entry(int, int);
+void make_entry(int, int, int, int, int, char *);
 void create_pattern(void);
 void create_cfg_maxpwr_switch(void);
 void create_cfg_maxpwr_exp(void);
 void create_cfg_th_trans_switch(void);
 void create_cfg_th_trans_mix(void);
+void create_cfg_stop_state(void);
 void create_th_switch_seq(void);
 void create_cfg_100_75_50_25_util(void);
 void create_cfg_cpu_mem_50(void);
@@ -62,12 +65,15 @@ void create_cfg_msrp_1p3m_28s_act_52s_idle(void);
 void create_cfg_p8_8fd_char(void);
 void create_cfg_p8_rdp_switch(void);
 void create_cfg_p8_swicthing_cmp(void);
+void create_eq_fabric_io_cfg(void);
 void get_htx_home_dir(char *);
 
 int main(int argc, char **argv)
 {
-    int rc = 0, time_quantum, wof_test = 0;
+    int rc = 0, time_quantum, offline_cpu = 0, pattern_len = 0;
+    int time_delay = 0, log_duration = 0, node_no;
     char cfg_file[128], eq_cfg_path[128], *tmp_ptr = NULL;
+    char cpu_util[64];
 
     rc = init_syscfg_with_malloc();
     if (rc == -1) {
@@ -75,11 +81,21 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    cpu_util[0] = '\0';
+
     get_hardware_stat(&sys_stat);
     get_smt_details(&t);
     smt_threads = t.min_smt_threads;
-    pvr = get_cpu_version();
+    pvr = get_true_cpu_version();
     pvr = pvr >> 16;
+
+    num_nodes = get_num_of_nodes_in_sys();
+    for (node_no = 0; node_no < num_nodes; node_no++) {
+        num_chips_in_node = get_num_of_chips_in_node(node_no);
+        if (num_chips_in_node > 1) {
+            break;
+        }
+    }
 
     /* Get eq_cfg_path from env. variable */
     tmp_ptr = getenv("HTXCFGPATH");
@@ -103,6 +119,32 @@ int main(int argc, char **argv)
         strcpy(mem_eq_rulefile, "default.eq");
     }
 
+    /* create cfg to test STOP states. It will be created for P9 and above */
+    if (pvr >= 78) {
+        sprintf(cfg_file, "%s/htx_eq_stop_state_test.cfg", eq_cfg_path);
+        open_file(cfg_file);
+        time_quantum = 60000;
+        offline_cpu = 50;
+        pattern_len = 1;
+        strcpy (cpu_util, "UTIL_LEFT%20_30");
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
+        create_cfg_stop_state(); /* will create exerciser entries in cfg file. */
+        fclose(fp);
+        offline_cpu = 0;
+        pattern_len = 0;
+        cpu_util[0] = '\0';
+    }
+
+    /* create cfg file for fabric stress for char only if both fabc and fabn can b created */
+    if (num_nodes > 1 && num_chips_in_node > 1) {
+        sprintf(cfg_file, "%s/htx_eq_fabric_io.cfg", eq_cfg_path);
+        open_file(cfg_file);
+        time_quantum = 60000;
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
+        create_eq_fabric_io_cfg();
+        fclose(fp);
+    }
+
     /***************************************************************************************/
     /* Type of workloads for below 2 cfgs:                                                 */
     /* The kind of workload will be such that when the core is in the list of active cores */
@@ -117,7 +159,7 @@ int main(int argc, char **argv)
     sprintf(cfg_file, "%s/htx_eq_maxpwr_switch.cfg", eq_cfg_path);
     open_file(cfg_file);
     time_quantum = 100;
-    make_entry(time_quantum, wof_test); /* Will create common entries in cfg file. */
+    make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
     create_cfg_maxpwr_switch(); /* will create exerciser entries in cfg file. */
     fclose(fp);
 
@@ -125,7 +167,7 @@ int main(int argc, char **argv)
     sprintf(cfg_file, "%s/htx_eq_maxpwr_exp.cfg", eq_cfg_path);
     open_file(cfg_file);
     time_quantum = 4000;
-    make_entry(time_quantum, wof_test);
+    make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
     create_cfg_maxpwr_exp();
     fclose(fp);
 
@@ -135,7 +177,7 @@ int main(int argc, char **argv)
         sprintf(cfg_file, "%s/htx_eq_100_75_50_25_util.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 300000;
-        make_entry(time_quantum, wof_test);
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
         create_cfg_100_75_50_25_util();
         fclose(fp);
 
@@ -143,7 +185,7 @@ int main(int argc, char **argv)
         sprintf(cfg_file, "%s/htx_eq_cpu_mem_50.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 300000;
-        make_entry(time_quantum, wof_test);
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
         create_cfg_cpu_mem_50();
         fclose(fp);
     }
@@ -155,10 +197,10 @@ int main(int argc, char **argv)
     /************************************************************/
 
     if (smt_threads > 1) {
-		sprintf(cfg_file, "%s/htx_eq_th_trans_switch.cfg", eq_cfg_path);
+        sprintf(cfg_file, "%s/htx_eq_th_trans_switch.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 6000;
-        make_entry(time_quantum, wof_test);
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
         create_cfg_th_trans_switch();
         fclose(fp);
 
@@ -166,7 +208,7 @@ int main(int argc, char **argv)
             sprintf(cfg_file, "%s/htx_eq_th_trans_mix.cfg", eq_cfg_path);
             open_file(cfg_file);
             time_quantum = 6000;
-            make_entry(time_quantum, wof_test);
+            make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
             create_cfg_th_trans_mix();
             fclose(fp);
         }
@@ -178,7 +220,7 @@ int main(int argc, char **argv)
 		sprintf(cfg_file, "%s/htx_ewm_msrp_1p3m_28s_act_52s_idle.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 4000;
-        make_entry(time_quantum, wof_test);
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
         create_cfg_msrp_1p3m_28s_act_52s_idle();
         fclose(fp);
     }
@@ -188,22 +230,22 @@ int main(int argc, char **argv)
         sprintf(cfg_file, "%s/htx_ewm_p8_8fd_char.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 2000;
-        make_entry(time_quantum, wof_test);
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
         create_cfg_p8_8fd_char();
         fclose(fp);
 
         sprintf(cfg_file, "%s/htx_ewm_p8_rdp_switch.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 400;
-        make_entry(time_quantum, wof_test);
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
         create_cfg_p8_rdp_switch();
         fclose(fp);
     }
     if (pvr >= 75) {
-        sprintf(cfg_file, "%s/htx_ewm_p8_swicthing_cmp.cfg", eq_cfg_path);
+		sprintf(cfg_file, "%s/htx_ewm_p8_swicthing_cmp.cfg", eq_cfg_path);
         open_file(cfg_file);
         time_quantum = 800;
-        make_entry(time_quantum, wof_test);
+        make_entry(time_quantum, pattern_len, time_delay, log_duration, offline_cpu, cpu_util); /* Will create common entries in cfg file. */
         create_cfg_p8_swicthing_cmp();
         fclose(fp);
     }
@@ -234,22 +276,49 @@ void get_htx_home_dir(char *path)
     fclose(fp_tmp);
 }
 
-void make_entry(int time_quantum, int wof_test)
+void make_entry(int time_quantum, int pattern_len, int time_delay, int log_duration, int offline_cpu, char *cpu_util)
 {
     fprintf(fp, "# if first letter in the line is \"#\", its taken as a comment\n\n");
     fprintf(fp, "#timeQuantum in milliseconds\n");
     fprintf(fp, "time_quantum = %d\n\n", time_quantum);
     fprintf(fp, "#startup time delay specified in seconds\n");
-    fprintf(fp, "startup_time_delay = 30\n\n");
-    fprintf(fp, "# Log equalizer status for the last <log_duration> (in secs) only\n");
-    fprintf(fp, "log_duration = 60\n\n");
-    if (wof_test == 1) {
-        fprintf(fp, "wof_test = 1\n\n");
+    if (time_delay != 0) {
+		fprintf(fp, "startup_time_delay = %d\n\n", time_delay);
+    } else {
+		fprintf(fp, "startup_time_delay = 30\n\n");
     }
+    fprintf(fp, "# Log equalizer status for the last <log_duration> (in secs) only\n");
+    if (log_duration != 0) {
+		fprintf(fp, "log_duration = %d\n\n", log_duration);
+	} else {
+		fprintf(fp, "log_duration = 60\n\n");
+    }
+    if (pattern_len != 0) {
+		fprintf(fp, "pattern_length = %d\n\n", pattern_len);
+	}
+	if (strlen(cpu_util) >=  1) {
+		fprintf(fp, "cpu_util = %s\n\n", cpu_util);
+	}
+	if (offline_cpu != 0) {
+		fprintf(fp, "offline_cpu = %d\n\n", offline_cpu);
+	}
+
     fprintf(fp, "# In utilizationSequence,upto 10 steps are allowed.\n#\n");
     fprintf(fp, "#\tResource Name\tComma separated device list with various input params\n");
     fprintf(fp, "#\t             \t<dev_name>[<rule_file>:start_delay:runtime:utilzation]\n");
     fprintf(fp, "#\t-------------\t------------------------------------------------------\n");
+}
+
+void create_cfg_stop_state()
+{
+	fprintf (fp, "\tN*P*C*T*\t\tfpu[default.fpu.eq:0:0:UTIL_LEFT%%50]\n");
+}
+
+void create_eq_fabric_io_cfg()
+{
+    fprintf (fp, "\t*\t\t\tfabc[default.inter_chip:0:0:111110000000000]\n");
+    fprintf (fp, "\t*\t\t\tfabn[default.inter_node:0:0:000001111100000]\n");
+    fprintf (fp, "\t*\t\t\tnet_*[sample_rule:0:0:000000000011111]\n");
 }
 
 /**************************************************************/
@@ -856,7 +925,7 @@ void create_cfg_cpu_mem_50()
     } else {
         fprintf (fp, "\tN0P0C0T0\t\tmem[%s:0:0:1010]\n", mem_eq_rulefile);
     }
-    
+
     fprintf (fp, "\tN0P0C0T1\t\tcpu[default.cpu.eq:0:0:0101]\n");
     for (i = 2; i < smt_threads; i++) {
         if (i % 2 == 0) {
@@ -923,4 +992,5 @@ void create_cfg_p8_swicthing_cmp()
 {
     fprintf (fp, "\tN*P*C*T*\t\tfdaxpy[rule.fdaxpy:0:0:UTIL_LEFT%%50]\n");
 }
+
 

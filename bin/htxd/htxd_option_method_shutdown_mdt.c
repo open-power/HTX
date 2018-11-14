@@ -239,7 +239,7 @@ int htxd_option_method_shutdown_mdt(char **result, htxd_command *p_command)
 	HTXD_TRACE(LOG_OFF, "shutdown unload exercisers");
 	htxd_unload_exercisers(p_ecg_info_node_to_remove);
 
-	if (htxd_get_equaliser_offline_cpu_flag() == 1) {
+	if (htxd_get_equaliser_offline_cpu_flag() != 0) {
 		HTXD_TRACE(LOG_OFF, "Unload equaliser setting");
 		htxd_cleanup_equaliser_setting();
 	}
