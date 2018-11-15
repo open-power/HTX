@@ -101,24 +101,28 @@ int update_dump_file (char *msg, char *err_str)
 /**********************************************************************/
 int update_timestamp (struct thread_context *tctx, char *err_str, int flag)
 {
-    int index, rc = 0;
+    int index, i = 0, rc = 0;
     time_t cur_time;
 
-    /* Update timestamp in segment table */
-    index = (seg_info.seg_table + tctx->seg_table_num[0])->seg_table_data[tctx->seg_table_index[0]].time_index;
     cur_time = time(0);
-    rc = pthread_mutex_lock (&((seg_info.seg_table + tctx->seg_table_num[0])->seg_table_data[tctx->seg_table_index[0]].time_mutex));
-    if (rc != 0) {
-        sprintf(err_str, "pthread_mutx_lock failed in update_timestamp for time_mutex. rc: %d\n", rc);
-    }
-    (seg_info.seg_table + tctx->seg_table_num[0])->seg_table_data[tctx->seg_table_index[0]].last_update_time = cur_time;
-    (seg_info.seg_table + tctx->seg_table_num[0])->seg_table_data[tctx->seg_table_index[0]].io_update_time[index] = cur_time;
-    (seg_info.seg_table + tctx->seg_table_num[0])->seg_table_data[tctx->seg_table_index[0]].time_index++;
-    (seg_info.seg_table + tctx->seg_table_num[0])->seg_table_data[tctx->seg_table_index[0]].io_in_progress = flag;
+    while (tctx->seg_table_num[i] != -1) {
+        index = (seg_info.seg_table + tctx->seg_table_num[i])->seg_table_data[tctx->seg_table_index[i]].time_index;
+        rc = pthread_mutex_lock (&((seg_info.seg_table + tctx->seg_table_num[i])->seg_table_data[tctx->seg_table_index[i]].time_mutex));
+        if (rc != 0) {
+            sprintf(err_str, "pthread_mutx_lock failed in update_timestamp for time_mutex. rc: %d\n", rc);
+            return (rc);
+        }
+        /* Update timestamp in segment table */
+        (seg_info.seg_table + tctx->seg_table_num[i])->seg_table_data[tctx->seg_table_index[i]].last_update_time = cur_time;
+        (seg_info.seg_table + tctx->seg_table_num[i])->seg_table_data[tctx->seg_table_index[i]].io_update_time[index] = cur_time;
+        (seg_info.seg_table + tctx->seg_table_num[i])->seg_table_data[tctx->seg_table_index[i]].time_index++;
+        (seg_info.seg_table + tctx->seg_table_num[i])->seg_table_data[tctx->seg_table_index[i]].io_in_progress = flag;
 
-    rc = pthread_mutex_unlock (&((seg_info.seg_table + tctx->seg_table_num[0])->seg_table_data[tctx->seg_table_index[0]].time_mutex));
-    if (rc != 0) {
-        sprintf(err_str, "pthread_mutx_unlock failed in update_timestamp for time_mutex. rc: %d\n", rc);
+        rc = pthread_mutex_unlock (&((seg_info.seg_table + tctx->seg_table_num[i])->seg_table_data[tctx->seg_table_index[i]].time_mutex));
+        if (rc != 0) {
+            sprintf(err_str, "pthread_mutx_unlock failed in update_timestamp for time_mutex. rc: %d\n", rc);
+        }
+        i++;
     }
     return (rc);
 }
@@ -299,7 +303,7 @@ int open_lun(struct htx_data *htx_ds, const char * device, struct thread_context
         chunk = shared_lun_id;
         /* Race condition, thread opening LUN gets delayed then other threads need to wait. */
         while((chunk == NULL_CHUNK_ID)) {
-            if(exit_flag == 'Y') {
+            if(exit_flag == 1) {
                 /** CleanUp...... **/
                 return(1);
             }
@@ -341,7 +345,7 @@ int close_lun(struct htx_data *htx_ds, struct thread_context *tctx) {
     char msg[1024];
 
     if(tctx->force_op) {
-		exit_flag = 'Y';
+		exit_flag = 1;
     }
 
     open_flag = tctx->open_flag;
@@ -400,7 +404,7 @@ int close_lun(struct htx_data *htx_ds, struct thread_context *tctx) {
 	 * This thread opened LUN, it has to stay alive until, we are closing the LUN
    	 */
     if(open_flag == CBLK_OPN_VIRT_LUN || open_flag == CBLK_OPN_PHY_LUN) {
-        while ((exit_flag == 'N' && int_signal_flag == 'N' && signal_flag == 'N') ||
+        while ((exit_flag == 0 && int_signal_flag == 'N' && signal_flag == 'N') ||
        	       ((BWRC_threads_running + non_BWRC_threads_running) != 0)) {
             sleep(2);
         }
@@ -427,7 +431,7 @@ cflsh_write_operation(struct htx_data * htx_ds, struct thread_context *tctx, int
 	/*
 	printf("%s: Writing at blk=%#llx, wbuf=%#llx, nblocks=%#llx \n", tctx->id, tctx->blkno[0],tctx->wbuf, nblocks);
 	*/
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_IN_PROGRESS);
         if (dump_rc != 0) {
@@ -435,7 +439,7 @@ cflsh_write_operation(struct htx_data * htx_ds, struct thread_context *tctx, int
         }
     }
     rc = cblk_write(tctx->fd,  tctx->wbuf,  tctx->blkno[0], nblocks, 0);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_DONE);
         if (dump_rc != 0) {
@@ -471,7 +475,7 @@ cflsh_read_operation(struct htx_data * htx_ds, struct thread_context *tctx, int 
 	/*
 	printf("%s: Reading from  blk=%#llx, wbuf=%#llx, nblocks=%#llx \n", tctx->id, tctx->blkno[0],tctx->rbuf, nblocks);
 	*/
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_IN_PROGRESS);
         if (dump_rc != 0) {
@@ -479,7 +483,7 @@ cflsh_read_operation(struct htx_data * htx_ds, struct thread_context *tctx, int 
         }
     }
     rc = cblk_read(tctx->fd,  tctx->rbuf,  tctx->blkno[0], nblocks, 0);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_DONE);
         if (dump_rc != 0) {
@@ -513,7 +517,7 @@ int cflsh_unmap_operation(struct htx_data *htx_ds, struct thread_context *tctx, 
 
     bzero(tctx->wbuf, tctx->dlen);
     nblocks = (tctx->dlen/dev_info.blksize);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_IN_PROGRESS);
         if (dump_rc != 0) {
@@ -521,7 +525,7 @@ int cflsh_unmap_operation(struct htx_data *htx_ds, struct thread_context *tctx, 
         }
     }
     rc = cblk_unmap(tctx->fd, tctx->wbuf, tctx->blkno[0], nblocks, 0);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_DONE);
         if (dump_rc != 0) {
@@ -755,7 +759,7 @@ int read_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
     /*****  Do read operation for eeh_retries time. ****/
     /***************************************************/
     addr = (offset_t)(tctx->blkno[0]) * (offset_t)(dev_info.blksize);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_IN_PROGRESS);
         if (dump_rc != 0) {
@@ -763,7 +767,7 @@ int read_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
         }
     }
     rc = disk_read_operation(htx_ds, tctx->fd, rbuf, tctx->dlen, addr);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_DONE);
         if (dump_rc != 0) {
@@ -841,7 +845,7 @@ int write_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
     /****************************************************/
 
     addr = (offset_t)(tctx->blkno[0]) * (offset_t)(dev_info.blksize);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_IN_PROGRESS);
         if (dump_rc != 0) {
@@ -849,7 +853,7 @@ int write_disk (struct htx_data *htx_ds, struct thread_context *tctx, int loop)
         }
     }
     rc = disk_write_operation (htx_ds, tctx->fd, tctx->wbuf, tctx->dlen, addr);
-    if (tctx->testcase != PERFORMANCE) {
+    if (tctx->mode != PERFORMANCE) {
         /* Update timestamp in segment table */
         dump_rc = update_timestamp(tctx, err_str, IO_DONE);
         if (dump_rc != 0) {
@@ -1054,7 +1058,7 @@ int do_compare (struct htx_data *htx_ds, struct thread_context *tctx, char *wbuf
                     sprintf(msg, "Data write state miscompare detected.\n"
                                  "expecetd write stamping: %d, Actual write stamping: %d.\n",
                                  *(unsigned short *) (wbuf + i + WRITE_STAMP_POS), *(unsigned short *) (rbuf + i + WRITE_STAMP_POS));
-                    offset = 0;
+                    offset = WRITE_STAMP_POS;
                 } else if (time_buffer < s_tbl.enablement_time) {
                     error_found = 1;
                 }
@@ -2533,5 +2537,4 @@ int run_cmd(struct htx_data *htx_ds, char *cmd_line)
     }
     return 0;
 }
-
 

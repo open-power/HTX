@@ -6,7 +6,7 @@ LDFLAGS +=
 
 OBJ_SUFF=.o
 
-CFLAGS += -O2 -D_GNU_SOURCE -D__HTX_LINUX__ -D_target_ppc -D_FILE_OFFSET_BITS=64
+CFLAGS += -O2 -g -D_GNU_SOURCE -D__HTX_LINUX__ -D_target_ppc -D_FILE_OFFSET_BITS=64
 
 LIBS += -lhtx64 -lpthread -lrt
 

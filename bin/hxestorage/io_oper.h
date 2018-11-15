@@ -43,9 +43,6 @@ typedef loff_t  offset_t;
 #define MMAP_FILE_SIZE (200 * KB)
 extern char fsync_flag;
 
-#define IO_DONE             0
-#define IO_IN_PROGRESS      1
-
 #ifdef __CAPI_FLASH__
 
 
