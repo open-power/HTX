@@ -1,23 +1,3 @@
-/* IBM_PROLOG_BEGIN_TAG */
-/*
- * Copyright 2003,2016 IBM International Business Machines Corp.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *               http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-/* IBM_PROLOG_END_TAG */
-
-
 /* @(#)57	1.8  src/htx/usr/lpp/htx/bin/htxd/htxd_option_method_run_mdt.c, htxd, htxfedora 8/23/15 23:34:35 */
 
 
@@ -416,7 +396,7 @@ int htxd_option_method_run_mdt(char **result, htxd_command *p_command)
     strcpy(option_list_arg, p_command->option_list);
 	int time_driven_value_fetched_from_command_line_args_var = get_command_line_arguement_for_time_driven_run(&time_driven_value_fetched_from_command_line_args, &option_list_arg, &result);
 	if(time_driven_value_fetched_from_command_line_args_var != 0){
-		sprintf(*result,"The command line run args provided  as '%s' is invalid, try the format 'time <value in seconds>' ",option_list_arg);
+		sprintf(*result,"The command line run args provided  as '%s' is invalid, try the format 'test_time=<value in seconds>' ",option_list_arg);
 		HTXD_TRACE(LOG_ON, *result);
 		return  time_driven_value_fetched_from_command_line_args_var;
 	}
@@ -803,9 +783,9 @@ int get_command_line_arguement_for_time_driven_run(int *time_driven_value_fetche
 	char trace_str[256];
 	char *token;
 	if  (strcmp(option_list_arg, "")){
-        token = strtok(option_list_arg, " ");
+        token = strtok(option_list_arg, "=");
 		if( token != NULL){
-			if((strcmp(token,"time"))==0){
+			if((strcmp(token,"test_time"))==0){
 				token = strtok(NULL, " ");
 				if( token != NULL){
 					if  (strcmp(token, "")){
