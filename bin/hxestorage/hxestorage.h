@@ -290,13 +290,13 @@ typedef int (*close_fptr)(struct htx_data *, struct thread_context *);
 typedef int (*oper_fptr)(struct htx_data *, struct thread_context *, int);
 
 extern int read_rules_file_count;
-extern pthread_mutex_t cache_mutex, stats_mutex;
+extern pthread_mutex_t cache_mutex, stats_mutex, mutex_for_time_driven_exec;
 extern int eeh_retries, turn_attention_on;
 extern time_t time_mark;
-extern volatile char exit_flag, signal_flag, int_signal_flag;
+extern volatile char signal_flag, int_signal_flag;
+extern volatile int exit_flag;
 extern int total_BWRC_threads;
 extern struct htx_data global_htx_d;
-
 pthread_attr_t thread_attrs_detached;    /* threads created detached */
 
 int volatile BWRC_threads_running, non_BWRC_threads_running;

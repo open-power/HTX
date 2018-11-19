@@ -37,6 +37,7 @@ pthread_mutex_t log_mutex;
 
 struct device_info dev_info;
 
+extern unsigned long long saved_num_oper;
 int total_BWRC_threads, num_non_BWRC_threads;
 int free_BWRC_th_mem_index = 0;
 int threshold = DEFAULT_THRESHOLD, hang_time = DEFAULT_HANG_TIME;
@@ -44,13 +45,20 @@ int max_thread_cnt = 0; 	/* Highest thread count defined in rule file stanza */
 int sync_cache_flag = 0, randomize_sync_cache = 1;
 int discard_enabled = 0, enable_state_table = NO;
 int eeh_retries = 1, turn_attention_on = 0, read_rules_file_count;
-volatile char exit_flag = 'N', signal_flag = 'N', int_signal_flag = 'N';
+volatile int exit_flag = 0;
+volatile char signal_flag = 'N', int_signal_flag = 'N';
 char misc_run_cmd[256] = "", run_on_misc = 'N';
 struct thread_context *non_BWRC_threads_mem = NULL, *BWRC_threads_mem = NULL;
 struct htx_data data, global_htx_d;
 
 char *mmap_ptr= NULL;
 int mmap_fd, mmap_offset = 0;
+
+/* time_driven_htx variables */
+time_diff_func_struct time_diff_struct;
+int total_no_of_stanzas_present;
+int time_interval_for_run;
+int time_interval_for_stanza_switch_tmp;
 
 #ifdef __CAPI_FLASH__
 oper_fptr oper_list[TESTCASE_TYPES][MAX_OPER_COUNT] = {{cflsh_read_operation, cflsh_write_operation, compare_buffers, cflsh_unmap_operation,NULL, NULL},
@@ -248,6 +256,13 @@ int main(int argc, char *argv[])
     }
     close(mmap_fd);
 
+    if (strcmp(data.run_type, "REG") == 0){
+        /* time_driven_htx read the time_interval_for_run from the shm header */
+        time_interval_for_run = get_exec_time_value_from_shm_hdr(&data);
+        sprintf(msg,"debug_msg6 from FPU, exec_time = %d \n",time_interval_for_run);
+        hxfmsg (&data, 0, INFO, msg);
+    }
+
     /****************************************************************************/
 	/*   For CAPI flash, Device given as input is of format /dev/rhdisk[0-1]*.N */
     /*   on AIX and sd[a-z][a-z]*.N on Linux. Actual device would be            */
@@ -439,6 +454,23 @@ int main(int argc, char *argv[])
         exit(1);
     }
     segment_table_init();
+
+    /* time_driven_htx */
+    /* if we provide a value for time_interval_for_run along with cmdline as arg then only we need to populate these variables */
+    if (time_interval_for_run > 0){
+        /* provide total no. of stanzas present */
+        total_no_of_stanzas_present = num_rules_defined;
+        if (total_BWRC_threads > 0) {
+            if (rule_list[1].oper[0][0] == 'S' || rule_list[1].oper[0][0] == 's') {
+                time_interval_for_run -= (rule_list[1].sleep / 1000000);
+            }
+            time_interval_for_stanza_switch_tmp = time_interval_for_run / (total_no_of_stanzas_present - 2);
+        } else {
+            time_interval_for_stanza_switch_tmp = time_interval_for_run/total_no_of_stanzas_present;
+        }
+        /* provide the reference to exit_flag */
+        time_diff_struct.exit_flag = &exit_flag;
+    }
 
     /* if run_on_misc is set to YES and misc_run_cmd is null. {Populate the default script to run*/
     if (run_on_misc == 'Y' && strcmp(misc_run_cmd, "") == 0) {
@@ -700,10 +732,25 @@ int main(int argc, char *argv[])
             }
             current_ruleptr++;
 
-            if (exit_flag == 'Y' || int_signal_flag == 'Y' || signal_flag == 'Y') {
+            if (exit_flag == 1 || int_signal_flag == 'Y' || signal_flag == 'Y') {
                 break;
             }
             /* DPRINT("%s:%d - Completed stanza: %d\n", __FUNCTION__, __LINE__, rule_no + 1); */
+
+            /* time_driven_htx switches stanza with the given interval by setting time_out_flag as 0 */
+            if (time_interval_for_run > 0) {
+                rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex lock failed in MAIN for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+			    }
+			    (time_diff_struct.time_out_flag) = 0;
+                rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex unlock failed in MAIN for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+			    }
+		    }
         } /* End rule_no < num_rules_defined for loop */
 
         if (signal_flag == 'Y') {
@@ -728,13 +775,13 @@ int main(int argc, char *argv[])
         user_msg(&data, 0, 0, INFO, msg);
         HTX_STATS_UPDATE (FINISH, &data);
         read_rules_file_count++;
-    } while ((strcmp(data.run_type, "REG") == 0) && (exit_flag == 'N') && (int_signal_flag == 'N'));
+    } while ((strcmp(data.run_type, "REG") == 0) && (exit_flag == 0) && (int_signal_flag == 'N'));
 
     /****************************************************/
     /** Set the exit flag and wait for any BWRC thread **/
     /** if  running                                    **/
     /****************************************************/
-    exit_flag = 'Y';
+    exit_flag = 1;
 #ifdef __CAPI_FLASH__
     /* Wait for the thread (i.e. the thread for which open_flag was set) to close the LUN. */
     while (shared_lun_id != NULL_CHUNK_ID) {
@@ -875,7 +922,7 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
 {
 
     char tmp[64], msg[1024];
-    int rc = 0, malloc_count = 0;
+    int rc = 0, malloc_count = 0, time_out_flag;
     int nwrites_left = 0, nreads_left = 0;
     unsigned long long oper, oper_loop, cur_num_oper;
     unsigned int opertn = 1, hot = 1, buf_alignment;
@@ -981,7 +1028,7 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
             }
 
             while (cur_num_oper == -1 || oper_loop < cur_num_oper) {
-                if (exit_flag == 'Y' || int_signal_flag == 'Y' || signal_flag == 'Y') {
+                if (exit_flag == 1 || int_signal_flag == 'Y' || signal_flag == 'Y') {
                 	goto cleanup_dma_buffers;
                 }
 
@@ -1057,8 +1104,14 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                 wait_for_fencepost_catchup(tctx);
             }
 
+            /* time_driven_htx if we provide a value for time_interval_for_run along with
+               cmdline as arg then only implement time driven htx */
+            if ( time_interval_for_run != 0) {
+                cur_num_oper = -1;
+            }
+
             while (cur_num_oper == -1 || oper_loop < cur_num_oper) {
-                if (exit_flag == 'Y' || int_signal_flag == 'Y' || signal_flag == 'Y') {
+                if (exit_flag == 1 || int_signal_flag == 'Y' || signal_flag == 'Y') {
                 	goto cleanup_dma_buffers;
                 }
                 do_boundary_check(htx_ds, tctx, oper_loop);
@@ -1184,6 +1237,53 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                     malloc_count++;
                 }
                 oper_loop++;
+
+                /* time_driven_htx if we provide a value for time_interval_for_run along with
+                   cmdline as arg then only implement time driven htx. Below part of code is
+                   for SAVE/RESTORE stanza. */
+                if (time_interval_for_run > 0) {
+                    rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                    if (rc) {
+                        sprintf(msg, "Mutex lock failed in SEQ validation test for time_driven_exec, rc = %d\n", rc);
+                        user_msg(&data, rc, 0, HARD, msg);
+				    }
+                    time_out_flag = time_diff_struct.time_out_flag;
+                    rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                    if (rc) {
+                        sprintf(msg, "Mutex unlock failed in SEQ validation test for time_driven_exec, rc = %d\n", rc);
+                        user_msg(&data, rc, 0, HARD, msg);
+				    }
+				    if (time_out_flag == 1) {
+                        if (tctx->rule_option & RESTORE_SEEDS_FLAG) {
+                            if (oper_loop >= saved_num_oper) {
+                                break;
+                            }
+                        } else {
+                            if (tctx->rule_option & SAVE_SEEDS_FLAG) {
+                                saved_num_oper = oper_loop;
+                            }
+                            break;
+                        }
+                    } else if ((tctx->rule_option & RESTORE_SEEDS_FLAG) && (oper_loop >= saved_num_oper)) {
+                        while (1) {
+				    		rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                            if (rc) {
+                                sprintf(msg, "Mutex lock failed in SEQ validation test for time_driven_exec, rc = %d\n", rc);
+                                user_msg(&data, rc, 0, HARD, msg);
+				    	    }
+				    	    time_out_flag = time_diff_struct.time_out_flag;
+				    	    rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                            if (rc) {
+                                sprintf(msg, "Mutex lock failed in SEQ validation test for time_driven_exec, rc = %d\n", rc);
+                                user_msg(&data, rc, 0, HARD, msg);
+				    	    }
+				     	    if (time_out_flag == 1) {
+				    			break;
+				    		}
+				    		sleep(1);
+                        }
+                    }
+				}
             } /* End for num_oper loop */
             if (tctx->testcase == CACHE) {
 			    wait_for_cache_threads_completion(htx_ds, tctx);
@@ -1218,8 +1318,14 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
             nreads_left = tctx->num_reads - opertn;
         }
 
+        /* time_driven_htx if we provide a value for time_interval_for_run along with
+           cmdline as arg then only implement time driven htx */
+        if ( time_interval_for_run != 0) {
+            cur_num_oper = -1;
+        }
+
         while (oper_loop < cur_num_oper || cur_num_oper == -1) {
-            if (exit_flag == 'Y' || int_signal_flag == 'Y' || signal_flag == 'Y') {
+            if (exit_flag == 1 || int_signal_flag == 'Y' || signal_flag == 'Y') {
             	goto cleanup_dma_buffers;
             }
 
@@ -1348,6 +1454,53 @@ int execute_validation_test (struct htx_data *htx_ds, struct thread_context *tct
                 malloc_count++;
             }
             oper_loop++;
+
+            /* time_driven_htx if we provide a value for time_interval_for_run along with
+               cmdline as arg then only implement time driven htx. Below part of code is
+               for SAVE/RESTORE stanza. */
+            if (time_interval_for_run > 0) {
+				rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex lock failed in RANDOM validation test for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+		        }
+                time_out_flag = time_diff_struct.time_out_flag;
+                rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex unlock failed in RANDOM validation test for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+			    }
+			    if (time_out_flag == 1) {
+                    if (tctx->rule_option & RESTORE_SEEDS_FLAG) {
+                        if (oper_loop >= saved_num_oper) {
+                            break;
+                        }
+                    } else {
+                        if (tctx->rule_option & SAVE_SEEDS_FLAG) {
+                            saved_num_oper = oper_loop;
+                        }
+                        break;
+                    }
+                } else if ((tctx->rule_option & RESTORE_SEEDS_FLAG) && (oper_loop >= saved_num_oper)) {
+                    while (1) {
+				    	rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                        if (rc) {
+                            sprintf(msg, "Mutex lock failed in RANDOM validation test for time_driven_exec, rc = %d\n", rc);
+                            user_msg(&data, rc, 0, HARD, msg);
+				        }
+				        time_out_flag = time_diff_struct.time_out_flag;
+				        rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                        if (rc) {
+                            sprintf(msg, "Mutex unlock failed in RANDOM valication test for time_driven_exec, rc = %d\n", rc);
+                            user_msg(&data, rc, 0, HARD, msg);
+				        }
+				        if (time_out_flag == 1) {
+				     		break;
+				    	}
+				    	sleep(1);
+				    }
+                }
+            }
         }
     } /* End if condition check for RANDOM access */
 
@@ -1378,9 +1531,9 @@ int execute_performance_test (struct htx_data *htx_ds, struct thread_context *tc
 {
 
     char tmp[64], msg[512];
-    unsigned long long oper_loop=0, oper;
+    unsigned long long oper_loop=0, oper, cur_num_oper;
     int i, malloc_count=0, rc = 0;
-    unsigned int buf_alignment;
+    unsigned int buf_alignment, time_out_flag;
     volatile unsigned short write_stamping = 1;
 
     /*******************************************************/
@@ -1462,9 +1615,16 @@ int execute_performance_test (struct htx_data *htx_ds, struct thread_context *tc
     }
 
     if (tctx->seek_breakup_prcnt == 0) { /* means SEQ access */
+        cur_num_oper = tctx->num_oper[SEQ];
+        /* time_driven_htx if we provide a value for time_interval_for_run along with
+           cmdline as arg then only implement time driven htx */
+        if ( time_interval_for_run != 0) {
+            cur_num_oper = -1;
+        }
+
         init_blkno(htx_ds, tctx);
-        while (oper_loop < tctx->num_oper[SEQ] || tctx->num_oper[SEQ] == -1) {
-            if (exit_flag == 'Y' || int_signal_flag == 'Y' || signal_flag == 'Y') {
+        while (cur_num_oper == -1 || oper_loop < cur_num_oper) {
+            if (exit_flag == 1 || int_signal_flag == 'Y' || signal_flag == 'Y') {
 				goto cleanup_dma_buffers ;
             }
 
@@ -1496,11 +1656,65 @@ int execute_performance_test (struct htx_data *htx_ds, struct thread_context *tc
             set_blkno(htx_ds, tctx);
             malloc_count = (malloc_count + 1) % tctx->num_mallocs;
             oper_loop++;
+
+            /* time_driven_htx if we provide a value for time_interval_for_run along with
+               cmdline as arg then only implement time driven htx. Below part of code is
+               for SAVE/RESTORE stanza. */
+            if (time_interval_for_run > 0) {
+				rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex lock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+		        }
+                time_out_flag = time_diff_struct.time_out_flag;
+                rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex unlock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+			    }
+			    if (time_out_flag == 1) {
+                    if (tctx->rule_option & RESTORE_SEEDS_FLAG) {
+                        if (oper_loop >= saved_num_oper) {
+                            break;
+                        }
+                    } else {
+                        if (tctx->rule_option & SAVE_SEEDS_FLAG) {
+                            saved_num_oper = oper_loop;
+                        }
+                        break;
+                    }
+                } else if ((tctx->rule_option & RESTORE_SEEDS_FLAG) && (oper_loop >= saved_num_oper)) {
+                    while (1) {
+				    	rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                        if (rc) {
+                            sprintf(msg, "Mutex lock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                            user_msg(&data, rc, 0, HARD, msg);
+				        }
+				        time_out_flag = time_diff_struct.time_out_flag;
+				        rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                        if (rc) {
+                            sprintf(msg, "Mutex unlock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                            user_msg(&data, rc, 0, HARD, msg);
+				        }
+				        if (time_out_flag == 1) {
+				     		break;
+				    	}
+				    	sleep(1);
+				    }
+                }
+            }
         }
     } else { /* else for SEQ access check */
         oper_loop = 0;
-        while (oper_loop < tctx->num_oper[RANDOM] || tctx->num_oper[RANDOM] == -1) {
-            if (exit_flag == 'Y' || int_signal_flag == 'Y' || signal_flag == 'Y') {
+        cur_num_oper = tctx->num_oper[RANDOM];
+        /* time_driven_htx if we provide a value for time_interval_for_run along with
+           cmdline as arg then only implement time driven htx */
+        if ( time_interval_for_run != 0) {
+            cur_num_oper = -1;
+        }
+
+        while (cur_num_oper == -1 || oper_loop < cur_num_oper) {
+            if (exit_flag == 1 || int_signal_flag == 'Y' || signal_flag == 'Y') {
 				goto cleanup_dma_buffers ;
             }
             tctx->wbuf = tctx->strt_wptr[malloc_count];
@@ -1529,6 +1743,53 @@ int execute_performance_test (struct htx_data *htx_ds, struct thread_context *tc
 #endif
             malloc_count = (malloc_count + 1) % tctx->num_mallocs;
             oper_loop++;
+
+            /* time_driven_htx if we provide a value for time_interval_for_run along with
+               cmdline as arg then only implement time driven htx. Below part of code is
+               for SAVE/RESTORE stanza. */
+            if (time_interval_for_run > 0) {
+				rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex lock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+		        }
+                time_out_flag = time_diff_struct.time_out_flag;
+                rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                if (rc) {
+                    sprintf(msg, "Mutex unlock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                    user_msg(&data, rc, 0, HARD, msg);
+			    }
+			    if (time_out_flag == 1) {
+                    if (tctx->rule_option & RESTORE_SEEDS_FLAG) {
+                        if (oper_loop >= saved_num_oper) {
+                            break;
+                        }
+                    } else {
+                        if (tctx->rule_option & SAVE_SEEDS_FLAG) {
+                            saved_num_oper = oper_loop;
+                        }
+                        break;
+                    }
+                } else if ((tctx->rule_option & RESTORE_SEEDS_FLAG) && (oper_loop >= saved_num_oper)) {
+                    while (1) {
+				    	rc = pthread_mutex_lock(&mutex_for_time_driven_exec);
+                        if (rc) {
+                            sprintf(msg, "Mutex lock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                            user_msg(&data, rc, 0, HARD, msg);
+				        }
+				        time_out_flag = time_diff_struct.time_out_flag;
+				        rc = pthread_mutex_unlock(&mutex_for_time_driven_exec);
+                        if (rc) {
+                            sprintf(msg, "Mutex unlock failed in SEQ perf test for time_driven_exec, rc = %d\n", rc);
+                            user_msg(&data, rc, 0, HARD, msg);
+				        }
+				        if (time_out_flag == 1) {
+				     		break;
+				    	}
+				    	sleep(1);
+				    }
+                }
+            }
         }
     } /* End if check for SEQ/RQNDOM access */
 cleanup_dma_buffers :
@@ -1683,7 +1944,7 @@ void stats_update_thread()
         time_spent = 0;
         while ((time_spent++) < STATS_UPDATE_INTERVAL) {
             sleep(1);
-            if (exit_flag == 'Y' || exit_flag == 'y') {
+            if (exit_flag == 1) {
                 break;
             }
         }
@@ -1719,7 +1980,7 @@ void stats_update_thread()
         if (htx_d.good_reads > 0 || htx_d.good_writes  > 0 || htx_d.bytes_read > 0 || htx_d.bytes_writ > 0) {
             HTX_STATS_UPDATE(UPDATE, &htx_d);
         }
-        if (exit_flag == 'Y' || exit_flag == 'y') {
+        if (exit_flag == 1) {
             pthread_exit((void *) 0);
         }
     }
@@ -1761,7 +2022,7 @@ int sync_cache_thread(struct htx_data *htx_ds)
     srand48_r (seed, &drand_buf);
 
     while (1) {
-        if (exit_flag == 'Y' || int_signal_flag == 'Y') {
+        if (exit_flag == 1 || int_signal_flag == 'Y') {
             break;
 	    }
 
@@ -2021,7 +2282,7 @@ void update_blkno(struct htx_data *htx_ds, struct ruleinfo *ruleptr, struct thre
     /* DPRINT("num_blks_per_thread: %lld\n", num_blks_per_thread); */
     remaining_blks = (ruleptr->max_blkno.value[0] - ruleptr->min_blkno.value[0] + 1) % ruleptr->num_threads;
     for (th_num = 0; th_num < ruleptr->num_threads; th_num++, current_tctx++) {
-        current_tctx->min_blkno = ruleptr->min_blkno.value[0] + th_num * num_blks_per_thread;
+        current_tctx->min_blkno =  ruleptr->min_blkno.value[0] + th_num * num_blks_per_thread;
         current_tctx->max_blkno = current_tctx->min_blkno + num_blks_per_thread - 1;
         if (th_num == (ruleptr->num_threads - 1) && remaining_blks != 0) {
             current_tctx->max_blkno += remaining_blks;
@@ -2968,7 +3229,7 @@ void int_sig_function(int sig, int code, struct sigcontext *scp)
 /***************************************************************************/
 void SIGTERM_hdl(int sig, int code, struct sigcontext *scp)
 {
-    exit_flag = 'Y';
+    exit_flag = 1;
 }
 
 /************************************************/

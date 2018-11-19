@@ -27,7 +27,7 @@
 
 static struct random_seed_t saved_seed, saved_data_seed;
 static unsigned long long volatile saved_maxlba, saved_minlba;
-unsigned long long saved_data_len;
+unsigned long long saved_data_len, saved_num_oper;
 extern pthread_mutex_t fencepost_mutex;
 
 static int volatile seg_table_entries[1024] = {0};
@@ -236,7 +236,7 @@ void random_blkno (struct htx_data *htx_ds, struct thread_context *tctx, unsigne
 				(lba_fencepost[fencepost_index].max_lba - lba_fencepost[fencepost_index].min_lba - tctx->lba_align + 1 > num_blks)) { /* BWRC thread has completed num_blks */
 				break;
 			}
-			if (exit_flag == 'Y' || int_signal_flag == 'Y') {
+			if (exit_flag == 1 || int_signal_flag == 'Y') {
                 if (lba_fencepost[fencepost_index].max_lba - lba_fencepost[fencepost_index].min_lba - tctx->lba_align + 1  <= num_blks) {
                     num_blks = lba_fencepost[fencepost_index].max_lba - lba_fencepost[fencepost_index].min_lba - tctx->lba_align;
                     tctx->num_blks = num_blks;
@@ -561,7 +561,7 @@ void wait_for_fencepost_catchup (struct thread_context *tctx)
 	/* point where current thread can do initial operation,         */
 	/* otherwise, hold the thread from running                      */
 	/****************************************************************/
-	while(exit_flag == 'N' && int_signal_flag == 'N') {
+	while(exit_flag == 0 && int_signal_flag == 'N') {
 		if ((tctx->first_blk >= lba_fencepost[tctx->BWRC_zone_index].min_lba) && ((tctx->first_blk + tctx->num_blks - 1) <= lba_fencepost[tctx->BWRC_zone_index].max_lba)) {
 			break;
 		}
@@ -1854,9 +1854,12 @@ void hang_monitor (struct htx_data *htx_ds)
 
         pid = getpid(); /* Get our process ID */
         while (1) {
-        if (exit_flag == 'Y' || int_signal_flag == 'Y') {
+        if (exit_flag == 1 || int_signal_flag == 'Y') {
             break;
         }
+
+        oldest_time = current_time = time(0);
+        hung_switch = 0;
 		for(i = 0; i < seg_info.num_of_seg_tables; i++) {
         	/* Acquire the segment table mutex so table won't change on us... */
                 if ((err_level = pthread_mutex_lock(&(seg_info.seg_table + i)->segment_mutex))) {
@@ -1876,12 +1879,19 @@ void hang_monitor (struct htx_data *htx_ds)
                 /** only want to sleep for 5-1=4 seconds so that we check that thread as  */
                 /** close to the 5 second mark as possible.                               */
                 /**************************************************************************/
-                oldest_time = current_time = time(0);
-                hung_switch = 0;
 
-                for (j = 0; j < seg_table_entries[i]; j++){
+                for (j = 0; j < seg_table_entries[i]; j++) {
                         if ((seg_info.seg_table + i)->seg_table_data[j].in_use & 0x1) {
-                                /****************************************************************************/
+ 							/* take the lock and check if IO was on progress, then only look for hung IO.
+							   Otherwise, go to next index. */
+							err_level = pthread_mutex_lock (&((seg_info.seg_table + i)->seg_table_data[j].time_mutex));
+							if (err_level != 0) {
+								STRERROR_R(err_level, err_str, ERR_STR_SZ);
+								sprintf(msg, "Mutex lock for time_mutex failed in hang_monitor(), rc: %d(%s)\n", err_level, err_str);
+								user_msg(htx_ds, err_level, 0, HARD, msg);
+							}
+							if ((seg_info.seg_table + i)->seg_table_data[j].io_in_progress & IO_IN_PROGRESS) {
+                               /****************************************************************************/
                                 /** Check if I/O time exceeds a multiple of the hang_time var.  The object  */
                                 /** is to only issue a new alert when a multiple of hang_time has been      */
                                 /** exceeded.  Thus if hang_time is 5 seconds, we'll issue an alert message */
@@ -1889,25 +1899,52 @@ void hang_monitor (struct htx_data *htx_ds)
                                 /** var for that I/O, which initially is 0 when the I/O is started and is   */
                                 /** incremented each time a hang is detected.                               */
                                 /****************************************************************************/
-                                if ((current_time - (seg_info.seg_table + i)->seg_table_data[j].last_update_time) >= (hang_time * ((seg_info.seg_table + i)->seg_table_data[j].hang_count + 1))) {
+   							    if ((current_time - (seg_info.seg_table + i)->seg_table_data[j].last_update_time) >= (hang_time * ((seg_info.seg_table + i)->seg_table_data[j].hang_count + 1))) {
                                         /* Found a hung I/O!  Incr it's hang_count and check the threshold. */
-                                        if (++(seg_info.seg_table + i)->seg_table_data[j].hang_count > threshold) {
+                                        (seg_info.seg_table + i)->seg_table_data[j].hang_count = (current_time - (seg_info.seg_table + i)->seg_table_data[j].last_update_time) / hang_time;
+                                        if ((seg_info.seg_table + i)->seg_table_data[j].hang_count > threshold) {
                                                 threshold_exceeded = 1;
                                         }
-					hung_switch++;
+										hung_switch++;
+										break;
                                 }
-                                /**********************************************************************/
-                                /** Record the oldest I/O in this period.  Adjust I/Os that have been */
-                                /** already marked hung by their hang count for purposes of figuring  */
-                                /** the oldest I/O.  This will be used in calculating the length of   */
-                                /** time to sleep between table scans.                                */
-                                /**********************************************************************/
-                                if ((temp_time = (seg_info.seg_table + i)->seg_table_data[j].last_update_time + ((seg_info.seg_table + i)->seg_table_data[j].hang_count * hang_time)) < oldest_time) {
-                                	oldest_time = temp_time;
-                                }
+						    }
+                            /**********************************************************************/
+                            /** Record the oldest I/O in this period.  Adjust I/Os that have been */
+                            /** already marked hung by their hang count for purposes of figuring  */
+                            /** the oldest I/O.  This will be used in calculating the length of   */
+                            /** time to sleep between table scans.                                */
+                            /**********************************************************************/
+                            if ((temp_time = (seg_info.seg_table + i)->seg_table_data[j].last_update_time + ((seg_info.seg_table + i)->seg_table_data[j].hang_count * hang_time)) < oldest_time) {
+                             	oldest_time = temp_time;
+                            }
+							err_level = pthread_mutex_unlock (&((seg_info.seg_table + i)->seg_table_data[j].time_mutex));
+							if (err_level != 0) {
+								STRERROR_R(err_level, err_str, ERR_STR_SZ);
+								sprintf(msg, "Mutex unlock for time_mutex failed in hang_monitor(), rc: %d(%s)\n", err_level, err_str);
+								user_msg(htx_ds, err_level, 0, HARD, msg);
+							}
                         }
-                }
-                if (hung_switch) {
+					}
+
+					/* Release the segment table mutex */
+		            if ((err_level = pthread_mutex_unlock(&(seg_info.seg_table + i)->segment_mutex))) {
+                    	STRERROR_R(err_level, err_str, ERR_STR_SZ);
+                       	sprintf(msg, "Mutex unlock failed in hang_monitor(), Segment table-%d, rc %d (%s), Hung I/O monitor for disk exerciser terminating.",
+                                          i, err_level, err_str);
+                       	user_msg (htx_ds, err_level, 0, HARD, msg);
+                       	return;
+                	}
+	   				if (hung_switch) {
+                        if ((temp_time = (seg_info.seg_table + i)->seg_table_data[j].last_update_time + ((seg_info.seg_table + i)->seg_table_data[j].hang_count * hang_time)) < oldest_time) {
+                         	oldest_time = temp_time;
+                        }
+						break;
+					}
+
+				}
+
+				if (hung_switch) {
                         sprintf(msg1, "Hung I/O alert! Segment table-%d,  Detected %d I/O(s) hung.\nCurrent time: " "%d; hang criteria: %d secs, Hard hang threshold: %d\n"
                                                 "Process ID: 0x%x\n" "       1st lba       Blocks       Kernel    Hang   Duration\n"
                                                 "        (Hex)        (Hex)        Thread    Cnt    (Secs)\n",
@@ -1919,18 +1956,11 @@ void hang_monitor (struct htx_data *htx_ds)
                         } else {
                                 err_level = SOFT;
                         }
-                        for (j = 0; j < seg_table_entries[i]; j++ ) {
-                                if ((seg_info.seg_table + i)->seg_table_data[j].in_use & 0x1) {
-                                        sprintf(msg, "%#16llx    %6llx     %8llx      %d    %d \n", (seg_info.seg_table + i)->seg_table_data[j].flba, (seg_info.seg_table + i)->seg_table_data[j].llba - (seg_info.seg_table + i)->seg_table_data[j].flba + 1,
-                                                                (unsigned long long)(seg_info.seg_table + i)->seg_table_data[j].tid, (seg_info.seg_table + i)->seg_table_data[j].hang_count, (unsigned int) (current_time - (seg_info.seg_table + i)->seg_table_data[j].last_update_time));
-                                        if (strlen(msg1) + strlen(msg) < MSG1_LIMIT ) {
-                                                strcat(msg1, msg);
-                                        } else {
-                                                strcat(msg1, "(size limit reached)");
-                                                break;
-                                        }
-                                }
-                        }
+                        sprintf(msg, "%#16llx    %6llx     %8llx      %d    %d \n", (seg_info.seg_table + i)->seg_table_data[j].flba, (seg_info.seg_table + i)->seg_table_data[j].llba - (seg_info.seg_table + i)->seg_table_data[j].flba + 1,
+                                        (unsigned long long)(seg_info.seg_table + i)->seg_table_data[j].tid, (seg_info.seg_table + i)->seg_table_data[j].hang_count, (unsigned int) (current_time - (seg_info.seg_table + i)->seg_table_data[j].last_update_time));
+
+                        strcat(msg1, msg);
+
                         /* Dump the procstack in a file then in a buffer and pass the buffer address to KDB */
                         sprintf (file_name, "%s/procstack_dump_%d", htx_ds->htx_exer_log_dir, count);
                     #ifdef __HTX_LINUX__
@@ -1974,29 +2004,29 @@ void hang_monitor (struct htx_data *htx_ds)
 
                         if (dev_info.crash_on_hang) {
                         #ifdef __HTX_LINUX__
-                                do_trap_htx64(0xBEEFDEAD, (unsigned long)(seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, (unsigned long)msg1, (unsigned long)htx_ds, 0, 0);
+                                do_trap_htx64(0xBEEFDEAD, (unsigned long)(seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, (unsigned long)msg1,
+                                (unsigned long)htx_ds, (unsigned long)dump_ptr, 0);
                         #else
-                                trap(0xBEEFDEAD, (seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, msg1, htx_ds);
+                                trap(0xBEEFDEAD, (seg_info.seg_table + i)->seg_table_data, seg_table_entries[i], pid, msg1, htx_ds, dump_ptr);
                         #endif
                         }
+
                         user_msg (htx_ds, -1, 0, err_level, msg1);
+
+						err_level = pthread_mutex_unlock (&((seg_info.seg_table + i)->seg_table_data[j].time_mutex));
+						if (err_level != 0) {
+							STRERROR_R(err_level, err_str, ERR_STR_SZ);
+							sprintf(msg, "Mutex unlock for time_mutex failed in hang_monitor(), rc: %d(%s)\n", err_level, err_str);
+							user_msg(htx_ds, err_level, 0, HARD, msg);
+						}
                         if (dump_ptr != NULL) {
                              free (dump_ptr);
                              dump_ptr = NULL;
                         }
                 }
-		 /* Release the segment table mutex. */
-                if ((err_level = pthread_mutex_unlock(&(seg_info.seg_table + i)->segment_mutex))) {
-                        STRERROR_R(err_level, err_str, ERR_STR_SZ);
-                        sprintf(msg, "Mutex unlock failed in hang_monitor(), Segment table-%d, rc %d (%s), Hung I/O monitor for disk exerciser terminating.",
-                                                i, err_level, err_str);
-                        user_msg (htx_ds, err_level, 0, HARD, msg);
-                        return;
-                }
                 /* Sleep until time to check again... */
                 temp_time = hang_time - (current_time - oldest_time);
                 sleep(temp_time <= 0 ? hang_time : temp_time);
-		}
         }
 }
 
@@ -2298,5 +2328,4 @@ int wait_for_aio_completion(struct htx_data *htx_ds, struct thread_context *tctx
     return index;
 }
 #endif
-
 

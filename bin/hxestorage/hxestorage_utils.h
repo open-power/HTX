@@ -50,6 +50,9 @@
 #define BUFSIG              "MDHF"
 #define OVERHEAD            (HEADER_SIZE/2)
 
+#define IO_DONE             0
+#define IO_IN_PROGRESS      1
+
 #define UPDATE_LBA(buf, lba) \
  	{ *(unsigned long long *)buf = lba; \
  	}
