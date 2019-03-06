@@ -21,7 +21,7 @@
 extern volatile int htxd_ecg_shutdown_flag;
 extern int init_syscfg(void);
 extern int htxd_start_stop_watch_monitor(htxd_thread *);
-
+int get_command_line_arguement_for_time_driven_run(int *, char *, char **);
 
 /* start equaliser process */
 int htxd_start_equaliser(void)
