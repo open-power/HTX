@@ -24,6 +24,7 @@
 /*************************************************************/
 
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <libgen.h>
@@ -78,7 +79,7 @@ struct dev_exer_map map_array[] = {{"mem", "hxemem64", "64bit", "memory"},
                               };
 int line_num = 0;
 int pvr, num_devs = 0, net_configured = 0;
-char scripts_dir[128], mdt_dir[128], mdt_file_name[256];
+char scripts_dir[128], mdt_dir[128], htxpath[64], mdt_file_name[256];
 static int num_mem_instances = 0;
 
 void create_default_stanza(FILE *fp, char *eq_file);
@@ -129,6 +130,12 @@ int main(int argc, char **argv)
         printf("Could not collect system config detail. Exiting...\n");
         exit(1);
     }
+
+    ptr = getenv("HTX_HOME_DIR");
+    if (ptr != NULL) {
+         strcpy(htxpath, ptr);
+    }
+
     ptr = getenv("HTXSCRIPTS");
     if (ptr != NULL) {
          strcpy(scripts_dir, ptr);
@@ -233,7 +240,7 @@ int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
     int i, j, num_entries, len;
     int node, chip, core, cpu;
     char dev_name_str[16], rule_file_name[64], tmp_str[64], cmd_str[256];
-    char filter_str[2][128], filename[64], *ptr;
+    char filter_str[2][128], filename[64], *ptr, bpt_file[128];
     FILE *fp1, *tmp_ptr;
     struct dev_exer_map cur_dev_map;
     struct dev_info cur_dev_input;
@@ -332,8 +339,11 @@ int create_dev_stanza (FILE *fp, char *resource_str, struct dev_info *dev_input)
                         }
                         pclose(tmp_ptr);
                     }
-                } else if (strncasecmp (dev_input[i].dev_name, "net", 3) == 0) {
-                    system ("build_net help y y");
+                } else if ((net_configured == 0) && (strncasecmp (dev_input[i].dev_name, "net", 3) == 0)) {
+                    sprintf (bpt_file, "%s/bpt", htxpath);
+                    if (access (bpt_file, F_OK) == -1) {
+                        system ("build_net help y y");
+                    }
                     net_configured = 1;
                 } else if (strncasecmp (dev_input[i].dev_name, "fab", 3)  == 0) {
                     strcpy(dev_name_str, dev_input[i].dev_name);
@@ -521,5 +531,4 @@ int get_line(char line[], int lim, FILE *fp)
                 return rc;
         }
 }
-
 
