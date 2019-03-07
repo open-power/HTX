@@ -87,6 +87,8 @@ extern void         htxd_set_equaliser_pattern_length(int value);
 extern int			htxd_is_hang_monitor_initialized(void);
 extern void			htxd_remove_hang_monitor(void);
 extern int			htxd_is_hotplug_monitor_initialized(void);
+extern int 			htxd_is_time_driven_run_monitor_initialized(void);
+extern void			htxd_remove_time_driven_run_monitor(void);
 extern void			htxd_remove_hotplug_monitor(void);
 extern int			htxd_get_system_header_info_error_count(void);
 extern void			htxd_set_system_header_info_shm_id(int);

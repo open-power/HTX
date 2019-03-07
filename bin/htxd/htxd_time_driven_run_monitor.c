@@ -39,6 +39,7 @@
 #include "htxd_trace.h"
 #include "htxd_util.h"
 #include "htxd_instance.h"
+#include "htxd_signal.h"
 
 #define LOG_ENTRY_COUNT 6  /* 5 + 1 */
 

@@ -54,6 +54,7 @@ extern int htxd_shutdown_all_mdt(void);
 extern int htxd_stop_hotplug_monitor(htxd_thread **);
 extern int htxd_launch_autostart(void);
 extern int detach_syscfg(void);
+extern int htxd_stop_time_driven_run_monitor(htxd_thread **time_driven_run_monitor_thread);
 
 int htxd_verify_command_buffer_format(char *command_buffer)
 {

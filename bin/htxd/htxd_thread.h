@@ -40,6 +40,7 @@ extern int htxd_thread_cancel(htxd_thread *);
 extern int htxd_enable_thread_cancel_state_type(void);
 extern int htxd_thread_join(htxd_thread *);
 extern int htxd_start_hang_monitor(htxd_thread **);
+extern int htxd_start_time_driven_run_monitor(htxd_thread **);
 extern int htxd_stop_hang_monitor(htxd_thread **);
 extern int htxd_thread_unblock_all_signals(void);
 extern void htxd_trace_log_lock_init(void);
