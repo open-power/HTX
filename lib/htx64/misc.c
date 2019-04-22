@@ -120,6 +120,11 @@ int get_cpu_version(void)
 	if ((TempPvr == 0x4e || TempPvr == 0x4f) && (!strncmp(str,"POWER8",6))) {
  		pvr = 0x004b0000; // P9 running in P8 mode
 	}
+	
+	if ((TempPvr == 0x4e || TempPvr == 0x4f) && (!strncmp(str,"POWER7",6))) {
+		pvr =  0x003f0000; // P9 running in P7 mode
+	}
+
 	return pvr;
 }
 
