@@ -7,7 +7,7 @@ case "$1" in
 		mkdir -p /var/log
 		echo "/usr/lpp/htx" > /var/log/htx_install_path	
 		[[ -f /usr/lpp/htx/etc/scripts/htx.d ]] && cp -f /usr/lpp/htx/etc/scripts/htx.d /etc/init.d
-		ln -sf /usr/bin/perl /bin/perl
+		[[ -f /bin/perl ]] || ln -sf /usr/bin/perl /bin/perl
 		ln -sf /usr/bin/awk /bin/awk
 		ln -sf /usr/lpp/htx/bin/htxcmdline /bin/htxcmdline
 		ln -sf /usr/lpp/htx/bin/htxcmdline /bin/hcl
