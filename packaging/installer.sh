@@ -140,7 +140,7 @@ echo -ne "\nFinishing Installation..." | tee -a ${INSTALL_LOG_FILE}
 [[ -f $INSTALL_PATH/htx/etc/scripts/htx.d ]] && cp -f $INSTALL_PATH/htx/etc/scripts/htx.d /etc/init.d
 echo -e "[OK]" | tee -a ${INSTALL_LOG_FILE}
 echo -ne "\nCopying HTX Binaries..." | tee -a ${INSTALL_LOG_FILE}
-[[ -f /bin/perl ]] && ln -sf /usr/bin/perl /bin/perl >> ${INSTALL_LOG_FILE} 2>&1
+[[ -f /bin/perl ]] && ln -s /usr/bin/perl /bin/perl >> ${INSTALL_LOG_FILE} 2>&1
 if [ "$OS" != "RedHat" ];
 then 
 	ln -sf /usr/bin/awk /bin/awk >> ${INSTALL_LOG_FILE} 2>&1
