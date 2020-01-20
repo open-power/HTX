@@ -1,8 +1,20 @@
 include ../htx.mk
 
 SUBDIRS= hxssup hxsmsg hxstats htxd hxesamp show_syscfg  hxecentaur \
-	hxestorage hxecapi hxecapi_afu_dir hxecom hxediag hxedapl hxemem64 hxetape hxesctu hxefpu64 hxecd  \
+	hxestorage hxecapi hxecapi_afu_dir hxecom hxediag hxemem64 hxetape hxesctu hxefpu64 hxecd  \
 	hxecache hxerng hxeasy create_eq_cfg create_eq_mdt hxeocapi
+
+ifneq ("$(wildcard /*/libdat2.*)","")
+	SUBDIRS+=hxedapl
+else 
+ifneq ("$(wildcard /*/*/libdat2.*)","")
+	SUBDIRS+=hxedapl
+else 
+ifneq ("$(wildcard /*/*/*/libdat2.*)","")
+	SUBDIRS+=hxedapl
+endif
+endif
+endif
 
 ifeq ($(HTX_RELEASE), $(filter ${HTX_RELEASE},"htxrhel72le" "htxrhel7" "htxubuntu"))
 	SUBDIRS+=hxecorsa
